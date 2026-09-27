@@ -1148,6 +1148,9 @@ export const infraApi = {
       profiles: string[];
       profilesToRemove: string[];
       estimatedTime: number;
+      // Present only when Docker started or stopped built-in services; `errors` lists what failed.
+      orchestration?: { errors?: string[] };
+      removal?: { errors?: string[] };
     }>('/infra/restart', {
       method: 'POST',
       body: JSON.stringify({ profiles: profiles || [], profilesToRemove: profilesToRemove || [] }),

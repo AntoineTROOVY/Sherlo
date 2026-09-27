@@ -876,13 +876,29 @@ export function Infrastructure() {
           {restartFlow.restartStatus === 'success' && (
             <>
               <CheckCircle size={48} className="restart-status-icon" />
-              <p className="restart-success-msg">{t('infrastructure.restart.successMsg')}</p>
+              {restartFlow.restartWarnings.length === 0 ? (
+                <p className="restart-success-msg">{t('infrastructure.restart.successMsg')}</p>
+              ) : (
+                <>
+                  <div className="migration-warning" role="alert">
+                    <AlertTriangle size={18} />
+                    <div>
+                      {restartFlow.restartWarnings.map((warning, index) => (
+                        <p key={index}>{warning}</p>
+                      ))}
+                    </div>
+                  </div>
+                  <button className="btn-primary" onClick={() => window.location.reload()}>
+                    {t('infrastructure.restart.reload')}
+                  </button>
+                </>
+              )}
             </>
           )}
 
           {restartFlow.restartStatus === 'error' && (
             <>
-              <p className="restart-error-msg">{t('infrastructure.restart.errorMsg')}</p>
+              <p className="restart-error-msg">{restartFlow.restartError ?? t('infrastructure.restart.errorMsg')}</p>
               <button className="btn-primary" onClick={() => window.location.reload()}>
                 {t('infrastructure.restart.reload')}
               </button>
