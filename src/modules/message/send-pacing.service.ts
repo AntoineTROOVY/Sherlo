@@ -113,9 +113,8 @@ const MAX_REFUSAL_KEYS = 1000;
  * unlike a failed single send whose PENDING row is kept as FAILED. A session using
  * them can exceed its stated allowance. A Baileys product send (catalog.service.ts `sendProduct`)
  * writes no row itself but is counted through the OUTGOING row its own-send echo persists
- * (MessageProjector.handleOwnSendEcho) shortly after the send returns; sendCatalog answers 501 on
- * both engines. Deliberate, and documented in .env.example and docs/06 so
- * the number an operator reads is the number they get.
+ * (MessageProjector.handleOwnSendEcho) shortly after the send returns. Deliberate, and documented in
+ * .env.example and docs/06 so the number an operator reads is the number they get.
  * The breaker, by contrast, is in memory on purpose: it describes live conditions, and a restart
  * clearing it is the correct behaviour.
  */
