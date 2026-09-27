@@ -777,7 +777,7 @@ quoting the message it printed.
 > A patch that never applied is not fatal on its own: only the capability it repairs is affected and
 > the rest of the gateway runs normally, which is why this is easy to misread as a bug in one route.
 
-### Issue: Reads on a large account fail with `Runtime.callFunctionOn timed out`
+### Issue: Reads on a large account fail with `did not answer ... in time` or `Runtime.callFunctionOn timed out`
 
 > **Engine:** This issue applies to the `whatsapp-web.js` engine only (Chromium/Puppeteer-based). It does not affect `ENGINE_TYPE=baileys`.
 
@@ -793,7 +793,8 @@ quoting the message it printed.
 **Cause:** Puppeteer gives every browser command a time budget, 180 000 ms by default, and one
 `getChats()` over a very large store can run past it. The renderer is still working; only the
 command is dropped. That is also why this is **not** treated as a dead page — a transport death
-answers `503` and takes the session down with it, and this is just a slow command on a live page.
+takes the session down with it, while this is just a slow command on a live page. The chat and contact
+lists answer it with a `503` as well, but the session stays `ready`.
 
 **Solution:** raise the budget for that deployment.
 

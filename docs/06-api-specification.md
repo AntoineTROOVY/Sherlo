@@ -2354,7 +2354,7 @@ The `Contact` object returned by the list and get-by-id routes has this shape:
 
 List all contacts for a session, returned as an in-memory paginated window.
 
-On Baileys the list is the saved address book: contacts with a name saved on the phone (`isMyContact: true`), rebuilt from WhatsApp's app-state contact collection on connect, including after a process restart. A peer known only by its pushname is not listed but still resolves through the get-by-id route below with `isMyContact: false`. whatsapp-web.js lists what the WhatsApp Web page holds, which also includes unsaved chat partners (`isMyContact: false`). An entry the page cannot read, or one without a readable id (for example a device-scoped id), is left out of the list; the gateway logs a warning with the count, and the response does not signal it.
+On Baileys the list is the saved address book: contacts with a name saved on the phone (`isMyContact: true`), rebuilt from WhatsApp's app-state contact collection on connect, including after a process restart. A peer known only by its pushname is not listed but still resolves through the get-by-id route below with `isMyContact: false`. whatsapp-web.js lists what the WhatsApp Web page holds, which also includes unsaved chat partners (`isMyContact: false`). An entry the page cannot read (for example a device-scoped id), or one without a readable id, is left out of the list; the gateway logs a warning with the count, and the response does not signal it.
 
 **Auth:** API key
 
@@ -2387,7 +2387,7 @@ On Baileys the list is the saved address book: contacts with a name saved on the
 ]
 ```
 
-**Errors:** `400` session is not started · `401` missing/invalid API key, or key not scoped to this session · `409` conflict or engine not ready (retryable) · `500` engine error, including whatsapp-web.js when some entries could not be read and no unblocked contact was readable (a page-wide failure, not an empty address book) · `503` the WhatsApp page died while reading contacts or the command timed out (retry shortly)
+**Errors:** `400` session is not started · `401` missing/invalid API key, or key not scoped to this session · `409` conflict or engine not ready (retryable) · `500` engine error, including whatsapp-web.js when entries could not be read and no unblocked contact was, or when no entry had a readable id (a page-wide failure, not an empty address book) · `503` the WhatsApp page died while reading contacts or the command timed out (retry shortly)
 
 #### GET /api/sessions/:sessionId/contacts/blocked
 
