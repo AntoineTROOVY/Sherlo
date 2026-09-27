@@ -11116,9 +11116,8 @@
         "type": "object",
         "properties": {
           "conditions": {
-            "minItems": 1,
             "maxItems": 20,
-            "description": "Every condition must match (AND) for the webhook to fire.",
+            "description": "Every condition must match (AND) for the webhook to fire. An empty list means no filter: the webhook fires on every subscribed event.",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/WebhookFilterConditionDto"

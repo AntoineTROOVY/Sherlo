@@ -4692,7 +4692,7 @@ Update a webhook. Partial — only fields present in the body are changed.
 | events     | string[]               | no       | `@IsOptional`, `@IsArray`, `@ArrayMinSize(1)`, `@IsIn([...WEBHOOK_EVENTS, '*'], { each: true })`          | Same allowed set as create (incl. `*`).                                       |
 | secret     | string                 | no       | `@IsOptional`, `@IsString`, `@MinLength(16)` (skipped for `""`, which clears it), `@MaxLength(255)`       | **Write-only.** An empty string is normalized to `null`, which disables HMAC. |
 | headers    | Record<string,string>  | no       | `@IsOptional`, `@IsHeaderMap()` (same constraints as create)                                              | **Write-only.** Replaces existing headers wholesale when provided.            |
-| filters    | WebhookFilters \| null | no       | `@IsOptional`, `@IsValidWebhookFilters()`                                                                 | Set to `null` to clear filters.                                               |
+| filters    | WebhookFilters \| null | no       | `@IsOptional`, `@IsValidWebhookFilters()`                                                                 | Set to `null` or `{ conditions: [] }` to clear filters.                       |
 | active     | boolean                | no       | `@IsOptional`, `@IsBoolean`                                                                               | Enable/disable the webhook. (Present only on update, not create.)             |
 | retryCount | number (int)           | no       | `@IsOptional`, `@IsInt`, `@Min(0)`, `@Max(5)`                                                             | Total delivery attempts per event, including the first.                       |
 
