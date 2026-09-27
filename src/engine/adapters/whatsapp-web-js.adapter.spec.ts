@@ -1036,10 +1036,13 @@ describe('WhatsAppWebJsAdapter.forwardMessage (returns the real sent id, not a s
     const forward = jest.fn().mockResolvedValue(undefined);
     const sourceChat = { fetchMessages: jest.fn().mockResolvedValue([{ id: { _serialized: 'SRC1' }, forward }]) };
     const destChat = {
-      fetchMessages: jest.fn().mockResolvedValue([
-        { id: { _serialized: 'OLD' }, timestamp: 100 },
-        { id: { _serialized: 'REAL_FWD' }, timestamp: 200 }, // most recent fromMe = the forwarded copy
-      ]),
+      fetchMessages: jest
+        .fn()
+        .mockResolvedValueOnce([{ id: { _serialized: 'OLD' }, timestamp: 100 }]) // read before the forward
+        .mockResolvedValueOnce([
+          { id: { _serialized: 'OLD' }, timestamp: 100 },
+          { id: { _serialized: 'REAL_FWD' }, timestamp: 200 }, // the one new fromMe = the forwarded copy
+        ]),
     };
     const client = {
       getChatById: jest.fn((id: string) => Promise.resolve(id === 'dest@c.us' ? destChat : sourceChat)),
@@ -1075,6 +1078,58 @@ describe('WhatsAppWebJsAdapter.forwardMessage (returns the real sent id, not a s
       getChatById: jest.fn((id: string) =>
         id === 'dest@c.us' ? Promise.reject(new Error('puppeteer detached')) : Promise.resolve(sourceChat),
       ),
+    };
+
+    const result = await readyAdapter(client).forwardMessage('src@c.us', 'dest@c.us', 'SRC1');
+
+    expect(forward).toHaveBeenCalledWith('dest@c.us');
+    expect(result.id).toBe('');
+  });
+
+  // Destination reads: the first call is the snapshot taken before the forward, the second the read
+  // after it. Timestamps are whole seconds, so a send just before the forward can share one.
+  const forwardWith = async (beforeRows: unknown[], afterRows: unknown[]): Promise<string> => {
+    const forward = jest.fn().mockResolvedValue(undefined);
+    const sourceChat = { fetchMessages: jest.fn().mockResolvedValue([{ id: { _serialized: 'SRC1' }, forward }]) };
+    const destChat = { fetchMessages: jest.fn().mockResolvedValueOnce(beforeRows).mockResolvedValueOnce(afterRows) };
+    const client = {
+      getChatById: jest.fn((id: string) => Promise.resolve(id === 'dest@c.us' ? destChat : sourceChat)),
+    };
+    const result = await readyAdapter(client).forwardMessage('src@c.us', 'dest@c.us', 'SRC1');
+    expect(forward).toHaveBeenCalledWith('dest@c.us');
+    return result.id;
+  };
+  const row = (id: string, isForwarded = false) => ({ id: { _serialized: id }, timestamp: 1000, isForwarded });
+
+  it('returns the new copy, not an earlier send that landed in the same second', async () => {
+    // Order matters: the earlier send comes last, where a latest-timestamp pick would keep it.
+    expect(await forwardWith([row('TEXT')], [row('FWD'), row('TEXT')])).toBe('FWD');
+  });
+
+  it('returns the unknown id when nothing new appears in the destination chat', async () => {
+    expect(await forwardWith([row('TEXT')], [row('TEXT')])).toBe('');
+  });
+
+  it('returns the unknown id when several new messages appear and none, or more than one, is marked forwarded', async () => {
+    expect(await forwardWith([row('TEXT')], [row('TEXT'), row('A'), row('B')])).toBe('');
+    expect(await forwardWith([], [row('A', true), row('B', true)])).toBe('');
+  });
+
+  it('picks the one marked forwarded when a concurrent send also appeared', async () => {
+    expect(await forwardWith([row('TEXT')], [row('TEXT'), row('OTHER'), row('FWD', true)])).toBe('FWD');
+  });
+
+  it('still forwards, with the unknown id, when the destination cannot be read beforehand', async () => {
+    const forward = jest.fn().mockResolvedValue(undefined);
+    const sourceChat = { fetchMessages: jest.fn().mockResolvedValue([{ id: { _serialized: 'SRC1' }, forward }]) };
+    const destChat = {
+      fetchMessages: jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Evaluation failed'))
+        .mockResolvedValueOnce([row('FWD', true)]),
+    };
+    const client = {
+      getChatById: jest.fn((id: string) => Promise.resolve(id === 'dest@c.us' ? destChat : sourceChat)),
     };
 
     const result = await readyAdapter(client).forwardMessage('src@c.us', 'dest@c.us', 'SRC1');
@@ -4737,12 +4792,18 @@ describe('LID resolution for individual sends (#573 — WhatsApp @c.us → @lid 
     const forward = jest.fn().mockResolvedValue(undefined);
     const srcMsg = { id: { _serialized: 'M1' }, forward };
     const srcChat = { fetchMessages: jest.fn().mockResolvedValue([srcMsg]) };
-    const destChat = { fetchMessages: jest.fn().mockResolvedValue([{ id: { _serialized: 'OUT1' }, timestamp: 123 }]) };
-    const getChatById = jest.fn().mockResolvedValueOnce(srcChat).mockResolvedValueOnce(destChat);
+    const destChat = {
+      fetchMessages: jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: { _serialized: 'OUT1' }, timestamp: 123 }]),
+    };
+    const getChatById = jest.fn().mockResolvedValueOnce(srcChat).mockResolvedValue(destChat);
     const getNumberId = jest.fn().mockResolvedValue({ _serialized: '159442138038327@lid' });
     const res = await ready({ getChatById, getNumberId }).forwardMessage('src@c.us', '529934031058@c.us', 'M1');
     expect(forward).toHaveBeenCalledWith('159442138038327@lid');
     expect(getChatById).toHaveBeenNthCalledWith(2, '159442138038327@lid');
+    expect(getChatById).toHaveBeenNthCalledWith(3, '159442138038327@lid');
     expect(res.id).toBe('OUT1');
   });
 });
