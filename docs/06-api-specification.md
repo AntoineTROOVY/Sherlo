@@ -2254,11 +2254,11 @@ Send messages to multiple recipients as an async batch — returns immediately a
 
 **Request body** — `SendBulkMessageDto`
 
-| Field    | Type                  | Required | Constraints                      | Description                                                                                                               |
-| -------- | --------------------- | -------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| batchId  | string                | No       | string                           | Auto-generated `batch_<hex>` if omitted; a duplicate id returns `400`                                                     |
-| messages | BulkMessageItemDto[]  | Yes      | array, max 100, nested-validated | The batch items (see below); duplicate `chatId`s are collapsed before processing — first occurrence wins, order preserved |
-| options  | BulkMessageOptionsDto | No       | nested-validated                 | Pacing/error options (see below)                                                                                          |
+| Field    | Type                  | Required | Constraints                      | Description                                                                                                                                                                                                                          |
+| -------- | --------------------- | -------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| batchId  | string                | No       | string                           | Auto-generated `batch_<hex>` if omitted; a duplicate id returns `400`                                                                                                                                                                |
+| messages | BulkMessageItemDto[]  | Yes      | array, max 100, nested-validated | The batch items (see below); exact duplicate entries (same `chatId`, `type`, `content` and `variables`) are collapsed before processing, first occurrence wins, order preserved; distinct messages to the same `chatId` are all sent |
+| options  | BulkMessageOptionsDto | No       | nested-validated                 | Pacing/error options (see below)                                                                                                                                                                                                     |
 
 Each `BulkMessageItemDto`: `{ chatId: string, type: 'text'|'image'|'video'|'audio'|'document', content: BulkMessageContentDto, variables?: Record<string,string> }`. `content` (all fields optional, nested-validated): `text?: string`, `image?`/`video?`/`audio?`/`document?`: `{ url?, base64?, mimetype?, filename? }`, `caption?: string`, `mentions?: string[]` (per item; a batch fans out to many chats, and a WID is only taggable in a chat the participant is in).
 
