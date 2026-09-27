@@ -217,6 +217,11 @@ export class SendPacingService {
     // against themselves and the cap would reset every request.
     const usedToday =
       (await this.countColdReachoutsToday(sessionId, dayStart)) + this.groupReachoutsToday(sessionId, dayStart);
+    // The UTC day rolled over while counting: check again against the new day, so the batch is
+    // reserved on (and judged by) the day it actually runs in.
+    if (startOfUtcDay(new Date()).getTime() !== dayStart.getTime()) {
+      return this.assertReachoutAllowed(sessionId, contactIds);
+    }
     if (usedToday + coldCount <= allowance) {
       // Reserved now, with no await between the check and the charge: a concurrent request must
       // see this batch as spent. The caller refunds it (refundGroupReachouts) if the engine call
@@ -258,9 +263,6 @@ export class SendPacingService {
   private addGroupReachouts(sessionId: string, dayStart: Date, n: number): void {
     const dayStartMs = dayStart.getTime();
     const tally = this.groupReachoutTally.get(sessionId);
-    // A check that straddled midnight must not replace a tally another request already started
-    // for the new day.
-    if (tally && tally.dayStartMs > dayStartMs) return;
     if (tally && tally.dayStartMs === dayStartMs) tally.count += n;
     else this.groupReachoutTally.set(sessionId, { dayStartMs, count: n });
   }

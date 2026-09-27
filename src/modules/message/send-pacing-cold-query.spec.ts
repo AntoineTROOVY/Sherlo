@@ -343,19 +343,33 @@ describe('group reachouts against a real database', () => {
     await expect(reachout('s1', ['f@c.us'])).rejects.toMatchObject({ status: 429 });
   });
 
-  it("does not let a check that straddled UTC midnight overwrite the new day's tally", async () => {
+  // A check whose count query spans UTC midnight is judged by, and charged to, the new day.
+  const rollOverDuringCount = (during: () => Promise<unknown> = async () => undefined): void => {
     const internals = service as unknown as { countColdReachoutsToday: () => Promise<number> };
     const realCount = internals.countColdReachoutsToday.bind(service);
-    // While the first check is suspended on its count query, the clock rolls over and another
-    // request spends the whole new day's allowance.
-    jest.spyOn(internals, 'countColdReachoutsToday').mockImplementationOnce(async () => {
-      jest.setSystemTime(new Date(NOW.getTime() + DAY_MS));
-      await reachout('s1', ['b@c.us', 'c@c.us', 'd@c.us']);
-      return 0;
-    });
-    jest.spyOn(internals, 'countColdReachoutsToday').mockImplementation(realCount);
+    jest
+      .spyOn(internals, 'countColdReachoutsToday')
+      .mockImplementationOnce(async () => {
+        jest.setSystemTime(new Date(NOW.getTime() + DAY_MS));
+        await during();
+        return 0;
+      })
+      .mockImplementation(realCount);
+  };
 
-    await reachout('s1', ['a@c.us']);
+  it('charges a check that straddled UTC midnight to the new day', async () => {
+    rollOverDuringCount();
+
+    await reachout('s1', ['a@c.us', 'b@c.us', 'c@c.us']);
+    await expect(reachout('s1', ['d@c.us'])).rejects.toMatchObject({ status: 429 });
+  });
+
+  it("refuses a straddling check once another request spent the new day's allowance", async () => {
+    // While the first check is suspended on its count query, another request spends the whole
+    // new day's allowance.
+    rollOverDuringCount(() => reachout('s1', ['b@c.us', 'c@c.us', 'd@c.us']));
+
+    await expect(reachout('s1', ['a@c.us'])).rejects.toMatchObject({ status: 429 });
     await expect(reachout('s1', ['e@c.us'])).rejects.toMatchObject({ status: 429 });
   });
 
