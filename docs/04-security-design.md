@@ -158,9 +158,11 @@ sub-resource, no per-entry `active` flag. Enforcement lives in two places:
 
 ### IPv6 Support
 
-CIDR matching is IPv4-only: an IPv6 range in `allowedIps` never matches. An exact IPv6 address still
-works, by literal comparison — IPv4-mapped forms (`::ffff:203.0.113.50`) are normalized to their bare
-IPv4 address first.
+`allowedIps` accepts IPv4 addresses and IPv4 CIDR ranges only; the API rejects an IPv6 entry. An
+IPv4-mapped client address (`::ffff:203.0.113.50`) is normalized to its bare IPv4 address before
+matching. `TRUSTED_PROXIES` accepts IPv4 and IPv6 addresses and CIDR ranges (for example `fd00::/8`);
+an entry that is neither is ignored, with a warning at boot. A trusted proxy that appends a port to
+an `X-Forwarded-For` hop (`203.0.113.7:51000`, `[2001:db8::1]:443`) resolves to the bare address.
 
 ## 4.4 Data Encryption
 
