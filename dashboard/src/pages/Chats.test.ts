@@ -864,6 +864,31 @@ test('a socket reconnect refetches the chat list so the sidebar shows what arriv
   assert.equal(countFetchCalls('GET', chatsPath), 2);
 });
 
+test('a socket reconnect keeps the open chat read instead of badging it with the gap count', async () => {
+  const { screen, fireEvent, within, act, waitFor } = rtl;
+  const { container } = renderChats();
+  await screen.findByText('Main (15551234567)');
+  fireEvent.click(await screen.findByText('Alice'));
+  await within(container.querySelector('.room-messages') as HTMLElement).findByText('hello from alice');
+  await waitFor(() => assert.ok(!screen.queryByLabelText('2 unread messages'), 'opening the chat kept its badge'));
+  // Past the mark-as-read quiet window, so the open's own call is out before counting.
+  await new Promise(resolve => setTimeout(resolve, 1_000));
+  resetFetchCalls();
+
+  // Alice wrote into the open chat while the socket was down; the snapshot still counts it unread.
+  chatsResponder = () =>
+    Promise.resolve(jsonResponse([{ ...CHAT, unreadCount: 4, lastMessage: 'sent during the gap' }, CHAT_2]));
+  const socket = lastSocket();
+  assert.ok(socket, 'expected the page to have opened a socket');
+  act(() => socket.receive('disconnect', 'transport close'));
+  act(() => socket.receive('connect'));
+
+  await screen.findByText('sent during the gap');
+  await new Promise(resolve => setTimeout(resolve, 1_000));
+  assert.ok(!screen.queryByLabelText('4 unread messages'), 'the open chat was badged with the gap count');
+  assert.ok(findFetchCall('POST', `/api/sessions/${SESSION.id}/chats/read`), 'the gap messages were not marked read');
+});
+
 test('a read-only key opening a chat sends no mark-as-read', async () => {
   const { screen, fireEvent, within, waitFor } = rtl;
   resetFetchCalls();

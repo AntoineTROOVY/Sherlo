@@ -594,6 +594,7 @@ export function Chats() {
   // banner's retry refreshes too. The transition logic is unit-tested in utils/reconnectState.
   const reconnectHadConnected = useRef(false);
   const reconnectWasDisconnected = useRef(false);
+  const activeChatId = activeChat?.id;
   useEffect(() => {
     const decision = nextReconnectState({
       isConnected,
@@ -610,9 +611,15 @@ export function Chats() {
       queryClient.invalidateQueries({ queryKey: ['contact-statuses', selectedSessionId] });
       // The sidebar list is local state, so previews, unread counts and chats started during the gap
       // only show after a refetch. Background mode keeps the current list on screen meanwhile.
-      void loadChats(selectedSessionId, { background: true });
+      // The open chat's gap messages are read on screen: mark them read and keep its row at zero,
+      // since the snapshot still counts them (the same rule a live frame and opening a chat follow).
+      const readChatId = canWrite ? activeChatId : undefined;
+      if (readChatId) markChatRead(readChatId);
+      void loadChats(selectedSessionId, { background: true }).then(() => {
+        if (readChatId) setChats(prev => prev.map(c => (c.id === readChatId ? { ...c, unreadCount: 0 } : c)));
+      });
     }
-  }, [isConnected, connectionFailed, selectedSessionId, queryClient, loadChats]);
+  }, [isConnected, connectionFailed, selectedSessionId, queryClient, loadChats, activeChatId, canWrite, markChatRead]);
 
   useEffect(() => {
     if (selectedSessionId && isConnected) {
