@@ -12,7 +12,7 @@ import { warnIfInsecureHttpUrl } from '../utils/urlSecurity';
 // same-origin '/api' and a split deployment failed with "Invalid API Key" (#91).
 // Exported so direct fetches (e.g. auth/validate in Login.tsx / App.tsx) honor VITE_API_URL
 // too — otherwise split-origin deployments break. Empty VITE_API_URL → '/api'.
-const API_ORIGIN = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+export const API_ORIGIN = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
 export const API_BASE_URL = `${API_ORIGIN}/api`;
 // Warn (not refuse — would break dev + TLS-terminating-proxy) when the API origin is an
 // insecure http:// URL pointing at a non-localhost host (API keys sent in cleartext).

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isLocalhostHost, warnIfInsecureHttpUrl } from './urlSecurity.ts';
+import { isLocalhostHost, resolveSocketUrl, warnIfInsecureHttpUrl } from './urlSecurity.ts';
 
 test('isLocalhostHost recognizes loopback hosts', () => {
   assert.ok(isLocalhostHost('localhost'));
@@ -55,4 +55,13 @@ test('warnIfInsecureHttpUrl is silent on https', () => {
 
 test('warnIfInsecureHttpUrl returns the URL unchanged (does not throw)', () => {
   assert.equal(warnIfInsecureHttpUrl('http://gateway.example.com', 'x'), 'http://gateway.example.com');
+});
+
+test('resolveSocketUrl prefers VITE_WS_URL, then the API origin, then the page origin', () => {
+  const page = 'https://dashboard.example.com';
+  const api = 'https://api.example.com';
+  assert.equal(resolveSocketUrl(undefined, '', page), page);
+  assert.equal(resolveSocketUrl('', '', page), page);
+  assert.equal(resolveSocketUrl(undefined, api, page), api);
+  assert.equal(resolveSocketUrl('https://ws.example.com', api, page), 'https://ws.example.com');
 });

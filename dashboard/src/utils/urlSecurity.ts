@@ -25,3 +25,12 @@ export function warnIfInsecureHttpUrl(url: string, label: string): string {
   }
   return url;
 }
+
+/**
+ * The origin the realtime socket dials: VITE_WS_URL when set, else the API origin VITE_API_URL
+ * names (a split-origin build serves the socket from the API, not from the dashboard's host), else
+ * the page's own origin.
+ */
+export function resolveSocketUrl(wsUrl: string | undefined, apiOrigin: string, pageOrigin: string): string {
+  return wsUrl || apiOrigin || pageOrigin;
+}
