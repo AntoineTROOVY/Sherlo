@@ -1396,6 +1396,39 @@ describe('SessionService', () => {
       expect(ownership.release).toHaveBeenCalledWith('sess-uuid-1');
     });
 
+    // The incomplete stop evicted the engine and wrote DISCONNECTED. A claim left to lapse still names
+    // this node, and a peer's takeover sweep adopts exactly such a row: it would restart the session
+    // the operator just stopped. A released claim is not adopted.
+    it('stop() releases on the 502 SESSION_STOP_INCOMPLETE path when nothing stays alive here', async () => {
+      const ownership = withOwnership();
+      jest.spyOn(lifecycle, 'stop').mockRejectedValue(new BadGatewayException({ code: 'SESSION_STOP_INCOMPLETE' }));
+      jest.spyOn(lifecycle, 'isEngineActive').mockReturnValue(false);
+
+      await expect(service.stop('sess-uuid-1')).rejects.toThrow(BadGatewayException);
+
+      expect(ownership.release).toHaveBeenCalledWith('sess-uuid-1');
+    });
+
+    it('stop() keeps the claim on the 502 path when a concurrent start still holds the session here', async () => {
+      const ownership = withOwnership();
+      jest.spyOn(lifecycle, 'stop').mockRejectedValue(new BadGatewayException({ code: 'SESSION_STOP_INCOMPLETE' }));
+      jest.spyOn(lifecycle, 'isEngineActive').mockReturnValue(true);
+
+      await expect(service.stop('sess-uuid-1')).rejects.toThrow(BadGatewayException);
+
+      expect(ownership.release).not.toHaveBeenCalled();
+    });
+
+    it('stop() keeps the claim when it fails for any other reason', async () => {
+      const ownership = withOwnership();
+      jest.spyOn(lifecycle, 'stop').mockRejectedValue(new NotFoundException('Session not found'));
+      jest.spyOn(lifecycle, 'isEngineActive').mockReturnValue(false);
+
+      await expect(service.stop('sess-uuid-1')).rejects.toThrow(NotFoundException);
+
+      expect(ownership.release).not.toHaveBeenCalled();
+    });
+
     it('forceKill() hands the claim back after the kill', async () => {
       const ownership = withOwnership();
       jest.spyOn(lifecycle, 'forceKill').mockResolvedValue(createMockSession());
