@@ -9,7 +9,11 @@ import { workerConnectionOptions, webhookWorkerConcurrency } from '../redis-conn
 import { WebhookJobData, WebhookPayload } from '../../webhook/webhook.service';
 import { Webhook } from '../../webhook/entities/webhook.entity';
 import { WebhookDeliveryFailure } from '../../webhook/entities/webhook-delivery-failure.entity';
-import { recordWebhookDeliveryFailure, statusCodeFromError } from '../../webhook/utils/record-delivery-failure';
+import {
+  clearDeliveryFailureRows,
+  recordWebhookDeliveryFailure,
+  statusCodeFromError,
+} from '../../webhook/utils/record-delivery-failure';
 import { buildDeliveryHeaders, postWebhookPayload } from '../../webhook/utils/deliver-once';
 import { HookManager } from '../../../core/hooks';
 import { redactSsrfError } from '../../../common/security/ssrf-guard';
@@ -185,6 +189,11 @@ export class WebhookProcessor extends WorkerHost {
         { webhookId, deliveryId: payload.deliveryId, action: 'webhook_bookkeeping_failed' },
       );
     }
+
+    // A delivered event must not stay listed as lost. A failure row exists for it only when an
+    // earlier dispatch of the same delivery was shed, refused or failed before this job ran. An
+    // indexed delete that usually matches nothing.
+    await clearDeliveryFailureRows(this.failureRepository, this.logger, webhookId, payload.idempotencyKey);
 
     // Execute hook after successful delivery
     await this.hookManager.execute(
