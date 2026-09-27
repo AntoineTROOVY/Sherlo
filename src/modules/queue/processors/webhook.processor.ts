@@ -90,8 +90,8 @@ export class WebhookProcessor extends WorkerHost {
     try {
       // The job carries a snapshot taken at enqueue time. Re-read the row before every attempt: a
       // webhook that was deleted, disabled or unsubscribed from this event since then must not
-      // receive it (the reconciler skips only deleted and disabled rows; neither re-applies the
-      // webhook's filters, which need the event data). Completing the job instead of throwing
+      // receive it (the reconciler applies the same test; neither re-applies the webhook's filters,
+      // which need the event data). Completing the job instead of throwing
       // stops the retries and files no dead-letter row. Otherwise deliver with the CURRENT url,
       // headers and secret, as the reconciler's replay does, so a receiver move or a rotated
       // secret or auth header applies to jobs already waiting in the queue.
