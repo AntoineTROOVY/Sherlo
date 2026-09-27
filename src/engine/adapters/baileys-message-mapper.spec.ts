@@ -23,6 +23,8 @@ describe('mapBaileysMessageType (baileys content-type -> neutral MessageType)', 
     ['extendedTextMessage', false, 'text'],
     ['imageMessage', false, 'image'],
     ['videoMessage', false, 'video'],
+    // A round video note is a VideoMessage under its own key.
+    ['ptvMessage', false, 'video'],
     ['audioMessage', false, 'audio'],
     ['audioMessage', true, 'voice'],
     ['documentMessage', false, 'document'],
@@ -231,6 +233,25 @@ describe('extractBaileysContext (quoted body shares the live body extractor)', (
     expect(quoted({ imageMessage: { caption: 'pic' } })?.body).toBe('pic');
     expect(quoted({ conversation: 'the original' })?.body).toBe('the original');
     expect(quoted({ stickerMessage: {} })?.body).toBe('');
+  });
+
+  it('reads the quote, timer and mentions off a video note', () => {
+    expect(
+      extractBaileysContext({
+        ptvMessage: {
+          contextInfo: {
+            stanzaId: 'wamid.original',
+            quotedMessage: { conversation: 'the original' },
+            expiration: 86400,
+            mentionedJid: ['628222@s.whatsapp.net'],
+          },
+        },
+      }),
+    ).toMatchObject({
+      quotedMessage: { id: 'wamid.original', body: 'the original' },
+      ephemeralDuration: 86400,
+      mentionedJids: ['628222@s.whatsapp.net'],
+    });
   });
 
   it('carries a quote from a button-reply contextInfo', () => {

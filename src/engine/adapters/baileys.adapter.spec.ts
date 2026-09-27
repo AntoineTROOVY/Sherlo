@@ -2723,6 +2723,59 @@ describe('BaileysAdapter inbound fan-out', () => {
     expect(msg.media).toEqual({ mimetype: 'image/png', data: imgBuf.toString('base64') });
   });
 
+  it.each([
+    ['downloads', 'true'],
+    ['marks as omitted', 'false'],
+  ])('inbound video note: types it as video, %s its media and keeps its quote', async (_label, enabled) => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+    const baileys = jest.requireMock('@whiskeysockets/baileys') as {
+      getContentType: jest.Mock;
+      downloadMediaMessage: jest.Mock;
+    };
+    baileys.getContentType.mockImplementation(realGetContentType);
+    const clip = Buffer.from('MP4BYTES');
+    baileys.downloadMediaMessage.mockResolvedValue(streamOf(clip));
+    const prev = process.env.MEDIA_DOWNLOAD_ENABLED;
+    process.env.MEDIA_DOWNLOAD_ENABLED = enabled;
+    try {
+      const onMessage = jest.fn();
+      const adapter = newAdapter();
+      await adapter.initialize({ onMessage });
+      fakeSock.fire('messages.upsert', {
+        type: 'notify',
+        messages: [
+          {
+            key: { remoteJid: '628111@s.whatsapp.net', fromMe: false, id: 'PTV1' },
+            message: {
+              ptvMessage: {
+                mimetype: 'video/mp4',
+                fileLength: 8,
+                contextInfo: { stanzaId: 'ORIG1', quotedMessage: { conversation: 'the original' } },
+              },
+            },
+            messageTimestamp: 1700000020,
+          },
+        ],
+      });
+      await new Promise(r => setImmediate(r));
+      await new Promise(r => setImmediate(r));
+      expect(onMessage).toHaveBeenCalledTimes(1);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const msg = onMessage.mock.calls[0][0] as IncomingMessage;
+      expect(msg.type).toBe('video');
+      expect(msg.quotedMessage).toEqual({ id: 'ORIG1', body: 'the original' });
+      if (enabled === 'true') {
+        expect(msg.media).toEqual({ mimetype: 'video/mp4', data: clip.toString('base64') });
+      } else {
+        expect(msg.media).toEqual({ mimetype: 'video/mp4', omitted: true, sizeBytes: 8 });
+        expect(baileys.downloadMediaMessage).not.toHaveBeenCalled();
+      }
+    } finally {
+      if (prev === undefined) delete process.env.MEDIA_DOWNLOAD_ENABLED;
+      else process.env.MEDIA_DOWNLOAD_ENABLED = prev;
+    }
+  });
+
   it('inbound media: skips the download entirely when the declared fileLength exceeds the cap', async () => {
     const prev = process.env.MEDIA_DOWNLOAD_MAX_BYTES;
     process.env.MEDIA_DOWNLOAD_MAX_BYTES = '10';

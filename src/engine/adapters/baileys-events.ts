@@ -1229,6 +1229,7 @@ export class BaileysEvents {
     const isMediaType =
       contentType === 'imageMessage' ||
       contentType === 'videoMessage' ||
+      contentType === 'ptvMessage' ||
       contentType === 'audioMessage' ||
       contentType === 'documentMessage' ||
       contentType === 'documentWithCaptionMessage' ||
@@ -1248,6 +1249,7 @@ export class BaileysEvents {
       const subMessage =
         normalizedContent.imageMessage ??
         normalizedContent.videoMessage ??
+        normalizedContent.ptvMessage ??
         normalizedContent.audioMessage ??
         normalizedContent.documentMessage ??
         normalizedContent.stickerMessage;
@@ -1265,6 +1267,7 @@ export class BaileysEvents {
     const subMessage =
       normalizedContent.imageMessage ??
       normalizedContent.videoMessage ??
+      normalizedContent.ptvMessage ??
       normalizedContent.audioMessage ??
       normalizedContent.documentMessage ??
       normalizedContent.stickerMessage;

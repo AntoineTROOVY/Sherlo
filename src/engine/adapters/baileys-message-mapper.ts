@@ -38,6 +38,8 @@ export function mapBaileysMessageType(
     case 'imageMessage':
       return 'image';
     case 'videoMessage':
+    case 'ptvMessage':
+      // A round video note is a VideoMessage under its own content key.
       return 'video';
     case 'audioMessage':
       return isPtt ? 'voice' : 'audio';
@@ -806,6 +808,7 @@ export interface BaileysContextContent {
   extendedTextMessage?: (BaileysContextCarrier & { backgroundArgb?: number | null; font?: number | null }) | null;
   imageMessage?: BaileysContextCarrier | null;
   videoMessage?: BaileysContextCarrier | null;
+  ptvMessage?: BaileysContextCarrier | null;
   audioMessage?: BaileysContextCarrier | null;
   documentMessage?: BaileysContextCarrier | null;
   stickerMessage?: BaileysContextCarrier | null;
@@ -844,6 +847,7 @@ export function extractBaileysContext(content: BaileysContextContent): BaileysMe
     content.extendedTextMessage ??
     content.imageMessage ??
     content.videoMessage ??
+    content.ptvMessage ??
     content.audioMessage ??
     content.documentMessage ??
     content.stickerMessage ??
