@@ -56,10 +56,11 @@ export function clampNumber(value: number, min: number, max: number): number {
 
 /**
  * Clamp a computed backoff delay finite and within setTimeout's safe range (a huge value would
- * overflow its 32-bit ms field and fire immediately).
+ * overflow its 32-bit ms field and fire immediately). NaN falls back to baseDelay; +Infinity is
+ * simply huge, so it takes the cap like any other oversized delay.
  */
 export function clampReconnectDelay(rawDelay: number, baseDelay: number): number {
-  return clampNumber(Number.isFinite(rawDelay) ? rawDelay : baseDelay, 0, RECONNECT_DELAY_CAP_MS);
+  return clampNumber(Number.isNaN(rawDelay) ? baseDelay : rawDelay, 0, RECONNECT_DELAY_CAP_MS);
 }
 
 /**
@@ -91,8 +92,12 @@ export function decideReconnect(
 
   // Exponential backoff: baseDelay * 2^attempts (with jitter), clamped finite + within
   // setTimeout's safe range so the timer can't overflow and fire immediately. With the default
-  // unlimited budget the delay parks at RECONNECT_DELAY_CAP_MS once the exponent outgrows it.
-  const delayMs = clampReconnectDelay(state.baseDelay * Math.pow(2, state.attempts) + jitter, state.baseDelay);
+  // unlimited budget the delay parks at RECONNECT_DELAY_CAP_MS once the exponent outgrows it; the
+  // exponent is bounded so a very long streak never overflows the product to Infinity.
+  const delayMs = clampReconnectDelay(
+    state.baseDelay * Math.pow(2, Math.min(state.attempts, 30)) + jitter,
+    state.baseDelay,
+  );
   state.attempts++;
 
   return {
