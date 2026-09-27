@@ -539,10 +539,12 @@ flowchart TB
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
 | Database credentials              | Environment variable                                                                                               | 90 days                                         |
 | Redis password                    | Environment variable                                                                                               | 90 days                                         |
-| API master key (`API_MASTER_KEY`) | Environment variable                                                                                               | 180 days                                        |
+| API master key (`API_MASTER_KEY`) | Environment variable (first-boot seed only)                                                                        | Not via the env var; see the note below         |
 | API key pepper (`API_KEY_PEPPER`) | Environment variable                                                                                               | Rotating it invalidates all existing key hashes |
 | Webhook secrets                   | Database — **plaintext**; not in the webhook read DTOs, and omitted from `GET /api/infra/export-data` webhook rows | Per webhook                                     |
 | Session auth state                | File system (data volume) — **not encrypted**                                                                      | Never (tied to the WA session)                  |
+
+> `API_MASTER_KEY` only seeds the first ADMIN key, and is read only while the key table is empty. Changing it later has no effect: the new value never authenticates and the seeded key stays valid. Rotate by minting a new ADMIN key with `POST /api/auth/api-keys` and revoking the seeded `Default Admin Key`.
 
 > There is no application `ENCRYPTION_KEY` — OpenWA does not encrypt data at rest (see §4.4). The rotation cadences above are operational recommendations, not enforced by the app.
 
@@ -612,7 +614,7 @@ const masterKey = getSecret('API_MASTER_KEY');
 
 ### Key Rotation Procedure
 
-> **Not applicable today.** OpenWA stores no encrypted-at-rest data (see §4.4), so there is no data-encryption key to rotate and no `rotateEncryptionKey()` in the codebase. The flow below is illustrative for if/when field-level encryption is added. To rotate the `API_MASTER_KEY` or `API_KEY_PEPPER`, use the API-key endpoints (§4.2) — rotating the pepper invalidates existing key hashes.
+> **Not applicable today.** OpenWA stores no encrypted-at-rest data (see §4.4), so there is no data-encryption key to rotate and no `rotateEncryptionKey()` in the codebase. The flow below is illustrative for if/when field-level encryption is added. To rotate the key seeded from `API_MASTER_KEY`, mint a new ADMIN key through the API-key endpoints (§4.2) and revoke the seeded one; editing the env var has no effect after first boot. Rotating `API_KEY_PEPPER` invalidates every existing key hash.
 
 ```mermaid
 flowchart TB

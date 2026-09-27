@@ -475,8 +475,9 @@ PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox
 # ===========================================
 # SECURITY
 # ===========================================
-# Generate with: openssl rand -base64 32
-API_MASTER_KEY=your-master-api-key
+# First-boot seed for the initial ADMIN key, ignored once any key exists. Leave it unset to
+# generate a random key into data/.api-key, or set one generated with: openssl rand -base64 32
+# API_MASTER_KEY=
 # Optional HMAC pepper so a DB leak alone can't precompute key hashes
 API_KEY_PEPPER=optional-key-hashing-pepper
 
