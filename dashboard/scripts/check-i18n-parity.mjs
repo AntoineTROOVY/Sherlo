@@ -71,7 +71,7 @@ function setsEqual(a, b) {
  * A value made up only of {{placeholder}} tokens plus short separator punctuation (spaces, ·, /, :, etc. — no actual alphabetic prose outside the tokens), or a value matching a URL shape (scheme://...) should not be flagged.
  */
 function hasTranslatableProse(str) {
-  if (/^[a-zA-Z]+:\/\//.test(str)) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\/\S+$/i.test(str)) return false;
   const noTokens = str.replace(/\{\{.*?\}\}/g, '');
   return /\p{L}{2,}/u.test(noTokens);
 }
