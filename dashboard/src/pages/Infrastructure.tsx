@@ -197,6 +197,19 @@ export function Infrastructure() {
     ) : null;
   };
 
+  // Built-in services the restart failed to start or stop. Shown whether or not the server came back:
+  // a service that failed to start is the likeliest reason it did not.
+  const restartWarningBox = restartFlow.restartWarnings.length > 0 && (
+    <div className="migration-warning" role="alert">
+      <AlertTriangle size={18} />
+      <div>
+        {restartFlow.restartWarnings.map((warning, index) => (
+          <p key={index}>{warning}</p>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="infrastructure-page">
       <PageHeader title={t('infrastructure.title')} subtitle={t('infrastructure.subtitle')} />
@@ -880,14 +893,7 @@ export function Infrastructure() {
                 <p className="restart-success-msg">{t('infrastructure.restart.successMsg')}</p>
               ) : (
                 <>
-                  <div className="migration-warning" role="alert">
-                    <AlertTriangle size={18} />
-                    <div>
-                      {restartFlow.restartWarnings.map((warning, index) => (
-                        <p key={index}>{warning}</p>
-                      ))}
-                    </div>
-                  </div>
+                  {restartWarningBox}
                   <button className="btn-primary" onClick={() => window.location.reload()}>
                     {t('infrastructure.restart.reload')}
                   </button>
@@ -899,6 +905,7 @@ export function Infrastructure() {
           {restartFlow.restartStatus === 'error' && (
             <>
               <p className="restart-error-msg">{restartFlow.restartError ?? t('infrastructure.restart.errorMsg')}</p>
+              {restartWarningBox}
               <button className="btn-primary" onClick={() => window.location.reload()}>
                 {t('infrastructure.restart.reload')}
               </button>

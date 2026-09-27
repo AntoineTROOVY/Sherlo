@@ -88,6 +88,7 @@ let overrides: {
   statusFails?: boolean;
   currentEngine?: { engineType: string };
   restart?: () => Response;
+  readyFails?: boolean;
 } = {};
 
 // ENGINE_TYPE supplied by the container environment, so the dashboard cannot change it.
@@ -172,6 +173,7 @@ function installFetchStub(): void {
       );
     }
     if (method === 'GET' && path === '/api/health/ready') {
+      if (overrides.readyFails) return Promise.resolve(jsonResponse({ status: 'error', details: {} }, 503));
       return Promise.resolve(jsonResponse({ status: 'ok', details: {} }));
     }
     if (method === 'GET' && path === '/api/infra/export-data') {
@@ -748,5 +750,42 @@ test(
     } finally {
       console.error = consoleError;
     }
+  },
+);
+
+test(
+  'services that failed to start stay on screen when the server never becomes ready',
+  { timeout: 15_000 },
+  async () => {
+    const { screen, fireEvent, within } = rtl;
+    const failure = 'Failed to start postgres: image pull failed';
+    overrides = {
+      readyFails: true,
+      restart: () =>
+        jsonResponse({
+          message: 'restarting',
+          restarting: true,
+          profiles: ['postgres'],
+          profilesToRemove: [],
+          estimatedTime: 5,
+          orchestration: { success: false, message: 'Some services failed', errors: [failure] },
+        }),
+    };
+    renderInfrastructure();
+    await screen.findByText('Database Configuration');
+    fireEvent.click(screen.getByRole('button', { name: 'Save Configuration' }));
+    const dialog = await screen.findByRole('dialog');
+    // The readiness poll gives up after a minute of 1s retries; shorten only those waits. Every
+    // lookup below passes its own timeout, since the default 1s one would be shortened too.
+    const realSetTimeout = globalThis.setTimeout;
+    globalThis.setTimeout = ((fn: () => void, ms?: number, ...rest: unknown[]) =>
+      realSetTimeout(fn, ms === 1000 || ms === 3000 ? 1 : ms, ...rest)) as typeof setTimeout;
+    try {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Restart Now' }));
+      await within(dialog).findByText('Restart failed', {}, { timeout: 5_000 });
+    } finally {
+      globalThis.setTimeout = realSetTimeout;
+    }
+    assert.ok(within(dialog).getByText(failure), 'the failure that explains the restart is not shown');
   },
 );
