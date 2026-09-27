@@ -81,13 +81,28 @@ describe('the non-root drop is enforced, not merely documented', () => {
     expect(entrypoint).toMatch(/exec\s+gosu\s+openwa/);
   });
 
-  // The stale Chromium Singleton* entries are symlinks. A bind mount that refuses to chown a symlink
-  // (Docker Desktop file sharing) fails the recursive chown under `set -e`, so the cleanup has to run
-  // first or it never runs and the container crash-loops (#1722).
-  it('clears stale Chromium locks before the recursive chown', () => {
+  // The Dockerfile explains the missing USER directive by pointing at the entrypoint. A line number
+  // goes stale on the next entrypoint edit and sends the reader to the wrong statement.
+  it('does not cite entrypoint line numbers from the Dockerfile', () => {
+    const dockerfile = fs.readFileSync(path.join(__dirname, '..', '..', 'Dockerfile'), 'utf8');
+    expect(dockerfile).toContain('docker-entrypoint.sh ends with');
+    expect(dockerfile).not.toMatch(/docker-entrypoint\.sh:\d/);
+    expect(dockerfile).not.toMatch(/chowns? on lines? \d/);
+  });
+
+  // Chromium's Singleton* locks, a relocated session profile and a backup staging copy are all
+  // symlinks under /app/data. A bind mount that refuses to chown a symlink (Docker Desktop file
+  // sharing) failed a recursive chown under `set -e` and crash-looped the container (#1722), and a
+  // lock cleanup can only cover the default path. The ownership fix itself has to skip links.
+  // `-h` too: find tests the type before the batched chown runs, so without it a path replaced by a
+  // link in between would have root re-own the link's target.
+  it('re-owns /app/data without touching symlinks', () => {
     const entrypoint = fs.readFileSync(path.join(__dirname, '..', '..', 'docker-entrypoint.sh'), 'utf8');
     const cleanup = entrypoint.search(/^rm -f \/app\/data\/sessions\/\*\/Singleton\*/m);
-    const chown = entrypoint.search(/^chown -R openwa:openwa \/app\/data/m);
+    const chown = entrypoint.search(/^find \/app\/data ! -type l -exec chown -h openwa:openwa \{\} \+$/m);
+    expect(entrypoint).not.toMatch(/^\s*chown\s+-R\b.*\/app\/data/m);
+    // Swallowing the failure would hide a real refusal (NFS root_squash, SELinux).
+    expect(entrypoint).not.toMatch(/-exec chown[^\n]*\|\|/);
     expect(cleanup).toBeGreaterThan(-1);
     expect(chown).toBeGreaterThan(-1);
     expect(cleanup).toBeLessThan(chown);
