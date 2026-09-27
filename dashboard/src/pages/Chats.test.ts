@@ -793,6 +793,52 @@ test('a chat whose newest message has no text does not claim to have no messages
   assert.equal(row.querySelector('.no-message')?.textContent ?? null, null, 'the row reads "No messages yet"');
 });
 
+test('a message arriving the moment the chat list commits updates the listed row without a refetch', async () => {
+  const { screen, waitFor } = rtl;
+  resetFetchCalls();
+  // Deliver the frame from a MutationObserver callback, a microtask right after the commit that puts
+  // the Alice row on screen and before React flushes that commit's passive effects. A list the socket
+  // handler reads from a passive effect is still empty there, so the chat reads as unlisted and the
+  // refetch it fires replaces the row this frame just updated.
+  let delivered = false;
+  const observer = new MutationObserver(() => {
+    if (delivered || !screen.queryByText('Alice')) return;
+    delivered = true;
+    observer.disconnect();
+    const socket = lastSocket();
+    assert.ok(socket, 'expected the page to have opened a socket');
+    socket.receive('message', {
+      type: 'event',
+      timestamp: new Date(1_700_002_000_000).toISOString(),
+      payload: {
+        event: 'message.received',
+        sessionId: SESSION.id,
+        data: {
+          id: 'wamid.live.commit',
+          chatId: CHAT.id,
+          from: CHAT.id,
+          to: 'me',
+          body: 'right on the commit',
+          type: 'text',
+          fromMe: false,
+          timestamp: 1_700_001_800,
+        },
+      },
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  try {
+    renderChats();
+    await waitFor(() => assert.ok(screen.queryByLabelText('3 unread messages'), 'the arrival did not reach the row'));
+    await flush();
+    assert.ok(delivered, 'the frame was never delivered');
+    assert.equal(countFetchCalls('GET', `/api/sessions/${SESSION.id}/chats`), 1, 'a listed chat refetched the list');
+    assert.ok(screen.queryByLabelText('3 unread messages'), 'a refetch overwrote the live row');
+  } finally {
+    observer.disconnect();
+  }
+});
+
 test('a read-only key opening a chat sends no mark-as-read', async () => {
   const { screen, fireEvent, within, waitFor } = rtl;
   resetFetchCalls();

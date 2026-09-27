@@ -396,8 +396,10 @@ export function Chats() {
   );
 
   // 3. WebSocket integration for real-time messages
+  // Synced in a layout effect: a socket frame handled after the list commits but before passive
+  // effects flush would otherwise see the previous list, miss the chat and refetch the whole list.
   const chatsRef = useRef(chats);
-  useEffect(() => {
+  useLayoutEffect(() => {
     chatsRef.current = chats;
   });
   const handleIncomingMessage = useCallback(
