@@ -147,13 +147,6 @@ export class WwebjsContacts {
       throw error;
     }
 
-    // Every model threw: a systemic page failure (a renamed WA Web module, WWebJS not injected), not
-    // one unreadable entry. Answer an error, as before the per-entry catch, rather than an empty
-    // address book that a syncing consumer would read as every contact deleted.
-    if (raw.length === 0 && unreadable > 0) {
-      throw new Error(`WhatsApp Web could not read any of ${unreadable} contact(s): ${firstError}`);
-    }
-
     // Read every id through readWid (so the `_serialized`->`$1` rename lands here too) and skip
     // entries with no readable id, counted and logged like the chats path, rather than dropping
     // the whole address book silently.
@@ -166,6 +159,18 @@ export class WwebjsContacts {
         continue;
       }
       contacts.push(mapped);
+    }
+
+    // A systemic page failure (a renamed WA Web module, WWebJS not injected), not one unreadable
+    // entry: answer an error rather than a list a syncing consumer would read as every contact
+    // deleted. That covers models that exist but none mapped, and a failure that left only blocked
+    // contacts: getContactModel skips getAlternateUserWid for a blocked contact, so a blocked row
+    // still reads when that call is broken for everyone else.
+    if ((unreadable > 0 && !contacts.some(c => !c.isBlocked)) || (contacts.length === 0 && skipped > 0)) {
+      throw new Error(
+        `WhatsApp Web could not read any unblocked contact (${unreadable} failed, ${skipped} without an id, ` +
+          `${contacts.length} blocked read)${firstError ? `: ${firstError}` : ''}`,
+      );
     }
     if (skipped > 0) {
       this.host.logger.warn(`Skipped ${skipped} contact(s) without a serialized id`);

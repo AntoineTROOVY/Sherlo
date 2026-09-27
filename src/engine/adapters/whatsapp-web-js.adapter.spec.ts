@@ -6069,9 +6069,68 @@ describe('WhatsAppWebJsAdapter page transport error detection (wedged page fast-
     const { adapter, onDisconnected } = readyAdapter({ pupPage: { evaluate } });
 
     await expect(adapter.getContacts()).rejects.toThrow(
-      'WhatsApp Web could not read any of 3 contact(s): x is not a function',
+      'WhatsApp Web could not read any unblocked contact (3 failed, 0 without an id, 0 blocked read): x is not a function',
     );
     expect(onDisconnected).not.toHaveBeenCalled();
+  });
+
+  // Models that failed plus rows that came back without a readable id leave nothing to list: the
+  // same page-wide failure, not an empty address book.
+  it('fails the read when the only rows left after a partial failure have no readable id', async () => {
+    const evaluate = jest.fn().mockResolvedValue({ rows: [{ id: {}, number: '1' }], failed: 2, firstError: 'boom' });
+    const { adapter } = readyAdapter({ pupPage: { evaluate } });
+
+    await expect(adapter.getContacts()).rejects.toThrow(
+      'WhatsApp Web could not read any unblocked contact (2 failed, 1 without an id, 0 blocked read): boom',
+    );
+  });
+
+  it('fails the read when no row at all has a readable id', async () => {
+    const evaluate = jest.fn().mockResolvedValue({ rows: [{ id: {} }, { id: {} }], failed: 0 });
+    const { adapter } = readyAdapter({ pupPage: { evaluate } });
+
+    await expect(adapter.getContacts()).rejects.toThrow(
+      'WhatsApp Web could not read any unblocked contact (0 failed, 2 without an id, 0 blocked read)',
+    );
+  });
+
+  // getContactModel calls getAlternateUserWid only for an unblocked contact, so a build that breaks
+  // that call still reads every blocked row. Blocked survivors alone say nothing about the rest.
+  it('fails the read when only blocked contacts survive a failure', async () => {
+    const blocked = { id: { _serialized: '9@c.us' }, number: '9', isBlocked: true };
+    const evaluate = jest.fn().mockResolvedValue({
+      rows: [blocked],
+      failed: 499,
+      firstError: 'getAlternateUserWid - Invalid get call using deviceWid',
+    });
+    const { adapter, onDisconnected } = readyAdapter({ pupPage: { evaluate } });
+
+    await expect(adapter.getContacts()).rejects.toThrow(
+      'WhatsApp Web could not read any unblocked contact (499 failed, 0 without an id, 1 blocked read): ' +
+        'getAlternateUserWid - Invalid get call using deviceWid',
+    );
+    expect(onDisconnected).not.toHaveBeenCalled();
+  });
+
+  it('keeps a blocked-only address book when nothing failed, and an empty one', async () => {
+    const blocked = { id: { _serialized: '9@c.us' }, number: '9', isBlocked: true };
+    const evaluate = jest
+      .fn()
+      .mockResolvedValueOnce({ rows: [blocked], failed: 0 })
+      .mockResolvedValueOnce({ rows: [], failed: 0 });
+    const { adapter } = readyAdapter({ pupPage: { evaluate } });
+
+    await expect(adapter.getContacts()).resolves.toEqual([expect.objectContaining({ id: '9@c.us', isBlocked: true })]);
+    await expect(adapter.getContacts()).resolves.toEqual([]);
+  });
+
+  // The #1720 shape at scale: a single device-scoped wid among ordinary contacts still answers.
+  it('keeps the readable unblocked contacts when one of many could not be read', async () => {
+    const rows = Array.from({ length: 499 }, (_, i) => ({ id: { _serialized: `${i}@c.us` }, number: String(i) }));
+    const evaluate = jest.fn().mockResolvedValue({ rows, failed: 1, firstError: 'x' });
+    const { adapter } = readyAdapter({ pupPage: { evaluate } });
+
+    await expect(adapter.getContacts()).resolves.toHaveLength(499);
   });
 
   // A walk over a large address book that outruns Puppeteer's per-command budget got no answer: a
