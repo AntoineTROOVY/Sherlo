@@ -492,7 +492,7 @@ WEBHOOK_DISPATCH_MAX_QUEUED=1000
 # ===========================================
 # RATE LIMITING
 # ===========================================
-# Three global per-IP windows (short/medium/long); defaults shown
+# Three windows (short/medium/long), each counted per route and client IP; defaults shown
 RATE_LIMIT_MEDIUM_TTL=60000
 RATE_LIMIT_MEDIUM_LIMIT=100
 ```

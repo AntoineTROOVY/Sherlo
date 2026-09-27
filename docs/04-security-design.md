@@ -251,7 +251,7 @@ flowchart LR
     RL -->|Under Limit| APP[Application]
     RL -->|Over Limit| ERR[429 Too Many Requests]
 
-    subgraph Limits["Global windows (per client IP)"]
+    subgraph Limits["Windows (per route, per client IP)"]
         T1[short: 10 / 1s]
         T2[medium: 100 / 60s]
         T3[long: 1000 / 1h]
@@ -260,7 +260,7 @@ flowchart LR
 
 ### Windows
 
-All limits are **global and per client IP** (resolved through `TRUSTED_PROXIES`), applied by a global `ThrottlerGuard`. There is **no per-endpoint limit table** — these three windows apply to every non-exempt route, and exceeding any one returns `429 Too Many Requests`:
+Each window is counted **per route handler per client IP** (the IP resolved through `TRUSTED_PROXIES`) by a global `ThrottlerGuard`, so a client gets the full budget on every endpoint; for an aggregate per-client cap, add a limiter at your reverse proxy. There is **no per-endpoint limit table**: these three windows apply to every non-exempt route, and exceeding any one returns `429 Too Many Requests`:
 
 | Window   | Default limit | Window length | Env overrides                                       |
 | -------- | ------------- | ------------- | --------------------------------------------------- |

@@ -677,7 +677,7 @@ curl -H "X-API-Key: $API_KEY" \
 curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/infra/status
 
-# Rate limiting is global (throttler, env-configured) — there is no per-session rate-limit endpoint
+# Rate limiting is env-configured, per route and client IP; there is no per-session rate-limit endpoint
 ```
 
 **Common Causes:**
