@@ -144,16 +144,23 @@ describe('a job that runs a repo script checks the repo out', () => {
  * was published most recently at tag time; pin the exact version the way the Dockerfile pins its npm.
  */
 describe('a job that can mint a publish credential installs only exact global versions', () => {
-  type OidcJob = { permissions?: Record<string, string> | string; steps?: Step[] };
+  type Permissions = Record<string, string> | string | null | undefined;
+  type OidcJob = { permissions?: Permissions; steps?: Step[] };
+  type OidcWorkflow = { permissions?: Permissions; jobs?: Record<string, OidcJob> };
   const workflows = fs.readdirSync(workflowDir).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
   const GLOBAL_INSTALL = /\bnpm\s+(?:install|i|add)\s+(?:-g|--global)\s+([^\n;&|]+)/g;
 
-  const globalInstallsInOidcJobs = (file: string): Array<{ job: string; spec: string }> => {
-    const jobs = (
-      yaml.load(fs.readFileSync(path.join(workflowDir, file), 'utf8')) as { jobs?: Record<string, OidcJob> }
-    ).jobs;
-    return Object.entries(jobs ?? {})
-      .filter(([, def]) => typeof def.permissions === 'object' && def.permissions['id-token'] === 'write')
+  // A job without its own `permissions` inherits the workflow-level block; `write-all` grants id-token too.
+  const grantsIdToken = (perms: Permissions): boolean =>
+    perms === 'write-all' || (typeof perms === 'object' && perms !== null && perms['id-token'] === 'write');
+
+  const globalInstallsInOidcJobs = (source: string | OidcWorkflow): Array<{ job: string; spec: string }> => {
+    const workflow =
+      typeof source === 'string'
+        ? (yaml.load(fs.readFileSync(path.join(workflowDir, source), 'utf8')) as OidcWorkflow)
+        : source;
+    return Object.entries(workflow.jobs ?? {})
+      .filter(([, def]) => grantsIdToken(def.permissions !== undefined ? def.permissions : workflow.permissions))
       .flatMap(([job, def]) =>
         (def.steps ?? []).flatMap(step =>
           [...executableLines(step.run ?? '').matchAll(GLOBAL_INSTALL)].flatMap(match =>
@@ -172,6 +179,17 @@ describe('a job that can mint a publish credential installs only exact global ve
     expect(globalInstallsInOidcJobs('js-sdk-release.yml').map(entry => entry.spec)).toEqual([
       expect.stringMatching(/^npm@/),
     ]);
+  });
+
+  it('treats a job that inherits id-token: write or write-all from the workflow as able to mint', () => {
+    const job = { steps: [{ run: 'npm install -g npm@latest' }] };
+    expect(globalInstallsInOidcJobs({ permissions: { 'id-token': 'write' }, jobs: { publish: job } })).toHaveLength(1);
+    expect(globalInstallsInOidcJobs({ permissions: 'write-all', jobs: { publish: job } })).toHaveLength(1);
+    expect(globalInstallsInOidcJobs({ jobs: { publish: { ...job, permissions: 'write-all' } } })).toHaveLength(1);
+    // A job-level block replaces the workflow-level one, so it can also withdraw the grant.
+    expect(
+      globalInstallsInOidcJobs({ permissions: 'write-all', jobs: { publish: { ...job, permissions: {} } } }),
+    ).toHaveLength(0);
   });
 
   it.each(workflows)('%s: global installs in id-token jobs are pinned to an exact version', file => {
