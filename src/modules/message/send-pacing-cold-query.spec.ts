@@ -344,7 +344,7 @@ describe('group reachouts against a real database', () => {
   });
 
   // A check whose count query spans UTC midnight is judged by, and charged to, the new day.
-  const rollOverDuringCount = (during: () => Promise<unknown> = async () => undefined): void => {
+  const rollOverDuringCount = (during: () => Promise<unknown> = () => Promise.resolve()): void => {
     const internals = service as unknown as { countColdReachoutsToday: () => Promise<number> };
     const realCount = internals.countColdReachoutsToday.bind(service);
     jest
