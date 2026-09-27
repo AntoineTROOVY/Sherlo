@@ -5237,20 +5237,20 @@ Notes: raw return of an in-memory `Settings` object built once in the controller
 
 #### GET /api/audit
 
-List audit-log entries, newest first. API-key lifecycle changes, session lifecycle events and ADMIN infra operations land here. **The six actions below are never emitted**: message sends and webhook deliveries are tracked in their own tables (`messages`, `webhook_delivery_failures`) — `webhook_created`/`webhook_deleted` are simply not wired yet — so filtering for `message_sent`, `message_failed`, `webhook_created`, `webhook_deleted`, `webhook_triggered` or `webhook_failed` returns zero rows by design.
+List audit-log entries, newest first. API-key lifecycle changes, session lifecycle events and ADMIN infra operations land here. **The eight actions below are never emitted**, so filtering for any of them returns zero rows by design: `message_sent` and `message_failed` (every send and its outcome is in the `messages` table), `webhook_triggered` and `webhook_failed` (tracked in `webhook_delivery_failures` and the `openwa_webhook_delivery_failures_total` counter), `webhook_created` and `webhook_deleted` (not wired yet), `api_key_used` (it would fire on every authenticated request; failed authentication is audited as `api_key_auth_failed`), and `session_connected` (an engine-level transition already reflected in `sessions.status`; the user-initiated `session_started` and `session_stopped` are audited).
 
 **Auth:** API key (ADMIN) · **Scope:** rows are confined to the calling key's `allowedSessions` — the `sessionId` query may only narrow within that list, never widen it
 
 **Query parameters**
 
-| Name        | Type                          | Required | Default | Description                                                                                                                                        |
-| ----------- | ----------------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `action`    | string                        | No       | —       | Filter by `AuditAction` (e.g. `api_key_created`, `session_started`, `infra_data_imported`). Message/webhook actions are never emitted (see above). |
-| `severity`  | `'info' \| 'warn' \| 'error'` | No       | —       | Filter by `AuditSeverity`.                                                                                                                         |
-| `sessionId` | string                        | No       | —       | Narrow to one session. A value outside the key's `allowedSessions` returns `{ "data": [], "total": 0 }`.                                           |
-| `apiKeyId`  | string                        | No       | —       | Filter by the acting key's id.                                                                                                                     |
-| `limit`     | integer                       | No       | `50`    | Page size, clamped to a maximum of `200`.                                                                                                          |
-| `offset`    | integer                       | No       | `0`     | Rows to skip; a negative value resolves to `0`.                                                                                                    |
+| Name        | Type                          | Required | Default | Description                                                                                                                                                                                 |
+| ----------- | ----------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `action`    | string                        | No       | —       | Filter by `AuditAction` (e.g. `api_key_created`, `session_started`, `infra_data_imported`). Message, webhook, `api_key_used` and `session_connected` actions are never emitted (see above). |
+| `severity`  | `'info' \| 'warn' \| 'error'` | No       | —       | Filter by `AuditSeverity`.                                                                                                                                                                  |
+| `sessionId` | string                        | No       | —       | Narrow to one session. A value outside the key's `allowedSessions` returns `{ "data": [], "total": 0 }`.                                                                                    |
+| `apiKeyId`  | string                        | No       | —       | Filter by the acting key's id.                                                                                                                                                              |
+| `limit`     | integer                       | No       | `50`    | Page size, clamped to a maximum of `200`.                                                                                                                                                   |
+| `offset`    | integer                       | No       | `0`     | Rows to skip; a negative value resolves to `0`.                                                                                                                                             |
 
 **Response** `200`
 

@@ -614,6 +614,11 @@ plugin instances (`integration_instance_created`, `integration_instance_updated`
 `infra_restart_requested`, `infra_data_exported`, `infra_data_imported`, `infra_storage_exported`,
 `infra_storage_imported`).
 
+Eight of these are reserved and never emitted, so no row ever carries them: `api_key_used`,
+`session_connected`, `message_sent`, `message_failed`, `webhook_created`, `webhook_deleted`,
+`webhook_triggered` and `webhook_failed`. `src/modules/audit/intentionally-unemitted-actions.ts` is the
+authoritative list, with the reason for each.
+
 > [!NOTE]
 > Audit-log retention is automatic: see [§5.7 Data Retention](#57-data-retention). Other event types (session logs, API access logs) are surfaced via structured application logging, not dedicated database tables. The one exception is a webhook delivery that exhausts every retry — that lands in the `webhook_delivery_failures` table (§5.3.8), not just the log stream.
 
