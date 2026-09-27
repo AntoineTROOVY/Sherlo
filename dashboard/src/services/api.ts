@@ -705,7 +705,7 @@ async function handleErrorResponse<T>(response: Response): Promise<T> {
     }
   }
 
-  // On a non-JSON body (e.g. a reverse-proxy 502/503 HTML page) fall through to `HTTP <status>`
+  // On a non-JSON body (e.g. a reverse-proxy 502/503/504 HTML page) fall through to `HTTP <status>`
   // rather than statusText: the status code is what the toast connection-lost de-dup matches on,
   // and statusText is empty over HTTP/2 anyway.
   const error = await response.json().catch(() => ({}));
