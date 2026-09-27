@@ -161,6 +161,24 @@ describe('ScopeBindingService.onApplicationBootstrap reconciliation', () => {
     ).resolves.toBeUndefined();
   });
 
+  it('logs a failure after the listing without blaming the listing', async () => {
+    const { loader, audit, sessions } = build();
+    const instances = {
+      listAll: jest
+        .fn()
+        .mockResolvedValue([
+          { pluginId: 'chatwoot', instanceId: 'a', sessionScope: 'sess-1', config: {}, enabled: true },
+        ]),
+    } as unknown as PluginInstanceService;
+    const svc = new ScopeBindingService(instances, loader, audit, sessions);
+    jest.spyOn(svc, 'applyScopeBinding').mockRejectedValue(new Error('bind failed'));
+    const error = jest.spyOn((svc as unknown as { logger: { error: jest.Mock } }).logger, 'error');
+    error.mockImplementation(() => undefined);
+
+    await expect(svc.onApplicationBootstrap()).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalledWith('Scope-binding reconciliation failed', 'Error: bind failed');
+  });
+
   // A scope pointing at a deleted session binds the plugin to nothing, and every other signal an
   // operator can read (instance `enabled`, plugin `status`, healthCheck) stays green — so the log line
   // is the only place the inertness can surface.

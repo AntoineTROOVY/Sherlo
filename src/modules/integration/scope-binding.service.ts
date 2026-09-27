@@ -44,7 +44,7 @@ export class ScopeBindingService implements OnApplicationBootstrap {
     try {
       await this.reconcile();
     } catch (err) {
-      this.logger.error('Scope-binding reconciliation skipped (failed to list instances)', String(err));
+      this.logger.error('Scope-binding reconciliation failed', String(err));
     }
   }
 
