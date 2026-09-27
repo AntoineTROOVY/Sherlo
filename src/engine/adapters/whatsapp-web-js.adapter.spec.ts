@@ -6062,6 +6062,18 @@ describe('WhatsAppWebJsAdapter page transport error detection (wedged page fast-
     expect(onDisconnected).not.toHaveBeenCalled();
   });
 
+  // When no model at all could be read, the page is broken as a whole; an empty 200 would read as an
+  // address book with every contact deleted, so the failure still reaches the caller.
+  it('fails the read when WhatsApp Web could not read any contact', async () => {
+    const evaluate = jest.fn().mockResolvedValue({ rows: [], failed: 3, firstError: 'x is not a function' });
+    const { adapter, onDisconnected } = readyAdapter({ pupPage: { evaluate } });
+
+    await expect(adapter.getContacts()).rejects.toThrow(
+      'WhatsApp Web could not read any of 3 contact(s): x is not a function',
+    );
+    expect(onDisconnected).not.toHaveBeenCalled();
+  });
+
   // A rejection that carries no transport-death signature is an ordinary failure, not a dead page —
   // it must reach the caller unchanged and leave the session READY, unlike the 503 case above.
   it('propagates a non-transport rejection from getContacts untouched and leaves the session READY', async () => {

@@ -143,6 +143,13 @@ export class WwebjsContacts {
       throw error;
     }
 
+    // Every model threw: a systemic page failure (a renamed WA Web module, WWebJS not injected), not
+    // one unreadable entry. Answer an error, as before the per-entry catch, rather than an empty
+    // address book that a syncing consumer would read as every contact deleted.
+    if (raw.length === 0 && unreadable > 0) {
+      throw new Error(`WhatsApp Web could not read any of ${unreadable} contact(s): ${firstError}`);
+    }
+
     // Read every id through readWid (so the `_serialized`->`$1` rename lands here too) and skip
     // entries with no readable id, counted and logged like the chats path, rather than dropping
     // the whole address book silently.
