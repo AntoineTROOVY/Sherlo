@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A plugin `configUi` editor receives the dashboard language as `locale` in `config:value`, and the `schema` it gets carries field titles and descriptions localized from the manifest `i18n` block, as the generated form already showed. Thanks @probably-ABHINAV, and @TreIngenia for the proposal.
+- whatsapp-web.js: `GET /api/sessions/:sessionId/contacts` no longer fails with `500` when WhatsApp Web cannot read one contact (`getAlternateUserWid - Invalid get call using deviceWid`). That contact is skipped and counted in a warning, and the rest of the list is returned ([#1720](https://github.com/rmyndharis/OpenWA/issues/1720)). Thanks @onepay-ye for the report.
 
 ## [0.23.7] - 2026-09-25
 
