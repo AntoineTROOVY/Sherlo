@@ -5152,14 +5152,16 @@ describe('WhatsAppWebJsAdapter inbound media concurrency (slot held until the re
       (adapter as unknown as { capInboundMediaFor: (msg: unknown) => Promise<unknown> }).capInboundMediaFor(m);
 
     const r1 = cap(makeMsg('m1')); // download1 starts synchronously (slot 1)
+    // r2 arrives later, so its own deadline (t=35) outlasts r1's (t=20) and the slot handover below.
+    await jest.advanceTimersByTimeAsync(15);
     const r2 = cap(makeMsg('m2')); // parks on the limiter; download2 must NOT start
     expect(downloads.length).toBe(1);
 
-    // Time out BOTH callers' wall-clock deadline while the real download is still pending. With the old
+    // Time out r1's wall-clock deadline while its real download is still pending. With the old
     // coupling this freed the slot and admitted download2 (inFlight 2); the fix holds the slot.
-    await jest.advanceTimersByTimeAsync(25);
+    await jest.advanceTimersByTimeAsync(10);
     expect(await r1).toEqual(expect.objectContaining({ mimetype: 'image/png', omitted: true, sizeBytes: 100 }));
-    expect(downloads.length).toBe(1); // download2 still not started — slot held by the pending real download1
+    expect(downloads.length).toBe(1); // download2 still not started: slot held by the pending real download1
     expect(maxInFlight).toBe(1);
 
     // The real download1 finally settles -> the slot transfers and download2 may now start.
@@ -5168,12 +5170,54 @@ describe('WhatsAppWebJsAdapter inbound media concurrency (slot held until the re
     expect(downloads.length).toBe(2);
     expect(maxInFlight).toBe(1);
 
-    // Settle the rest so nothing dangles.
-    await jest.advanceTimersByTimeAsync(25);
-    expect(await r2).toEqual(expect.objectContaining({ mimetype: 'image/png', omitted: true, sizeBytes: 100 }));
+    // r2 was still waiting, so it gets its media.
     downloads[1].resolve({ mimetype: 'image/png', data: Buffer.from('b').toString('base64') });
     await jest.advanceTimersByTimeAsync(0);
+    expect(await r2).toEqual(
+      expect.objectContaining({ mimetype: 'image/png', data: Buffer.from('b').toString('base64') }),
+    );
     expect(maxInFlight).toBe(1);
+  });
+
+  it('skips the download of a queued message whose caller already gave up, so a later message keeps its media', async () => {
+    process.env.INBOUND_MEDIA_CONCURRENCY = '1';
+    process.env.MEDIA_DOWNLOAD_TIMEOUT_MS = '100';
+    process.env.MEDIA_DOWNLOAD_MAX_BYTES = String(10 * 1024 * 1024);
+    process.env.MEDIA_DOWNLOAD_ENABLED = 'true';
+    jest.useFakeTimers();
+
+    const adapter = newAdapter();
+    const started: string[] = [];
+    const makeMsg = (id: string): unknown => ({
+      id: { _serialized: id },
+      _data: { size: 100, mimetype: 'image/png' },
+      downloadMedia: jest.fn(() => {
+        started.push(id);
+        // Every download takes 60 ms, inside the 100 ms deadline on its own.
+        return new Promise(resolve =>
+          setTimeout(() => resolve({ mimetype: 'image/png', data: Buffer.from(id).toString('base64') }), 60),
+        );
+      }),
+    });
+    const cap = (m: unknown): Promise<{ data?: string; omitted?: boolean }> =>
+      (
+        adapter as unknown as { capInboundMediaFor: (msg: unknown) => Promise<{ data?: string; omitted?: boolean }> }
+      ).capInboundMediaFor(m);
+
+    // A burst of six: m1 downloads at t=0, m2 is admitted at t=60, and m3..m6 time out at t=100
+    // while still queued. Their downloads must never start.
+    const burst = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6'].map(id => cap(makeMsg(id)));
+    await jest.advanceTimersByTimeAsync(120);
+    const results = await Promise.all(burst);
+    expect(results[0].data).toBe(Buffer.from('m1').toString('base64'));
+    expect(results.slice(1).every(r => r.omitted === true)).toBe(true);
+    expect(started).toEqual(['m1', 'm2']);
+
+    // A message arriving right after the burst is not stuck behind downloads nobody reads.
+    const fresh = cap(makeMsg('m7'));
+    await jest.advanceTimersByTimeAsync(60);
+    expect((await fresh).data).toBe(Buffer.from('m7').toString('base64'));
+    expect(started).toEqual(['m1', 'm2', 'm7']);
   });
 
   it('returns the omitted marker for a rejecting download and releases the slot for the next one', async () => {
