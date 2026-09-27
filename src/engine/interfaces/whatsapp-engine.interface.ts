@@ -114,7 +114,7 @@ export interface IncomingMessage {
    *  in the raw payload. 0 or undefined = no disappearing timer.
    *  Known values: 86400 (24h), 604800 (7d), 7776000 (90d). */
   ephemeralDuration?: number;
-  /** For group messages, the WID of the participant who actually sent it (`from` is the group JID there). */
+  /** For group, status and broadcast-list messages, the WID of the sender (`from` is the group or `@broadcast` id). */
   author?: string;
   /** WIDs @mentioned in the message (empty/absent when none). Surfaced for command targeting. */
   mentionedIds?: string[];

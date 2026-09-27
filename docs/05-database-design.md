@@ -489,7 +489,7 @@ CREATE TABLE messages (
     "waMessageId" VARCHAR,                -- nullable; transient outgoing rows have none yet
     "chatId" VARCHAR NOT NULL,
     "chatName" VARCHAR,                   -- nullable; inbound sender pushName (the member, in a group)
-    author VARCHAR,                       -- nullable; participant JID for a group message ("from" is the group)
+    author VARCHAR,                       -- nullable; sender JID for a group, status or broadcast-list message
     "from" VARCHAR NOT NULL,
     "to" VARCHAR NOT NULL,
     body TEXT,

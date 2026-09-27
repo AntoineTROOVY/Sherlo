@@ -11637,7 +11637,7 @@
           "author": {
             "type": "string",
             "nullable": true,
-            "description": "Group participant who posted the message (`from` is the group JID there).",
+            "description": "Sender of a group, status or broadcast-list message (`from` is the group or `@broadcast` id there).",
             "example": "628123456789@c.us"
           },
           "from": {
@@ -12658,7 +12658,7 @@
           },
           "author": {
             "type": "string",
-            "description": "Group participant who actually sent it (`from` is the group JID there).",
+            "description": "Sender of a group, status or broadcast-list message (`from` is the group or `@broadcast` id there).",
             "example": "628123456789@c.us"
           },
           "mentionedIds": {
