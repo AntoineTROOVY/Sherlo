@@ -2,6 +2,21 @@ import { DeliveryStatus, IncomingMessage, MessageType } from '../interfaces/what
 import { chatKind } from '../identity/wa-id';
 
 /**
+ * Content types that change or annotate another message and carry nothing of their own: a poll vote,
+ * an in-chat pin, a keep-in-chat toggle, an album header (its photos arrive as their own messages), an
+ * encrypted reaction and an event RSVP. Mapped, they would surface as a bodyless `unknown` message, so
+ * the live and history paths drop them instead.
+ */
+export const BAILEYS_NON_CONTENT_TYPES: ReadonlySet<string> = new Set([
+  'pollUpdateMessage',
+  'pinInChatMessage',
+  'keepInChatMessage',
+  'albumMessage',
+  'encReactionMessage',
+  'encEventResponseMessage',
+]);
+
+/**
  * Map a Baileys message content-type token (from `getContentType`) to the engine-neutral
  * {@link MessageType}. `audioMessage` splits on the `ptt` flag into `voice` vs `audio`,
  * mirroring the wwjs `ptt -> voice` mapping. Anything unmapped becomes `unknown`.

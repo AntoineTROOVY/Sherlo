@@ -2189,6 +2189,83 @@ describe('BaileysAdapter inbound fan-out', () => {
     });
   });
 
+  describe('messages with no content of their own are dropped on the live and history paths', () => {
+    // A poll vote rides with its messageContextInfo, which protobuf decodes first (field 35 before 50);
+    // it must not decide the type. A vote in a disappearing chat arrives wrapped.
+    const nonContent: Array<[string, Record<string, unknown>]> = [
+      [
+        'VOTE',
+        {
+          messageContextInfo: { messageSecret: 'cw==' },
+          pollUpdateMessage: { pollCreationMessageKey: { id: 'POLL1' }, vote: { encPayload: 'eA==', encIv: 'eA==' } },
+        },
+      ],
+      [
+        'VOTE_EPHEMERAL',
+        { ephemeralMessage: { message: { pollUpdateMessage: { pollCreationMessageKey: { id: 'POLL1' } } } } },
+      ],
+      ['PIN', { pinInChatMessage: { key: { id: 'M1' }, type: 1 } }],
+      ['KEEP', { keepInChatMessage: { key: { id: 'M1' }, keepType: 1 } }],
+      ['ALBUM', { albumMessage: { expectedImageCount: 2 } }],
+      ['ENC_REACTION', { encReactionMessage: { targetMessageKey: { id: 'M1' } } }],
+      ['EVENT_RSVP', { encEventResponseMessage: { eventCreationMessageKey: { id: 'EV1' } } }],
+    ];
+    const batch = (fromMe: boolean) => [
+      ...nonContent.map(([id, message]) => ({
+        key: { remoteJid: '628111@s.whatsapp.net', fromMe, id },
+        message,
+        messageTimestamp: 1700000060,
+      })),
+      {
+        key: { remoteJid: '628111@s.whatsapp.net', fromMe, id: 'TEXT' },
+        message: { conversation: 'a real message' },
+        messageTimestamp: 1700000061,
+      },
+    ];
+
+    beforeEach(() => {
+      baileys.getContentType.mockImplementation(realGetContentType);
+      baileys.normalizeMessageContent.mockImplementation(
+        (m?: { ephemeralMessage?: { message?: unknown } }) => m?.ephemeralMessage?.message ?? m,
+      );
+    });
+
+    it.each([
+      ['received', false, 'onMessage'],
+      ['sent from the phone', true, 'onMessageCreate'],
+    ] as const)('live, %s: emits and stores only the real message', async (_label, fromMe, callback) => {
+      const emitted = jest.fn();
+      const adapter = newAdapter();
+      const logger = (adapter as unknown as { logger: { debug: (m: string, meta?: unknown) => void } }).logger;
+      const debug = jest.spyOn(logger, 'debug').mockImplementation(() => undefined);
+      await adapter.initialize({ [callback]: emitted });
+      fakeSock.fire('messages.upsert', { type: 'notify', messages: batch(fromMe) });
+      await new Promise(r => setImmediate(r));
+      await new Promise(r => setImmediate(r));
+
+      expect(emitted).toHaveBeenCalledTimes(1);
+      expect(emitted).toHaveBeenCalledWith(expect.objectContaining({ id: 'TEXT', type: 'text' }));
+      const stored = fakeStore.put.mock.calls as Array<[string, { key: { id: string } }]>;
+      expect(stored.map(([, m]) => m.key.id)).toEqual(['TEXT']);
+      expect(debug).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ msgId: 'VOTE', contentType: 'pollUpdateMessage' }),
+      );
+    });
+
+    it('history sync: keeps only the real message', async () => {
+      const onHistoryMessages = jest.fn();
+      const adapter = newAdapter();
+      await adapter.initialize({ onHistoryMessages });
+      fakeSock.fire('messaging-history.set', { contacts: [], chats: [], messages: batch(false) });
+      await new Promise(r => setImmediate(r));
+      await new Promise(r => setImmediate(r));
+      expect(onHistoryMessages).toHaveBeenCalledTimes(1);
+      const mapped = (onHistoryMessages.mock.calls as Array<[IncomingMessage[]]>)[0][0];
+      expect(mapped.map(m => m.id)).toEqual(['TEXT']);
+    });
+  });
+
   it('surfaces inbound @mentions as neutral mentionedIds (contextInfo.mentionedJid)', async () => {
     const onMessage = jest.fn();
     const adapter = newAdapter();
