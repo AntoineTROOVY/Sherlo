@@ -548,9 +548,9 @@ export function useStopSessionMutation() {
 Real-time updates use **socket.io** (`socket.io-client`), not a raw browser `WebSocket`. The hook is
 `src/hooks/useWebSocket.ts`. Key facts:
 
-- **Namespace `/events`** (not `/ws`). The client connects to
-  `${VITE_WS_URL || VITE_API_URL || window.location.origin}/events` — same-origin by default; a split-origin build
-  follows the `VITE_API_URL` origin, and `VITE_WS_URL` overrides both.
+- **Namespace `/events`** (not `/ws`). The client connects to `<origin>/events`, where the origin is
+  `VITE_WS_URL` when set, else the origin of `VITE_API_URL` (so a split-origin build reaches the
+  API), else `window.location.origin`.
 - **API key via the socket.io `auth` payload (and an `X-API-Key` header for proxies), deliberately
   _not_ in the query string** — a key in the handshake URL would leak into access logs / `Referer`.
 - **Reconnection is socket.io's built-in mechanism** — `reconnectionAttempts: 5`,
@@ -749,8 +749,9 @@ VITE_API_URL=https://api.example.com npm run build   # in dashboard/
 ```
 
 `dashboard/src/services/api.ts` reads `VITE_API_URL` and calls that origin instead of same-origin
-`/api`. The realtime socket follows the same origin unless `VITE_WS_URL` overrides it. Set `SERVE_DASHBOARD=false` on the API so it stops serving its own copy. Remember to add the
-dashboard's origin to `CORS_ORIGINS` on the API.
+`/api`. The realtime socket follows the same origin unless `VITE_WS_URL` overrides it. Set
+`SERVE_DASHBOARD=false` on the API so it stops serving its own copy. Remember to add the dashboard's
+origin to `CORS_ORIGINS` on the API.
 
 For TLS or public exposure of the default single-port setup, terminate at your own reverse proxy
 (nginx, Caddy, a cloud load balancer, or a k8s Ingress) in front of the API; see

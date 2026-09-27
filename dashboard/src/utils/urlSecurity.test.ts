@@ -65,3 +65,11 @@ test('resolveSocketUrl prefers VITE_WS_URL, then the API origin, then the page o
   assert.equal(resolveSocketUrl(undefined, api, page), api);
   assert.equal(resolveSocketUrl('https://ws.example.com', api, page), 'https://ws.example.com');
 });
+
+test('resolveSocketUrl keeps only the origin of a VITE_API_URL that carries a path', () => {
+  const page = 'https://dashboard.example.com';
+  assert.equal(resolveSocketUrl(undefined, 'https://api.example.com/gw', page), 'https://api.example.com');
+  assert.equal(resolveSocketUrl(undefined, 'https://api.example.com:8443/gw/v1', page), 'https://api.example.com:8443');
+  // A relative value is a path on the page's own host.
+  assert.equal(resolveSocketUrl(undefined, '/gw', page), page);
+});
