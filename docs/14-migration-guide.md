@@ -290,14 +290,18 @@ BullMQ stores job data in Redis. When switching Redis instances, pending jobs ma
 **Best Practice - Drain Queue Before Switching:**
 
 ```bash
-# Step 1: Check queue status via Bull Board
-# Visit: http://localhost:2785/api/admin/queues
+# Step 1: Read both queues' depth from Bull Board's JSON route. Bull Board takes an ADMIN key in the
+# X-API-Key header only, so a plain browser tab on /api/admin/queues gets 401; open the HTML board
+# through a reverse proxy or client that adds the header.
+curl -s 'http://localhost:2785/api/admin/queues/api/queues' \
+  -H 'X-API-Key: ADMIN_KEY' | jq '.queues[] | {name, waiting: .counts.waiting, active: .counts.active, delayed: .counts.delayed}'
 
-# Step 2: Wait until the webhook and ingress queues are empty (Bull Board shows webhook-queue and ingress-queue; there is no MESSAGE queue)
-# Or check via API:
+# Step 2: Wait until waiting, active and delayed are 0 for both webhook-queue and ingress-queue
+# (there is no MESSAGE queue). /api/infra/status is a shortcut for the webhook queue only: it does
+# not count ingress-queue, and it reports zeros when Redis is unreachable.
 curl -s 'http://localhost:2785/api/infra/status' \
-  -H 'X-API-Key: YOUR_KEY' | jq '.queue'
-# Wait for: pending: 0
+  -H 'X-API-Key: ADMIN_KEY' | jq '.queue.webhooks.pending'
+# Wait for: 0
 
 # Step 3: Change Redis configuration
 REDIS_HOST=new-redis-host.com
@@ -313,7 +317,7 @@ docker compose up -d
 | Built-in → External Redis | ⚠️      | Drain queue first |
 
 > [!WARNING]
-> **Job Loss Prevention**: Always ensure the `webhook-queue` and `ingress-queue` queues are empty before switching Redis instances (there is no MESSAGE queue). Check the `/api/admin/queues` dashboard.
+> **Job Loss Prevention**: Always ensure the `webhook-queue` and `ingress-queue` queues are empty before switching Redis instances (there is no MESSAGE queue). Check both with the header-authenticated Bull Board JSON route in Step 1; the `/api/admin/queues` board needs an ADMIN key in the `X-API-Key` header, so a browser reaches it only through a reverse proxy that adds the header.
 
 ### Infrastructure Migration Summary
 
