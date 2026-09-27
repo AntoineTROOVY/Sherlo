@@ -4743,6 +4743,8 @@ Send a synthetic test payload to the webhook URL and report the result. No reque
 
 On a reachable endpoint the response is `{ success: <response.ok>, statusCode: <response.status> }` — so a non-2xx target returns `200` HTTP with `success: false` and the target's `statusCode`. On an SSRF/timeout/network error the response is `{ "success": false, "error": "<message>" }`. The endpoint never throws on delivery failure; the failure is reflected in the body, not the HTTP status. The test POST sends `{ "event": "test", ... }` with headers `Content-Type`, `User-Agent: OpenWA-Webhook/1.0.0`, `X-OpenWA-Event: test`, `X-OpenWA-Idempotency-Key`, `X-OpenWA-Delivery-Id`, `X-OpenWA-Retry-Count: 0`, and `X-OpenWA-Signature` when a secret is set. Timeout defaults to 10000 ms (`webhook.timeout` config).
 
+Every test call carries a fresh `X-OpenWA-Idempotency-Key` (`test_<deliveryId>_<webhookId>`), so a receiver that dedups on it runs its handler for each test.
+
 **Errors:** `401` missing/invalid API key · `403` insufficient role · `404` webhook not found in this session
 
 #### DELETE /api/sessions/:sessionId/webhooks/:id
