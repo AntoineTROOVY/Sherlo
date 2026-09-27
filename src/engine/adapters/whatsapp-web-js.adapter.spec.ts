@@ -1117,8 +1117,9 @@ describe('WhatsAppWebJsAdapter.forwardMessage (returns the real sent id, not a s
   const row = (id: string, isForwarded = false) => ({ id: { _serialized: id }, timestamp: 1000, isForwarded });
 
   it('returns the new copy, not an earlier send that landed in the same second', async () => {
-    // Order matters: the earlier send comes last, where a latest-timestamp pick would keep it.
-    expect(await forwardWith([row('TEXT')], [row('FWD'), row('TEXT')])).toBe('FWD');
+    // Order matters: the earlier send comes first, where a strict latest-timestamp pick keeps the
+    // first of a tie.
+    expect(await forwardWith([row('TEXT')], [row('TEXT'), row('FWD')])).toBe('FWD');
   });
 
   it('returns the unknown id when nothing new appears in the destination chat', async () => {
