@@ -2527,6 +2527,8 @@ Batch-resolve profile picture URLs for many contacts in one request (a chat side
 
 `pictures` is keyed by the requested id. A per-id failure — or a lookup that exceeds the 8 s per-id deadline — yields `null` for that id rather than failing the batch. An omitted or empty `ids` returns `{ "pictures": {} }`.
 
+An engine that is not ready is the exception: it describes the session rather than one id, so the whole request answers `409` and no partial result is returned.
+
 > Route-order caveat: `profile-pictures` is declared **before** `GET /:contactId`, so the literal segment wins — a contact whose id is literally `profile-pictures` cannot be fetched through the single-contact route.
 
 **Errors:** `400` session is not started · `401` missing/invalid API key, or key not scoped to this session · `409` conflict or engine not ready (retryable)
