@@ -42,7 +42,6 @@ export interface WebhookJobData {
   url: string;
   event: string;
   payload: WebhookPayload;
-  headers: Record<string, string>;
   attempt: number;
   maxRetries: number;
 }
@@ -473,15 +472,13 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
   ): Promise<WebhookDeliveryOutcome> {
     const { sessionId, event } = ctx;
     try {
-      // The job's headers are the enqueue-time snapshot. The processor rebuilds them (and the
-      // signature) from the current webhook row on every attempt, so a secret or header rotated
-      // while the job waits is honoured.
+      // No headers are stored: the processor builds them and the signature from the current row on
+      // every attempt, so custom headers (which may carry receiver credentials) never reach Redis.
       const jobData: WebhookJobData = {
         webhookId: webhook.id,
         url: webhook.url,
         event,
         payload: finalPayload,
-        headers,
         attempt: 1,
         maxRetries: webhook.retryCount,
       };

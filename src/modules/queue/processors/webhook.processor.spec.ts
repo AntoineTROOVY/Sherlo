@@ -46,7 +46,6 @@ describe('WebhookProcessor', () => {
           deliveryId: 'd',
           data: {},
         },
-        headers: { 'Content-Type': 'application/json' },
         attempt: 1,
         maxRetries: 3,
         ...overrides,
@@ -262,13 +261,15 @@ describe('WebhookProcessor', () => {
         secret: 'rotated',
       });
       mockFetch.mockResolvedValue({ ok: true, status: 200 });
+      // Jobs no longer carry headers, but one enqueued by an earlier release still holds a snapshot
+      // in Redis; it must be ignored in favour of the current row.
       const job = makeJob({
         headers: {
           'Content-Type': 'application/json',
           Authorization: 'Bearer old',
           'X-OpenWA-Signature': 'sha256=old',
         },
-      });
+      } as Partial<WebhookJobData>);
 
       const result = await processor.process(job);
 

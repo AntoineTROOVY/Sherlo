@@ -1447,8 +1447,10 @@ describe('WebhookDeliveryService', () => {
       ];
       // BullMQ's dedupe boundary and the receiver's must key off the SAME identifier, or a job
       // that BullMQ accepts twice still looks like one delivery to the receiver (and vice versa).
-      expect(opts.jobId).toBe(jobData.headers['X-OpenWA-Delivery-Id']);
       expect(opts.jobId).toBe(jobData.payload.deliveryId);
+      // Custom headers may carry receiver credentials and the processor rebuilds every header from
+      // the current row, so the job must not copy them into Redis.
+      expect(jobData).not.toHaveProperty('headers');
     });
 
     it('gives sibling webhooks distinct job ids, so one event fanning out is not collapsed into one job', async () => {
