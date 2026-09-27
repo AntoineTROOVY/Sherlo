@@ -390,6 +390,9 @@ flowchart TB
 ```bash
 # .env — excerpt of the commonly-tuned keys. The repo's `.env.example` is the canonical,
 # fully annotated list; add nothing here that does not appear there.
+# Keys the dashboard manages (Dashboard > Infrastructure) are commented out with their defaults:
+# an uncommented key in .env pins that value over the one the dashboard saves (see the header of
+# `.env.example`). Uncomment only what you intend to manage by hand.
 
 # ===========================================
 # APPLICATION
@@ -405,8 +408,8 @@ LOG_FORMAT=json
 # ===========================================
 # Option 1: SQLite (for minimal deployments)
 # For SQLite, DATABASE_NAME is the database FILE PATH.
-DATABASE_TYPE=sqlite
-DATABASE_NAME=./data/openwa.sqlite
+# DATABASE_TYPE=sqlite
+# DATABASE_NAME=./data/openwa.sqlite
 
 # Option 2: PostgreSQL (for production) — DATABASE_NAME is the database NAME here
 # DATABASE_TYPE=postgres
@@ -424,8 +427,8 @@ DATABASE_NAME=./data/openwa.sqlite
 # STORAGE_TYPE accepts only `local` or `s3` — env validation rejects anything else and the app
 # FAILS TO BOOT ("Invalid environment configuration"). There is no silent fallback to local disk.
 # Option 1: Local filesystem (default)
-STORAGE_TYPE=local
-STORAGE_LOCAL_PATH=./data/media
+# STORAGE_TYPE=local
+# STORAGE_LOCAL_PATH=./data/media
 
 # Option 2: S3 (AWS) — leave S3_ENDPOINT unset; the SDK derives it from the region
 # STORAGE_TYPE=s3
@@ -448,9 +451,9 @@ STORAGE_LOCAL_PATH=./data/media
 # Both are opt-in and both need a reachable Redis, configured with the discrete host/port pair
 # (there is no REDIS_URL). Defaults: no cache at all (CacheService is a no-op and every read falls
 # through to the database — there is no in-memory tier) and inline (non-queued) dispatch.
-REDIS_ENABLED=false
-REDIS_HOST=localhost
-REDIS_PORT=6379
+# REDIS_ENABLED=false
+# REDIS_HOST=localhost
+# REDIS_PORT=6379
 # Redis-backed caching switches on when REDIS_ENABLED=true OR CACHE_ENABLED=true — enabling Redis
 # for the queue alone therefore also enables the cache.
 # CACHE_ENABLED=true
@@ -462,12 +465,12 @@ REDIS_PORT=6379
 # ENGINE_TYPE=baileys   # whatsapp-web.js (default) | baileys; omit to use the dashboard selection
 
 # Session
-SESSION_DATA_PATH=./data/sessions
+# SESSION_DATA_PATH=./data/sessions
 
 # Puppeteer (for whatsapp-web.js)
 PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-PUPPETEER_HEADLESS=true
-PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox
+# PUPPETEER_HEADLESS=true
+# PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu
 # Optional per-browser-command budget, ms. Unset = Puppeteer's own budget. Raise only after seeing
 # "Runtime.callFunctionOn timed out"; positive integer, max 2147483647 (cost: see docs/12).
 # PUPPETEER_PROTOCOL_TIMEOUT_MS=300000
@@ -478,8 +481,9 @@ PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox
 # First-boot seed for the initial ADMIN key, ignored once any key exists. Leave it unset to
 # generate a random key into data/.api-key, or set one generated with: openssl rand -base64 32
 # API_MASTER_KEY=
-# Optional HMAC pepper so a DB leak alone can't precompute key hashes
-API_KEY_PEPPER=optional-key-hashing-pepper
+# Optional HMAC pepper so a DB leak alone can't precompute key hashes. Generate a random value
+# (openssl rand -base64 32); setting or changing it invalidates every API key issued before.
+# API_KEY_PEPPER=
 
 # ===========================================
 # WEBHOOK
@@ -542,12 +546,15 @@ export default () => ({
     puppeteer: {
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       headless: process.env.PUPPETEER_HEADLESS !== 'false',
-      // Split on commas AND whitespace; the default is a four-flag string, not an empty list
-      args: (
-        process.env.PUPPETEER_ARGS || '--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu'
-      )
-        .split(/[\s,]+/)
-        .filter(Boolean),
+      // Split on whitespace, and on a comma only before the next flag, so a flag value keeps its
+      // commas (--disable-features=A,B). The default is a four-flag string, not an empty list, and
+      // --lang=en-US is appended unless a --lang flag is already present.
+      args: withPinnedBrowserLocale(
+        (process.env.PUPPETEER_ARGS || '--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu')
+          .split(/\s+|,+(?=-)/)
+          .map(arg => arg.replace(/^,+|,+$/g, ''))
+          .filter(Boolean),
+      ),
     },
   },
   webhook: {
