@@ -290,9 +290,9 @@ BullMQ stores job data in Redis. When switching Redis instances, pending jobs ma
 **Best Practice - Drain Queue Before Switching:**
 
 ```bash
-# Step 1: Read both queues' depth from Bull Board's JSON route. Bull Board takes an ADMIN key in the
-# X-API-Key header only, so a plain browser tab on /api/admin/queues gets 401; open the HTML board
-# through a reverse proxy or client that adds the header.
+# Step 1: Read both queues' depth from Bull Board's JSON route. Bull Board takes an ADMIN key only in
+# a request header (X-API-Key or Authorization: Bearer), never in the URL, so a plain browser tab on
+# /api/admin/queues gets 401; open the HTML board through a reverse proxy or client that adds one.
 curl -s 'http://localhost:2785/api/admin/queues/api/queues' \
   -H 'X-API-Key: ADMIN_KEY' | jq '.queues[] | {name, waiting: .counts.waiting, active: .counts.active, delayed: .counts.delayed}'
 
@@ -317,7 +317,7 @@ docker compose up -d
 | Built-in → External Redis | ⚠️      | Drain queue first |
 
 > [!WARNING]
-> **Job Loss Prevention**: Always ensure the `webhook-queue` and `ingress-queue` queues are empty before switching Redis instances (there is no MESSAGE queue). Check both with the header-authenticated Bull Board JSON route in Step 1; the `/api/admin/queues` board needs an ADMIN key in the `X-API-Key` header, so a browser reaches it only through a reverse proxy that adds the header.
+> **Job Loss Prevention**: Always ensure the `webhook-queue` and `ingress-queue` queues are empty before switching Redis instances (there is no MESSAGE queue). Check both with the header-authenticated Bull Board JSON route in Step 1; the `/api/admin/queues` board needs an ADMIN key in the `X-API-Key` header or as an `Authorization: Bearer` token (never in the URL), so a browser reaches it only through a reverse proxy that adds one.
 
 ### Infrastructure Migration Summary
 
