@@ -118,12 +118,14 @@ deployment rather than on a single session:
 
 - Infrastructure routes (`/api/infra/*`)
 - API-key lifecycle routes (`/api/auth/api-keys/*`)
-- Plugin installation and lifecycle (`/api/plugins/*` — per-session activation
-  and per-session config remain available, scoped to the sessions the key
-  allows)
+- Plugin installation, lifecycle and activation (`/api/plugins/*`, including
+  `PUT /api/plugins/:id/sessions`, which replaces the whole activation set);
+  only the per-session config override (`PUT /api/plugins/:id/config/:sessionId`)
+  remains available, scoped to the sessions the key allows
 - Cross-session statistics (`GET /api/stats/overview`, `GET /api/stats/messages`)
 - Application settings (`GET /api/settings`)
 - Session creation (`POST /api/sessions`)
+- Session egress proxy configuration (`PATCH /api/sessions/:sessionId/proxy`)
 - The queue dashboard (`/api/admin/queues`)
 
 Redriving a dead-lettered integration delivery also fails closed (`404`) when
