@@ -1496,9 +1496,10 @@ export interface PresenceCapability {
    * wire operation (`<chatstate>` / `sendStateTyping`) and do not publish this.
    *
    * The call itself is one-shot. The gateway remembers a successful one for the life of the running
-   * engine and re-applies it once each time that connection opens: Baileys broadcasts `available`
-   * on connect (`markOnlineOnConnect`), which would otherwise wipe `available: false` on a
-   * transient reconnect. Replacing the engine drops the preference.
+   * engine and re-applies it once each time that connection opens: Baileys announces itself on
+   * connect per `markOnlineOnConnect` (`available` by default), which would otherwise replace the
+   * caller's choice on a transient reconnect. Replacing the engine drops the preference: stop,
+   * restart, reconnect recovery, a watchdog recycle, or a takeover by another node.
    *
    * On Baileys this throws when the account push name is not set yet. `sendPresenceUpdate`
    * resolves without sending in that case (`no name present, ignoring presence update request`).

@@ -5673,6 +5673,22 @@ describe('SessionService', () => {
       expect(mockEngine.setOnlinePresence).toHaveBeenCalledWith(false);
     });
 
+    it('re-applies on every later open of the same engine, and keeps the preference after a failed re-apply', async () => {
+      const callbacks = await startAndCaptureCallbacks();
+      await service.setOnlinePresence('sess-uuid-1', false);
+      mockEngine.setOnlinePresence.mockClear();
+
+      // A transient reconnect keeps the engine and fires onReady again; the first re-apply fails.
+      mockEngine.setOnlinePresence.mockRejectedValueOnce(new Error('socket closed'));
+      callbacks.onReady!('628123', 'Alice');
+      await flush();
+      callbacks.onReady!('628123', 'Alice');
+      await flush();
+
+      expect(mockEngine.setOnlinePresence).toHaveBeenCalledTimes(2);
+      expect(mockEngine.setOnlinePresence).toHaveBeenNthCalledWith(2, false);
+    });
+
     it('does not publish own presence on ready when the caller never set one', async () => {
       const callbacks = await startAndCaptureCallbacks();
       mockEngine.setOnlinePresence.mockClear();

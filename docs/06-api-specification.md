@@ -889,10 +889,12 @@ offline suppresses the phone's own alerts — `available: false` hands them back
 engines.
 
 A successful call is remembered for the life of the running engine and re-applied once each time
-that connection opens, including a Baileys transient reconnect. Baileys broadcasts `available` on
-connect (`markOnlineOnConnect`), which would otherwise replace a previous `available: false`. The
-preference is dropped when the engine is replaced (stop, or a restart that builds a new engine) and
-must be re-issued after that. Typing, recording, and outbound sends do not change global presence.
+that connection opens, including a Baileys transient reconnect. Baileys announces itself on connect
+(`available` unless `BAILEYS_MARK_ONLINE_ON_CONNECT=false`), which would otherwise replace the
+caller's choice. The preference is dropped whenever the gateway replaces the engine: stop, restart,
+reconnect recovery, a watchdog recycle, or a takeover by another node. Re-issue it after
+`session.status` reports `ready` again. On Baileys, typing, recording and outbound sends do not
+change global presence.
 
 Not best-effort — a failure surfaces instead of leaving the account silently online. On Baileys a
 `409` is also returned when the account push name has not synced yet: `sendPresenceUpdate` returns

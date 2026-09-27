@@ -218,8 +218,9 @@ curl "$BASE/api/sessions/8f3c2b1a-9d4e-4c7a-8b2f-1e6d5a4c3b2a/presence/123456789
 
 Set the account's OWN global presence — appear online or offline (OPERATOR, both engines). A
 successful call is re-applied once each time that engine's connection opens, including a Baileys
-transient reconnect, and dropped when the engine is replaced. On Baileys a `409` means the push
-name has not synced yet and nothing was sent.
+transient reconnect. It is dropped whenever the gateway replaces the engine (stop, restart, reconnect
+recovery, watchdog recycle, takeover), so re-issue it after `session.status` reports `ready`. On
+Baileys a `409` on a ready session means the push name has not synced yet and nothing was sent.
 
 ```bash
 curl -X PUT "$BASE/api/sessions/8f3c2b1a-9d4e-4c7a-8b2f-1e6d5a4c3b2a/presence" \
