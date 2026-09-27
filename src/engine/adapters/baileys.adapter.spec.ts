@@ -1037,25 +1037,45 @@ describe('BaileysAdapter reconnect policy — unlimited backoff (I4 hardening)',
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it('successful connection resets the reconnect counter (next drop uses the attempt-1 delay)', async () => {
-    const adapter = await initWithRealTimers({});
+  it('a connection that drops right after opening keeps climbing the backoff (1 s, 2 s, 4 s)', async () => {
+    const onReconnecting = jest.fn();
+    const adapter = await initWithRealTimers({ onReconnecting });
     baileys().default.mockClear();
     jest.useFakeTimers();
     jest.spyOn(Math, 'random').mockReturnValue(0);
 
-    // Drop + reconnect — the counter is now 1 (no 'open' yet).
+    // Each cycle opens, then drops at once: the open alone must not restart the counter.
+    for (const delay of [1_000, 2_000, 4_000]) {
+      fireRecoverableClose();
+      await jest.advanceTimersByTimeAsync(delay);
+      fakeSock.fire('connection.update', { connection: 'open' });
+      expect(adapter.getStatus()).toBe(EngineStatus.READY);
+    }
+    expect(onReconnecting.mock.calls).toEqual([
+      [1, 1_000],
+      [2, 2_000],
+      [3, 4_000],
+    ]);
+    expect(baileys().default).toHaveBeenCalledTimes(3);
+  });
+
+  it('a connection that stayed open past the stability window restarts the backoff at attempt 1', async () => {
+    const onReconnecting = jest.fn();
+    await initWithRealTimers({ onReconnecting });
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+
     fireRecoverableClose();
     await jest.advanceTimersByTimeAsync(1_000);
-    expect(baileys().default).toHaveBeenCalledTimes(1);
-
-    // Simulate a successful open — should reset the reconnect counter to 0.
     fakeSock.fire('connection.update', { connection: 'open' });
-    expect(adapter.getStatus()).toBe(EngineStatus.READY);
-
-    // The next drop must schedule attempt 1 (1 s), not attempt 2 (2 s): 1.5 s settles it.
     fireRecoverableClose();
-    await jest.advanceTimersByTimeAsync(1_500);
-    expect(baileys().default).toHaveBeenCalledTimes(2);
+    await jest.advanceTimersByTimeAsync(2_000);
+    fakeSock.fire('connection.update', { connection: 'open' });
+
+    // Up for the whole window, then dropped: a fresh incident, so attempt 1 (1 s), not attempt 3.
+    jest.setSystemTime(Date.now() + 5 * 60_000);
+    fireRecoverableClose();
+    expect(onReconnecting).toHaveBeenLastCalledWith(1, 1_000);
   });
 
   it('stability reset: a close >5 min after the previous close restarts the backoff at attempt 1', async () => {
