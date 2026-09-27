@@ -91,7 +91,14 @@ export async function loadRemoteMedia(url: string, sessionProxyUrl: string | und
   // `sessionProxyUrl` routes the fetch through this session's egress proxy (#1626); the browser's
   // own requests already ride Chromium's --proxy-server, this one is made by the gateway itself.
   const { data, mimetype } = await loadRemoteMediaBuffer(url, sessionProxyUrl);
-  const filename = new URL(url).pathname.split('/').pop() || undefined;
+  // The pathname keeps its percent-encoding, and the recipient would see `Laporan%20Bulanan.pdf`. A
+  // malformed escape keeps the raw name, and a decoded slash is replaced so the label stays one name.
+  let filename = new URL(url).pathname.split('/').pop() || undefined;
+  try {
+    filename = filename && decodeURIComponent(filename).replace(/[/\\]/g, '_');
+  } catch {
+    // URIError: keep the raw basename.
+  }
   return new MessageMedia(mimetype || 'application/octet-stream', data.toString('base64'), filename);
 }
 

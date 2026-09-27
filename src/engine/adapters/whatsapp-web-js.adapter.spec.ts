@@ -570,6 +570,21 @@ describe('loadRemoteMedia — routes through the SSRF-pinned media fetch', () =>
     expect(undiciFetch).not.toHaveBeenCalled();
   });
 
+  it('names the file after the percent-decoded URL basename', async () => {
+    (undiciFetch as jest.Mock).mockResolvedValue(fakeResponse([1], { 'content-type': 'application/pdf' }));
+
+    const name = async (url: string): Promise<string | undefined> =>
+      (await loadRemoteMedia(url, undefined)).filename ?? undefined;
+
+    expect(await name('https://8.8.8.8/files/Laporan%20Bulanan%20Sept.pdf')).toBe('Laporan Bulanan Sept.pdf');
+    // A malformed escape keeps the raw name instead of failing the send.
+    expect(await name('https://8.8.8.8/files/x%zz.pdf')).toBe('x%zz.pdf');
+    expect(await name('https://8.8.8.8/files/r%E0%A4.pdf')).toBe('r%E0%A4.pdf');
+    // A decoded separator cannot put a path into the label.
+    expect(await name('https://8.8.8.8/files/a%2Fb%5Cc.pdf')).toBe('a_b_c.pdf');
+    expect(await name('https://8.8.8.8/')).toBeUndefined();
+  });
+
   it('honors the SSRF_ALLOWED_HOSTS escape-hatch for trusted internal media stores', async () => {
     process.env.SSRF_ALLOWED_HOSTS = 'minio';
     (undiciFetch as jest.Mock).mockResolvedValue(fakeResponse([1], { 'content-type': 'image/png' }));
