@@ -1235,10 +1235,14 @@ describe('BaileysAdapter reconnect policy — unlimited backoff (I4 hardening)',
   const QR_REFS_ENDED = 'QR refs attempts ended';
 
   /**
-   * Deliver a QR on the current socket and wait for the lifecycle to publish it. The renderer's PNG
-   * encoder runs on nextTick and setImmediate, so a test using this must leave both unfaked.
+   * Deliver a QR on the current socket and wait for the lifecycle to publish it. The PNG encode is
+   * stubbed for this one render: these tests count reconnects, not pixels, and a real encode per QR
+   * made a many-window case slow enough to time out on a loaded machine.
    */
   const showQr = async (qr: string): Promise<void> => {
+    (qrcode.toDataURL as unknown as jest.Mock).mockImplementationOnce(() =>
+      Promise.resolve(`data:image/png;base64,${qr}`),
+    );
     fakeSock.fire('connection.update', { connection: 'connecting' });
     fakeSock.fire('connection.update', { qr });
     await (qrcode.toDataURL as unknown as jest.Mock).mock.results.at(-1)?.value;
