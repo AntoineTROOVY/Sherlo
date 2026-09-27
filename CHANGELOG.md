@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A plugin `configUi` editor receives the dashboard language as `locale` in `config:value`, and the `schema` it gets carries field titles and descriptions localized from the manifest `i18n` block, as the generated form already showed. Thanks @probably-ABHINAV, and @TreIngenia for the proposal.
 - whatsapp-web.js: `GET /api/sessions/:sessionId/contacts` no longer fails with `500` when WhatsApp Web cannot read one contact (`getAlternateUserWid - Invalid get call using deviceWid`). That contact is skipped and counted in a warning, and the rest of the list is returned ([#1720](https://github.com/rmyndharis/OpenWA/issues/1720)). Thanks @onepay-ye for the report.
+- `PUT /api/sessions/:sessionId/presence` is re-applied once each time the engine's connection opens, so an `available: false` survives a Baileys transient reconnect instead of being replaced by the connect-time announcement. It is still dropped when the gateway replaces the engine. On Baileys the route answers `409` while the account push name has not synced, where it answered `200` and sent nothing. Thanks @gabrielmmoraes1999.
 
 ## [0.23.7] - 2026-09-25
 
