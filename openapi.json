@@ -4477,6 +4477,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "STORAGE_TYPE is s3 but the bucket is unreachable or its credentials are missing; nothing was read or written."
           }
         },
         "summary": "Get file count in current storage",
@@ -4499,6 +4502,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "STORAGE_TYPE is s3 but the bucket is unreachable or its credentials are missing; nothing was read or written."
           }
         },
         "summary": "Export all storage files as tar.gz",
@@ -4532,6 +4538,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "STORAGE_TYPE is s3 but the bucket is unreachable or its credentials are missing; nothing was read or written."
           }
         },
         "summary": "Import storage files from tar.gz",
@@ -14727,6 +14736,11 @@
             "description": "Objects written.",
             "example": 128
           },
+          "failed": {
+            "type": "number",
+            "description": "Archive entries the store refused to write. `imported` is false when entries failed and none was written.",
+            "example": 0
+          },
           "storageType": {
             "type": "string",
             "enum": [
@@ -14739,6 +14753,7 @@
         "required": [
           "imported",
           "count",
+          "failed",
           "storageType"
         ]
       },

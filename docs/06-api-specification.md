@@ -5783,7 +5783,7 @@ File count and total size in the active storage backend.
 { "storageType": "local", "count": 128, "sizeBytes": 5242880, "sizeMB": "5.00" }
 ```
 
-**Errors:** `401` · `403` · `500`
+**Errors:** `401` · `403` · `500` · `503` `STORAGE_TYPE=s3` but the bucket is unreachable or its credentials are missing (this route, the export and the import refuse rather than report on the local fallback directory)
 
 ---
 
@@ -5801,7 +5801,7 @@ Export all storage files into a `tar.gz` under `data/exports` and return its **s
 
 `download` is a server filesystem path — feed it back to `POST /api/infra/storage/import`. The archive is auto-deleted after `STORAGE_EXPORT_TTL_MS` (default 1h).
 
-**Errors:** `401` · `403` · `500`
+**Errors:** `401` · `403` · `500` · `503` S3 configured but unavailable
 
 ---
 
@@ -5824,10 +5824,12 @@ Import storage files from a `tar.gz` located inside the `data/` directory.
 **Response** `200`
 
 ```json
-{ "imported": true, "count": 128, "storageType": "local" }
+{ "imported": true, "count": 128, "failed": 0, "storageType": "local" }
 ```
 
-**Errors:** `400` missing/out-of-`data/`/not-found path · `401` · `403` · `500`
+`failed` counts archive entries the store refused to write; a bad or traversing entry is skipped without failing the rest. `imported` is `false` when entries failed and none was written.
+
+**Errors:** `400` missing/out-of-`data/`/not-found path · `401` · `403` · `500` · `503` S3 configured but unavailable
 
 ---
 
