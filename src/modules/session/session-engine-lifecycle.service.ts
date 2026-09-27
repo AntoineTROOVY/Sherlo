@@ -826,10 +826,15 @@ export class SessionEngineLifecycle {
     // Clear any stale failure reason on success. READY also ends the pending attempt: a reconnect
     // still armed (the watchdog reported this engine, then it recovered on its own) would tear the
     // recovered engine down. Only the timer goes; the state keeps the session's reconnect settings
-    // for its next drop. The attempt streak is not reset here: the next scheduleReconnect resets it
+    // for its next drop. This READY does not reset the attempt streak: the next scheduleReconnect resets it
     // only if this READY held for STABLE_READY_MS, so a session that flaps keeps backing off.
+    // Baileys fires READY again on every internal socket reopen, with no drop reported in between:
+    // a previous READY that already held the window ends the streak here, before it is overwritten.
     const reconnectState = this.reconnectStates.get(id);
     if (reconnectState) {
+      if (reconnectState.readyAt !== undefined && Date.now() - reconnectState.readyAt >= STABLE_READY_MS) {
+        reconnectState.attempts = 0;
+      }
       reconnectState.readyAt = Date.now();
       if (reconnectState.timer) {
         clearTimeout(reconnectState.timer);

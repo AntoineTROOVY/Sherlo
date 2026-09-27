@@ -1783,7 +1783,7 @@ describe('SessionService', () => {
       intern.reconnectStates.set('x', { attempts: 3, timer: null, readyAt: Date.now() });
       expect(lifecycle.isEngineActive('x')).toBe(false);
 
-      // An armed timer, attempts reset by a successful READY.
+      // An armed timer on a fresh streak.
       intern.reconnectStates.set('x', { attempts: 0, timer: setTimeout(() => undefined, 60_000) });
       expect(lifecycle.isEngineActive('x')).toBe(true);
       clearTimeout((intern.reconnectStates.get('x') as { timer: NodeJS.Timeout }).timer);
@@ -2173,6 +2173,63 @@ describe('SessionService', () => {
         expect(i.sessionErrors.get('sess-uuid-1')).toBeUndefined();
         i.scheduleReconnect('sess-uuid-1', createMockSession());
         expect(i.sessionErrors.get('sess-uuid-1')).toMatch(/Reconnection failed after 7 attempts/);
+      } finally {
+        jest.clearAllTimers();
+        jest.useRealTimers();
+      }
+    });
+
+    it('ends the streak on a READY that held the stability window, even if another READY follows it', () => {
+      // Baileys fires READY on every internal socket reopen with no gateway-level drop in between, so
+      // a later READY must not restart the window and carry a long-finished streak forward.
+      jest.useFakeTimers();
+      try {
+        const i = internals();
+        (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+        const state = { attempts: 0, timer: null, maxAttempts: 7, baseDelay: 5000 };
+        i.reconnectStates.set('sess-uuid-1', state);
+        jest.spyOn(i, 'executeReconnect').mockResolvedValue(undefined);
+        const engine = {
+          getStatus: jest.fn().mockReturnValue(EngineStatus.READY),
+          forceDestroy: jest.fn().mockResolvedValue(undefined),
+        };
+        i.engines.set('sess-uuid-1', engine);
+
+        i.scheduleReconnect('sess-uuid-1', createMockSession());
+        expect(state.attempts).toBe(1);
+        i.handleEngineReady('sess-uuid-1', engine, '628123', 'Tester');
+        jest.advanceTimersByTime(STABLE_READY_MS);
+        i.handleEngineReady('sess-uuid-1', engine, '628123', 'Tester');
+        jest.advanceTimersByTime(60_000);
+        i.scheduleReconnect('sess-uuid-1', createMockSession());
+        expect(state.attempts).toBe(1);
+      } finally {
+        jest.clearAllTimers();
+        jest.useRealTimers();
+      }
+    });
+
+    it('keeps the streak when a second READY follows one that did not hold the stability window', () => {
+      jest.useFakeTimers();
+      try {
+        const i = internals();
+        (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+        const state = { attempts: 0, timer: null, maxAttempts: 7, baseDelay: 5000 };
+        i.reconnectStates.set('sess-uuid-1', state);
+        jest.spyOn(i, 'executeReconnect').mockResolvedValue(undefined);
+        const engine = {
+          getStatus: jest.fn().mockReturnValue(EngineStatus.READY),
+          forceDestroy: jest.fn().mockResolvedValue(undefined),
+        };
+        i.engines.set('sess-uuid-1', engine);
+
+        i.scheduleReconnect('sess-uuid-1', createMockSession());
+        i.handleEngineReady('sess-uuid-1', engine, '628123', 'Tester');
+        jest.advanceTimersByTime(STABLE_READY_MS - 1);
+        i.handleEngineReady('sess-uuid-1', engine, '628123', 'Tester');
+        jest.advanceTimersByTime(60_000);
+        i.scheduleReconnect('sess-uuid-1', createMockSession());
+        expect(state.attempts).toBe(2);
       } finally {
         jest.clearAllTimers();
         jest.useRealTimers();
