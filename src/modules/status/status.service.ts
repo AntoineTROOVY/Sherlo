@@ -94,9 +94,12 @@ export class StatusService {
     }
     try {
       const buffer = await this.storageService.getFile(media.path);
+      // MIME types are case-insensitive, and a browser treats `image/SVG+XML` exactly as it treats
+      // `image/svg+xml`: both checks run on the normalized form, and that form is what gets served.
+      const declared = media.mimetype.trim().toLowerCase();
       const mimetype =
-        SAFE_STATUS_MIMETYPE.test(media.mimetype) && !SCRIPTABLE_SVG_MIMETYPE.test(media.mimetype)
-          ? media.mimetype
+        SAFE_STATUS_MIMETYPE.test(declared) && !SCRIPTABLE_SVG_MIMETYPE.test(declared)
+          ? declared
           : 'application/octet-stream';
       return { buffer, mimetype };
     } catch (error) {
