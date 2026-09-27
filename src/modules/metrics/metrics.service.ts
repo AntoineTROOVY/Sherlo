@@ -120,7 +120,7 @@ export class MetricsService {
 
     gauge(
       'openwa_stats_available',
-      'Whether the database-derived series below could be read on this scrape (1) or not (0).',
+      'Whether the database-derived series below could be read (1) or not (0); cached up to STATS_CACHE_TTL_MS + 5 s.',
       overview ? 1 : 0,
     );
 

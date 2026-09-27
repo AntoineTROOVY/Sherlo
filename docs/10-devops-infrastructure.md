@@ -936,7 +936,7 @@ export class MetricsService {
 | `openwa_process_uptime_seconds`              | gauge     | —                                   | Process uptime                                                                               |
 | `openwa_process_resident_memory_bytes`       | gauge     | —                                   | RSS                                                                                          |
 | `openwa_process_heap_used_bytes`             | gauge     | —                                   | V8 heap used                                                                                 |
-| `openwa_stats_available`                     | gauge     | —                                   | 1 when the database-derived series below could be read on this scrape, 0 when they could not |
+| `openwa_stats_available`                     | gauge     | —                                   | 1 when the last overview read of the database-derived series below succeeded, 0 if it failed |
 | `openwa_sessions_total`                      | gauge     | —                                   | Configured sessions                                                                          |
 | `openwa_sessions_active`                     | gauge     | —                                   | READY (active) sessions                                                                      |
 | `openwa_sessions`                            | gauge     | `status`                            | Session count per status                                                                     |
@@ -967,12 +967,16 @@ from a module that is neither — and not spliced through `lines.push(...renderX
 seen, so keep new renderers on that composition.
 
 > **The database-derived series can be absent.** `openwa_sessions_*`, `openwa_messages_*` and the per-status
-> breakdown are read from the data database on each scrape. If that read fails — an outage, a statement
+> breakdown come from `StatsService.getOverview()`, which is memoized for `STATS_CACHE_TTL_MS` (default 30 s,
+> shared with `GET /api/stats/overview`) behind the 5 s render cache. If that read fails — an outage, a statement
 > timeout, pool exhaustion, a `SQLITE_BUSY` under load — they are OMITTED rather than reported as zero, and
 > `openwa_stats_available` goes to 0. The process, HTTP and webhook series keep being served, so `up` stays 1
 > and still means "the process is alive". Alert on `openwa_stats_available == 0` for the degradation itself;
 > an alert written as `openwa_sessions_active == 0` would never fire for it, and one written with `absent()`
-> would.
+> would. Because of the two caches, `openwa_stats_available` can keep reporting 1, and the series their last
+> values, for up to `STATS_CACHE_TTL_MS` + 5 s after the data database fails, so give an alert on it a `for:`
+> at least that long. `STATS_CACHE_TTL_MS=0` makes the signal live at the cost of a full overview query per
+> render.
 
 ### Grafana Dashboard Definition
 
