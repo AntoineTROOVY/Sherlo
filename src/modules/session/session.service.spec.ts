@@ -3703,6 +3703,33 @@ describe('SessionService', () => {
         'Reconnecting after a dropped connection (attempt 5, down for 80s).',
       );
     });
+
+    // Baileys keeps its attempt counter across a READY that lasted under five minutes, so the next
+    // drop can arrive as attempt 5. The time the session spent READY is not downtime.
+    it('measures the downtime from the last READY when the attempt count carries across it', async () => {
+      const callbacks = await startAndCapture();
+      const sessionErrors = (service as unknown as { sessionErrors: SessionErrorStore }).sessionErrors;
+      const start = Date.now();
+      const now = jest.spyOn(Date, 'now');
+      try {
+        for (let attempt = 1; attempt <= 4; attempt++) {
+          now.mockReturnValue(start + (attempt - 1) * 5_000);
+          callbacks.onReconnecting?.(attempt, 8_000);
+        }
+        now.mockReturnValue(start + 20_000);
+        callbacks.onReady?.('628123', 'Tester');
+        now.mockReturnValue(start + 4 * 60_000);
+        callbacks.onReconnecting?.(5, 16_000);
+        now.mockReturnValue(start + 4 * 60_000 + 16_000);
+        callbacks.onReconnecting?.(6, 32_000);
+      } finally {
+        now.mockRestore();
+      }
+
+      expect(sessionErrors.get('sess-uuid-1')).toBe(
+        'Reconnecting after a dropped connection (attempt 6, down for 16s).',
+      );
+    });
   });
 
   // A restriction is WhatsApp judging the account, not a fault on our side, so it has its own
