@@ -28,6 +28,8 @@ function runWith<T = { chats: { channels: Record<string, string> } }>(file: stri
 test('the shipped catalogues pass the parity check', () => {
   const result = spawnSync(process.execPath, [SCRIPT], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
+  // A key no plural rule can select is dead weight, and its warning on every run buries real ones.
+  assert.doesNotMatch(result.stderr, /extra key/);
 });
 
 test('a renamed token in a plural form en.json does not have fails the check', () => {
