@@ -9440,6 +9440,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The instance is disabled or deleted; its dead-lettered deliveries cannot be re-dispatched."
           }
         },
         "tags": [

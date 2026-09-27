@@ -341,6 +341,16 @@ describe('IntegrationInstanceController (e2e)', () => {
         .post('/api/integration/instances/chatwoot/other1/redrive')
         .set('X-API-Key', scopedKey)
         .expect(404);
+      // own1 was disabled above; dispatch refuses a disabled instance, so the redrive is refused too.
+      await request(app.getHttpServer())
+        .post('/api/integration/instances/chatwoot/own1/redrive')
+        .set('X-API-Key', scopedKey)
+        .expect(409);
+      await request(app.getHttpServer())
+        .patch(`${base}/chatwoot/instances/own1`)
+        .set('X-API-Key', scopedKey)
+        .send({ enabled: true })
+        .expect(200);
       await request(app.getHttpServer())
         .post('/api/integration/instances/chatwoot/own1/redrive')
         .set('X-API-Key', scopedKey)

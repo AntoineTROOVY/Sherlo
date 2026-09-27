@@ -6220,10 +6220,9 @@ still outstanding after this batch.
 
 **Auth:** API key (ADMIN) · **Scope:** session-scoped (a key restricted to `allowedSessions` may only
 redrive an instance whose current `sessionScope` is inside that allowlist; out of scope and missing
-instances both answer `404`, so redrive can't be used to probe other sessions). An unrestricted key is
-not fenced this way: it may drain retained rows for an instance that no longer exists, which is
-deliberate — those rows still carry the deleted binding's `sessionId` and only an unscoped caller may
-replay them.
+instances both answer `404`, so redrive can't be used to probe other sessions). A deleted or disabled
+instance answers `409` for every caller: ingress dispatch refuses such an instance, so its rows could
+only fail again. Re-enable the instance to replay its backlog.
 
 **Path parameters**
 
@@ -6238,7 +6237,7 @@ replay them.
 { "redriven": 3, "remaining": 0, "batchSize": 100 }
 ```
 
-**Errors:** `401` · `403` key role < ADMIN · `404` a **scoped** key's instance that is missing or outside its `allowedSessions` (an unrestricted key gets `201` with `redriven: 0` instead)
+**Errors:** `401` · `403` key role < ADMIN · `404` a **scoped** key's instance that is missing or outside its `allowedSessions` · `409` the instance is deleted or disabled
 
 ---
 
