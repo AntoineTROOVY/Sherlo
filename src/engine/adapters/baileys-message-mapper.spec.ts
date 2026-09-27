@@ -340,6 +340,31 @@ describe('buildIncomingMessageFromBaileys', () => {
     expect(r.author).toBe('628111@s.whatsapp.net');
   });
 
+  it('exposes the sender of a received broadcast-list message as author and keeps the list as the chat', () => {
+    const normalize = (jid: string) => jid.replace('@s.whatsapp.net', '@c.us');
+    const r = buildIncomingMessageFromBaileys(
+      { ...base, remoteJid: '1700000000@broadcast', participant: '628222@s.whatsapp.net' },
+      normalize,
+    );
+    expect(r.chatId).toBe('1700000000@broadcast');
+    expect(r.from).toBe('1700000000@broadcast');
+    expect(r.isStatusBroadcast).toBe(false);
+    expect(r.isGroup).toBe(false);
+    expect(r.author).toBe('628222@c.us');
+  });
+
+  it('keeps the list as the chat for a broadcast-list message the account sent', () => {
+    const normalize = (jid: string) => jid.replace('@s.whatsapp.net', '@c.us');
+    const r = buildIncomingMessageFromBaileys(
+      { ...base, remoteJid: '1700000000@broadcast', fromMe: true, participant: '628999@s.whatsapp.net' },
+      normalize,
+    );
+    expect(r.chatId).toBe('1700000000@broadcast');
+    expect(r.from).toBe('628999@c.us');
+    expect(r.to).toBe('1700000000@broadcast');
+    expect(r.author).toBe('628999@c.us');
+  });
+
   it('converts extended-text status styling: backgroundArgb -> #RRGGBB, font passed through', () => {
     const r = buildIncomingMessageFromBaileys({
       ...base,
