@@ -303,7 +303,29 @@ describe('InfraStorageController audit trail (light-dependency handlers)', () =>
         [AuditAction, { metadata: { count: number; storageType: string } }]
       >;
       expect(calls[0][0]).toBe(AuditAction.INFRA_STORAGE_IMPORTED);
-      expect(calls[0][1].metadata).toEqual({ count: 5, storageType: 'local' });
+      expect(calls[0][1].metadata).toEqual({ count: 5, failed: 0, storageType: 'local' });
+    } finally {
+      cwdSpy.mockRestore();
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+    }
+  });
+
+  it('importStorage records an import that wrote nothing as a warning, with its failed count', async () => {
+    const audit = { logInfo: jest.fn().mockResolvedValue(null), logWarn: jest.fn().mockResolvedValue(null) };
+    const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue('/srv/openwa');
+    (fs.existsSync as jest.Mock).mockImplementation((p: string) => p === '/srv/openwa/data/exports/x.tar.gz');
+    try {
+      const storageService = {
+        importFromStream: jest.fn().mockResolvedValue({ imported: 0, failed: 4 }),
+        getCurrentStorageType: () => 'local',
+      };
+      await new InfraStorageController(storageService as never, audit as never).importStorage({
+        filePath: 'data/exports/x.tar.gz',
+      });
+      expect(audit.logInfo).not.toHaveBeenCalled();
+      expect(audit.logWarn).toHaveBeenCalledWith(AuditAction.INFRA_STORAGE_IMPORTED, {
+        metadata: { count: 0, failed: 4, storageType: 'local' },
+      });
     } finally {
       cwdSpy.mockRestore();
       (fs.existsSync as jest.Mock).mockReturnValue(false);
