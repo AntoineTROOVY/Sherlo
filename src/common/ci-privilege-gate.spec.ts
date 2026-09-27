@@ -137,3 +137,45 @@ describe('a job that runs a repo script checks the repo out', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+/**
+ * A job granted `id-token: write` can mint a registry publish credential, so every tool it installs
+ * globally runs with that ability. A floating spec (`npm@latest`, a bare major) resolves to whatever
+ * was published most recently at tag time; pin the exact version the way the Dockerfile pins its npm.
+ */
+describe('a job that can mint a publish credential installs only exact global versions', () => {
+  type OidcJob = { permissions?: Record<string, string> | string; steps?: Step[] };
+  const workflows = fs.readdirSync(workflowDir).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+  const GLOBAL_INSTALL = /\bnpm\s+(?:install|i|add)\s+(?:-g|--global)\s+([^\n;&|]+)/g;
+
+  const globalInstallsInOidcJobs = (file: string): Array<{ job: string; spec: string }> => {
+    const jobs = (
+      yaml.load(fs.readFileSync(path.join(workflowDir, file), 'utf8')) as { jobs?: Record<string, OidcJob> }
+    ).jobs;
+    return Object.entries(jobs ?? {})
+      .filter(([, def]) => typeof def.permissions === 'object' && def.permissions['id-token'] === 'write')
+      .flatMap(([job, def]) =>
+        (def.steps ?? []).flatMap(step =>
+          [...executableLines(step.run ?? '').matchAll(GLOBAL_INSTALL)].flatMap(match =>
+            match[1]
+              .trim()
+              .split(/\s+/)
+              .filter(arg => !arg.startsWith('-'))
+              .map(spec => ({ job, spec })),
+          ),
+        ),
+      );
+  };
+
+  // Non-vacuity: the JS SDK release job installs its own npm, so the finder must see it.
+  it('finds the global npm install in the JS SDK publish job', () => {
+    expect(globalInstallsInOidcJobs('js-sdk-release.yml').map(entry => entry.spec)).toEqual([
+      expect.stringMatching(/^npm@/),
+    ]);
+  });
+
+  it.each(workflows)('%s: global installs in id-token jobs are pinned to an exact version', file => {
+    const floating = globalInstallsInOidcJobs(file).filter(entry => !/@\d+\.\d+\.\d+$/.test(entry.spec));
+    expect(floating).toEqual([]);
+  });
+});
