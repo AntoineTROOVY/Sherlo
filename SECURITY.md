@@ -54,8 +54,11 @@ If you created your `.env` by copying `.env.example` before this advisory, check
 `ENABLE_SWAGGER=true`. Earlier templates shipped that line uncommented alongside
 `NODE_ENV=production`, so a copied file pinned the opt-in that production otherwise
 withholds, and `/api/docs` is served outside the API-key guard. Comment the line out or
-set it to `false` to restore the production default. Docker Compose and the Helm chart
-are unaffected — neither forwards `ENABLE_SWAGGER` and the container never reads `.env`.
+set it to `false` to restore the production default. The bundled Docker Compose files
+(`docker-compose.yml` and `docker-compose.dev.yml`) are affected too: Compose substitutes
+`ENABLE_SWAGGER` from the `.env` next to the compose file and forwards it to the container.
+Fix the line there, then run `docker compose up -d` so the container is recreated with the
+new value. The Helm chart does not set `ENABLE_SWAGGER`.
 
 ### Plugins are full host trust — by design
 
