@@ -5716,6 +5716,26 @@ describe('SessionService', () => {
       expect(mockEngine.setOnlinePresence).toHaveBeenNthCalledWith(2, false);
     });
 
+    it('drops the own-presence preference and chat presence when the engine is replaced', async () => {
+      const first = await startAndCaptureCallbacks();
+      await service.setOnlinePresence('sess-uuid-1', false);
+      first.onPresenceUpdate!({ chatId: 'c@c.us', participants: [{ id: 'c@c.us', state: 'composing' }] });
+      expect(await service.getPresence('sess-uuid-1', 'c@c.us')).not.toBeNull();
+
+      await service.stop('sess-uuid-1');
+      await service.start('sess-uuid-1');
+      const calls = mockEngine.initialize.mock.calls as [EngineEventCallbacks][];
+      expect(calls).toHaveLength(2);
+      mockEngine.setOnlinePresence.mockClear();
+
+      // The replacement engine's first open must not re-publish the previous engine's choice.
+      calls[1][0].onReady!('628123', 'Alice');
+      await flush();
+
+      expect(mockEngine.setOnlinePresence).not.toHaveBeenCalled();
+      expect(await service.getPresence('sess-uuid-1', 'c@c.us')).toBeNull();
+    });
+
     it('does not publish own presence on ready when the caller never set one', async () => {
       const callbacks = await startAndCaptureCallbacks();
       mockEngine.setOnlinePresence.mockClear();
