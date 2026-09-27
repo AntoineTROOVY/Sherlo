@@ -166,9 +166,15 @@ export class BulkMessageService implements OnApplicationBootstrap {
    * Same policy as the boot reaper and for the same reason: the dead node's already-sent messages
    * are unknowable, so resuming risks double-sends — FAILED with the payloads stripped is the
    * honest terminal state, and the caller can re-issue the batch knowingly.
+   *
+   * A batch this process is running itself is not orphaned: the adoption claims the session before
+   * its engine finishes initializing, so a bulk request routed here in that window starts a batch
+   * that is already PROCESSING by the time the caller reaps. Only the dead holder's batches go.
    */
   async reapProcessingBatches(sessionId: string, reason: string): Promise<number> {
-    const processing = await this.batchRepository.find({ where: { status: BatchStatus.PROCESSING, sessionId } });
+    const processing = (
+      await this.batchRepository.find({ where: { status: BatchStatus.PROCESSING, sessionId } })
+    ).filter(batch => !this.processingBatches.has(batch.id));
     for (const batch of processing) {
       await this.failOrphanedBatch(batch);
     }

@@ -135,6 +135,23 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
     expect(JSON.stringify(mine.messages)).not.toContain('x'.repeat(64));
   });
 
+  it('reapProcessingBatches leaves alone a PROCESSING batch this process is still running', async () => {
+    // Adopted session: the claim moved here before the engine finished initializing, and a bulk
+    // request routed here in that window started a batch of its own before the reap ran.
+    const running = { id: 'b-live', sessionId: 'sess-a', status: BatchStatus.PROCESSING, messages: [] };
+    const orphan = { id: 'b-dead', sessionId: 'sess-a', status: BatchStatus.PROCESSING, messages: [] };
+    repo.find.mockResolvedValue([running, orphan]);
+    (service as unknown as { processingBatches: Map<string, boolean> }).processingBatches.set('b-live', true);
+
+    const reaped = await service.reapProcessingBatches('sess-a', 'session adopted from a lapsed node');
+
+    expect(reaped).toBe(1);
+    expect(running.status).toBe(BatchStatus.PROCESSING);
+    expect(orphan.status).toBe(BatchStatus.FAILED);
+    expect(repo.save).toHaveBeenCalledTimes(1);
+    expect(repo.save).toHaveBeenCalledWith(orphan);
+  });
+
   /**
    * A batch is only ever driven by the process holding its session's engine, so on a second replica
    * "PROCESSING" does not mean "abandoned". Reaping a peer's batch tells the caller their send
