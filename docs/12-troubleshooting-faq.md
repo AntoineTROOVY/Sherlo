@@ -649,7 +649,9 @@ leaving it unset means unlimited retries with the delay parking at a 5-minute ca
 the gateway's own reconnect. On Baileys that is only the reconnect after a logged-out close: every
 other drop is retried inside the engine, with a fixed 1s to 60s backoff and no attempt cap, so a
 session behind an unreachable network keeps retrying there whatever these keys say. Subscribe to the
-`session.reconnect_loop` webhook to be alerted on every 5th consecutive attempt.
+`session.reconnect_loop` webhook to be alerted on every 5th consecutive attempt. Attempts stop being
+consecutive only once the session has stayed READY for 5 minutes, so a session that keeps dropping
+sooner than that spends a finite cap and ends FAILED.
 
 On a slow host, raise the first-boot init wait with `WWEBJS_AUTH_TIMEOUT_MS` (see _QR generation
 times out on slow first boot_ above).

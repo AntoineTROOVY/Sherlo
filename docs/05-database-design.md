@@ -384,6 +384,9 @@ clears it, and so does a gateway restart.
 | `reconnectBaseDelay`   | `5000` ms | Base delay of the reconnect backoff, clamped to 1000-300000 ms. Same engine scope as `maxReconnectAttempts`                                                                                            |
 | `autoRejectCalls`      | `false`   | Auto-reject an incoming call as soon as it rings (Baileys only)                                                                                                                                        |
 
+The reconnect attempt count restarts only once the session has stayed READY for 5 minutes, so a
+session that keeps dropping sooner than that spends a finite `maxReconnectAttempts` and ends FAILED.
+
 Set them at creation with `POST /api/sessions`, or on an existing session with
 `PATCH /api/sessions/{sessionId}/config` — no restart, and no re-scan of the QR. The patch merges, so a key
 it does not mention keeps its stored value, and an explicit `null` clears a key back to the default
