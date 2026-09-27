@@ -6074,6 +6074,23 @@ describe('WhatsAppWebJsAdapter page transport error detection (wedged page fast-
     expect(onDisconnected).not.toHaveBeenCalled();
   });
 
+  // A walk over a large address book that outruns Puppeteer's per-command budget got no answer: a
+  // 503 the client retries, not a bare 500, and not a death.
+  it('answers a protocol timeout on the contact walk with a 503 and reports no death', async () => {
+    const evaluate = jest
+      .fn()
+      .mockRejectedValue(
+        new Error(
+          "Runtime.callFunctionOn timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed.",
+        ),
+      );
+    const { adapter, onDisconnected } = readyAdapter({ pupPage: { evaluate } });
+
+    await expect(adapter.getContacts()).rejects.toBeInstanceOf(EngineTransportError);
+    expect(onDisconnected).not.toHaveBeenCalled();
+    expect(adapter.getStatus()).toBe(EngineStatus.READY);
+  });
+
   // A rejection that carries no transport-death signature is an ordinary failure, not a dead page —
   // it must reach the caller unchanged and leave the session READY, unlike the 503 case above.
   it('propagates a non-transport rejection from getContacts untouched and leaves the session READY', async () => {

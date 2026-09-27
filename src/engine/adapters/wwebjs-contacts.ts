@@ -140,6 +140,10 @@ export class WwebjsContacts {
         this.host.reportIfPageTransportError(error, 'getContacts');
         throw new EngineTransportError('Transport died while reading contacts');
       }
+      // A walk that outran the protocol budget got no answer: a 503, but no death.
+      if (isProtocolTimeout(error)) {
+        throw new EngineTransportError('WhatsApp Web did not answer the contact list read in time');
+      }
       throw error;
     }
 

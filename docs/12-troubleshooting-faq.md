@@ -785,7 +785,9 @@ quoting the message it printed.
 
 - `GET /api/sessions/{id}/chats` (or another read that walks the whole store) fails on an account
   with thousands of chats, while smaller accounts on the same deployment are fine
-- The error names a CDP method and the setting: `Runtime.callFunctionOn timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed.`
+- The chat and contact lists answer `503` with `WhatsApp Web did not answer the chat list read in time`
+  (or `the contact list read`); another read may answer `500` with the raw error, which names a CDP
+  method and the setting: `Runtime.callFunctionOn timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed.`
 - The session stays `ready` and the next request works, so the page did not die
 
 **Cause:** Puppeteer gives every browser command a time budget, 180 000 ms by default, and one

@@ -1098,7 +1098,7 @@
             "description": "The session is not connected: an engine exists for it but is not `ready`, meaning disconnected, reconnecting, or still initializing, so the request never reached WhatsApp. Wait for `ready` and retry. A session that was never started answers `400` instead, and the session lifecycle routes answer `409` for a conflicting state rather than this. One window answers this while the session still reads `ready`: WhatsApp Web periodically reloads its own page and the engine re-injects into it, and for those few seconds the answer is a `409` naming the reload; retry shortly."
           },
           "503": {
-            "description": "The whatsapp-web.js page connection died mid-read, so nothing could be read. Deliberately not reported as an empty list — a page that went away says nothing about the chats."
+            "description": "The whatsapp-web.js page connection died mid-read, or WhatsApp Web did not answer within the protocol timeout, so nothing could be read. Deliberately not reported as an empty list: a page that went away says nothing about the chats."
           }
         },
         "summary": "Get active chats for a session",
@@ -4593,7 +4593,7 @@
             "description": "The session is not connected: an engine exists for it but is not `ready`, meaning disconnected, reconnecting, or still initializing, so the request never reached WhatsApp. Wait for `ready` and retry. A session that was never started answers `400` instead, and the session lifecycle routes answer `409` for a conflicting state rather than this. One window answers this while the session still reads `ready`: WhatsApp Web periodically reloads its own page and the engine re-injects into it, and for those few seconds the answer is a `409` naming the reload; retry shortly."
           },
           "503": {
-            "description": "The WhatsApp page died while reading contacts, retry shortly"
+            "description": "The WhatsApp page died while reading contacts, or WhatsApp Web did not answer within the protocol timeout. Retry shortly."
           }
         },
         "summary": "Get all contacts for a session",
