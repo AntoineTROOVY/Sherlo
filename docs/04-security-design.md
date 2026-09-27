@@ -272,7 +272,7 @@ Each window is counted **per route handler per client IP** (the IP resolved thro
 
 TTL values are in milliseconds. The `/api/metrics` and `/api/health*` routes are exempt (`@SkipThrottle`). To enforce tighter per-route limits, lower the global windows or add a limiter at your reverse proxy.
 
-An IPv6 client is keyed on its /64, so rotating addresses inside one allocation does not mint fresh buckets. The same key is used by every other per-client limit: the MCP and Bull Board pre-auth throttles, the WebSocket limits below, the per-client share of the in-flight body budget, and the health route's auth-failure audit bound. `allowedIps` matching and audit rows still see the full address.
+An IPv6 client is keyed on its /64, so rotating addresses inside one allocation does not mint fresh buckets. The same key is used by every other per-client limit: the MCP and Bull Board pre-auth throttles, the WebSocket limits below, the per-client share of the in-flight body budget, the health route's auth-failure audit bound, and the REST and queue-dashboard auth-failure audit bound. `allowedIps` matching and audit rows still see the full address.
 
 ### Response on limit
 
@@ -494,7 +494,7 @@ flowchart TB
 
 ### Security Alerts
 
-> **Not implemented.** There is no alerting or automatic temp-block subsystem; the table below is a design target, not shipped behavior. The signals do get recorded — rejected authentication and WebSocket rate-limit violations write persisted audit rows (the latter sampled), and an IP-restricted key used from a disallowed IP also emits a `logger.warn` — but nothing acts on them. Forward the audit log / application log to your SIEM to build these alerts.
+> **Not implemented.** There is no alerting or automatic temp-block subsystem; the table below is a design target, not shipped behavior. The signals do get recorded: rejected authentication and WebSocket rate-limit violations write persisted audit rows, and an IP-restricted key used from a disallowed IP also emits a `logger.warn`; but nothing acts on them. A REST or queue-dashboard rejection that names no stored key (missing or unknown) is capped at 10 rows per client IP per minute; a rejection of a stored key (revoked, expired, IP or session refused, insufficient role) is recorded every time. Rate-limit violations are sampled. Forward the audit log / application log to your SIEM to build these alerts.
 
 | Event                | Severity | Intended action (roadmap) |
 | -------------------- | -------- | ------------------------- |
