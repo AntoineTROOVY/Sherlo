@@ -12,6 +12,7 @@ import { LidMappingStoreService } from '../../engine/identity/lid-mapping-store.
 import { ChatStateStoreService } from '../../engine/adapters/baileys-chat-state-store.service';
 import { SessionOwnershipService } from '../session/session-ownership.service';
 import { ScopeBindingService } from '../integration/scope-binding.service';
+import { ReKeyChatStatesBySessionId1786500000000 } from '../../database/migrations/1786500000000-ReKeyChatStatesBySessionId';
 import { Session as SessionEntity, SessionStatus } from '../session/entities/session.entity';
 import { In } from 'typeorm';
 import { DateUtils } from 'typeorm/util/DateUtils';
@@ -751,6 +752,23 @@ export class InfraDataService {
             warnings.push(
               `Failed to restore session ownership: ${error instanceof Error ? error.message : String(error)}`,
             );
+          }
+        }
+
+        // An archive taken before 0.23.5 keys chat_states by session NAME. The migration that re-keys
+        // them to the session id has already run on this database, so a restored name-keyed row would
+        // never be read again and its mute, archive and pin state would be silently lost. Run the same
+        // re-key here, inside the transaction. A failure takes the rollback below, like the ownership
+        // restore, because on PostgreSQL it has already aborted the transaction.
+        if (warnings.length === 0) {
+          try {
+            if (await queryRunner.hasTable('chat_states')) {
+              await queryRunner.query(
+                ReKeyChatStatesBySessionId1786500000000.rekey('name', 'id', { skipAlreadyKeyed: true }),
+              );
+            }
+          } catch (error) {
+            warnings.push(`Failed to re-key chat states: ${error instanceof Error ? error.message : String(error)}`);
           }
         }
 

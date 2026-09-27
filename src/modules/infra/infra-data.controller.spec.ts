@@ -1847,6 +1847,51 @@ describe('InfraDataController.importData status_updates + runtime reconciliation
     await expect(repo.findOneByOrFail({ id: 'held' })).resolves.toMatchObject({ status: SessionStatus.READY });
   });
 
+  // Archives taken before 0.23.5 key chat_states by session name; the re-key migration has already
+  // run on the target, so the import has to apply it to the restored rows itself.
+  const chatStateRow = (sessionId: string, updatedAt: unknown) => ({
+    sessionId,
+    chatId: 'c@s.whatsapp.net',
+    muteEndTime: null,
+    archived: false,
+    pinned: true,
+    updatedAt,
+  });
+  const storedChatStates = () =>
+    ds.query<Array<{ sessionId: string; chatId: string }>>(
+      'SELECT "sessionId", "chatId" FROM chat_states ORDER BY "sessionId"',
+    );
+
+  it('re-keys a chat state row restored from a name-keyed archive onto its session id', async () => {
+    const id = '8f5b1d9e-0c4a-4e21-9d6b-2a7c3f0e1b44';
+    await seedSession(id);
+    const dump = await build().exportData();
+    const session = dump.tables.sessions[0];
+
+    const res = await build().importData({
+      tables: { ...dump.tables, chatStates: [chatStateRow(session.name, session.updatedAt)] as never },
+    });
+
+    expect(res.imported).toBe(true);
+    expect(await storedChatStates()).toEqual([{ sessionId: id, chatId: 'c@s.whatsapp.net' }]);
+  });
+
+  it('leaves a chat state row already keyed by a session id alone, even when another session is named that id', async () => {
+    // Session 'a' is named 'session-a', which is also the id of the second session. The row belongs
+    // to the second session and must not be moved onto 'a'.
+    await seedSession('a');
+    await seedSession('session-a');
+    const dump = await build().exportData();
+    const updatedAt = dump.tables.sessions[0].updatedAt;
+
+    const res = await build().importData({
+      tables: { ...dump.tables, chatStates: [chatStateRow('session-a', updatedAt)] as never },
+    });
+
+    expect(res.imported).toBe(true);
+    expect(await storedChatStates()).toEqual([{ sessionId: 'session-a', chatId: 'c@s.whatsapp.net' }]);
+  });
+
   it('exports and restores automation_rules, which the session wipe would otherwise cascade away', async () => {
     await seedSession('s1');
     const ruleRepo = ds.getRepository(AutomationRule);
