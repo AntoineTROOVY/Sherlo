@@ -8440,7 +8440,7 @@
             }
           },
           "400": {
-            "description": "Product has no image — a product card requires one."
+            "description": "Product has no image (a product card requires one), a plugin blocked the send, or a plugin returned an invalid productId or body."
           },
           "404": {
             "description": "Product id not found in the session catalog."
