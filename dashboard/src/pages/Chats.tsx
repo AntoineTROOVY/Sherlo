@@ -608,8 +608,11 @@ export function Chats() {
       // Statuses are live now (status.received): a story posted during the socket gap would
       // otherwise stay invisible until a focus refetch.
       queryClient.invalidateQueries({ queryKey: ['contact-statuses', selectedSessionId] });
+      // The sidebar list is local state, so previews, unread counts and chats started during the gap
+      // only show after a refetch. Background mode keeps the current list on screen meanwhile.
+      void loadChats(selectedSessionId, { background: true });
     }
-  }, [isConnected, connectionFailed, selectedSessionId, queryClient]);
+  }, [isConnected, connectionFailed, selectedSessionId, queryClient, loadChats]);
 
   useEffect(() => {
     if (selectedSessionId && isConnected) {

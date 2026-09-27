@@ -839,6 +839,31 @@ test('a message arriving the moment the chat list commits updates the listed row
   }
 });
 
+test('a socket reconnect refetches the chat list so the sidebar shows what arrived during the gap', async () => {
+  const { screen, act } = rtl;
+  resetFetchCalls();
+  renderChats();
+  await screen.findByText('Alice');
+  const chatsPath = `/api/sessions/${SESSION.id}/chats`;
+  assert.equal(countFetchCalls('GET', chatsPath), 1);
+
+  // While the socket was down, Alice wrote again and a new chat started.
+  const DAVE: Chat = { ...CHAT_2, id: '15550005555@c.us', name: 'Dave', timestamp: 1_700_000_900 };
+  chatsResponder = () =>
+    Promise.resolve(
+      jsonResponse([{ ...CHAT, unreadCount: 4, lastMessage: 'sent during the gap', timestamp: 1_700_000_800 }, DAVE]),
+    );
+  const socket = lastSocket();
+  assert.ok(socket, 'expected the page to have opened a socket');
+  act(() => socket.receive('disconnect', 'transport close'));
+  act(() => socket.receive('connect'));
+
+  await screen.findByText('Dave');
+  await screen.findByText('sent during the gap');
+  assert.ok(screen.queryByLabelText('4 unread messages'), 'the unread count missed during the gap is not shown');
+  assert.equal(countFetchCalls('GET', chatsPath), 2);
+});
+
 test('a read-only key opening a chat sends no mark-as-read', async () => {
   const { screen, fireEvent, within, waitFor } = rtl;
   resetFetchCalls();
