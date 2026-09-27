@@ -45,6 +45,9 @@ import { IntegrationDeliveryFailure } from '../integration/entities/integration-
 import { StatusUpdate } from '../status-store/entities/status-update.entity';
 import { AutomationRule } from '../automation/entities/automation-rule.entity';
 import { AuditAction } from '../audit/entities/audit-log.entity';
+import { ScopeBindingService } from '../integration/scope-binding.service';
+import { PluginInstanceService } from '../integration/plugin-instance.service';
+import { PluginLoaderService } from '../../core/plugins/plugin-loader.service';
 import { BadRequestException } from '@nestjs/common';
 
 describe('InfraDataController.importData round-trips export-data (no silent message/batch loss)', () => {
@@ -2341,5 +2344,142 @@ describe('InfraDataController.importData rejects a malformed table value', () =>
     ['carries an empty table', { sessions: [], messages: [] }],
   ])('does not reject an archive that %s', async (_label, tables) => {
     await expect(controller().importData({ tables } as never)).rejects.not.toThrow(/must be an array/);
+  });
+});
+
+// Plugin runtime bindings (activeSessions, per-session config) are projected from plugin_instances
+// rows and kept in the plugin registry, and the boot pass only adds. A restore that drops an instance
+// must retire its binding, or the plugin keeps firing on that session with the dropped config.
+describe('InfraDataController.importData re-syncs plugin instance bindings', () => {
+  let ds: DataSource;
+  const cfg = { get: (key: string, def?: unknown) => (key === 'dataDatabase.type' ? 'sqlite' : def) };
+
+  beforeEach(async () => {
+    ds = new DataSource({
+      type: 'better-sqlite3',
+      database: ':memory:',
+      entities: [
+        Session,
+        Webhook,
+        Message,
+        MessageBatch,
+        Template,
+        BaileysStoredMessage,
+        LidMapping,
+        ChatState,
+        PluginInstance,
+        ConversationMapping,
+        IngressEvent,
+        WebhookDeliveryFailure,
+        WebhookOutboxEvent,
+        IntegrationDeliveryFailure,
+        StatusUpdate,
+        AutomationRule,
+      ],
+      synchronize: true,
+    });
+    await ds.initialize();
+  });
+
+  afterEach(async () => {
+    await ds.destroy();
+  });
+
+  const seed = async () => {
+    const sessions = ds.getRepository(Session);
+    for (const id of ['sess-1', 'sess-2']) {
+      await sessions.save(
+        sessions.create({ id, name: `session-${id}`, status: SessionStatus.DISCONNECTED, config: {} }),
+      );
+    }
+    const instances = ds.getRepository(PluginInstance);
+    for (const [instanceId, sessionScope, token] of [
+      ['kept', 'sess-2', 'token-kept'],
+      ['dropped', 'sess-1', 'token-dropped'],
+    ]) {
+      await instances.save(
+        instances.create({
+          id: `chatwoot:${instanceId}`,
+          pluginId: 'chatwoot',
+          instanceId,
+          sessionScope,
+          secret: 's',
+          verifyToken: 'v',
+          config: { token },
+          enabled: true,
+        }),
+      );
+    }
+  };
+
+  /** A loader whose runtime state the resync really mutates, as the plugin registry would hold it. */
+  const statefulLoader = () => {
+    const plugin = {
+      manifest: { id: 'chatwoot' },
+      activeSessions: ['sess-1', 'sess-2'],
+      sessionConfig: { 'sess-1': { token: 'token-dropped' }, 'sess-2': { token: 'token-kept' } } as Record<
+        string,
+        unknown
+      >,
+    };
+    const loader = {
+      getPlugin: (id: string) => (id === 'chatwoot' ? plugin : undefined),
+      setPluginSessionConfig: (_id: string, scope: string, config: unknown) => {
+        plugin.sessionConfig = { ...plugin.sessionConfig, [scope]: config };
+      },
+      setPluginSessions: (_id: string, sessions: string[]) => {
+        plugin.activeSessions = sessions;
+      },
+      updatePluginConfig: jest.fn(),
+    };
+    return { plugin, loader };
+  };
+
+  const serviceWith = (moduleRef: unknown) =>
+    new InfraDataService(cfg as never, ds, undefined, undefined, undefined, undefined, undefined, moduleRef as never);
+
+  it('retires the binding of an instance the backup does not contain', async () => {
+    await seed();
+    const dump = await new InfraDataController(serviceWith(undefined)).exportData();
+    const tables = {
+      ...dump.tables,
+      pluginInstances: dump.tables.pluginInstances?.filter(row => row.instanceId !== 'dropped'),
+    };
+    const { plugin, loader } = statefulLoader();
+    const scopeBinding = new ScopeBindingService(
+      new PluginInstanceService(ds.getRepository(PluginInstance)),
+      loader as unknown as PluginLoaderService,
+      { logInfo: jest.fn(), logWarn: jest.fn() } as never,
+      ds.getRepository(Session),
+    );
+    const moduleRef = { get: jest.fn(() => scopeBinding) };
+
+    const res = await new InfraDataController(serviceWith(moduleRef)).importData({ tables });
+
+    expect(res.imported).toBe(true);
+    expect(res.restartRequired).toBe(false);
+    expect(moduleRef.get).toHaveBeenCalledWith(ScopeBindingService, { strict: false });
+    expect(plugin.activeSessions).toEqual(['sess-2']);
+    expect(plugin.sessionConfig).toEqual({ 'sess-1': {}, 'sess-2': { token: 'token-kept' } });
+  });
+
+  it('commits the import and reports a failed resync as a notice with restartRequired', async () => {
+    await seed();
+    const dump = await new InfraDataController(serviceWith(undefined)).exportData();
+    const resyncAfterImport = jest.fn().mockRejectedValue(new Error('registry write failed'));
+    const moduleRef = { get: () => ({ resyncAfterImport }) };
+
+    const res = await new InfraDataController(serviceWith(moduleRef)).importData({ tables: dump.tables });
+
+    expect(res.imported).toBe(true);
+    expect(res.restartRequired).toBe(true);
+    expect(res.notices.some(n => n.includes('registry write failed'))).toBe(true);
+    // The snapshot handed over is the pre-import state, read before the table was cleared.
+    expect(resyncAfterImport).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ pluginId: 'chatwoot', sessionScope: 'sess-1', enabled: true }),
+        expect.objectContaining({ pluginId: 'chatwoot', sessionScope: 'sess-2', enabled: true }),
+      ]),
+    );
   });
 });

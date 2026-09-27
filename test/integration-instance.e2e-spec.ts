@@ -7,6 +7,7 @@ process.env.ALLOW_DEV_API_KEY = 'true';
 process.env.BASE_URL = 'https://api.example.com';
 
 import { INestApplication } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -18,6 +19,8 @@ import { PluginLoaderService } from '../src/core/plugins/plugin-loader.service';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { ApiKeyRole } from '../src/modules/auth/entities/api-key.entity';
 import { IntegrationDeliveryFailure } from '../src/modules/integration/entities/integration-delivery-failure.entity';
+import { InfraDataService } from '../src/modules/infra/infra-data.service';
+import { ScopeBindingService } from '../src/modules/integration/scope-binding.service';
 
 // A stub ingress-capable plugin so the capability check passes without a real plugin on disk. The
 // configSchema carries a NESTED secret field so the masking tests can prove a `secret:true` config
@@ -90,6 +93,13 @@ describe('IntegrationInstanceController (e2e)', () => {
     } catch {
       /* ignore teardown-only multi-datasource quirk */
     }
+  });
+
+  // InfraDataService re-syncs plugin bindings after an import through a non-strict lookup of
+  // ScopeBindingService, which lives in another module. Proven against the real module graph.
+  it('lets InfraDataService resolve the app ScopeBindingService for the post-import resync', () => {
+    const infraModuleRef = Reflect.get(app.get(InfraDataService), 'moduleRef') as ModuleRef | undefined;
+    expect(infraModuleRef?.get(ScopeBindingService, { strict: false })).toBe(app.get(ScopeBindingService));
   });
 
   it('requires an API key (401 without one)', async () => {
