@@ -53,7 +53,10 @@ import java.util.Map;
  * }</pre>
  */
 public final class OpenWAClient {
-    private final Gson gson = new Gson();
+    // An unrecognised enum token decodes to that enum's UNKNOWN constant rather than null.
+    private final Gson gson = new GsonBuilder()
+            .registerTypeAdapterFactory(new LenientEnumTypeAdapterFactory())
+            .create();
 
     // Used for the two body types listed in bodySerializer(), never the shared default. Emitting an
     // explicit null needs two things that pull in opposite directions: a serializer that decides

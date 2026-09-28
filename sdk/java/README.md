@@ -82,6 +82,12 @@ intentionally not exposed; all user-facing resources are.
 webhook's filters unchanged. To remove every filter, pass
 `new WebhookFilters(List.of())` instead.
 
+A response enum value newer than this SDK decodes to that enum's `UNKNOWN`
+constant (for example `SessionStatus.UNKNOWN`) rather than `null`, so give a
+`switch` over one a `default` branch. `WebhookEvent`, `ProxyType` and
+`MessageDirection` are also sent in requests and have no `UNKNOWN`: an
+unrecognised value there still decodes to `null`.
+
 ## Error handling
 
 Errors are a typed, unchecked hierarchy — branch with `instanceof` or on
