@@ -960,19 +960,16 @@ same value: `sessionId` is the session **UUID** (`Session.id`), which is the on-
 since 0.23.5, and `dbSessionId` is that UUID under the name FK-bound stores such as
 `baileys_stored_messages` read. An out-of-tree engine plugin that keys its own storage by `sessionId`
 has to re-key it on upgrade: `SessionAuthDirMigration` renames the two built-in shapes only. There is
-no `EngineType` union, no `switch`, and no `Unknown engine type` throw: if the plugin is unavailable it
-logs a warning and falls back to the legacy direct adapter — but that fallback can only build
-`whatsapp-web.js`. For any other configured engine (e.g. `ENGINE_TYPE=baileys` with its plugin
-missing) `createFallbackEngine` **throws** rather than silently running the wrong engine, so the
-session fails loudly at start. (A typo in `ENGINE_TYPE` is rejected at boot by `validateEnv`, which
-whitelists `whatsapp-web.js` | `baileys`.)
+no `EngineType` union and no `switch`. If the configured engine's plugin is not registered,
+`create()` throws `Engine '<type>' is not registered`; there is no direct-adapter fallback, so the
+session fails loudly at start instead of running some other engine. (A typo in `ENGINE_TYPE` is
+rejected at boot by `validateEnv`, which whitelists `whatsapp-web.js` | `baileys`.)
 
 ```typescript
 // engine/engine.factory.ts
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IWhatsAppEngine } from './interfaces/whatsapp-engine.interface';
-import { WhatsAppWebJsAdapter } from './adapters/whatsapp-web-js.adapter';
 import { PluginLoaderService, PluginType, IEnginePlugin } from '../core/plugins';
 
 export interface EngineCreateOptions {
@@ -1015,19 +1012,8 @@ export class EngineFactory implements OnModuleInit {
       }) as IWhatsAppEngine;
     }
 
-    // Plugin missing -> warn, then fall back to the direct whatsapp-web.js adapter.
-    return this.createFallbackEngine(options);
-  }
-
-  private createFallbackEngine(options: EngineCreateOptions): IWhatsAppEngine {
-    // The legacy fallback can only construct whatsapp-web.js. Building it for a different configured
-    // engine would silently run the WRONG one — fail loudly instead.
-    if (this.engineType !== 'whatsapp-web.js') {
-      throw new Error(
-        `Engine '${this.engineType}' is unavailable and has no direct fallback; cannot start the session.`,
-      );
-    }
-    return new WhatsAppWebJsAdapter(/* ...sessionDataPath, puppeteer, proxy, lidMappingStore... */);
+    // Both built-ins are always registered, so this is reached only by a broken host.
+    throw new Error(`Engine '${this.engineType}' is not registered; cannot start the session.`);
   }
 }
 ```
