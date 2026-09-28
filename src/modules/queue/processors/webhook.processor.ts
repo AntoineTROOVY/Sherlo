@@ -156,7 +156,7 @@ export class WebhookProcessor extends WorkerHost {
       url,
       body,
       requestHeaders,
-      // Honor WEBHOOK_TIMEOUT on the primary (queued) path too — not just the deprecated direct one.
+      // Honor WEBHOOK_TIMEOUT on the queued path too, as the direct path does.
       this.configService.get<number>('webhook.timeout', 10000),
     );
 

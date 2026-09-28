@@ -9,13 +9,7 @@ import { Webhook } from './entities/webhook.entity';
 import { WebhookOutboxService } from './webhook-outbox.service';
 import { WebhookDeliveryFailure } from './entities/webhook-delivery-failure.entity';
 import { clearDeliveryFailureRows, recordWebhookDeliveryFailure } from './utils/record-delivery-failure';
-import {
-  buildDeliveryHeaders,
-  generateSignature,
-  postWebhookPayload,
-  recordTerminalFailure,
-  sanitizeCustomHeaders,
-} from './utils/deliver-once';
+import { buildDeliveryHeaders, postWebhookPayload, recordTerminalFailure } from './utils/deliver-once';
 import { createLogger } from '../../common/services/logger.service';
 import { DEFAULT_WEBHOOK_MEDIA_INLINE_MAX_BYTES, shedInlineMedia } from '../../common/utils/inline-media';
 import { incrementWebhookDeliveryFailures } from '../../common/metrics/webhook-delivery-metrics';
@@ -736,7 +730,8 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * @deprecated Use job queue dispatch instead. This is kept for fallback.
+   * Direct delivery with in-process retries, up to `webhook.retryCount` attempts: the path every
+   * delivery takes when the queue is disabled (the default), and the fallback when an enqueue fails.
    * `body` is the pre-serialized payload from preflight — the exact bytes the size gate checked and
    * (when a secret is set) the signature covers — so it is never re-serialized here.
    */
@@ -749,11 +744,6 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     // Update retry count header
     headers['X-OpenWA-Retry-Count'] = String(attempt - 1);
-
-    // Add signature if secret is configured and not already present
-    if (webhook.secret && !headers['X-OpenWA-Signature']) {
-      headers['X-OpenWA-Signature'] = this.generateSignature(body, webhook.secret);
-    }
 
     try {
       await postWebhookPayload(webhook.url, body, headers, this.configService.get<number>('webhook.timeout', 10000));
@@ -814,14 +804,5 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
       }
       throw error;
     }
-  }
-
-  /** Shared with WebhookService.test(), which must probe with headers identical to a real delivery's. */
-  sanitizeCustomHeaders(custom: Record<string, string> | null | undefined): Record<string, string> {
-    return sanitizeCustomHeaders(custom);
-  }
-
-  generateSignature(payload: string, secret: string): string {
-    return generateSignature(payload, secret);
   }
 }
