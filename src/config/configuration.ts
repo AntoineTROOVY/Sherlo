@@ -160,13 +160,12 @@ export default () => ({
     // SQLite file for the auth/audit DB. Overridable (e.g. e2e points it at a temp file) so tests
     // never write api keys into the developer's ./data/main.sqlite.
     database: process.env.MAIN_DATABASE_NAME || './data/main.sqlite',
-    // Schema management for the auth/audit DB. Default ON (zero-config first boot).
-    // Set MAIN_DATABASE_SYNCHRONIZE=false to manage schema via the main-owned migrations
-    // instead (migrationsRun then creates api_keys/audit_logs). When disabled, run the
-    // main-connection migrations explicitly with `npm run migration:run:main` (or
-    // `migration:run:main:prod` for the compiled image) — the plain `migration:run` only
-    // manages the data connection.
-    synchronize: process.env.MAIN_DATABASE_SYNCHRONIZE !== 'false',
+    // Schema management for the auth/audit DB. By default the main-owned migrations run at boot
+    // (they also adopt a file an earlier release built with synchronize); run them by hand with
+    // `npm run migration:run:main` (or `migration:run:main:prod` for the compiled image), since the
+    // plain `migration:run` only manages the data connection. MAIN_DATABASE_SYNCHRONIZE=true opts
+    // into synchronize instead, which main.ts warns about in production.
+    synchronize: process.env.MAIN_DATABASE_SYNCHRONIZE === 'true',
     logging: process.env.DATABASE_LOGGING === 'true',
   },
 

@@ -818,13 +818,15 @@ OpenWA runs **two separate TypeORM connections**, each with its own migrations d
 Migrations are hand-authored and idempotent (`IF NOT EXISTS`) so they are safe to adopt on a database originally created by `synchronize`. The two connections differ in how schema is managed:
 
 - **data** — `synchronize` defaults **off**, so this connection is migration-managed by default. On PostgreSQL `migrationsRun` is hardcoded on, and `DATABASE_SYNCHRONIZE=true` is rejected outright at boot validation (it would drop the migration-created `body_ts` tsvector column that `/search` depends on). On SQLite there is no such rejection and `migrationsRun` is the inverse of `synchronize` — so an opted-in `DATABASE_SYNCHRONIZE=true` switches the data connection to entity-synchronized schema and turns its migrations **off**.
-- **main** — `synchronize` defaults **on** (zero-config first boot) regardless of `NODE_ENV`; set `MAIN_DATABASE_SYNCHRONIZE=false` to manage `api_keys` / `audit_logs` via `migrations-main/` instead. Never both at once — `migrationsRun` on this connection is the inverse of `synchronize`.
+- **main**: migration-managed by default, like data: `migrations-main/` creates and upgrades `api_keys` / `audit_logs` at boot. The chain is idempotent, so a `main.sqlite` an earlier release built with synchronize is adopted in place on the first boot (rows kept, missing columns added, the ledger written). `MAIN_DATABASE_SYNCHRONIZE=true` opts into synchronize instead, for development; boot logs a warning when it is set under `NODE_ENV=production`. `migrationsRun` on this connection is the inverse of `synchronize`.
 
 ### Migration Files
 
 ```
 src/database/migrations-main/      # main connection (auth + audit, SQLite)
-└── 1779900000000-CreateAuthAuditTables.ts   # creates api_keys + audit_logs
+├── 1779900000000-CreateAuthAuditTables.ts   # creates api_keys + audit_logs
+├── 1786600000000-AddApiKeyAllowedChats.ts   # api_keys.allowedChats
+└── 1786610000000-DropSynchronizeIndexDuplicates.ts  # drops synchronize-named duplicate indexes
 
 src/database/migrations/           # data connection (pluggable)
 ├── 1770108659848-AddMessageStatus.ts

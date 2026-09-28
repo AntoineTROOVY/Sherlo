@@ -465,9 +465,8 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     // `!== 'false'`, so a typo keeps the SECURE value — but it is still not the flag the operator set,
     // and it is only meaningful alongside DATABASE_SSL above.
     'DATABASE_SSL_REJECT_UNAUTHORIZED',
-    // `!== 'false'`, so a typo keeps synchronize ON — and app.module.ts derives `migrationsRun` from
-    // its negation, so the main connection's migration ledger silently never advances for an operator
-    // who deliberately opted into migration-managed api_keys/audit_logs.
+    // `=== 'true'`: a typo keeps the main connection on its migrations, so an operator who meant to
+    // opt into synchronize for api_keys/audit_logs silently does not get it.
     'MAIN_DATABASE_SYNCHRONIZE',
     // Read with `=== 'true'` by the plugin ingress gate: a typo turns an intentional
     // `ALLOW_UNSIGNED_INGRESS=true` back off, and a route the operator meant to open stops loading.

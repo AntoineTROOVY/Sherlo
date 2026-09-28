@@ -22,6 +22,7 @@ import {
   isDashboardCspUpgradeTrapLikely,
   assertNoDefaultSecretsInProduction,
   isApiKeyPepperMissingInProduction,
+  isMainDbSynchronizeInProduction,
   isNodeEnvUnset,
 } from './config/bootstrap-security';
 import { BullBoardAuthMiddleware } from './common/security/bull-board-auth.middleware';
@@ -97,6 +98,15 @@ async function bootstrap() {
     bootstrapLogger.warn(
       'API_KEY_PEPPER is not set in production: stored API-key hashes use plain SHA-256. ' +
         'Set API_KEY_PEPPER and re-issue keys to enable HMAC hashing.',
+    );
+  }
+
+  // Advisory (not enforced): the main DB normally runs its migration chain; synchronize is an opt-in.
+  if (isMainDbSynchronizeInProduction(process.env.NODE_ENV, process.env.MAIN_DATABASE_SYNCHRONIZE)) {
+    bootstrapLogger.warn(
+      'MAIN_DATABASE_SYNCHRONIZE=true in production: the auth/audit database schema is rebuilt from the ' +
+        "running release's entities instead of its migrations, so running an older release against it " +
+        'reshapes api_keys and audit_logs. Unset it to use the main migrations.',
     );
   }
 

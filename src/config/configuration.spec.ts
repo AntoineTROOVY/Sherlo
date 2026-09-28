@@ -14,12 +14,14 @@ describe('configuration — main DB synchronize', () => {
     else process.env.MAIN_DATABASE_SYNCHRONIZE = orig;
   });
 
-  it('defaults main synchronize ON (zero-config first boot)', () => {
+  it('defaults the main DB to its migration chain (synchronize off), including a blank compose forward', () => {
     delete process.env.MAIN_DATABASE_SYNCHRONIZE;
-    expect(configuration().database.synchronize).toBe(true);
+    expect(configuration().database.synchronize).toBe(false);
+    process.env.MAIN_DATABASE_SYNCHRONIZE = '';
+    expect(configuration().database.synchronize).toBe(false);
   });
 
-  it('disables synchronize only when MAIN_DATABASE_SYNCHRONIZE="false"', () => {
+  it('synchronizes only when MAIN_DATABASE_SYNCHRONIZE="true"', () => {
     process.env.MAIN_DATABASE_SYNCHRONIZE = 'false';
     expect(configuration().database.synchronize).toBe(false);
     process.env.MAIN_DATABASE_SYNCHRONIZE = 'true';
