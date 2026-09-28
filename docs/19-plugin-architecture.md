@@ -109,8 +109,8 @@ plugins/
 ### Manifest File
 
 `id`, `name`, `version`, `type`, and `main` are required; the rest are optional. There is **no**
-`types` field and **no** version-compatibility (`min`/`maxVersion`) check — the loader does not gate on
-a host version, except for the SDK-major check applied to a manifest that declares `ingress` (see the
+`types` field and **no** `maxVersion`. The host version is gated by `minOpenWAVersion` only (see its
+row), and the SDK major by the check applied to a manifest that declares `ingress` (see the
 `sdkVersion` row). The config schema is the top-level `configSchema` (note: not nested under `config`).
 
 ```json
@@ -166,6 +166,7 @@ a host version, except for the SDK-major check applied to a manifest that declar
 | `net.allow`             | —        | Outbound-HTTP host allowlist for `ctx.net.fetch` (`host`, `host:port`, or `'*'`). Absent = deny all, unless `net.allowConfigHosts` admits a host                                                                                                                                                     |
 | `net.allowConfigHosts`  | —        | Config keys holding an https URL; each URL's host is admitted at fetch time on top of `net.allow`, so an adapter can reach an operator-configured host without `net.allow: ['*']`. Credentialed or non-https values are ignored, and the SSRF guard still applies                                    |
 | `sdkVersion`            | —        | Integration SDK `major` (or `major.minor`) the plugin was authored against. Absent = `'1'`. Only enforced for a manifest declaring `ingress`: a major other than `1` is refused at load                                                                                                              |
+| `minOpenWAVersion`      | -        | Oldest OpenWA release the plugin runs on (`MAJOR.MINOR.PATCH`). Install answers 400 and boot load fails when the running host is older; a malformed value is rejected. Absent or `null` = no floor                                                                                                   |
 | `ingress`               | —        | Inbound webhook routes this plugin claims (requires the `webhook:ingress` permission). Validated at load — route uniqueness, signature scheme, ack contract; see [25 — Integration Fabric](./25-integration-fabric.md)                                                                               |
 | `configSchema`          | —        | Declarative config schema the dashboard renders as a form when there is no `configUi`. Still required with one: it defines the fields, their types and which are `secret`                                                                                                                            |
 | `configUi`              | —        | Optional self-contained HTML config editor served into a sandboxed iframe. When present it **replaces** the generated form and owns saving — the dashboard renders neither the form nor its Save button                                                                                              |
@@ -538,9 +539,11 @@ volume; `PLUGINS_DIR` overrides it). For each
 sub-directory with a `manifest.json` it reads the manifest, validates the required fields
 (`id`/`name`/`version`/`type`/`main`), and records an `INSTALLED` plugin plus a persisted registry
 entry — **without running any plugin code**. Persisted config and per-session activation/config are
-read back so an operator's choices survive a restart. There is **no** host version-compatibility check;
-the one version gate is `validateIngressManifest`, which refuses a manifest declaring `ingress` whose
-`sdkVersion` major is not the supported Integration SDK major (`1`).
+read back so an operator's choices survive a restart. There are two version gates. The manifest
+validator refuses a plugin whose `minOpenWAVersion` is newer than the running OpenWA (the plugin goes
+to `ERROR` with its config kept, and loads again after a host upgrade), and `validateIngressManifest`
+refuses a manifest declaring `ingress` whose `sdkVersion` major is not the supported Integration SDK
+major (`1`).
 
 > Loading a plugin from disk never runs it: a load always yields `INSTALLED`. Enabling is a separate
 > step that runs the lifecycle, and happens either on an explicit ADMIN action or — for a plugin the
