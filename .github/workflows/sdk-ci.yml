@@ -35,6 +35,7 @@ jobs:
   javascript:
     name: JavaScript SDK
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: sdk/javascript
@@ -56,6 +57,7 @@ jobs:
   python:
     name: Python SDK (${{ matrix.python }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -79,6 +81,7 @@ jobs:
   php:
     name: PHP SDK (${{ matrix.php }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -97,6 +100,7 @@ jobs:
   java:
     name: Java SDK
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: sdk/java
@@ -112,6 +116,7 @@ jobs:
   go:
     name: Go SDK
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: sdk/go

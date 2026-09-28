@@ -30,6 +30,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -126,6 +127,7 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # Mirrors ci.yml's test job. Without this service the queue-on e2e suite self-skips and the
     # release path reports green on a suite it never actually ran — the tag is the one place that
     # must not be verified less than the branch it came from.
@@ -173,6 +175,7 @@ jobs:
   test-postgres:
     name: Test (PostgreSQL migrations)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:16-alpine
@@ -245,6 +248,7 @@ jobs:
   dashboard:
     name: Dashboard
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -283,6 +287,7 @@ jobs:
   scripts-smoke:
     name: Shell scripts
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -311,6 +316,7 @@ jobs:
   chart:
     name: Helm chart and workflows
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -358,6 +364,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [lint, test, dashboard, scripts-smoke, chart]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -378,6 +385,7 @@ jobs:
   release:
     name: GitHub Release
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     # Gate the public Release on every CI-strength job AND a successfully built+pushed image that
@@ -431,6 +439,7 @@ jobs:
   docker:
     name: Docker Release
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     permissions:
       contents: read
       packages: write
@@ -523,6 +532,7 @@ jobs:
   boot-smoke:
     name: Boot smoke (amd64 + arm64)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       packages: read
     needs: [docker]
@@ -612,6 +622,7 @@ jobs:
   image-scan:
     name: Image scan (${{ matrix.platform }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       packages: read
     needs: [docker]
@@ -668,6 +679,7 @@ jobs:
   promote:
     name: Promote image to release tags
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       packages: write
     needs: [docker, boot-smoke, image-scan]
@@ -766,6 +778,7 @@ jobs:
   cleanup-staging:
     name: Clean up the staging tag
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: always()
     permissions:
       packages: write
@@ -813,6 +826,7 @@ jobs:
   verify-published:
     name: Verify published tags (anonymous)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # After cleanup-staging, not beside it: GHCR's package-versions API is eventually consistent, so
     # that job can read a version whose release tags are not listed yet and delete the version the
     # release just published. This check is the net for exactly that, so it has to run last. It is a

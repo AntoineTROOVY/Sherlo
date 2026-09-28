@@ -414,3 +414,30 @@ describe('ci.yml moves the branch image tag only for the tested branch head', ()
     expect(run).toMatch(/GITHUB_SHA/);
   });
 });
+
+/**
+ * A job without `timeout-minutes` runs to GitHub's 360-minute default. A hung dashboard test run once
+ * held its job for half an hour and still reported green, and a stalled apt mirror held another for
+ * over an hour, so every job carries its own bound: a hang turns into a prompt red job instead.
+ */
+describe('every workflow job declares a bounded timeout', () => {
+  type TimedWorkflow = { jobs?: Record<string, { 'timeout-minutes'?: unknown }> };
+  const workflows = fs.readdirSync(workflowDir).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+  const jobs = workflows.flatMap(file =>
+    Object.entries((workflowOf(file) as TimedWorkflow).jobs ?? {}).map(([job, def]) => ({
+      id: `${file}:${job}`,
+      timeout: def['timeout-minutes'],
+    })),
+  );
+
+  it('finds the jobs of every workflow', () => {
+    expect(jobs.length).toBeGreaterThanOrEqual(30);
+  });
+
+  it('gives each job a timeout between 1 and 120 minutes', () => {
+    const unbounded = jobs
+      .filter(({ timeout }) => !(Number.isInteger(timeout) && (timeout as number) > 0 && (timeout as number) <= 120))
+      .map(({ id, timeout }) => `${id} (${String(timeout)})`);
+    expect(unbounded).toEqual([]);
+  });
+});
