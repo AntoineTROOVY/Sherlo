@@ -1188,9 +1188,9 @@ flowchart TB
     end
 
     subgraph Migration["Migration Path"]
-        C[Update whatsapp-web.js]
+        C[Update engine library]
         D[Switch to Baileys]
-        E[Community Fork]
+        E[Track upstream fix\nOperators use fallback channel]
     end
 
     subgraph Resolution["Resolution"]
@@ -1200,7 +1200,7 @@ flowchart TB
     A --> B
     B -->|Minor| C --> F
     B -->|Major wwebjs| D --> F
-    B -->|Major Both| E --> F
+    B -->|Major Both| E --> C
 ```
 
 ### Engine Comparison

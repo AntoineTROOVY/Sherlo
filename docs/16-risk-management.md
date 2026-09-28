@@ -34,13 +34,14 @@ quadrantChart
 | **Risk Level**  | Critical   |
 
 **Description:**  
-WhatsApp can change their Web protocol at any time, which can cause the `whatsapp-web.js` library to stop working.
+WhatsApp can change its Web and multi-device protocols at any time, which can stop either engine library (`whatsapp-web.js` or Baileys) from working. A step WhatsApp enforces server-side inside the linking handshake, such as the passkey prompt some accounts now get ([#560](https://github.com/rmyndharis/OpenWA/issues/560)), blocks new links on both engines at once.
 
 **Indicators:**
 
-- Spike in `whatsapp-web.js` issues
+- Spike in engine library issues (`whatsapp-web.js` or Baileys)
 - Sudden increase in error rates
 - Authentication failures
+- New links stall at `qr_ready` on both engines (see [docs/12](./12-troubleshooting-faq.md#issue-linking-asks-for-a-passkey-and-never-completes-both-engines))
 
 **Mitigation Strategies:**
 
@@ -53,13 +54,15 @@ flowchart TB
 
     M1 --> A1[Watch releases & issues]
     M2 --> A2[Engine interface pattern]
-    M3 --> A3[Baileys engine available - ENGINE_TYPE env]
+    M3 --> A3[Switch ENGINE_TYPE - only when one library breaks]
     M4 --> A4[< 24h patch capability]
 ```
 
+Switching `ENGINE_TYPE` (M3) helps only when one engine library breaks. A gate WhatsApp enforces inside the linking handshake, such as the passkey step ([#560](https://github.com/rmyndharis/OpenWA/issues/560), upstream [WhiskeySockets/Baileys#2672](https://github.com/WhiskeySockets/Baileys/issues/2672)), stops new links on both engines; the fix has to come from the engine libraries, and operators rely on their fallback channel until then (see [Plan A](#plan-a-whatsapp-protocol-change)).
+
 **Action Items:**
 
-1. Subscribe to `whatsapp-web.js` releases
+1. Subscribe to `whatsapp-web.js` and Baileys releases
 2. Engine abstraction layer — implemented (pluggable `ENGINE_TYPE`: `whatsapp-web.js` default, `baileys` alternative)
 3. Document fallback procedures
 4. Maintain relationships with library maintainers
@@ -459,14 +462,19 @@ flowchart TB
 flowchart TB
     T[Trigger: Protocol Change] --> A1[Assess Impact]
     A1 --> |Minor| M1[Wait for library update]
-    A1 --> |Major| M2[Activate contingency]
+    A1 --> |Major| E{One engine or both?}
 
-    M2 --> C1[Notify users]
-    C1 --> C2[Switch to maintenance mode]
-    C2 --> C3[Evaluate alternatives]
-    C3 --> |Baileys viable| C4[Switch to Baileys engine - set ENGINE_TYPE=baileys]
-    C3 --> |No alternatives| C5[Project pause/EOL]
+    E --> |One engine| C1[Notify users]
+    C1 --> C2[Set ENGINE_TYPE to the unaffected engine]
+    C2 --> M1
+    E --> |Both engines or server-side gate| B1[Notify users and link the tracking issue]
+    B1 --> B2[Keep linked sessions running - no logout or restart churn]
+    B2 --> B3[Operators move critical traffic to their fallback channel]
+    B3 --> B4[Track the engine libraries upstream]
+    B4 --> |No path for a long period| C5[Project pause/EOL]
 ```
+
+During a both-engines event keep linked sessions running rather than logging them out or deleting them: linking again may hit the same gate.
 
 ### Plan B: Critical Security Vulnerability
 
