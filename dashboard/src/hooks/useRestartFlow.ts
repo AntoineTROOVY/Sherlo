@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { infraApi } from '../services/api';
 import { restartPollAttempts } from '../utils/restartPoll';
 
-export type RestartStatus = 'idle' | 'restarting' | 'waiting' | 'success' | 'error';
+// 'unknown': a proxy gave up waiting for the restart request, so whether it went through cannot be told.
+export type RestartStatus = 'idle' | 'restarting' | 'waiting' | 'success' | 'error' | 'unknown';
 
 export interface RestartOpenRequest {
   profiles: string[];
@@ -146,12 +147,20 @@ export function useRestartFlow(): RestartFlow {
       warnings = [...(response.orchestration?.errors ?? []), ...(response.removal?.errors ?? [])];
       setRestartWarnings(warnings);
     } catch (err) {
-      // An HTTP status (a proxy 502/503/504 included) means no shutdown was confirmed and the old
+      // An HTTP status (a proxy 503 included) means no shutdown was confirmed and the old
       // process may still be serving, so a readiness poll would report a restart that never happened.
       // Only a status-less network failure is the expected sign of the server going down mid-answer.
-      if (typeof (err as { status?: unknown } | null)?.status === 'number') {
+      const failure = err as { status?: unknown; code?: unknown } | null;
+      if (typeof failure?.status === 'number') {
         stopCountdown();
         setRestartCountdown(0);
+        // A 504, or a 502 the gateway did not stamp with a code, came from a proxy that stopped waiting.
+        // The request may still be running (a first-time enable pulls an image before the restart), so
+        // this is neither a refusal nor something a readiness poll can settle: the old process answers.
+        if (failure.status === 504 || (failure.status === 502 && failure.code === undefined)) {
+          setRestartStatus('unknown');
+          return;
+        }
         setRestartError(err instanceof Error ? err.message : String(err));
         setRestartStatus('error');
         return;

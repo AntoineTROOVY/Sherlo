@@ -816,7 +816,8 @@ export function Infrastructure() {
             <>
               {restartFlow.restartStatus === 'idle' && t('infrastructure.restart.idleTitle')}
               {restartFlow.restartStatus === 'restarting' && t('infrastructure.restart.restartingTitle')}
-              {restartFlow.restartStatus === 'waiting' && t('infrastructure.restart.waitingTitle')}
+              {(restartFlow.restartStatus === 'waiting' || restartFlow.restartStatus === 'unknown') &&
+                t('infrastructure.restart.waitingTitle')}
               {restartFlow.restartStatus === 'success' && t('infrastructure.restart.successTitle')}
               {restartFlow.restartStatus === 'error' && t('infrastructure.restart.errorTitle')}
             </>
@@ -899,6 +900,15 @@ export function Infrastructure() {
                   </button>
                 </>
               )}
+            </>
+          )}
+
+          {restartFlow.restartStatus === 'unknown' && (
+            <>
+              <p className="restart-error-msg">{t('infrastructure.restart.outcomeUnknown')}</p>
+              <button className="btn-primary" onClick={() => window.location.reload()}>
+                {t('infrastructure.restart.reload')}
+              </button>
             </>
           )}
 

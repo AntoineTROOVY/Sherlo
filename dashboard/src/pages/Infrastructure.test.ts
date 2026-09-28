@@ -708,6 +708,51 @@ test('a refused restart shows the server reason and never polls readiness', { ti
 });
 
 test(
+  'a proxy timeout on the restart request reports an unknown outcome, not a failure',
+  { timeout: 10_000 },
+  async () => {
+    const { screen, fireEvent, within } = rtl;
+    resetFetchCalls();
+    // The proxy stopped waiting while the gateway was still pulling an image: the restart may yet happen,
+    // and the old process still answers readiness, so neither a failure nor a poll tells the truth.
+    overrides = {
+      restart: () =>
+        new Response('<html><body>504 Gateway Time-out</body></html>', {
+          status: 504,
+          headers: { 'Content-Type': 'text/html' },
+        }),
+    };
+    // jsdom cannot navigate, so a reload reports itself through console.error; count those.
+    const navigations: string[] = [];
+    const consoleError = console.error;
+    console.error = (...args: unknown[]) => {
+      const text = args.map(a => (a instanceof Error ? a.message : String(a))).join(' ');
+      if (text.includes('navigation')) navigations.push(text);
+      else consoleError(...args);
+    };
+    try {
+      renderInfrastructure();
+      await screen.findByText('Database Configuration');
+      fireEvent.click(screen.getByRole('button', { name: 'Save Configuration' }));
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Restart Now' }));
+
+      await within(dialog).findByText(
+        'The proxy timed out before the server answered. The restart may still be in progress; reload in a minute to check.',
+      );
+      assert.equal(within(dialog).queryByText('Restart failed'), null);
+      assert.equal(within(dialog).queryByText('HTTP 504'), null);
+      // Past the first readiness poll (3s) and the 2s reload a confirmed restart schedules.
+      await new Promise(resolve => setTimeout(resolve, 3500));
+      assert.equal(findFetchCall('GET', '/api/health/ready'), undefined);
+      assert.deepEqual(navigations, [], 'the page reloaded on its own');
+    } finally {
+      console.error = consoleError;
+    }
+  },
+);
+
+test(
   'services that failed to start are shown after the restart instead of reloading over them',
   { timeout: 15_000 },
   async () => {
