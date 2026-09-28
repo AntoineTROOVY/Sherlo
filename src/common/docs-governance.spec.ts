@@ -145,6 +145,15 @@ describe('governance docs match the repository', () => {
     expect(note).toContain('`docker compose up -d --no-build`');
   });
 
+  // docs/20 section 20.4: the project runs no real-time chat server, and the `openwa` name is shared.
+  it('links no chat server the project does not run', () => {
+    const docs = readdirSync(join(root, 'docs'))
+      .filter(name => name.endsWith('.md'))
+      .map(name => `docs/${name}`);
+    expect(docs.length).toBeGreaterThanOrEqual(20);
+    expect(['README.md', ...docs].filter(file => /discord\.(gg|com\/invite)/i.test(read(file)))).toEqual([]);
+  });
+
   // Most values in the Standard profile are the defaults; only some groups differ.
   it('does not call every commented Standard profile value a non-default', () => {
     const header = between(read('docs/08-development-guidelines.md'), '#### Standard Profile', '# Application');
