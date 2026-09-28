@@ -29,8 +29,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Mirrors the ci.yml `audit` job step for step, so a scheduled failure means exactly what a
-  # merge-gate failure means — no stricter, no looser.
+  # Mirrors the ci.yml `audit` job step for step, with one difference: an audit npm cannot answer
+  # fails here (CHECK_AUDIT_REQUIRED=1) instead of skipping, because this job exists to detect
+  # advisories.
   audit:
     name: Security audit
     runs-on: ubuntu-latest
@@ -54,7 +55,10 @@ jobs:
       - name: Security audit
         # check:audit, not bare `npm audit`: the per-advisory allowlist in scripts/check-audit.mjs
         # applies, so an advisory already excused by id (with its recorded reason and drop
-        # condition) does not fire a false weekly alarm.
+        # condition) does not fire a false weekly alarm. Required here: this job exists to detect
+        # advisories, and a skipped audit would report the whole week clean.
+        env:
+          CHECK_AUDIT_REQUIRED: '1'
         run: npm run check:audit
 
       # The dashboard is a second dependency tree and the one that reaches a browser; same

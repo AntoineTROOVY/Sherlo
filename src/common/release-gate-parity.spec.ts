@@ -89,3 +89,39 @@ describe('one prerelease rule across the GitHub Release and the image channels',
     expect(steps().some(step => /\[\[ "\$REF_NAME" == \*-\* \]\]/.test(step.run ?? ''))).toBe(true);
   });
 });
+
+/**
+ * check:audit skips when npm's audit endpoint cannot answer, so an npm outage does not block every
+ * merge. The release and the weekly scan must not take that skip: one would publish, the other would
+ * report the week clean, with no advisory checked. CHECK_AUDIT_REQUIRED=1 turns the skip into a failure.
+ */
+describe('the release and weekly audits fail when the audit cannot run', () => {
+  type AuditStep = { run?: string; env?: Record<string, unknown> };
+  const auditSteps = (file: string): AuditStep[] => {
+    const workflow = yaml.load(fs.readFileSync(path.join(workflowDir, file), 'utf8')) as {
+      jobs?: Record<string, { steps?: AuditStep[] }>;
+    };
+    return Object.values(workflow.jobs ?? {})
+      .flatMap(job => job.steps ?? [])
+      .filter(step => executableLines(step.run ?? '').includes('npm run check:audit'));
+  };
+
+  it.each(['release.yml', 'security-scan.yml'])('%s requires the audit', file => {
+    const steps = auditSteps(file);
+    expect(steps.length).toBeGreaterThan(0);
+    expect(steps.filter(step => step.env?.CHECK_AUDIT_REQUIRED !== '1')).toEqual([]);
+  });
+
+  it('docs/10 describes the weekly audit as required, not as the merge job', () => {
+    const doc = fs.readFileSync(path.join(__dirname, '..', '..', 'docs', '10-devops-infrastructure.md'), 'utf8');
+    const paragraph = doc.split(/\n\s*\n/).find(block => block.includes('security-scan.yml'));
+    expect(paragraph).toContain('`CHECK_AUDIT_REQUIRED=1`');
+    expect(paragraph).not.toMatch(/exact\s+`audit`/);
+  });
+
+  it('ci.yml keeps the skip for merges', () => {
+    const steps = auditSteps('ci.yml');
+    expect(steps.length).toBeGreaterThan(0);
+    expect(steps.some(step => step.env?.CHECK_AUDIT_REQUIRED !== undefined)).toBe(false);
+  });
+});

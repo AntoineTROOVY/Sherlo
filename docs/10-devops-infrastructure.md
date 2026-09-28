@@ -270,8 +270,9 @@ Rollout is left to the operator — the repo has no SSH deploy step, no staging/
 environments and no auto-deploy on merge.
 
 `.github/workflows/security-scan.yml` (`name: Scheduled Security Scan`) complements the merge-time
-gates with a weekly run (Wednesdays 03:00 UTC, plus `workflow_dispatch`): it re-runs the exact
-`audit` job against the current dependency trees and the release workflow's `image-scan` against
+gates with a weekly run (Wednesdays 03:00 UTC, plus `workflow_dispatch`): it re-runs the `audit`
+job's checks against the current dependency trees, failing rather than skipping when npm's audit
+endpoint cannot answer (`CHECK_AUDIT_REQUIRED=1`), and the release workflow's `image-scan` against
 the published `latest` image on both architectures. A newly published advisory therefore turns
 something red within days instead of waiting for the next push or release. A third job,
 `base-image-drift`, fails when the two `node:22-slim` FROM lines in the `Dockerfile` pin different

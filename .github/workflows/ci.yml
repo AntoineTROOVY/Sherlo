@@ -186,8 +186,9 @@ jobs:
 
       - name: Run e2e smoke tests
         run: npm run test:e2e
-        # Point the queue-on suite at the service container (it self-skips without one). Every other
-        # suite keeps QUEUE_ENABLED=false via setup-e2e.ts and never touches Redis.
+        # Point the queue-on suite at the service container (under GitHub Actions the suite fails
+        # without one; a local run without Redis skips). Every other suite keeps QUEUE_ENABLED=false
+        # via setup-e2e.ts and never touches Redis.
         env:
           REDIS_HOST: localhost
           REDIS_PORT: '6379'
