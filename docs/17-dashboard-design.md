@@ -35,7 +35,8 @@ Every page — and most shared components — ships its own stylesheet colocated
 (`Sessions.tsx` + `Sessions.css`, `Layout.tsx` + `Layout.css`, ...), imported directly by the
 component (see §17.4 for the handful that carry no stylesheet of their own). Icons come from
 `lucide-react`; charts from `recharts`; i18n from `react-i18next`.
-Client state is **TanStack Query** for server data (see `src/hooks/queries.ts`) plus two small React
+Client state is **TanStack Query** for most server data (see `src/hooks/queries.ts`; §17.5 names the
+pages that keep their own copy) plus two small React
 Context providers (`RoleProvider`, `ToastProvider`); theme mode is a provider-less `useTheme` hook
 backed by `localStorage` — there is no Zustand store.
 
@@ -458,12 +459,25 @@ library — those visuals are composed directly with `div`s and the page's own C
 
 ## 17.5 State Management
 
-There is **no Zustand store** (and no global client-state library). Server data is owned by
+There is **no Zustand store** (and no global client-state library). Most server data is owned by
 **TanStack Query** (`@tanstack/react-query`); the only other shared state lives in the two React
 Context providers in the app — `RoleProvider` (the authenticated key's role, read through the
 `useRole` hook) and `ToastProvider` (transient notifications). Theme mode is deliberately _not_ a
 context: `useTheme` is a plain hook that persists to `localStorage` and writes one attribute on
 `<html>` (see §17.7).
+
+Three pages keep a server list in local state instead of the query cache:
+
+- **Sessions** (`Sessions.tsx`) holds the session list itself and sequences each read against its
+  own row writes and socket pushes, so an older answer never overwrites a newer row. After each read
+  it applies, it invalidates the `['sessions']` key prefix so the Dashboard and per-session views
+  refetch.
+- **Chats** (`Chats.tsx`) reads the ready sessions directly on mount, and again when a search hit
+  names a session that list lacks, and keeps the chat list in local state that socket pushes, sends
+  and marking a chat read update.
+- **Plugins** (`Plugins.tsx`) keeps the catalog in local state. It prefetches it silently on mount
+  so installed cards can show an update chip, fetches it again when the Catalog tab opens with an
+  empty list, and reloads it after an install or update.
 
 ### API client — raw payloads, no `{ data }` envelope
 
