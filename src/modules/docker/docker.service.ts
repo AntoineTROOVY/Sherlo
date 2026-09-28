@@ -350,6 +350,7 @@ export class DockerService implements OnModuleInit {
       const existing = await this.getContainerByService(profile);
       if (existing) {
         const info = await existing.inspect();
+        this.warnOnImageDrift(profile, spec.name, info);
         if (info.State.Running) {
           this.logger.log(`Container ${spec.name} already running`);
           return true;
@@ -444,26 +445,26 @@ export class DockerService implements OnModuleInit {
   async startService(service: string): Promise<boolean> {
     const container = await this.getContainerByService(service);
 
+    // Map service names to docker-compose profiles
+    const serviceToProfile: Record<string, string> = {
+      database: 'postgres',
+      cache: 'redis',
+      storage: 'minio',
+      postgres: 'postgres',
+      redis: 'redis',
+      minio: 'minio',
+    };
+    const profile = serviceToProfile[service] || service;
+
     if (!container) {
       // Container doesn't exist - create it using docker-compose
       this.logger.log(`Container for service '${service}' not found, creating...`);
-
-      // Map service names to docker-compose profiles
-      const serviceToProfile: Record<string, string> = {
-        database: 'postgres',
-        cache: 'redis',
-        storage: 'minio',
-        postgres: 'postgres',
-        redis: 'redis',
-        minio: 'minio',
-      };
-
-      const profile = serviceToProfile[service] || service;
       return this.createService(profile);
     }
 
     try {
       const info = await container.inspect();
+      this.warnOnImageDrift(profile, info.Name?.replace(/^\//, '') || service, info);
       if (info.State.Running) {
         this.logger.log(`Service '${service}' is already running`);
         return true;
@@ -476,6 +477,23 @@ export class DockerService implements OnModuleInit {
       this.logger.error(`Failed to start service: ${service}`, error);
       return false;
     }
+  }
+
+  /**
+   * A retained container is only ever restarted, never recreated (see stopManagedService), so it
+   * keeps the image it was created from after the pin moves. Warn with the way out; start and stop
+   * behaviour stay as they are.
+   */
+  private warnOnImageDrift(profile: string, name: string, info: Docker.ContainerInspectInfo): void {
+    const pinned = this.getContainerSpec(profile)?.image;
+    const running = info.Config?.Image;
+    if (!pinned || !running || running === pinned) return;
+    this.logger.warn(
+      `Container ${name} runs image ${running}, but this release pins ${pinned}. Remove it with ` +
+        `\`docker rm -f ${name}\` (its named data volume is kept) and restart OpenWA or re-enable the ` +
+        `service so it is recreated from the pin.` +
+        (profile === 'postgres' ? ' A PostgreSQL major version change needs a data migration first.' : ''),
+    );
   }
 
   /**
