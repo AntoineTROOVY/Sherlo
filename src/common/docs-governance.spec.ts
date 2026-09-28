@@ -99,6 +99,13 @@ describe('governance docs match the repository', () => {
     expect(note).toContain('`docker compose up -d --no-build`');
   });
 
+  // Most values in the Standard profile are the defaults; only some groups differ.
+  it('does not call every commented Standard profile value a non-default', () => {
+    const header = between(read('docs/08-development-guidelines.md'), '#### Standard Profile', '# Application');
+    expect(header).not.toMatch(/which are not the defaults/);
+    expect(header).toMatch(/set the ones that differ from the defaults/);
+  });
+
   // Registries show the package description on its own in search results, away from the README.
   it('keeps the non-affiliation notice in every SDK registry description', () => {
     const descriptions = [

@@ -1042,7 +1042,10 @@ export class WhatsAppWebJsAdapter implements IWhatsAppEngine {
 
     this.client = new Client({
       authStrategy: new LocalAuth({ clientId: this.sessionId, dataPath: this.sessionDataPath }),
-      puppeteer: { headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] },
+      puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      },
     });
 
     this.setupEventHandlers();
@@ -1529,68 +1532,72 @@ flowchart LR
 
 ### Configuration Examples
 
+Every key below is managed in Dashboard > Infrastructure, so the blocks show them commented out: an
+uncommented key in `.env` pins its value over the one the dashboard saves (see the header of
+`.env.example`). Uncomment only what you intend to manage by hand.
+
 #### Minimal Profile (.env)
 
 ```bash
 # Database
-DATABASE_TYPE=sqlite
-DATABASE_NAME=./data/openwa.sqlite
+# DATABASE_TYPE=sqlite
+# DATABASE_NAME=./data/openwa.sqlite
 
 # Storage
-STORAGE_TYPE=local
-STORAGE_LOCAL_PATH=./data/media
+# STORAGE_TYPE=local
+# STORAGE_LOCAL_PATH=./data/media
 
 # Cache: omit / leave Redis disabled -> the cache layer no-ops (no in-memory cache)
-REDIS_ENABLED=false
+# REDIS_ENABLED=false
 ```
 
 #### Standard Profile (.env)
 
 ```bash
 # Database (Postgres uses discrete host/port/credentials, not a single URL)
-DATABASE_TYPE=postgres
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_NAME=openwa
-DATABASE_USERNAME=openwa
-DATABASE_PASSWORD=password
+# DATABASE_TYPE=postgres
+# DATABASE_HOST=localhost
+# DATABASE_PORT=5432
+# DATABASE_NAME=openwa
+# DATABASE_USERNAME=openwa
+# DATABASE_PASSWORD=<set-a-strong-password>
 
 # Storage
-STORAGE_TYPE=local
-STORAGE_LOCAL_PATH=./data/media
+# STORAGE_TYPE=local
+# STORAGE_LOCAL_PATH=./data/media
 
 # Cache
-REDIS_ENABLED=true
-REDIS_HOST=localhost
-REDIS_PORT=6379
+# REDIS_ENABLED=true
+# REDIS_HOST=localhost
+# REDIS_PORT=6379
 ```
 
 #### Enterprise Profile (.env)
 
 ```bash
 # Database
-DATABASE_TYPE=postgres
-DATABASE_HOST=db-cluster
-DATABASE_PORT=5432
-DATABASE_NAME=openwa
-DATABASE_USERNAME=openwa
-DATABASE_PASSWORD=password
-DATABASE_POOL_SIZE=50
+# DATABASE_TYPE=postgres
+# DATABASE_HOST=db-cluster
+# DATABASE_PORT=5432
+# DATABASE_NAME=openwa
+# DATABASE_USERNAME=openwa
+# DATABASE_PASSWORD=<set-a-strong-password>
+# DATABASE_POOL_SIZE=50
 
 # Storage (S3 or any S3-compatible endpoint; MinIO uses the same vars)
-STORAGE_TYPE=s3
-S3_BUCKET=openwa-media
-S3_REGION=ap-southeast-1
-S3_ACCESS_KEY_ID=xxx
-S3_SECRET_ACCESS_KEY=xxx
+# STORAGE_TYPE=s3
+# S3_BUCKET=openwa-media
+# S3_REGION=ap-southeast-1
+# S3_ACCESS_KEY_ID=<access-key-id>
+# S3_SECRET_ACCESS_KEY=<secret-access-key>
 # AWS S3 needs NO endpoint (one is derived from the region) — leave S3_ENDPOINT unset for it. An
 # endpoint is only for S3-compatible stores (MinIO, R2, …), where setting it also enables path-style:
 # S3_ENDPOINT=http://minio:9000
 
 # Cache
-REDIS_ENABLED=true
-REDIS_HOST=redis-cluster
-REDIS_PORT=6379
+# REDIS_ENABLED=true
+# REDIS_HOST=redis-cluster
+# REDIS_PORT=6379
 ```
 
 > OpenWA runs as a single API instance per session-data volume; there is no cluster-mode flag.

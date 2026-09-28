@@ -680,33 +680,39 @@ OpenWA supports multiple infrastructure configurations. Choose based on your nee
 #### Minimal Profile (Development / Single Session)
 
 ```bash
+# Keys the dashboard manages (Dashboard > Infrastructure) are commented out with their defaults:
+# an uncommented key in .env pins that value over the one the dashboard saves (see the header of
+# `.env.example`). Uncomment only what you intend to manage by hand.
+
 # Application
 NODE_ENV=development
 PORT=2785
 LOG_LEVEL=debug
 
 # Database: SQLite (zero config)
-DATABASE_TYPE=sqlite
-DATABASE_NAME=./data/openwa.sqlite
-DATABASE_SYNCHRONIZE=true
+# DATABASE_TYPE=sqlite
+# DATABASE_NAME=./data/openwa.sqlite
+# SQLite runs migrations by default. DATABASE_SYNCHRONIZE=true is SQLite-only: PostgreSQL refuses it
+# at boot, so an uncommented true here stops a later switch to PostgreSQL in the dashboard from booting.
+# DATABASE_SYNCHRONIZE=false
 
 # Storage: Local filesystem
-STORAGE_TYPE=local
-STORAGE_LOCAL_PATH=./data/media
+# STORAGE_TYPE=local
+# STORAGE_LOCAL_PATH=./data/media
 
 # Redis and queue disabled by default
-REDIS_ENABLED=false
-QUEUE_ENABLED=false
+# REDIS_ENABLED=false
+# QUEUE_ENABLED=false
 
 # Optional: seed a known admin key. If omitted, OpenWA generates a random key and writes data/.api-key.
 API_MASTER_KEY=
 
 # Session
-SESSION_DATA_PATH=./data/sessions
+# SESSION_DATA_PATH=./data/sessions
 
 # Engine: whatsapp-web.js = Chromium-based; baileys = browser-free WebSocket
-ENGINE_TYPE=whatsapp-web.js
-PUPPETEER_HEADLESS=true
+# ENGINE_TYPE=whatsapp-web.js
+# PUPPETEER_HEADLESS=true
 
 # Swagger defaults ON outside production and OFF under NODE_ENV=production.
 # Set it explicitly to force either way.
@@ -716,43 +722,52 @@ ENABLE_SWAGGER=true
 #### Standard Profile (Production / Multi-Session)
 
 ```bash
+# Keys the dashboard manages (Dashboard > Infrastructure) are commented out with the values this
+# profile uses; set the ones that differ from the defaults (PostgreSQL, Redis, the queue, /app/data
+# paths) there. An uncommented key in .env pins that value over the one the dashboard saves (see the
+# header of `.env.example`). Uncomment only what you intend to manage by hand.
+
 # Application
 NODE_ENV=production
 PORT=2785
 LOG_LEVEL=info
 
 # Database: PostgreSQL
-DATABASE_TYPE=postgres
-DATABASE_HOST=postgres
-DATABASE_PORT=5432
-DATABASE_USERNAME=openwa
-DATABASE_PASSWORD=<set-a-strong-password>
-DATABASE_NAME=openwa
+# DATABASE_TYPE=postgres
+# DATABASE_HOST=postgres
+# DATABASE_PORT=5432
+# DATABASE_USERNAME=openwa
+# DATABASE_PASSWORD=<set-a-strong-password>
+# DATABASE_NAME=openwa
 DATABASE_SYNCHRONIZE=false
-DATABASE_POOL_SIZE=10
+# DATABASE_POOL_SIZE=10
 
 # Storage: Local filesystem
-STORAGE_TYPE=local
-STORAGE_LOCAL_PATH=/app/data/media
+# STORAGE_TYPE=local
+# STORAGE_LOCAL_PATH=/app/data/media
 
 # Cache: Redis
-REDIS_ENABLED=true
-REDIS_HOST=redis
-REDIS_PORT=6379
-QUEUE_ENABLED=true
+# REDIS_ENABLED=true
+# REDIS_HOST=redis
+# REDIS_PORT=6379
+# QUEUE_ENABLED=true
 
 # Security
-API_MASTER_KEY=<set-a-strong-initial-admin-key>
-API_KEY_PEPPER=<optional-hash-pepper>
+# First-boot seed for the initial ADMIN key, ignored once any key exists. Leave it unset to
+# generate a random key into data/.api-key, or set one generated with: openssl rand -base64 32
+# API_MASTER_KEY=
+# Optional HMAC pepper so a DB leak alone can't precompute key hashes. Generate a random value
+# (openssl rand -base64 32); setting or changing it invalidates every API key issued before.
+# API_KEY_PEPPER=
 CORS_ORIGINS=https://dashboard.example.com
 
 # Session
-SESSION_DATA_PATH=/app/data/sessions
+# SESSION_DATA_PATH=/app/data/sessions
 
 # Engine
-ENGINE_TYPE=whatsapp-web.js
-PUPPETEER_HEADLESS=true
-PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu
+# ENGINE_TYPE=whatsapp-web.js
+# PUPPETEER_HEADLESS=true
+# PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu
 ENABLE_SWAGGER=false
 ```
 
@@ -973,7 +988,7 @@ export class EngineTeardownService {
 
 1. **Chrome/Puppeteer issue**
    - Ensure Chrome for Testing is installed: `ls /usr/local/bin/puppeteer-chrome`
-   - Check Puppeteer args: `--no-sandbox --disable-setuid-sandbox`
+   - Check Puppeteer args (`PUPPETEER_ARGS`); the default is `--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu`
 
 2. **Previous session data corrupted**
    - Clear the stored auth/session data for the session under `data/sessions`
