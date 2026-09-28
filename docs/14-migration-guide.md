@@ -251,6 +251,20 @@ curl -X POST 'http://localhost:2785/api/infra/storage/import' \
 | Built-in MinIO → External S3 | ✅      | Export → Config → Import |
 | S3 → Local                   | ✅      | Export → Config → Import |
 
+The built-in storage (the compose `minio` profile and the dashboard's built-in option) runs
+`pgsty/silo`, a maintained MinIO fork, on the same `openwa_minio-data` volume. An `openwa-minio`
+container created from the older `minio/minio` image keeps running it until it is recreated: on the
+compose route run `docker compose --profile minio pull minio && docker compose --profile minio up -d minio`;
+for the dashboard built-in run `docker rm -f openwa-minio`, then restart OpenWA or re-save the
+built-in storage. The recreated dashboard built-in container publishes no host ports: the older one
+published the S3 API and console on `127.0.0.1:9000` and `127.0.0.1:9001`, and OpenWA reaches the new
+one over the Docker network alone. For host access to either, run storage through the compose `minio`
+profile, which still publishes both on loopback. The compose `minio` service no longer starts without `S3_ACCESS_KEY_ID` and
+`S3_SECRET_ACCESS_KEY` in the `.env` next to `docker-compose.yml`: a container that ran with neither
+set used `minioadmin`/`minioadmin`, so set them to the pair OpenWA uses before recreating it. If
+OpenWA uses the dashboard built-in storage, drop the `minio`/`full` profile and take the dashboard
+route instead. The volume and its media are kept either way.
+
 ### Redis Migration (Cache)
 
 Redis in OpenWA holds only **ephemeral** state: TTL-based cache entries, BullMQ jobs (see below), and — when `REDIS_ENABLED` — the rate-limit hit counters. Cache data automatically regenerates from the database.

@@ -300,8 +300,9 @@ export class DockerService implements OnModuleInit {
         securityOpt: ['no-new-privileges:true'],
       },
       minio: {
-        // Same pin as the compose minio service — never track the floating `latest` tag.
-        image: 'minio/minio:RELEASE.2025-09-07T16-13-09Z',
+        // Same pin (release tag and digest) as the compose minio service; never a floating tag.
+        image:
+          'pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46',
         name: 'openwa-minio',
         alias: 'minio',
         cmd: ['server', '/data', '--console-address', ':9001'],

@@ -270,12 +270,12 @@ docker compose --profile postgres up -d
 docker compose --profile full up -d
 ```
 
-| Profile    | Services              |
-| ---------- | --------------------- |
-| `postgres` | PostgreSQL database   |
-| `redis`    | Redis cache           |
-| `minio`    | S3-compatible storage |
-| `full`     | All services above    |
+| Profile    | Services                                        |
+| ---------- | ----------------------------------------------- |
+| `postgres` | PostgreSQL database                             |
+| `redis`    | Redis cache                                     |
+| `minio`    | S3-compatible storage (MinIO fork `pgsty/silo`) |
+| `full`     | All services above                              |
 
 A profile only starts the container; OpenWA keeps using SQLite and local storage until it is told
 to use the new service. The simplest route is **Dashboard > Infrastructure**: pick the built-in

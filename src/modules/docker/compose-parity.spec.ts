@@ -143,7 +143,15 @@ describe('DockerService managed specs ↔ docker-compose.yml parity', () => {
     const cfg = await capture(profile);
     expect(cfg.Image).toBe(compose.services[profile].image);
     expect(cfg.Image).toContain(':'); // an explicit tag, never the floating default
+    expect(cfg.Image).not.toMatch(/:latest(@|$)/);
     expect(cfg.name).toBe(compose.services[profile].container_name);
+  });
+
+  it('minio: pins a release tag and an image digest, and not the withdrawn minio/minio image', async () => {
+    // The equality above keeps both sides the same; this keeps the digest from being dropped from both.
+    const cfg = await capture('minio');
+    expect(cfg.Image).toMatch(/:RELEASE\.[0-9T-]+Z@sha256:[0-9a-f]{64}$/);
+    expect(cfg.Image).not.toMatch(/^(quay\.io\/)?minio\/minio[:@]/);
   });
 
   it.each(PROFILES)('%s: attaches to the fixed openwa-network like the compose service', async profile => {

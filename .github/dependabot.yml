@@ -170,10 +170,11 @@ updates:
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
 
-  # The compose stack's pinned images (docker-compose.yml): socket-proxy, postgres, redis, minio.
-  # A postgres, redis or minio bump fails src/modules/docker/compose-parity.spec.ts until the same
-  # tag is set in src/modules/docker/docker.service.ts; that failure is intended, so edit both on
-  # the Dependabot branch. tecnativa/docker-socket-proxy has no such mirror and no CI gate on its
+  # The compose stack's pinned images (docker-compose.yml): socket-proxy, postgres, redis, and
+  # pgsty/silo for the `minio` service. A postgres, redis or silo bump fails
+  # src/modules/docker/compose-parity.spec.ts until the same image reference (for silo, tag and
+  # digest) is set in src/modules/docker/docker.service.ts; that failure is intended, so edit both
+  # on the Dependabot branch. tecnativa/docker-socket-proxy has no such mirror and no CI gate on its
   # behaviour: review its release notes against the allow-list in docker-compose.yml and re-run
   # scripts/smoke-test-docker-proxy.sh by hand before merging one.
   - package-ecosystem: docker-compose
@@ -195,5 +196,3 @@ updates:
       # (ci.yml, release.yml), which no ecosystem updates. A deliberate, by-hand move.
       - dependency-name: "redis"
         update-types: ["version-update:semver-major"]
-      # Being replaced (#1729), and the registry no longer serves the image.
-      - dependency-name: "minio/minio"
