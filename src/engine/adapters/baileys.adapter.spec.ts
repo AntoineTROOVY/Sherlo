@@ -4912,6 +4912,7 @@ describe('BaileysAdapter store-backed ops', () => {
   describe('persisted chat states', () => {
     const chatStateStore = {
       get: jest.fn(),
+      chatIds: jest.fn((): string[] => []),
       remember: jest.fn().mockResolvedValue(undefined),
       fold: jest.fn().mockResolvedValue(undefined),
       reload: jest.fn().mockResolvedValue(undefined),
@@ -4936,6 +4937,16 @@ describe('BaileysAdapter store-backed ops', () => {
 
     // Another node may have written rows while it held the session (takeover).
     const makeSocket = (): jest.Mock => jest.requireMock<{ default: jest.Mock }>('@whiskeysockets/baileys').default;
+
+    it('lists a chat that has one on a new engine, before its next message', async () => {
+      chatStateStore.chatIds.mockReturnValueOnce(['628111@s.whatsapp.net']);
+      chatStateStore.get.mockImplementation((_s: string, chatId: string) =>
+        chatId === '628111@s.whatsapp.net' ? { muteEndTime: null, archived: false, pinned: true } : undefined,
+      );
+      const adapter = await linked();
+      expect(await adapter.getChats()).toEqual([expect.objectContaining({ id: '628111@c.us', pinned: true })]);
+      chatStateStore.get.mockReset();
+    });
 
     it('re-reads them on start, before the socket opens', async () => {
       makeSocket().mockClear();

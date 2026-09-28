@@ -18,6 +18,9 @@ class FakeChatStateStore implements ChatStateStore {
   get(s: string, c: string): ChatStateValue | undefined {
     return this.rows.get(this.key(s, c));
   }
+  chatIds(s: string): string[] {
+    return [...this.rows.keys()].filter(k => k.startsWith(`${s}\u0000`)).map(k => k.slice(s.length + 1));
+  }
   remember(s: string, c: string, patch: Partial<ChatStateValue>, create = true): Promise<void> {
     // Same bookkeeping as the real store: a new row observes only what the patch carries, and a patch
     // that may not create one writes nothing when it only restates defaults.
@@ -1113,6 +1116,28 @@ describe('BaileysSessionStore', () => {
       s.addLidMappings([{ lid: LID, pn: PHONE }]);
       s.removeChats([LID]);
       expect(fake.rows.size).toBe(0);
+    });
+
+    it('lists a chat with a persisted state after a restart, before its next message', () => {
+      fake.rows.set(K(PHONE), { muteEndTime: null, archived: false, pinned: true });
+      fake.rows.set(K('628222@s.whatsapp.net'), { muteEndTime: -1, archived: false, pinned: false });
+      fake.rows.set('other\u0000628333@s.whatsapp.net', { muteEndTime: -1, archived: false, pinned: false });
+      const s = newStore();
+      s.upsertContacts([{ id: PHONE, name: 'Alice' }]);
+      s.upsertChats([{ id: '628222@s.whatsapp.net', name: 'Bob', conversationTimestamp: 70 }]);
+      expect(s.listChats()).toEqual([
+        expect.objectContaining({ id: '628222@c.us', name: 'Bob', timestamp: 70, muted: true }),
+        expect.objectContaining({ id: '628111@c.us', name: 'Alice', timestamp: 0, pinned: true }),
+      ]);
+      s.removeChats([PHONE]);
+      expect(s.listChats().map(c => c.id)).toEqual(['628222@c.us']);
+    });
+
+    it('lists a persisted state filed under a lid once, under the phone', () => {
+      fake.rows.set(K(LID), { muteEndTime: null, archived: true, pinned: false });
+      const s = newStore();
+      s.addLidMappings([{ lid: LID, pn: PHONE }]);
+      expect(s.listChats()).toEqual([expect.objectContaining({ id: '628111@c.us', archived: true })]);
     });
 
     it('finds the disappearing timer a lid-keyed chat record carries from the @c.us id', () => {

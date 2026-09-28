@@ -32,6 +32,8 @@ export type ChatStateValue = {
 export interface ChatStateStore {
   /** Sync read from the in-memory mirror; undefined = no persisted state for this chat (defaults apply). */
   get(sessionId: string, chatId: string): ChatStateValue | undefined;
+  /** The chat ids the in-memory mirror holds a state for in one session (bounded by the cache cap). */
+  chatIds(sessionId: string): string[];
   /**
    * Write-through, last-write-wins: merge the patch into the stored state and persist. With `create`
    * false, a patch that only restates defaults writes nothing for a chat with no row (an update that
@@ -197,6 +199,11 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
     }
     if (!this.completeSessions.has(sessionId) && !this.absent.has(k)) this.warmFromTable(k, sessionId, chatId);
     return undefined;
+  }
+
+  chatIds(sessionId: string): string[] {
+    const prefix = `${sessionId}${SEP}`;
+    return [...this.states.keys()].filter(k => k.startsWith(prefix)).map(k => k.slice(prefix.length));
   }
 
   /**

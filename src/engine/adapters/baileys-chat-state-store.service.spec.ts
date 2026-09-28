@@ -121,6 +121,20 @@ describe('ChatStateStoreService', () => {
     });
   });
 
+  it("lists the chat ids of one session's cached states", async () => {
+    const svc = svcWith(
+      makeRepo([
+        { sessionId: 's', chatId: 'a', archived: true },
+        { sessionId: 's', chatId: 'b', pinned: true },
+        { sessionId: 't', chatId: 'c', pinned: true },
+      ]),
+    );
+    await svc.reload();
+    expect(svc.chatIds('s').sort()).toEqual(['a', 'b']);
+    await svc.forget('s', ['a']);
+    expect(svc.chatIds('s')).toEqual(['b']);
+  });
+
   it('returns undefined for an unknown chat', () => {
     expect(svcWith(makeRepo()).get('s', 'nope')).toBeUndefined();
   });

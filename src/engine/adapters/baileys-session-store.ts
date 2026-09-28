@@ -170,9 +170,10 @@ function mergeContactTwins(a: ContactTwin, b: ContactTwin): ContactTwin {
  * and `messaging-history.set` arrives only on the first link: once the account has synced, WhatsApp
  * skips history sync on every later connect (see BaileysHistory.hydrateNames). A new engine (a process
  * restart, a session stop and start, a reconnect the gateway runs itself) therefore starts with no
- * chats: the groups hydrateNames re-fetches on every open come back at once, and a 1:1 chat comes back
- * with its next message, since Baileys emits `chats.update` for every real message. Mute, archive and
- * pin survive through the ChatStateStore. Contacts are rebuilt from the address-book snapshot instead.
+ * chats: the groups hydrateNames re-fetches on every open come back at once, a chat with a persisted
+ * mute, archive or pin (ChatStateStore) is listed from that row, and any other 1:1 chat comes back with
+ * its next message, since Baileys emits `chats.update` for every real message. Contacts are rebuilt
+ * from the address-book snapshot instead.
  *
  * Every map is LRU-bounded (`BAILEYS_SESSION_STORE_MAX_ENTRIES`, default 5000 per map, 0 = unbounded)
  * because contacts/chats/lastMessages/lidToPn all grow from peer-controlled traffic — without a cap a
@@ -609,6 +610,14 @@ export class BaileysSessionStore {
     for (const c of [...this.chats.values()]) {
       const id = this.toNeutralJid(c.id!);
       byId.set(id, [...(byId.get(id) ?? []), c]);
+    }
+    // A new engine starts with no chats (see the class comment), but a chat with a persisted state is
+    // known to exist: a deleted chat loses its row. So it is listed before its next message arrives.
+    if (this.chatStateStore && this.sessionId) {
+      for (const chatId of this.chatStateStore.chatIds(this.sessionId)) {
+        const id = this.toNeutralJid(chatId);
+        if (!byId.has(id)) byId.set(id, [{ id: chatId }]);
+      }
     }
     return [...byId].map(([id, records]) => this.toNeutralChat(id, records, previews.get(id), lidIndex));
   }

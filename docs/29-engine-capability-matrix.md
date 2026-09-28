@@ -944,11 +944,12 @@ adapter boundary — none silently stubs.
 - **`getChats` after a restart (baileys).** Baileys keeps no chat list of its own, and WhatsApp
   skips history sync on every connect after the first link, so a new engine (a process restart, a
   session stop and start, or a reconnect the gateway runs itself, as for `deleteStatus` above) starts
-  with an empty one. `GET /chats` then lists the groups, re-fetched on every connect, and each 1:1
-  chat as its next message arrives; a quiet chat stays out of the list until then. Rows rebuilt this
-  way carry timestamp `0` and no `lastMessage` until a message arrives. A chat's archive, pin and mute
-  state is persisted and shows as soon as the chat is listed. The transient reconnects Baileys runs on
-  its own keep the list. whatsapp-web.js reads WhatsApp Web's own chat list and is unaffected.
+  with an empty one. `GET /chats` then lists the groups, re-fetched on every connect, and every chat
+  with a persisted archive, pin or mute state (bounded by `BAILEYS_CHAT_STATE_CACHE_MAX`); any other
+  1:1 chat comes back when its next message arrives and stays out of the list until then. Rows
+  rebuilt this way carry timestamp `0` and no `lastMessage` until a message arrives. The transient
+  reconnects Baileys runs on its own keep the list. whatsapp-web.js reads WhatsApp Web's own chat
+  list and is unaffected.
 - **`getContactStatus` / `getContactStatuses` (wwjs).** `Status.type` is the `text|image|video`
   union — audio/other story types collapse to `text`.
 - **`archiveChat` / `clearChatMessages` / `deleteChat` / `sendSeen` / `markUnread` (baileys).** The
