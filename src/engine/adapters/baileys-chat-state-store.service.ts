@@ -80,7 +80,9 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
       });
       this.states.clear();
       this.absent.clear();
-      for (const row of rows) {
+      // Oldest first, so the newest row ends at the most-recent end of the LRU rather than the first
+      // one evicted (the query is DESC only so `take` keeps the newest rows).
+      for (const row of [...rows].reverse()) {
         this.index(this.key(row.sessionId, row.chatId), {
           muteEndTime: row.muteEndTime,
           archived: row.archived,
@@ -227,7 +229,8 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
     for (const k of [...this.states.keys()]) {
       if (k.startsWith(prefix)) this.states.delete(k);
     }
-    for (const row of rows) {
+    for (const row of [...rows].reverse()) {
+      // Oldest first, as in reload.
       this.index(this.key(sessionId, row.chatId), {
         muteEndTime: row.muteEndTime,
         archived: row.archived,

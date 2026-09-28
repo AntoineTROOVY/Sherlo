@@ -17,9 +17,13 @@ function makeRepo(initial: Partial<ChatState>[] = []) {
   }
   const repo = {
     rows,
-    find: jest.fn((opts?: { where?: { sessionId: string } }) =>
-      Promise.resolve([...rows.values()].filter(r => !opts?.where || r.sessionId === opts.where.sessionId)),
-    ),
+    // Honors the DESC order and the take the service asks for; the sort is stable for equal stamps.
+    find: jest.fn((opts?: { where?: { sessionId: string }; order?: { updatedAt?: 'DESC' }; take?: number }) => {
+      const found = [...rows.values()].filter(r => !opts?.where || r.sessionId === opts.where.sessionId);
+      const at = (r: ChatState) => r.updatedAt?.getTime() ?? 0;
+      if (opts?.order?.updatedAt === 'DESC') found.sort((a, b) => at(b) - at(a));
+      return Promise.resolve(opts?.take ? found.slice(0, opts.take) : found);
+    }),
     findOne: jest.fn(({ where }: { where: { sessionId: string; chatId: string } }) =>
       Promise.resolve(rows.get(KEY(where.sessionId, where.chatId))),
     ),
@@ -97,6 +101,26 @@ describe('ChatStateStoreService', () => {
     expect(svc.get('s', 'a')).toBeUndefined();
     expect(svc.get('s', 'b')).toBeDefined();
     expect(svc.get('s', 'c')).toBeDefined();
+  });
+
+  describe('keeps the most recently changed rows when a preload fills the cap', () => {
+    const rows = (): Partial<ChatState>[] => [
+      { sessionId: 's', chatId: 'old', pinned: true, updatedAt: new Date(1000) },
+      { sessionId: 's', chatId: 'mid', pinned: true, updatedAt: new Date(2000) },
+      { sessionId: 's', chatId: 'new', pinned: true, updatedAt: new Date(3000) },
+    ];
+
+    it.each([
+      ['reload', (svc: ChatStateStoreService) => svc.reload()],
+      ['refreshSession', (svc: ChatStateStoreService) => svc.refreshSession('s')],
+    ])('evicts the oldest preloaded row first after %s', async (_name, load) => {
+      process.env[ENV] = '2';
+      const svc = svcWith(makeRepo(rows()));
+      await load(svc);
+      await svc.remember('s', 'fresh', { pinned: true });
+      expect(svc.get('s', 'new')).toEqual(expect.objectContaining({ pinned: true }));
+      expect(svc.get('s', 'mid')).toBeUndefined();
+    });
   });
 
   it('preserves persisted siblings when a partial patch lands on a cache-missed chat', async () => {
