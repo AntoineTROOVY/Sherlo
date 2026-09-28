@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -24,9 +25,9 @@ import { EventsGateway, type ApiKeyEvictionReason } from '../events/events.gatew
 
 /**
  * A 401 that names no stored key: the credential was missing or matched no row. Producing one costs
- * the caller nothing, so its audit row is bounded per client IP. Every other 401 (revoked, expired,
- * IP or session refused) required a real key and is audited on every attempt. The name stays
- * `UnauthorizedException` because MCP tool errors carry it on the wire.
+ * the caller nothing, so its audit row is bounded per client IP. Every other rejection (a revoked or
+ * expired key's 401, an IP or session refusal's 403) required a real key and is audited on every
+ * attempt. The name stays `UnauthorizedException` because MCP tool errors carry it on the wire.
  */
 export class UnresolvedApiKeyException extends UnauthorizedException {
   constructor(message: string) {
@@ -484,25 +485,28 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       throw new UnauthorizedException('API key has expired');
     }
 
+    // A live key refused by its own IP or session restriction answers 403, like every other scope
+    // refusal (role, chats): the key is valid, so a client must not read it as one to discard.
+
     // Check IP whitelist (fail closed: if a whitelist is configured but the client
     // IP could not be determined, reject rather than silently skipping the check)
     if (apiKey.allowedIps && apiKey.allowedIps.length > 0) {
       if (!clientIp) {
-        throw new UnauthorizedException('Client IP could not be determined');
+        throw new ForbiddenException('Client IP could not be determined');
       }
       if (!this.isIpAllowed(clientIp, apiKey.allowedIps)) {
         this.logger.warn(`IP not allowed: ${clientIp}`, {
           keyId: apiKey.id,
           action: 'ip_rejected',
         });
-        throw new UnauthorizedException('IP address not allowed');
+        throw new ForbiddenException('IP address not allowed');
       }
     }
 
     // Check session restriction
     if (apiKey.allowedSessions && apiKey.allowedSessions.length > 0 && sessionId) {
       if (!apiKey.allowedSessions.includes(sessionId)) {
-        throw new UnauthorizedException('API key not authorized for this session');
+        throw new ForbiddenException('API key not authorized for this session');
       }
     }
 

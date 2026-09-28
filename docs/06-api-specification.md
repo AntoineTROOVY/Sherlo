@@ -45,7 +45,7 @@ API keys carry one of three roles, ordered by privilege:
 
 `@RequireRole(role)` enforces a **minimum** role using the hierarchy `VIEWER < OPERATOR < ADMIN`: a key satisfies the guard if its own rank is ≥ the required rank (so an `admin` key passes an `OPERATOR`-guarded route). A route with no `@RequireRole` accepts any valid key, including `viewer`. A key whose role is below the requirement gets `403 Forbidden`; a missing or invalid key gets `401 Unauthorized`.
 
-A key may additionally be scoped to specific sessions (`allowedSessions`) and/or source IPs (`allowedIps`). The scope/IP check runs in the guard **before** any role check, so a request outside that scope is rejected with `401` (not `403`) even if the role would otherwise allow it.
+A key may additionally be scoped to specific sessions (`allowedSessions`) and/or source IPs (`allowedIps`). The scope/IP check runs in the guard **before** any role check, so a request outside that scope is rejected with `403` even if the role would otherwise allow it. `401` is kept for a missing, unknown, revoked or expired key.
 
 A key may also be restricted to selected chats (`allowedChats`: group `<id>@g.us`, contact `<phone>@c.us` or `<lid>@lid`, or a bare phone number, which is stored as `<phone>@c.us`). An empty or absent list leaves the key unrestricted. A chat-restricted key is **denied by default**: it may call only routes marked as chat-scoped, and every other route (webhooks, automation, status, channels, key management, and any route added later) answers `403 "API key is restricted to selected chats"` after the role check. On a chat-scoped route, every chat id the request names (a `:chatId` / `:groupId` / `:contactId` path param, `?chatId=`, a body `chatId` / `fromChatId` / `toChatId`, and each `messages[].chatId` of a bulk send) must be inside the allowlist, or the request answers `403 "API key not authorized for this chat"`; a contact entry also matches its mapped `@lid` form, and the reverse. The chat, group, contact and label-chat list routes (`GET /api/sessions/:sessionId/chats`, `/groups`, `/contacts` and `/labels/:labelId/chats`) return only the allowed entries, filtered before paging. On `GET /api/sessions/:sessionId/messages` such a key must pass `?chatId=`; omitting it answers `403`. A `quotedMessageId` is refused with `403` everywhere except the reply route, which binds the quote to the chat it sends into. The surfaces outside the REST guard refuse a chat-restricted key outright: the `/events` WebSocket at the handshake and on every subscribe, every MCP tool call (`403`), and the Bull Board queue dashboard (`403`).
 
@@ -99,8 +99,8 @@ Validation failures (`statusCode: 400`) return `message` as an **array** of fiel
 | HTTP Status | Meaning               | When                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ----------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `400`       | Bad Request           | DTO validation failed, unknown body field, or a business precondition not met (e.g. session not active, media over cap)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `401`       | Unauthorized          | Missing/invalid/expired/revoked `X-API-Key` (or `METRICS_TOKEN` for metrics), a blocked source IP, or a key used outside its `allowedSessions` scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `403`       | Forbidden             | A valid, in-scope key whose **role** is below the route's `@RequireRole` requirement, or a key with `allowedChats` that calls a route that is not chat-scoped, names a chat outside its allowlist, or sends a `quotedMessageId` outside the reply route (see Roles & Authorization)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `401`       | Unauthorized          | Missing/invalid/expired/revoked `X-API-Key` (or `METRICS_TOKEN` for metrics)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `403`       | Forbidden             | A valid key refused by its `allowedIps` (a blocked or undeterminable source IP) or used outside its `allowedSessions` scope, a key whose **role** is below the route's `@RequireRole` requirement, or a key with `allowedChats` that calls a route that is not chat-scoped, names a chat outside its allowlist, or sends a `quotedMessageId` outside the reply route (see Roles & Authorization)                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `404`       | Not Found             | The addressed resource (session, message, webhook, batch, …) does not exist                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `409`       | Conflict              | A uniqueness constraint was violated (e.g. duplicate name); a credential teardown for the same session name is still in flight on `start`/`delete` (retryable; body carries `code: 'SESSION_NAME_TEARDOWN_PENDING'`); or, on routes that reach a WhatsApp engine, the engine exists but is not ready yet (retryable; each route section carries the exact wording); or, on a multi-node deployment, another node currently owns the session's live engine (retryable)                                                                                                                                                                                                                                                                                                                                                                                    |
 | `413`       | Payload Too Large     | Base64 or downloaded media exceeds the media byte cap (see §6.3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -277,7 +277,7 @@ Get a single session by ID.
 }
 ```
 
-**Errors:** `401` missing/invalid key, or key not scoped to this session · `404` session not found
+**Errors:** `401` missing/invalid key · `403` key not scoped to this session · `404` session not found
 
 #### GET /api/sessions/:sessionId/config
 
@@ -307,7 +307,7 @@ Baileys that covers only the reconnect after a logged-out close: that engine ret
 internally, with a fixed 1s to 60s backoff and no attempt cap. See §5 (Database Design) for what each
 key does and the moment it is read.
 
-**Errors:** `401` missing/invalid key, or key not scoped to this session · `404` session not found
+**Errors:** `401` missing/invalid key · `403` key not scoped to this session · `404` session not found
 
 #### PATCH /api/sessions/:sessionId/config
 
@@ -339,7 +339,7 @@ and therefore apply on the next start, leaving a reconnect sequence already in f
 
 **Response** `200` — the resulting `SessionConfigResponseDto` (same shape as the GET above).
 
-**Errors:** `400` a supplied value is outside its accepted range · `401` missing/invalid key, or key not scoped to this session · `403` key lacks OPERATOR role · `404` session not found
+**Errors:** `400` a supplied value is outside its accepted range · `401` missing/invalid key · `403` key not scoped to this session, or key lacks OPERATOR role · `404` session not found
 
 #### GET /api/sessions/:sessionId/proxy
 
@@ -366,7 +366,7 @@ Read a session's masked proxy configuration. Credentials embedded in the stored 
 
 When no proxy is configured, `enabled` is `false` and the other fields are `null`/`false`.
 
-**Errors:** `401` missing/invalid key, or key not scoped to this session · `404` session not found
+**Errors:** `401` missing/invalid key · `403` key not scoped to this session · `404` session not found
 
 #### PATCH /api/sessions/:sessionId/proxy
 
@@ -392,7 +392,7 @@ Update per-session proxy settings. No restart is required or performed — chang
 
 **Response** `200` — the resulting `SessionProxyResponseDto` (same shape as the GET above).
 
-**Errors:** `400` validation (bad `proxyUrl`) · `401` missing/invalid key, or key not scoped to this session · `403` key lacks ADMIN role, or the key is restricted to specific sessions · `404` session not found
+**Errors:** `400` validation (bad `proxyUrl`) · `401` missing/invalid key · `403` key not scoped to this session, key lacks ADMIN role, or the key is restricted to specific sessions · `404` session not found
 
 #### GET /api/sessions/:sessionId/qr
 
@@ -1254,7 +1254,7 @@ Delete a session.
 
 The delete removes, in one transaction, the session's messages, message batches, chat states, received statuses, webhooks, templates, stored Baileys messages, automation rules, webhook outbox rows, webhook delivery-failure records and integration dead-letter rows, then purges its on-disk auth data. It keeps the audit log, the LID mappings, and the integration conversation mappings (so a re-paired session keeps its provider conversations); ingress dedup rows age out on their own after `INGRESS_DEDUP_RETENTION_DAYS` (default 7).
 
-**Errors:** `401` missing/invalid key, or key not scoped to this session · `403` key role below OPERATOR · `404` session not found · `409` credential teardown for the same session name still in flight (retryable; body carries `code: 'SESSION_NAME_TEARDOWN_PENDING'`; on a `409` the row is **not** deleted and no hook/auth-purge runs — retry after cleanup settles)
+**Errors:** `401` missing/invalid key · `403` key not scoped to this session, or key role below OPERATOR · `404` session not found · `409` credential teardown for the same session name still in flight (retryable; body carries `code: 'SESSION_NAME_TEARDOWN_PENDING'`; on a `409` the row is **not** deleted and no hook/auth-purge runs — retry after cleanup settles)
 
 ### 6.4.2 Messages
 
@@ -1526,7 +1526,7 @@ mimetype when it is in a conservative inert set (common image/video/audio types)
 `application/octet-stream` otherwise — a document, or an `image/svg+xml`, is never served as active
 content on the API origin.
 
-**Errors:** `401` missing/invalid API key, or key not scoped to this session · `404`
+**Errors:** `401` missing/invalid API key · `403` key not scoped to this session · `404`
 `No media stored for this message` — the message carries no media, `MEDIA_DOWNLOAD_ENABLED=false`
 or the media was above `MEDIA_DOWNLOAD_MAX_BYTES` when it was stored (the row holds a size-only
 marker), it was a URL-based API send (the gateway fetches those bytes at send time and never stores
@@ -2411,7 +2411,7 @@ On Baileys the list is the saved address book: contacts with a name saved on the
 ]
 ```
 
-**Errors:** `400` session is not started · `401` missing/invalid API key, or key not scoped to this session · `409` conflict or engine not ready (retryable) · `500` engine error, including whatsapp-web.js when entries could not be read and no unblocked contact was, or when no entry had a readable id (a page-wide failure, not an empty address book) · `503` the WhatsApp page died while reading contacts or the command timed out (retry shortly)
+**Errors:** `400` session is not started · `401` missing/invalid API key · `403` key not scoped to this session · `409` conflict or engine not ready (retryable) · `500` engine error, including whatsapp-web.js when entries could not be read and no unblocked contact was, or when no entry had a readable id (a page-wide failure, not an empty address book) · `503` the WhatsApp page died while reading contacts or the command timed out (retry shortly)
 
 #### GET /api/sessions/:sessionId/contacts/blocked
 
@@ -2553,7 +2553,7 @@ An engine that is not ready is the exception: it describes the session rather th
 
 > Route-order caveat: `profile-pictures` is declared **before** `GET /:contactId`, so the literal segment wins — a contact whose id is literally `profile-pictures` cannot be fetched through the single-contact route.
 
-**Errors:** `400` session is not started · `401` missing/invalid API key, or key not scoped to this session · `409` conflict or engine not ready (retryable)
+**Errors:** `400` session is not started · `401` missing/invalid API key · `403` key not scoped to this session · `409` conflict or engine not ready (retryable)
 
 #### GET /api/sessions/:sessionId/contacts/:contactId/phone
 
@@ -4212,7 +4212,7 @@ Get all contact status updates (stories) visible to the session, read from the s
 
 The controller wraps the store array in `{ statuses }`, ordered newest-first. `type` is one of `text | image | video | voice` (`voice` was added with the send-voice endpoint below; before that anything that was not an image or a video read back as `text`); `caption`, `backgroundColor`, `font` are optional. `mediaUrl` is present only when the status carried media that the store kept (see the media endpoint below) — it is a same-origin path into this API, not an external WhatsApp CDN link. `timestamp` and `expiresAt` serialize to ISO strings (these are `Date` values, not the epoch-number convention used by message timestamps).
 
-**Errors:** `401` missing/invalid API key, or key not scoped to this session
+**Errors:** `401` missing/invalid API key · `403` key not scoped to this session
 
 #### GET /api/sessions/:sessionId/status/:id
 
@@ -4248,7 +4248,7 @@ Get status updates posted by a specific contact, read from the store (24h TTL, b
 
 Same `{ statuses }` wrapper and `Status` shape as the list-all route. An unknown `contactId` returns `{ "statuses": [] }`, not a `404`.
 
-**Errors:** `401` missing/invalid API key, or key not scoped to this session
+**Errors:** `401` missing/invalid API key · `403` key not scoped to this session
 
 #### GET /api/sessions/:sessionId/status/:statusId/media
 
@@ -4267,7 +4267,7 @@ Stream a stored status's media bytes (the file behind a `mediaUrl` returned abov
 
 Only the essence of the stored mimetype is checked and served: the part before any `;`, trimmed and lowercased, since MIME types are case-insensitive. Parameters are dropped, and a value that is not a single well-formed type (a comma-joined list, for example) is served as `application/octet-stream`.
 
-**Errors:** `401` missing/invalid API key, or key not scoped to this session · `404` `Status media not found or expired` — the status is text-only, its media was omitted (e.g. over the configured size cap), or the 24h TTL has since purged the row
+**Errors:** `401` missing/invalid API key · `403` key not scoped to this session · `404` `Status media not found or expired` — the status is text-only, its media was omitted (e.g. over the configured size cap), or the 24h TTL has since purged the row
 
 Note: `:statusId/media` is a two-path-segment route, so it never collides with the single-segment `GET /status/:id` above regardless of declaration order.
 
@@ -4794,7 +4794,7 @@ No content (empty body; explicit `@HttpCode(204)`).
 
 ### 6.4.9 API Keys
 
-API keys are managed under `/api/auth/api-keys`. All management routes (create/list/get/update/delete/revoke) require an **ADMIN** key **with no session scope**: the controller is fenced with `@RequireUnscopedKey`, so a key whose `allowedSessions` is non-empty is rejected with `403` whatever its role — otherwise a confined admin key could mint an unrestricted one. The guard evaluates the role requirement _before_ that fence, so a scoped VIEWER/OPERATOR key is refused with `Insufficient permissions. Required: admin`; only a scoped ADMIN key reaches the fence and sees `Session-scoped API keys are not permitted on this route`. Both are `403`. A key restricted with `allowedChats` that passes the role check is refused next, before the session fence, with `403 "API key is restricted to selected chats"`: no management route is open to a chat-scoped key. The plaintext key string is returned **only once**, at creation. Validation of the caller's own key lives at `POST /api/auth/validate` (a separate controller, not fenced) and accepts any valid key except one restricted with `allowedChats`, which it refuses with `403` like every route not open to a chat-scoped key.
+API keys are managed under `/api/auth/api-keys`. All management routes (create/list/get/update/delete/revoke) require an **ADMIN** key **with no session scope**: the controller is fenced with `@RequireUnscopedKey`, so a key whose `allowedSessions` is non-empty is rejected with `403` whatever its role — otherwise a confined admin key could mint an unrestricted one. The guard evaluates the role requirement _before_ that fence, so a scoped VIEWER/OPERATOR key is refused with `Insufficient permissions. Required: admin`; only a scoped ADMIN key reaches the fence and sees `Session-scoped API keys are not permitted on this route`. Both are `403`. A key restricted with `allowedChats` that passes the role check is refused next, before the session fence, with `403 "API key is restricted to selected chats"`: no management route is open to a chat-scoped key. The plaintext key string is returned **only once**, at creation. Validation of the caller's own key lives at `POST /api/auth/validate` (a separate controller, not fenced) and accepts any valid key except one its `allowedIps` refuses or one restricted with `allowedChats`, each refused with `403` (the latter like every route not open to a chat-scoped key).
 
 #### GET /api/auth/api-keys
 
@@ -5013,7 +5013,7 @@ Validate the supplied `X-API-Key` and report its validity, its role, and the eng
 
 **Auth:** API key (any valid role — VIEWER+)
 
-The key is read from the `X-API-Key` header, not the body; send an empty body. This route sits behind the global guard (it is not `@Public`), so a missing/invalid/revoked/expired key is rejected with `401` at the guard before the handler runs. On success it returns the caller's role and `engineType`, the engine the process resolved at boot (`whatsapp-web.js` or `baileys`). The engine is reported to every role because `GET /api/infra/engines/current` is ADMIN-only. A key restricted with `allowedChats` is refused with `403 "API key is restricted to selected chats"`: the route is not open to a chat-scoped key.
+The key is read from the `X-API-Key` header, not the body; send an empty body. This route sits behind the global guard (it is not `@Public`), so a missing/invalid/revoked/expired key is rejected with `401` at the guard before the handler runs, and a key refused by its `allowedIps` with `403`. On success it returns the caller's role and `engineType`, the engine the process resolved at boot (`whatsapp-web.js` or `baileys`). The engine is reported to every role because `GET /api/infra/engines/current` is ADMIN-only. A key restricted with `allowedChats` is refused with `403 "API key is restricted to selected chats"`: the route is not open to a chat-scoped key.
 
 **Response** `200`
 
@@ -5021,7 +5021,7 @@ The key is read from the `X-API-Key` header, not the body; send an empty body. T
 { "valid": true, "role": "operator", "engineType": "whatsapp-web.js" }
 ```
 
-**Errors:** `401` missing/invalid/revoked/expired key (raised by the global guard before the handler); `403` a key restricted with `allowedChats`
+**Errors:** `401` missing/invalid/revoked/expired key (raised by the global guard before the handler); `403` a key refused by its `allowedIps` (blocked or undeterminable client IP), or one restricted with `allowedChats`
 
 > Implemented by `AuthValidateController` (`@Controller('auth')`), sharing the same `/api/auth` base.
 
@@ -5199,7 +5199,7 @@ Notes: raw handler return. `timeSeries.timestamp` is a DB-formatted bucket strin
 
 Get statistics for a single session: identity, message counts, top chats, and 24 h hourly activity.
 
-**Auth:** API key — any valid key (VIEWER and up); there is no `@RequireRole`. Scope still applies: the global guard feeds the `:sessionId` route param to the key's `allowedSessions`, so a session-scoped key asking for a session outside its list gets `401 "API key not authorized for this session"`. Only an unscoped key can read any session's stats.
+**Auth:** API key — any valid key (VIEWER and up); there is no `@RequireRole`. Scope still applies: the global guard feeds the `:sessionId` route param to the key's `allowedSessions`, so a session-scoped key asking for a session outside its list gets `403 "API key not authorized for this session"`. Only an unscoped key can read any session's stats.
 
 **Path parameters**
 
@@ -5223,7 +5223,7 @@ Get statistics for a single session: identity, message counts, top chats, and 24
 
 Notes: raw handler return. `session.status` is the `SessionStatus` enum value. `messages.sent`/`received` are all-time outgoing/incoming COUNTs; `today` is the total message count since local midnight; `failed` is the `FAILED`-status count. `topChats` is the top 10 by count DESC, with `lastActive` = `MAX(createdAt)` as a DB-native datetime string and `chatName` as in `GET /api/stats/messages`. `hourlyActivity` always has 24 entries (hour `0..23`), missing hours zero-filled, computed over the last 24 h.
 
-**Errors:** `401` — missing/invalid API key, or the key is not scoped to this session · `404` — session not found (`Session not found`).
+**Errors:** `401` — missing/invalid API key · `403` (the key is not scoped to this session) · `404` — session not found (`Session not found`).
 
 #### GET /api/settings
 
@@ -6318,7 +6318,7 @@ Key facts:
 
 For `tools/call` the result is an MCP `CallToolResult` (`content` array of `text` or embedded base64 `resource` items — payloads over 4096 bytes become a `resource`). **Tool-level failures are returned in-band as `CallToolResult` with `isError:true`** (HTTP stays 200), including a role, session or chat refusal (`name:'ForbiddenException'`) and rate-limit hits (`message:'MCP rate limit exceeded'`).
 
-**Errors:** `401` with a JSON-RPC error body for a missing or refused key · in-band JSON-RPC errors `-32601` (unknown method), `-32602` (invalid params / unknown tool), `-32700` (parse error), all at HTTP 200 · `500` if the key lookup fails for a reason other than a refused key, or if the transport throws before headers are sent · `404` when `MCP_ENABLED` is not `true`
+**Errors:** `401` for a missing or invalid key and `403` for a key carrying `allowedIps`, each with a JSON-RPC error body · in-band JSON-RPC errors `-32601` (unknown method), `-32602` (invalid params / unknown tool), `-32700` (parse error), all at HTTP 200 · `500` if the key lookup fails for a reason other than a refused key, or if the transport throws before headers are sent · `404` when `MCP_ENABLED` is not `true`
 
 > The full catalog of MCP tools (names, tiers, schemas) is documented separately — see **doc 24, MCP Integration**. This section documents only the transport endpoint.
 

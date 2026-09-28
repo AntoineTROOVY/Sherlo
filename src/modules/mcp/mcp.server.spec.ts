@@ -198,9 +198,9 @@ describe('auditMcpAuthFailure (MCP auth-failure audit trail, mirrors REST ApiKey
     expect(call[1].errorMessage).toBe('API key lacks the required role');
   });
 
-  it('mirrors the REST guard exactly: IP-not-allowed (Unauthorized) is audited', () => {
-    // validateApiKey throws Unauthorized for IP-not-allowed / revoked / expired / session-not-allowed.
-    auditMcpAuthFailure(auditService, new UnauthorizedException('IP address not allowed'), reqContext);
+  it('mirrors the REST guard exactly: IP-not-allowed (Forbidden) is audited', () => {
+    // validateApiKey throws Forbidden for IP-not-allowed / session-not-allowed, Unauthorized for revoked / expired.
+    auditMcpAuthFailure(auditService, new ForbiddenException('IP address not allowed'), reqContext);
     expect(auditService.logWarn).toHaveBeenCalledWith(
       AuditAction.API_KEY_AUTH_FAILED,
       expect.objectContaining({ errorMessage: 'IP address not allowed' }),

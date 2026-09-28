@@ -2,6 +2,7 @@
 // Centralized API client with TypeScript types
 
 import { warnIfInsecureHttpUrl } from '../utils/urlSecurity';
+import { isKeyUnusable } from '../utils/authLifecycle';
 
 // Resolve the API base URL. By default this is the same-origin relative path '/api',
 // correct when the dashboard and API are served from the same origin (the default
@@ -691,24 +692,24 @@ export interface SearchResults {
 // API Client
 // =============================================================================
 
-// Shared failure handling for every response shape (json/text/blob). On 401 the stored API key is
-// invalid/expired/revoked — clear it and return to login so the user isn't stuck on a dashboard that
-// 401s every request; the never-settling promise halts this request's chain so callers neither flash
-// a generic error toast nor receive an undefined payload while the page navigates away. Otherwise
-// throw an Error carrying the HTTP status and, when the gateway supplied one, its machine code.
+// Shared failure handling for every response shape (json/text/blob). When the stored API key is
+// unusable (a 401 for an invalid/expired/revoked key, or a 403 because its allowedIps refuse this
+// client) clear it and return to login so the user isn't stuck on a dashboard where every request
+// fails; the never-settling promise halts this request's chain so callers neither flash a generic
+// error toast nor receive an undefined payload while the page navigates away. Otherwise throw an
+// Error carrying the HTTP status and, when the gateway supplied one, its machine code.
 async function handleErrorResponse<T>(response: Response): Promise<T> {
-  if (response.status === 401) {
+  // On a non-JSON body (e.g. a reverse-proxy 502/503/504 HTML page) fall through to `HTTP <status>`
+  // rather than statusText: the status code is what the toast connection-lost de-dup matches on,
+  // and statusText is empty over HTTP/2 anyway.
+  const error = await response.json().catch(() => ({}));
+  if (isKeyUnusable(response.status, error.message)) {
     sessionStorage.removeItem('openwa_api_key');
     if (typeof window !== 'undefined') {
       window.location.assign('/');
       return new Promise<T>(() => {});
     }
   }
-
-  // On a non-JSON body (e.g. a reverse-proxy 502/503/504 HTML page) fall through to `HTTP <status>`
-  // rather than statusText: the status code is what the toast connection-lost de-dup matches on,
-  // and statusText is empty over HTTP/2 anyway.
-  const error = await response.json().catch(() => ({}));
   // Carry the HTTP status on the Error (message unchanged, so the toast de-dup still matches) so
   // callers can tell apart a permission 403 from a real server 5xx instead of guessing from text.
   // Carry the machine `code` too: the gateway's stable codes (SESSION_LOGOUT_INCOMPLETE,

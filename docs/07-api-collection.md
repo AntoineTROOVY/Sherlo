@@ -1210,7 +1210,7 @@ curl -X DELETE "$BASE/api/sessions/$SESSION_ID/webhooks/f1e2d3c4-b5a6-7890-1234-
 
 ### 07.11 API Keys
 
-All `/api/auth/api-keys` routes require an unscoped **ADMIN** key: one with `allowedSessions` or `allowedChats` set is refused with `403`. `POST /api/auth/validate` accepts any valid key except one restricted with `allowedChats`, which gets `403`. The plaintext key is returned only by the create call.
+All `/api/auth/api-keys` routes require an unscoped **ADMIN** key: one with `allowedSessions` or `allowedChats` set is refused with `403`. `POST /api/auth/validate` accepts any valid key except one its `allowedIps` refuses or one restricted with `allowedChats`, each of which gets `403`. The plaintext key is returned only by the create call.
 
 #### GET /api/auth/api-keys
 
@@ -1651,7 +1651,7 @@ curl -X DELETE "$BASE/api/plugins/chat-flow" \
 
 #### POST /mcp
 
-MCP JSON-RPC 2.0 transport (no `/api` prefix; gated by `MCP_ENABLED=true`). The API key goes via `X-Api-Key` or `Authorization: Bearer` on every request, `initialize` and `tools/list` included (a missing or refused key answers `401`); role and session scope are checked per tool call. The server is **read-only by default** — write tools such as `MessageSendText` are only mounted when `MCP_READONLY=false`. See doc 24 for the tool catalog.
+MCP JSON-RPC 2.0 transport (no `/api` prefix; gated by `MCP_ENABLED=true`). The API key goes via `X-Api-Key` or `Authorization: Bearer` on every request, `initialize` and `tools/list` included (a missing or invalid key answers `401`, a key carrying `allowedIps` `403`); role and session scope are checked per tool call. The server is **read-only by default** — write tools such as `MessageSendText` are only mounted when `MCP_READONLY=false`. See doc 24 for the tool catalog.
 
 ```bash
 # Initialize handshake

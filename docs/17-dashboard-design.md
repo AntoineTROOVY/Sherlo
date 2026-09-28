@@ -470,8 +470,9 @@ context: `useTheme` is a plain hook that persists to `localStorage` and writes o
 The client lives in `src/services/api.ts`. A single `request<T>()` helper attaches the `X-API-Key`
 header from `sessionStorage`, then returns **the parsed JSON body as-is** — the backend sends the
 raw handler payload, so `request<Session[]>('/sessions')` resolves to a bare `Session[]`, not
-`{ data: Session[] }`. (A `204 No Content` resolves to `undefined`; a `401` clears the stored key
-and redirects to login.) Endpoints are grouped into typed namespaces — `sessionApi`, `webhookApi`,
+`{ data: Session[] }`. (A `204 No Content` resolves to `undefined`; a `401`, or a `403` because the
+key's `allowedIps` refuse this client, clears the stored key and redirects to login; any other `403`
+leaves the key in place.) Endpoints are grouped into typed namespaces — `sessionApi`, `webhookApi`,
 `templateApi`, `apiKeyApi`, `auditApi`, `messageApi`, `infraApi`, `pluginsApi`, `statsApi`, ...
 
 ```typescript

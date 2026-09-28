@@ -5,7 +5,7 @@ jest.mock('fs', () => ({ __esModule: true, ...jest.requireActual<typeof import('
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { UnauthorizedException, NotFoundException, ConflictException } from '@nestjs/common';
+import { UnauthorizedException, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { createHash, createHmac } from 'crypto';
 import * as fs from 'fs';
 import { AuthService, resolveSeedApiKey, bannerKeyLine, UnresolvedApiKeyException } from './auth.service';
@@ -808,14 +808,16 @@ describe('AuthService', () => {
       await expect(service.validateApiKey('expired')).rejects.toThrow('API key has expired');
     });
 
-    it('should throw UnauthorizedException when IP is not allowed', async () => {
+    it('answers 403, not 401, when the IP is not allowed', async () => {
       const key = createMockApiKey({
         allowedIps: ['10.0.0.1'],
         keyHash: hashKey('ip-restricted'),
       });
       (repository.findOne as jest.Mock).mockResolvedValue(key);
 
-      await expect(service.validateApiKey('ip-restricted', '192.168.1.1')).rejects.toThrow('IP address not allowed');
+      const err = await service.validateApiKey('ip-restricted', '192.168.1.1').catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ForbiddenException);
+      expect((err as Error).message).toBe('IP address not allowed');
     });
 
     it('should pass when client IP matches allowed IPs', async () => {
@@ -837,7 +839,9 @@ describe('AuthService', () => {
       });
       (repository.findOne as jest.Mock).mockResolvedValue(key);
 
-      await expect(service.validateApiKey('ip-no-client')).rejects.toThrow('Client IP could not be determined');
+      const err = await service.validateApiKey('ip-no-client').catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ForbiddenException);
+      expect((err as Error).message).toBe('Client IP could not be determined');
     });
 
     it('rejects a malformed client IP instead of coercing it into an allowed range', async () => {
@@ -852,16 +856,24 @@ describe('AuthService', () => {
       await expect(service.validateApiKey('ip-malformed', '10.0.0.1abc')).rejects.toThrow('IP address not allowed');
     });
 
-    it('should throw UnauthorizedException when session not in allowedSessions', async () => {
+    it('answers 403, not 401, when the session is not in allowedSessions', async () => {
       const key = createMockApiKey({
         allowedSessions: ['session-A'],
         keyHash: hashKey('sess-restricted'),
       });
       (repository.findOne as jest.Mock).mockResolvedValue(key);
 
-      await expect(service.validateApiKey('sess-restricted', undefined, 'session-B')).rejects.toThrow(
-        'API key not authorized for this session',
-      );
+      const err = await service.validateApiKey('sess-restricted', undefined, 'session-B').catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ForbiddenException);
+      expect((err as Error).message).toBe('API key not authorized for this session');
+    });
+
+    it('keeps 401 for a revoked or expired key', async () => {
+      for (const overrides of [{ isActive: false }, { expiresAt: new Date(Date.now() - 60_000) }]) {
+        (repository.findOne as jest.Mock).mockResolvedValue(createMockApiKey(overrides));
+        const err = await service.validateApiKey('raw').catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(UnauthorizedException);
+      }
     });
   });
 

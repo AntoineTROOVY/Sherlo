@@ -86,7 +86,7 @@ above that level (`AuthService.hasPermission`). A key below it is rejected with 
 | Scope     | Field             | Effect                                                                                                                                                             |
 | --------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Source IP | `allowedIps`      | Empty/absent = unrestricted; non-empty = fail-closed IP whitelist (see §4.3)                                                                                       |
-| Sessions  | `allowedSessions` | Empty/absent = every session; non-empty = a request carrying any other session id is rejected with `401`                                                           |
+| Sessions  | `allowedSessions` | Empty/absent = every session; non-empty = a request carrying any other session id is rejected with `403`                                                           |
 | Chats     | `allowedChats`    | Empty/absent = every chat; non-empty = default-deny: only chat-scoped routes, and only for a listed chat, else `403`; `/events`, MCP and Bull Board refuse the key |
 
 The key-lifecycle routes (`/api/auth/api-keys`) are additionally fenced with `@RequireUnscopedKey()`:
@@ -113,7 +113,7 @@ flowchart TB
     AUTH -->|Yes| WL{IP Whitelist Enabled?}
     WL -->|No| ALLOW[Allow Request]
     WL -->|Yes| CHECK{IP in Whitelist?}
-    CHECK -->|No| RIP[401 Unauthorized]
+    CHECK -->|No| RIP[403 Forbidden]
     CHECK -->|Yes| ALLOW
     ALLOW --> PROCESS[Process Request]
 ```
@@ -149,9 +149,10 @@ sub-resource, no per-entry `active` flag. Enforcement lives in two places:
 - **Matching** — `AuthService.validateApiKey` compares that IP against the key's `allowedIps` with
   the shared `ipMatches` helper, which accepts an exact address or CIDR notation and returns `false`
   on a malformed entry rather than coercing it into range. With a whitelist configured, an
-  undeterminable client IP throws `UnauthorizedException` (`401`) straight away, with no log line;
+  undeterminable client IP throws `ForbiddenException` (`403`) straight away, with no log line;
   an IP outside the list writes a `logger.warn` with `action: 'ip_rejected'` first, then throws the
-  same `401`.
+  same `403`. The key itself is valid, so the refusal is a `403` like the role and chat refusals, and
+  a client does not read it as a key to discard.
 
 ### Best Practices
 

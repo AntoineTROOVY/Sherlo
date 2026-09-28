@@ -164,7 +164,8 @@ describe('MCP server (e2e)', () => {
       .set('X-API-Key', ipKey)
       .send(jsonRpcRequest('tools/list'));
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
+    expect(res.headers['www-authenticate']).toBeUndefined();
   });
 
   // Role, session and chat scope stay per tool call, answered in-band once the key passes the gate.
