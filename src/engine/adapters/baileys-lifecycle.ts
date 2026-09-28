@@ -177,8 +177,8 @@ export interface BaileysLifecycleHost {
 }
 
 export class BaileysLifecycle {
-  /** A close more than this long after the previous close means the connection had been healthy in
-   *  between: the backoff counter restarts from scratch instead of inheriting an old incident's attempts. */
+  /** A close more than this long after the previous close restarts the backoff counter from scratch
+   *  instead of inheriting an old incident's attempts. The backoff wait counts toward the gap. */
   private static readonly RECONNECT_STABILITY_RESET_MS = 5 * 60_000;
   /** How long a first link's history sync must stay silent before the address-book pull runs. */
   private static readonly ADDRESSBOOK_QUIET_MS = 20_000;
@@ -699,10 +699,10 @@ export class BaileysLifecycle {
         return;
       }
 
-      // Stability reset: a close more than 5 minutes after the previous one means the connection had
-      // been healthy in between, so the backoff starts fresh instead of inheriting the old counter. A
-      // drop sooner than that keeps climbing it, so a link that fails right after each handshake backs
-      // off instead of redialing every second or two.
+      // Stability reset: a close more than 5 minutes after the previous one starts the backoff fresh
+      // instead of inheriting the old counter. The gap runs close to close, so the backoff wait counts
+      // toward it. A drop sooner than that keeps climbing it, so a link that fails right after each
+      // handshake backs off instead of redialing every second or two.
       // A QR window that ran out resets it too: WhatsApp answered, and a QR left unscanned for hours
       // must not add up to a reconnect loop.
       const now = Date.now();

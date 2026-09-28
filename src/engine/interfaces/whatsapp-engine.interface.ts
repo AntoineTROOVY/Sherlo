@@ -824,8 +824,8 @@ export interface EngineEventCallbacks {
    *
    * `attempt` is the 1-based number of the attempt being scheduled. An engine may carry it across a
    * short-lived connection, so a link that drops right after opening keeps climbing the backoff; it
-   * resets on a scan, when a QR window runs out, or once the connection has stayed healthy for the
-   * engine's stability window. An episode can therefore start at attempt > 1 after a brief READY, so a
+   * resets on a scan, when a QR window runs out, or once no drop has occurred for the engine's
+   * stability window. An episode can therefore start at attempt > 1 after a brief READY, so a
    * consumer should treat the first attempt after a READY, not only attempt 1, as a new episode.
    * The close that ends an unscanned QR window is not a reconnect and is never reported; any other
    * close while a QR waits is.
