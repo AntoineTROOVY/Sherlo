@@ -18,6 +18,7 @@ import {
   NAVIGATION_REINJECT_GRACE_MS,
   NAVIGATION_EPISODE_CAP_MS,
 } from './whatsapp-web-js.adapter';
+import { resolveOnboardingContinueLabels } from './wwebjs-onboarding';
 import { getEffectiveWebVersionInfo, resolveWebVersionPin, __resetWebVersionCache } from '../wa-web-version';
 import { resolveEngineInitTimeoutMs } from '../engine-init-timeout';
 import * as fs from 'fs';
@@ -7625,6 +7626,23 @@ describe('probeOnboardingModal (in-page onboarding modal detection)', () => {
     expect(button.click).not.toHaveBeenCalled();
   });
 
+  // The unrecognised-dialog warning prints a label with whitespace runs collapsed, and operators are
+  // told to copy it into WWEBJS_ONBOARDING_CONTINUE_LABELS: a multi-word label must match as printed.
+  it.each([
+    ['split over elements and lines', 'Tudo\n  certo'],
+    ['joined by a non-breaking space', 'Tudo\u00a0certo'],
+  ])('dismisses a confirm button whose text is %s, with the label as the warning prints it', (_how, text) => {
+    const button = el(text, { button: true });
+    nest(el('Novidades', { dialog: true }), button);
+    install([button]);
+
+    expect(probeOnboardingModal({ labels: ['Continue', 'Tudo certo'], headingOptionalFor: ['Tudo certo'] })).toEqual({
+      modalPresent: true,
+      dismissed: true,
+    });
+    expect(button.click).toHaveBeenCalledTimes(1);
+  });
+
   it('matches the label exactly, so a longer string containing it is not a confirm button', () => {
     const button = el('Continuar con la copia de seguridad', { button: true });
     install([button]);
@@ -7642,6 +7660,21 @@ describe('probeOnboardingModal (in-page onboarding modal detection)', () => {
 // another language — shows up in the logs instead of failing silently. `collectDialogDiagnostics` is
 // a self-contained function for the same reason as the probe: it is stringified into the page, and
 // being plain means the DOM work is unit-testable here directly.
+describe('resolveOnboardingContinueLabels', () => {
+  const original = process.env.WWEBJS_ONBOARDING_CONTINUE_LABELS;
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.WWEBJS_ONBOARDING_CONTINUE_LABELS;
+    else process.env.WWEBJS_ONBOARDING_CONTINUE_LABELS = original;
+  });
+
+  it('collapses whitespace runs in a configured label, as the probe compares it', () => {
+    process.env.WWEBJS_ONBOARDING_CONTINUE_LABELS = ' Tudo   certo ,Weiter,Tudo\u00a0certo, ';
+
+    expect(resolveOnboardingContinueLabels()).toEqual(['Continue', 'Tudo certo', 'Weiter', 'Tudo certo']);
+  });
+});
+
 describe('collectDialogDiagnostics (in-page dialog diagnostics)', () => {
   type FakeEl = {
     tagName: string;
@@ -7757,6 +7790,15 @@ describe('collectDialogDiagnostics (in-page dialog diagnostics)', () => {
     install([dialog, button]);
 
     expect(collectDialogDiagnostics()).toEqual([{ heading: "What's new on WhatsApp Web", buttons: ['Continue'] }]);
+  });
+
+  // The other half of the copy contract the probe spec pins: this is the label operators copy.
+  it('prints a multi-word button label with its whitespace runs collapsed', () => {
+    const button = el('Tudo\n  certo', { tag: 'BUTTON' });
+    const dialog = nest(el('', { role: 'dialog' }), button);
+    install([dialog, button]);
+
+    expect(collectDialogDiagnostics()).toEqual([{ heading: null, buttons: ['Tudo certo'] }]);
   });
 
   // Captured page text goes straight into the logs: a newline in it would forge extra log lines.

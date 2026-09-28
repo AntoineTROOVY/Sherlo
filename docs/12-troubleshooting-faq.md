@@ -585,7 +585,8 @@ once, so the session stops instead of being silently unlinked by WhatsApp about 
 > minutes later and the device disappears from the phone's Linked devices list. That miss is not
 > silent: when the watcher finds a visible dialog it cannot match, it logs a warning
 > (`action: onboarding_dialog_unrecognized`) carrying the dialog's heading and button labels, including
-> the label to add, minutes before the unlink would happen. Because that path wipes the stored
+> the label to add, minutes before the unlink would happen. Copy that label as printed: a multi-word
+> label works, and whitespace runs compare as one space. Because that path wipes the stored
 > credentials, the automatic reconnect comes back with a fresh QR on its own, so the session is
 > usually already sitting at `qr_ready` rather than needing a manual start. Acknowledge the modal once
 > in a browser signed in as that account, then scan the QR. It does not recur — the modal is shown
