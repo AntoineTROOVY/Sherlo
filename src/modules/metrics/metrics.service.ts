@@ -146,7 +146,7 @@ export class MetricsService {
     }
 
     lines.push(
-      '# HELP openwa_webhook_delivery_failures_total Webhook deliveries that terminally failed (all retries exhausted) since process start.',
+      '# HELP openwa_webhook_delivery_failures_total Webhook delivery failures recorded since process start: retries exhausted, or never sent (shed, refused at shutdown, rejected before sending).',
     );
     lines.push('# TYPE openwa_webhook_delivery_failures_total counter');
     lines.push(`openwa_webhook_delivery_failures_total ${getWebhookDeliveryFailuresTotal()}`);

@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The webhook outbox replay no longer delivers an event the webhook has since been unsubscribed from.
 - A webhook delivery that succeeds removes the delivery-failure rows filed under its idempotency key, so an event the outbox replay delivers after a shed or shutdown refusal is no longer listed as lost.
 - The delivery-failure row of a shed or shutdown-refused webhook delivery takes the reason its replay failed with, and the attempt count once the replay was sent.
+- The `openwa_webhook_delivery_failures_total` help text and the metrics reference say it also counts webhook deliveries that were never sent.
 - `POST /api/sessions/:sessionId/webhooks/:id/test` sends a fresh `X-OpenWA-Idempotency-Key` on every call, so a deduplicating receiver runs each test.
 - A WebSocket `message` frame with no payload answers `INVALID_MESSAGE` instead of a generic exception.
 - On PostgreSQL, boot no longer runs FTS schema DDL when the `body_ts` column and its index already exist, so a restart no longer queues every read and write on `messages` behind the open ones.
