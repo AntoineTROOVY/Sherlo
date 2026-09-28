@@ -236,6 +236,26 @@ describe('InfraStatusController.getStatus envPinned', () => {
     expect(status.envPinned).not.toContain('PATH');
   });
 
+  it('reports the storage path and engine launch options the Quick Start stack pins', async () => {
+    // docker-compose.dev.yml forwards these four with non-empty defaults, so a dashboard edit reverts.
+    recordPinnedEnvKeys({
+      SESSION_DATA_PATH: '/app/data/sessions',
+      PUPPETEER_HEADLESS: 'true',
+      PUPPETEER_ARGS: '--no-sandbox',
+      STORAGE_LOCAL_PATH: '/app/data/media',
+      PATH: '/usr/bin',
+    });
+
+    const status = await buildController().getStatus();
+
+    expect(status.envPinned).toEqual([
+      'STORAGE_LOCAL_PATH',
+      'PUPPETEER_HEADLESS',
+      'SESSION_DATA_PATH',
+      'PUPPETEER_ARGS',
+    ]);
+  });
+
   it('reports an empty list when nothing above data/.env.generated supplies a selection key', async () => {
     recordPinnedEnvKeys({});
 
