@@ -1,3 +1,5 @@
+import { resolveNonNegativeIntEnv } from '../../config/configuration';
+
 /**
  * BullMQ Redis connection options for the WEBHOOK queue's Worker.
  *
@@ -47,8 +49,7 @@ const DEFAULT_WEBHOOK_WORKER_CONCURRENCY = 10;
  * workerConnectionOptions above.)
  */
 export function webhookWorkerConcurrency(): number {
-  const parsed = parseInt(process.env.WEBHOOK_WORKER_CONCURRENCY || '', 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_WEBHOOK_WORKER_CONCURRENCY;
+  return resolveNonNegativeIntEnv(process.env.WEBHOOK_WORKER_CONCURRENCY, 0) || DEFAULT_WEBHOOK_WORKER_CONCURRENCY;
 }
 
 /** Default number of ingress events the Worker processes in parallel. */
@@ -64,6 +65,5 @@ const DEFAULT_INGRESS_WORKER_CONCURRENCY = 10;
  * non-positive/garbage value falls back to the default.
  */
 export function ingressWorkerConcurrency(): number {
-  const parsed = parseInt(process.env.INGRESS_WORKER_CONCURRENCY || '', 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_INGRESS_WORKER_CONCURRENCY;
+  return resolveNonNegativeIntEnv(process.env.INGRESS_WORKER_CONCURRENCY, 0) || DEFAULT_INGRESS_WORKER_CONCURRENCY;
 }

@@ -1,4 +1,4 @@
-import { workerConnectionOptions, webhookWorkerConcurrency } from './redis-connection';
+import { ingressWorkerConcurrency, workerConnectionOptions, webhookWorkerConcurrency } from './redis-connection';
 
 describe('workerConnectionOptions (webhook Worker connection)', () => {
   const ORIGINAL_ENV = process.env;
@@ -67,5 +67,12 @@ describe('webhookWorkerConcurrency', () => {
     expect(webhookWorkerConcurrency()).toBe(10);
     process.env = { ...ORIGINAL_ENV, WEBHOOK_WORKER_CONCURRENCY: 'abc' };
     expect(webhookWorkerConcurrency()).toBe(10);
+  });
+
+  it('does not read the leading digits of a unit-suffixed value', () => {
+    process.env = { ...ORIGINAL_ENV, WEBHOOK_WORKER_CONCURRENCY: '5abc' };
+    expect(webhookWorkerConcurrency()).toBe(10);
+    process.env = { ...ORIGINAL_ENV, INGRESS_WORKER_CONCURRENCY: '5abc' };
+    expect(ingressWorkerConcurrency()).toBe(10);
   });
 });

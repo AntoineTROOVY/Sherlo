@@ -220,6 +220,8 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     'EXPORT_INLINE_MEDIA_BUDGET_BYTES', // 0 = a data export carries no inline media at all
     'MESSAGE_LIST_INLINE_MEDIA_BUDGET_BYTES', // 0 = a message list carries no inline media at all
     'CHAT_MEDIA_ARCHIVE_TTL_DAYS', // 0 = keep archived chat media forever
+    'INGRESS_RETRY_DELAY_MS', // 0 = retry without backoff
+    'REDIS_CACHE_DB',
   ]) {
     checkNonNegativeInt(key);
   }
@@ -337,6 +339,12 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     // the boot sweep delete every archive older than 24 ms, breaking export, restart, import.
     'STORAGE_EXPORT_TTL_MS',
     'STORAGE_EXPORT_SWEEP_MAX_AGE_MS',
+    // Each read fell back to its default on 0 or garbage, or passed a negative or fractional value on
+    // (SEARCH_LIMIT_MAX reached plugin search providers as-is).
+    'SEARCH_LIMIT_MAX',
+    'INGRESS_MAX_ATTEMPTS',
+    'WEBHOOK_WORKER_CONCURRENCY',
+    'INGRESS_WORKER_CONCURRENCY',
   ]) {
     checkPositiveInt(key);
   }

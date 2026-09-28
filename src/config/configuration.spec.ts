@@ -259,7 +259,7 @@ describe('configuration — webhook fan-out knobs are fail-safe', () => {
 describe('configuration search namespace', () => {
   // Save/restore the SEARCH_* env vars so a CI .env that sets them cannot flake the default-value
   // assertions below (mirrors the mutate-and-restore pattern used for PLUGIN_DOWNLOAD_MAX_BYTES etc.).
-  const keys = ['SEARCH_ENABLED', 'SEARCH_PROVIDER', 'SEARCH_LIMIT_MAX'];
+  const keys = ['SEARCH_ENABLED', 'SEARCH_PROVIDER'];
   const orig: Record<string, string | undefined> = {};
   beforeEach(() => keys.forEach(k => (orig[k] = process.env[k])));
   afterEach(() =>
@@ -272,7 +272,7 @@ describe('configuration search namespace', () => {
   it('exposes search defaults', () => {
     keys.forEach(k => delete process.env[k]);
     const cfg = configuration();
-    expect(cfg.search).toEqual({ enabled: true, provider: 'auto', limitMax: 100 });
+    expect(cfg.search).toEqual({ enabled: true, provider: 'auto' });
   });
 });
 

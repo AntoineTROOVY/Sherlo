@@ -117,7 +117,6 @@ export default () => ({
   search: {
     enabled: process.env.SEARCH_ENABLED !== 'false',
     provider: process.env.SEARCH_PROVIDER || 'auto',
-    limitMax: Number(process.env.SEARCH_LIMIT_MAX) || 100,
   },
 
   // Dashboard statistics. The /stats aggregates run GROUP BY scans over the whole messages

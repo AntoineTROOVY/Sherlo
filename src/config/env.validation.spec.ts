@@ -541,6 +541,27 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ [key]: '3600000' })).not.toThrow();
   });
 
+  // Each read fell back to the default on 0 or garbage, or passed a negative or fractional value on.
+  it.each(['SEARCH_LIMIT_MAX', 'INGRESS_MAX_ATTEMPTS', 'WEBHOOK_WORKER_CONCURRENCY', 'INGRESS_WORKER_CONCURRENCY'])(
+    'rejects a non-positive or non-integer %s and accepts a plain count',
+    key => {
+      for (const bad of ['0', '-5', '2.5', 'abc', '5x']) {
+        expect(() => validateEnv({ [key]: bad })).toThrow(new RegExp(`${key} must be a positive integer`));
+      }
+      expect(() => validateEnv({ [key]: '7' })).not.toThrow();
+      expect(() => validateEnv({ [key]: '' })).not.toThrow();
+      expect(() => validateEnv({ [key]: '  ' })).not.toThrow();
+    },
+  );
+
+  it.each(['INGRESS_RETRY_DELAY_MS', 'REDIS_CACHE_DB'])('rejects a negative or non-integer %s and keeps 0', key => {
+    for (const bad of ['-1', '1.5', 'abc']) {
+      expect(() => validateEnv({ [key]: bad })).toThrow(new RegExp(`${key} must be a non-negative integer`));
+    }
+    expect(() => validateEnv({ [key]: '0' })).not.toThrow();
+    expect(() => validateEnv({ [key]: '' })).not.toThrow();
+  });
+
   it('rejects a unit-suffixed CHAT_MEDIA_ARCHIVE_TTL_DAYS but keeps 0 (keep forever)', () => {
     expect(() => validateEnv({ CHAT_MEDIA_ARCHIVE_TTL_DAYS: '30d' })).toThrow(/CHAT_MEDIA_ARCHIVE_TTL_DAYS/);
     expect(() => validateEnv({ CHAT_MEDIA_ARCHIVE_TTL_DAYS: '0' })).not.toThrow();
