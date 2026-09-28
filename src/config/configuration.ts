@@ -72,6 +72,18 @@ export const MAX_TIMER_MS = 2147483647;
 export const PINNED_BROWSER_LOCALE = 'en-US';
 
 /**
+ * Chromium launch flags used when PUPPETEER_ARGS is unset, and the single fallback for every other
+ * path that has no configured args (the adapter, the Infrastructure save and status views).
+ * --disable-dev-shm-usage keeps tabs from crashing on Docker's 64 MB /dev/shm.
+ */
+export const DEFAULT_PUPPETEER_ARGS: readonly string[] = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+];
+
+/**
  * Append the locale pin unless the operator already set one. Deliberately applied AFTER the
  * PUPPETEER_ARGS override rather than baked into the default string: that variable REPLACES the
  * defaults, so a deployment that customises args for an unrelated reason would otherwise silently
@@ -82,7 +94,7 @@ export const PINNED_BROWSER_LOCALE = 'en-US';
  * session, and pushing per-session flags onto a shared array leaked proxy settings across sessions
  * once already (#840).
  */
-export function withPinnedBrowserLocale(args: string[]): string[] {
+export function withPinnedBrowserLocale(args: readonly string[]): string[] {
   return args.some(arg => arg.startsWith('--lang')) ? [...args] : [...args, `--lang=${PINNED_BROWSER_LOCALE}`];
 }
 
@@ -214,7 +226,7 @@ export default () => ({
       // A comma only splits before the next flag, since flag values carry commas of their own
       // (--disable-features=A,B, --window-size=1280,720).
       args: withPinnedBrowserLocale(
-        (process.env.PUPPETEER_ARGS || '--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu')
+        (process.env.PUPPETEER_ARGS || DEFAULT_PUPPETEER_ARGS.join(','))
           .split(/\s+|,+(?=-)/)
           .map(arg => arg.replace(/^,+|,+$/g, ''))
           .filter(Boolean),

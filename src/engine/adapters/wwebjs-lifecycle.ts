@@ -10,7 +10,7 @@ import {
 import { EngineNotReadyError } from '../../common/errors/engine-not-ready.error';
 import { EngineTransportError } from '../../common/errors/engine-transport.error';
 import { type createLogger } from '../../common/services/logger.service';
-import { MAX_TIMER_MS } from '../../config/configuration';
+import { DEFAULT_PUPPETEER_ARGS, MAX_TIMER_MS, withPinnedBrowserLocale } from '../../config/configuration';
 import { resolveWebVersionPin } from '../wa-web-version';
 import { resolveAuthTimeoutMs, resolveEngineInitTimeoutMs } from '../engine-init-timeout';
 import { killOrphanedChromiumProcesses, removeStaleSingletonFiles } from './chromium-profile-hygiene';
@@ -235,15 +235,7 @@ export class WwebjsLifecycle {
       // Build puppeteer args, including proxy if configured
       const puppeteerArgs = this.host.config.puppeteer?.args
         ? [...this.host.config.puppeteer.args]
-        : [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu',
-          ];
+        : withPinnedBrowserLocale(DEFAULT_PUPPETEER_ARGS);
 
       // Add proxy configuration if provided — but only when the URL parses to a supported scheme, so
       // a malformed/stored proxy value can't break the Chromium launch or smuggle a non-proxy scheme.

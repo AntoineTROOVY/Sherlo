@@ -23,6 +23,7 @@ import { StorageService } from '../../common/storage/storage.service';
 import { createLogger } from '../../common/services/logger.service';
 import { readGeneratedEnv } from './generated-env';
 import { isEnvPinned } from '../../config/env-precedence';
+import { DEFAULT_PUPPETEER_ARGS } from '../../config/configuration';
 import { checkForUpdate, type UpdateCheck } from './update-check';
 
 interface InfraStatus {
@@ -164,7 +165,7 @@ export class InfraStatusController {
     const engineHeadless = this.configService.get<boolean>('engine.puppeteer.headless', true) ?? true;
     const sessionDataPath = this.configService.get<string>('engine.sessionDataPath', './data/sessions');
     const browserArgs =
-      this.configService.get<string[]>('engine.puppeteer.args')?.join(' ') || '--no-sandbox --disable-gpu';
+      this.configService.get<string[]>('engine.puppeteer.args')?.join(' ') || DEFAULT_PUPPETEER_ARGS.join(' ');
 
     // Built-in detection: prefer the actually-running bundled container as truth (so a stopped/missing
     // container, or a host-pinned external host, reads as NOT built-in), and require the app to be

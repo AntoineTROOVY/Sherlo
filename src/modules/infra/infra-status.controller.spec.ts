@@ -129,6 +129,25 @@ describe('InfraStatusController.getStatus engine (reads the real engine.puppetee
     expect(status.engine.browserArgs).toBe('--foo --bar');
     expect(status.engine.sessionDataPath).toBe('./sess');
   });
+
+  it('reports the default Chromium flags when no args are configured', async () => {
+    const config = { get: (key: string, def?: unknown) => (key === 'engine.type' ? 'whatsapp-web.js' : def) };
+    const ds = { isInitialized: true, query: jest.fn().mockResolvedValue([{ '1': 1 }]) };
+    const controller = new InfraStatusController(
+      config as never,
+      ds as never,
+      ds as never,
+      {} as never,
+      { isDockerAvailable: () => false } as never,
+      { isAvailable: () => Promise.resolve(false) } as never,
+      { isS3Available: () => false, refreshS3Availability: () => Promise.resolve(false) } as never,
+    );
+
+    const status = await controller.getStatus();
+    expect(status.engine.browserArgs).toBe(
+      '--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu',
+    );
+  });
 });
 
 describe('InfraStatusController.getStatus storage (reads the real storage.localPath key)', () => {
