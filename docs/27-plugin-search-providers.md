@@ -128,9 +128,28 @@ the same handler keeps your index in step.
 Rows removed in bulk emit no `message:deleted`: deleting a session and message retention (`MESSAGE_RETENTION_DAYS`) leave the plugin's copies in its index until the plugin removes them itself.
 
 **Backfill is the plugin's responsibility.** The hook fires only for live traffic. A plugin installed on
-a deployment with existing message history must perform its own one-time backfill (read the `messages`
-table via `ctx.engine.getChatHistory` or a direct query, and index) at `onEnable`. The built-in DB-FTS
-provider is unaffected (its index is DB-synced via triggers on every insert, including backfill).
+a deployment with existing message history must perform its own one-time backfill. The only sanctioned
+path is `ctx.engine.getChats(sessionId)` followed by `ctx.engine.getChatHistory(sessionId, chatId, limit)`,
+which needs the `engine:read` permission and a session in the plugin's scope. It reads live from WhatsApp,
+not from the core `messages` table, and returns at most the 100 most recent messages per chat.
+
+`getChatHistory` exists only on the whatsapp-web.js engine. On Baileys it rejects with
+`EngineNotSupportedError` (see [29 - Engine Capability Matrix](./29-engine-capability-matrix.md)), so a
+Baileys deployment has no backfill path and a provider there indexes live `message:persisted` traffic
+only. Catch that error once and skip the backfill rather than retrying it chat after chat.
+
+There is no capability that reads the `messages` table. Reading the database directly bypasses the
+capability model and is unsupported; see [30 - Plugin Sandboxing](./30-plugin-sandboxing.md) for what a
+loaded plugin can still reach.
+
+Backfilled items carry only the WhatsApp id (`id` there is the WhatsApp message id), not the core row PK.
+Keep a `waMessageId` lookup too, and when a later `message:persisted` arrives for a message you already
+backfilled, upsert onto that document instead of adding a second one.
+
+Start the backfill from `onEnable` without awaiting it: a sandboxed lifecycle call is cut off after 30 s,
+and walking every chat's history takes longer on a real deployment. Record a marker in `ctx.storage` when
+it finishes so a restart does not repeat it. The built-in DB-FTS provider is unaffected (its index is
+DB-synced via triggers on every insert, including backfill).
 
 ## 27.4 Host-side guarantees (the plugin author doesn't handle these)
 
@@ -174,7 +193,7 @@ plugins/my-search/
 ```js
 module.exports = class MySearchPlugin {
   async onEnable(ctx) {
-    // 1. Index every persisted message (live traffic only — backfill separately at onEnable).
+    // 1. Index every persisted message (live traffic only — backfill separately, see 27.3).
     ctx.registerHook('message:persisted', async hookCtx => {
       const { message } = hookCtx.data;
       await this._index(ctx, message);
