@@ -68,6 +68,36 @@ describe('redactSensitiveHeaders (persisted ingress payloads)', () => {
     expect(recorded.payload.headers['x-delivery']).toBe('d1');
   });
 
+  it("redacts an hmac route's declared signature header in the persisted and enqueued payload", async () => {
+    const d = deps({
+      manifestRoute: jest.fn().mockReturnValue({
+        route: 'shop',
+        mode: 'async',
+        verify: 'core',
+        maxBodyBytes: 1024,
+        signature: { scheme: 'hmac-sha256', header: 'X-Custom-Sig' },
+        dedupHeader: 'x-delivery',
+      }),
+    });
+    const res = await new IngressService(d).handle({
+      pluginId: 'shop',
+      instanceId: 'acct1',
+      route: 'shop',
+      method: 'POST',
+      headers: { 'x-delivery': 'd1', 'x-custom-sig': createHmac('sha256', 's').update('{}').digest('hex') },
+      query: {},
+      rawBody: '{}',
+    });
+    expect(res.status).toBe(202);
+    const recorded = (
+      d.events.recordOrSkip.mock.calls as unknown as [[{ payload: { headers: Record<string, string> } }]]
+    )[0][0];
+    expect(recorded.payload.headers['x-custom-sig']).toBe('[redacted]');
+    expect(recorded.payload.headers['x-delivery']).toBe('d1');
+    const job = (d.enqueue.mock.calls as unknown as [[{ payload: { headers: Record<string, string> } }]])[0][0];
+    expect(job.payload.headers['x-custom-sig']).toBe('[redacted]');
+  });
+
   it("redacts a shared-secret route's declared credential header in the persisted and enqueued payload", async () => {
     const d = deps({
       manifestRoute: jest.fn().mockReturnValue({

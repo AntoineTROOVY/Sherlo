@@ -176,11 +176,14 @@ export class IngressService {
     const deliveryId = route.dedupOn === 'body' || !headerId ? deriveDeliveryId(req) : headerId;
     // Provider request headers persist with the event (redrive/debugging); credentials must not.
     // Signature headers are re-derivable, auth material is not — redact before the first write.
-    // A shared-secret route carries the instance secret itself in its declared header.
+    // A shared-secret route carries the instance secret itself in its declared header, and an hmac
+    // route's declared header carries a signature that is only useful to re-send the same body.
     const payload = {
       headers: redactSensitiveHeaders(
         req.headers,
-        route.signature.scheme === 'shared-secret' ? route.signature.header : undefined,
+        route.signature.scheme === 'shared-secret' || route.signature.scheme === 'hmac-sha256'
+          ? route.signature.header
+          : undefined,
       ),
       query: req.query,
       body: req.rawBody,

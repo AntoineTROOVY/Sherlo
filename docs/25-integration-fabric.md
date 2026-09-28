@@ -182,7 +182,15 @@ Four tables live on the data connection, each created by a hand-authored dual-di
   so the signature itself expires with the window; the loader warns when a route declares the header
   without signing it (or signs the token without declaring the header). `standard-webhooks` binds
   id + timestamp by spec. A provider that sends no timestamp header at all stays outside the replay
-  window by construction — dedup and handler idempotency are its only protections.
+  window by construction. For such an hmac-sha256 route, and for every `shared-secret` route, the default
+  header-keyed dedup does not stop a copy of a delivery: the dedup header is not covered by the
+  credential, so a copy with a different header value is accepted as new. `dedupOn: "body"` collapses
+  byte-identical copies within `INGRESS_DEDUP_RETENTION_DAYS` (a copy gets the route's ack and is not
+  enqueued again); beyond that, handler idempotency is the only protection. The loader logs a warning
+  for each such route that keeps the header-keyed default.
+  The value of a route's declared signature header (hmac-sha256 or shared-secret) is redacted from the
+  persisted and enqueued payload, like the well-known signature headers, so the plugin's handler sees
+  `[redacted]` in its place.
 - **Tenancy scoping.** Every durable ingress artifact — secret, dedup store, and dead-letter row — is
   partitioned by instance, and downstream capability calls carry the instance's resolved session scope, so
   a cross-tenant send is blocked host-side.
