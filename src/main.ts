@@ -9,7 +9,12 @@ import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule, DASHBOARD_DIST, dashboardServingEnabled, dashboardBuildPresent } from './app.module';
 import { ShutdownService } from './common/services/shutdown.service';
 import { LoggerService, LogLevel, createLogger } from './common/services/logger.service';
-import { createSwaggerConfig, dropUnexpressibleOperations, exemptPublicOperations } from './config/swagger.config';
+import {
+  createSwaggerConfig,
+  documentErrorResponses,
+  dropUnexpressibleOperations,
+  exemptPublicOperations,
+} from './config/swagger.config';
 import { registerUncaughtExceptionMonitor, registerUnhandledRejectionHandler } from './config/process-error-monitor';
 import { runBootstrapOrExit } from './config/bootstrap-fatal';
 import { validateEnv } from './config/env.validation';
@@ -190,11 +195,12 @@ async function bootstrap() {
   if (swaggerEnabled) {
     const config = createSwaggerConfig();
     const document = SwaggerModule.createDocument(app, config);
-    // Same two passes, in the same order, as scripts/export-openapi.ts. The document is produced in
+    // Same passes, in the same order, as scripts/export-openapi.ts. The document is produced in
     // TWO places — here for the live /api/docs and there for the committed snapshot — and fixing only
     // the snapshot leaves a running gateway serving a document that fails schema validation.
     dropUnexpressibleOperations(document);
     exemptPublicOperations(document);
+    documentErrorResponses(document);
     SwaggerModule.setup('api/docs', app, document);
   }
 

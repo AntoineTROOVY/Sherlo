@@ -132,7 +132,11 @@ describe('createInflightBodyBudget middleware', () => {
     expect(state.code).toBe(503);
     expect(headers['retry-after']).toBe('1');
     expect(headers['connection']).toBe('close');
-    expect((state.payload as { statusCode: number }).statusCode).toBe(503);
+    expect(state.payload).toEqual({
+      statusCode: 503,
+      message: 'Too much request body data in flight; retry later',
+      error: 'Service Unavailable',
+    });
     // Nothing was reserved for the rejected request and its stream was never tapped.
     expect(budget.currentBytes()).toBe(800);
     expect(rejected.listenerCount('data')).toBe(0);

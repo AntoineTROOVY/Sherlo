@@ -23,6 +23,7 @@ import { configureApp } from '../src/configure-app';
 import { applyGlobalValidation } from '../src/config/app-validation';
 import { DASHBOARD_CSP_NONCE_PLACEHOLDER } from '../src/config/dashboard-csp';
 import { ActiveKeyIndex } from '../src/modules/auth/active-key-index';
+import { documentErrorResponses, ERROR_RESPONSE_SCHEMA } from '../src/config/swagger.config';
 
 /**
  * The production HTTP surface, run for real. Every other e2e builds a bare Nest app, so the stack
@@ -172,6 +173,28 @@ describe('production HTTP surface (configureApp)', () => {
       .send({ blob: 'x'.repeat(1100 * 1024) });
 
     expect(res.status).toBe(413);
+  });
+
+  it('sends the error field on a malformed-JSON 400 but not on the 413, as the ErrorResponse schema says', async () => {
+    const malformed = await request(app.getHttpServer())
+      .post('/api/echo')
+      .set('Content-Type', 'application/json')
+      .send('{bad');
+    expect(malformed.status).toBe(400);
+    expect(malformed.body).toMatchObject({ statusCode: 400, error: 'Bad Request' });
+
+    const oversized = await request(app.getHttpServer())
+      .post('/api/echo')
+      .set('Content-Type', 'application/json')
+      .send({ blob: 'x'.repeat(1100 * 1024) });
+    expect(oversized.status).toBe(413);
+    expect(oversized.body).not.toHaveProperty('error');
+
+    const schema = documentErrorResponses({ openapi: '3.0.0', info: { title: 't', version: '0' }, paths: {} })
+      .components?.schemas?.[ERROR_RESPONSE_SCHEMA] as { properties: { error: { description: string } } };
+    const omittedOn = schema.properties.error.description.split('omits it')[1];
+    expect(omittedOn).toContain('oversized-body 413');
+    expect(omittedOn).not.toMatch(/malformed/i);
   });
 
   it('refuses a declared body over the aggregate in-flight budget with 503, a different layer', async () => {

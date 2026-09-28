@@ -206,11 +206,11 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
       req.destroy();
       return;
     }
-    res
-      .status(503)
-      .set('Retry-After', retryAfter)
-      .set('Connection', 'close')
-      .json({ statusCode: 503, message: 'Too much request body data in flight; retry later' });
+    res.status(503).set('Retry-After', retryAfter).set('Connection', 'close').json({
+      statusCode: 503,
+      message: 'Too much request body data in flight; retry later',
+      error: 'Service Unavailable',
+    });
   };
 
   /** Same never-read-the-body disposal as rejectBusy; only the reason and status differ. */
