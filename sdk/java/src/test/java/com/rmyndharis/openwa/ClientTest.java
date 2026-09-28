@@ -31,6 +31,15 @@ class ClientTest {
     }
 
     @Test
+    void emptyOrDotIdIsRefusedBeforeSending() {
+        assertThrows(IllegalArgumentException.class, () -> client.webhooks.delete("s1", ".."));
+        assertThrows(IllegalArgumentException.class, () -> client.webhooks.delete("s1", ""));
+        assertThrows(IllegalArgumentException.class,
+            () -> client.requestVoid(HttpMethod.DELETE, "/api/sessions/s1/labels/%2e%2E", null, null));
+        assertNull(tx.lastRequest());
+    }
+
+    @Test
     void requestSendsAuthHeaderAndParsesBody() {
         tx.respond(200, "{\"success\":true}");
         SuccessResult r = client.request(HttpMethod.POST, "/api/x", null, null, SuccessResult.class);

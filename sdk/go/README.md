@@ -182,6 +182,10 @@ err := client.Do(ctx, "GET", "/api/some/new/path", nil, nil, &out)
   than re-sending the API key to the redirect target.
 - Path segments (chat/message ids) are percent-encoded; a base-URL path prefix
   (e.g. behind a proxy at `/v1`) is preserved.
+- **Empty and dot ids are refused.** An empty, `.` or `..` id returns an error
+  and nothing is sent, so a proxy that resolves dot segments cannot turn the
+  call into one on the parent resource. `Client.Do` refuses a `.` or `..`
+  segment the same way but sends an empty one (a trailing slash) as written.
 
 ## Development
 

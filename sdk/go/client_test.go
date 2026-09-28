@@ -111,6 +111,54 @@ func TestJIDPathIsReadable(t *testing.T) {
 	}
 }
 
+func TestEmptyAndDotSegmentsRefused(t *testing.T) {
+	var hits int32
+	rt := RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		atomic.AddInt32(&hits, 1)
+		return &http.Response{StatusCode: 204, Body: io.NopCloser(strings.NewReader("")), Header: http.Header{}, Request: req}, nil
+	})
+	c := newTestClient(t, rt)
+	ctx := context.Background()
+
+	refused := map[string]error{
+		`Webhooks.Delete ".."`: c.Webhooks.Delete(ctx, "s1", ".."),
+		`Webhooks.Delete "."`:  c.Webhooks.Delete(ctx, "s1", "."),
+		`Webhooks.Delete ""`:   c.Webhooks.Delete(ctx, "s1", ""),
+		`Do %2E%2e`:            c.Do(ctx, "DELETE", "/api/sessions/s1/labels/%2E%2e", nil, nil, nil),
+		`Do ..`:                c.Do(ctx, "GET", "/api/sessions/s1/..?x=1", nil, nil, nil),
+	}
+	_, err := c.Sessions.Get(ctx, "")
+	refused[`Sessions.Get ""`] = err
+	_, err = c.Messages.Media(ctx, "s1", "..", "m1")
+	refused[`Messages.Media ".."`] = err
+	_, err = c.Status.Media(ctx, "s1", ".")
+	refused[`Status.Media "."`] = err
+	for name, err := range refused {
+		if err == nil || !strings.Contains(err.Error(), "path segment") {
+			t.Errorf("%s: err = %v, want a path segment error", name, err)
+		}
+	}
+	if n := atomic.LoadInt32(&hits); n != 0 {
+		t.Fatalf("%d requests sent, want 0", n)
+	}
+
+	// Dots inside an id, a dot-only query value, and a hand-written trailing or
+	// double slash are not refused.
+	for _, id := range []string{"a.b", "...", "628123@c.us"} {
+		if err := c.Webhooks.Delete(ctx, "s1", id); err != nil {
+			t.Errorf("Webhooks.Delete %q: %v", id, err)
+		}
+	}
+	for _, path := range []string{"/api/sessions/", "/api/sessions//x", "/", "/api/labels/a.b?x=/.."} {
+		if err := c.Do(ctx, "GET", path, nil, nil, nil); err != nil {
+			t.Errorf("Do %q: %v", path, err)
+		}
+	}
+	if n := atomic.LoadInt32(&hits); n != 7 {
+		t.Fatalf("%d requests sent, want 7", n)
+	}
+}
+
 func TestListSessionsQueryName(t *testing.T) {
 	rt := &recordTransport{status: 200, body: `[]`}
 	c := newTestClient(t, rt)
