@@ -1,4 +1,17 @@
-import { Module, INestApplication, Controller, Post, Body } from '@nestjs/common';
+import {
+  Module,
+  INestApplication,
+  Controller,
+  Post,
+  Body,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  All,
+  Req,
+} from '@nestjs/common';
+import type { Request } from 'express';
 import { NestFactory } from '@nestjs/core';
 import request from 'supertest';
 import { App } from 'supertest/types';
@@ -26,7 +39,35 @@ class EchoController {
   }
 }
 
-@Module({ controllers: [EchoController] })
+const deleted: string[] = [];
+
+@Controller('sessions')
+class SessionStubController {
+  @Get(':sessionId')
+  get(@Param('sessionId') sessionId: string) {
+    return { id: sessionId };
+  }
+
+  @Delete(':sessionId')
+  @HttpCode(204)
+  remove(@Param('sessionId') sessionId: string) {
+    deleted.push(sessionId);
+  }
+}
+
+const ingressHits: string[] = [];
+
+/** Same route shape as the real ingress controller, which forwards every method to a plugin. */
+@Controller('ingress')
+class IngressStubController {
+  @All(':pluginId/:instanceId/*path')
+  @HttpCode(202)
+  receive(@Req() req: Request) {
+    ingressHits.push(`${req.method} ${req.path}`);
+  }
+}
+
+@Module({ controllers: [EchoController, SessionStubController, IngressStubController] })
 class HttpSurfaceModule {}
 
 // A stand-in for the bundled document: the real dashboard/index.html carries the placeholder in a
@@ -151,6 +192,39 @@ describe('production HTTP surface (configureApp)', () => {
 
     expect(res.status).toBe(503);
     expect(res.headers['retry-after']).toBeDefined();
+  });
+
+  it('refuses a DELETE whose path ends in a slash instead of matching the route without it', async () => {
+    deleted.length = 0;
+    for (const path of ['/api/sessions/abc/', '/api/sessions/abc/?x=1']) {
+      const res = await request(app.getHttpServer()).delete(path).set('Origin', 'https://allowed.example').expect(404);
+      expect(res.body).toMatchObject({ statusCode: 404, error: 'Not Found' });
+      expect(res.headers['x-request-id']).toBeDefined();
+      // A browser can read the refusal only if it carries the CORS headers; helmet's must be there too.
+      expect(res.headers['access-control-allow-origin']).toBe('https://allowed.example');
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+    }
+    expect(deleted).toEqual([]);
+
+    await request(app.getHttpServer()).delete('/api/sessions/abc').expect(204);
+    expect(deleted).toEqual(['abc']);
+    // Other methods keep the lenient trailing-slash match.
+    await request(app.getHttpServer()).get('/api/sessions/abc/').expect(200);
+  });
+
+  it('refuses a trailing-slash DELETE whatever the case of the prefix, as routing ignores it', async () => {
+    deleted.length = 0;
+    for (const path of ['/API/sessions/abc/', '/Api/sessions/abc/']) {
+      await request(app.getHttpServer()).delete(path).expect(404);
+    }
+    expect(deleted).toEqual([]);
+  });
+
+  it('still delivers a trailing-slash DELETE to the ingress route', async () => {
+    ingressHits.length = 0;
+    await request(app.getHttpServer()).delete('/api/ingress/p/i/hook/').expect(202);
+    await request(app.getHttpServer()).delete('/API/ingress/p/i/hook/').expect(202);
+    expect(ingressHits).toEqual(['DELETE /api/ingress/p/i/hook/', 'DELETE /API/ingress/p/i/hook/']);
   });
 
   it('answers a compressed body with 415 rather than charging the budget its inflated size', async () => {

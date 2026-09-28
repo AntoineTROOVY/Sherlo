@@ -258,5 +258,27 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
     maxAge: 86400, // 24 hours
   });
 
+  // A DELETE path ending in '/' names no resource. Non-strict routing would still match it to the
+  // route without the slash, so a client that normalises `<parent>/<child>/..` down to `<parent>/`
+  // would delete the parent. Only DELETE under /api/ is refused: a trailing slash on other methods
+  // keeps working, and /mcp handles its own DELETE. /api/ingress/ is exempt: it forwards every
+  // method to a plugin route picked by its first wildcard segment and deletes nothing. The prefix
+  // is compared case-insensitively because routing matches it that way. Registered after helmet
+  // and CORS so the 404 carries their headers; routes mount later, at init, so it still runs
+  // before routing.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const path = req.path.toLowerCase();
+    if (
+      req.method === 'DELETE' &&
+      path.startsWith('/api/') &&
+      !path.startsWith('/api/ingress/') &&
+      path.endsWith('/')
+    ) {
+      res.status(404).json({ statusCode: 404, message: `Cannot DELETE ${req.path}`, error: 'Not Found' });
+      return;
+    }
+    next();
+  });
+
   return { bodyLimit, inflightBudgetBytes };
 }
