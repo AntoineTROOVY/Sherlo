@@ -766,20 +766,17 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     return this.engines.require(id);
   }
 
-  async getGroups(
-    id: string,
-    opts: ListOptions = {},
-  ): Promise<{ id: string; name: string; linkedParentJID?: string | null }[]> {
+  /** Every group for a session WITHOUT the response window, for callers that filter before paging. */
+  async listGroups(id: string): Promise<{ id: string; name: string; linkedParentJID?: string | null }[]> {
     await this.findOne(id); // Verify session exists
     const engine = this.requireEngine(id);
 
     const groups = await engine.getGroups();
-    const mapped = groups.map(g => ({
+    return groups.map(g => ({
       id: g.id,
       name: g.name,
       linkedParentJID: g.linkedParentJID,
     }));
-    return paginate(mapped, opts.limit, opts.offset);
   }
 
   /**

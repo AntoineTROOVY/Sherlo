@@ -6966,21 +6966,6 @@ describe('SessionService', () => {
     });
   });
 
-  describe('getGroups pagination', () => {
-    it('caps an unbounded group list at the default limit (1000)', async () => {
-      const session = createMockSession();
-      (repository.findOne as jest.Mock).mockResolvedValue(session);
-      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
-      await service.start('sess-uuid-1');
-
-      const groups = Array.from({ length: 1500 }, (_, i) => ({ id: `g${i}`, name: `G${i}` }));
-      mockEngine.getGroups.mockResolvedValue(groups);
-
-      const result = await service.getGroups('sess-uuid-1');
-      expect(result).toHaveLength(1000);
-    });
-  });
-
   describe('start() concurrent stop/delete guard', () => {
     it('tears down the just-initialized engine if a stop/delete lands during start() (no resurrection to READY)', async () => {
       const session = createMockSession();

@@ -67,7 +67,7 @@ This lets you point an **AI agent or third-party integration at a shared account
 
 Identity is matched through the lid mapping table: a contact allowlisted by phone number also matches the same person's `@lid` privacy id once the table maps the two, and an unmapped `@lid` is refused rather than guessed. A lid's digits are never mistaken for a phone number, so `555000111@lid` does not admit `555000111@c.us`.
 
-The default covers REST routes only. Surfaces that authenticate outside the REST guard do not inherit it, so each one that can return chat data refuses a chat-scoped key with its own check: the `/events` WebSocket, the MCP mount (per tool call), and the Bull Board queue dashboard. Of the list routes, only `GET /sessions/{sessionId}/chats` is usable, and it filters to the key's chats before paging.
+The default covers REST routes only. Surfaces that authenticate outside the REST guard do not inherit it, so each one that can return chat data refuses a chat-scoped key with its own check: the `/events` WebSocket, the MCP mount (per tool call), and the Bull Board queue dashboard. Four list routes are usable, each filtered to the key's chats before paging: `GET /sessions/{sessionId}/chats`, `GET /sessions/{sessionId}/groups` (id, name and community parent id only), `GET /sessions/{sessionId}/contacts` and `GET /sessions/{sessionId}/labels/{labelId}/chats`.
 
 The API also accepts `allowedChats` on an admin key, but no admin-only route is open to a chat-scoped key, and the last usable admin key cannot be scoped this way.
 

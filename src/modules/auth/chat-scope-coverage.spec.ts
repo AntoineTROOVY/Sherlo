@@ -82,6 +82,11 @@ export const MUST_STAY_MARKED: ReadonlyArray<readonly [string, string, string]> 
   ['message.controller.ts', 'getChatHistory', 'fenced'],
   // Stored history on both engines, for the chat named in ?chatId=.
   ['message.controller.ts', 'getMessages', 'fenced'],
+  // List routes a restricted key may use, each filtered to its chats before paging.
+  ['session.controller.ts', 'getChats', 'filtered'],
+  ['session.controller.ts', 'getGroups', 'filtered'],
+  ['contact.controller.ts', 'findAll', 'filtered'],
+  ['label.controller.ts', 'getChatsByLabel', 'filtered'],
 ];
 
 const REQUIRED_GUARD_FIELD = new RegExp(`\\b(?:${GUARD_BODY_CHAT_FIELDS.join('|')})!\\s*:`);

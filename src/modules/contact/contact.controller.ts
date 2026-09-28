@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Post, Put, Delete, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { ContactService } from './contact.service';
-import { ChatScoped, RequireRole } from '../auth/decorators/auth.decorators';
-import { ApiKeyRole } from '../auth/entities/api-key.entity';
+import { ChatScoped, CurrentApiKey, RequireRole } from '../auth/decorators/auth.decorators';
+import { type ApiKey, ApiKeyRole } from '../auth/entities/api-key.entity';
+import { ChatScopeService } from '../auth/chat-scope.service';
+import { paginate } from '../../common/utils/paginate';
 import { UpsertContactDto } from './dto/upsert-contact.dto';
 import {
   ContactAckResponseDto,
@@ -17,8 +19,12 @@ import { ENGINE_NOT_READY_409 } from '../../common/openapi/engine-status-respons
 @ApiTags('contacts')
 @Controller('sessions/:sessionId/contacts')
 export class ContactController {
-  constructor(private readonly contactService: ContactService) {}
+  constructor(
+    private readonly contactService: ContactService,
+    private readonly chatScope: ChatScopeService,
+  ) {}
 
+  @ChatScoped('filtered')
   @Get()
   @ApiOperation({ summary: 'Get all contacts for a session' })
   @ApiParam({ name: 'sessionId', description: 'Session ID' })
@@ -41,11 +47,11 @@ export class ContactController {
     @Param('sessionId') sessionId: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @CurrentApiKey() apiKey?: ApiKey,
   ) {
-    return this.contactService.getContacts(sessionId, {
-      limit: limit ? parseInt(limit, 10) : undefined,
-      offset: offset ? parseInt(offset, 10) : undefined,
-    });
+    // Filtered before paging so a chat-restricted key sees only its contacts, in full windows.
+    const visible = await this.chatScope.filter(apiKey, await this.contactService.listContacts(sessionId), c => c.id);
+    return paginate(visible, limit ? parseInt(limit, 10) : undefined, offset ? parseInt(offset, 10) : undefined);
   }
 
   @Get('profile-pictures')

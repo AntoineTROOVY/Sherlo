@@ -481,6 +481,7 @@ export class SessionController {
 
   // Shares a Path Item with GroupController's POST on the same route — one parameter name for the
   // one positional segment, or the contract splits it into two entries.
+  @ChatScoped('filtered')
   @Get(':sessionId/groups')
   @ApiOperation({ summary: 'Get all groups for a session' })
   @ApiParam({ name: 'sessionId', description: 'Session ID' })
@@ -503,13 +504,14 @@ export class SessionController {
   @ApiQuery({ name: 'offset', required: false, description: 'Number of groups to skip (for paging)' })
   async getGroups(
     @Param('sessionId', ParseUUIDPipe) id: string,
+    @CurrentApiKey() apiKey?: ApiKey,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ): Promise<{ id: string; name: string; linkedParentJID?: string | null }[]> {
-    return this.sessionService.getGroups(id, {
-      limit: limit ? parseInt(limit, 10) : undefined,
-      offset: offset ? parseInt(offset, 10) : undefined,
-    });
+    // Filtered before paging, as getChats is, so a chat-restricted key sees only its groups and
+    // never a short window while an allowed group sat just past it.
+    const visible = await this.chatScope.filter(apiKey, await this.sessionService.listGroups(id), g => g.id);
+    return paginate(visible, limit ? parseInt(limit, 10) : undefined, offset ? parseInt(offset, 10) : undefined);
   }
 
   @ChatScoped('filtered')

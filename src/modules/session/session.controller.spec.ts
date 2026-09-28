@@ -542,3 +542,41 @@ describe('SessionController — GET .../chats filters before paginating', () => 
     expect(out).toHaveLength(2);
   });
 });
+
+// GET /sessions/:sessionId/groups follows the same rule: a restricted key sees only its groups, and
+// the window is taken after the filter.
+describe('SessionController: GET .../groups filters before paginating', () => {
+  const group = (id: string) => ({ id, name: id, linkedParentJID: '777@g.us' });
+  let sessionService: { listGroups: jest.Mock };
+  let controller: SessionController;
+
+  beforeEach(() => {
+    sessionService = { listGroups: jest.fn() };
+    controller = new SessionControllerClass(
+      sessionService as unknown as SessionService,
+      { logInfo: jest.fn() } as unknown as AuditService,
+      new ChatScopeService(),
+    );
+  });
+
+  it('filters the full list before the window, keeping the allowed group as returned', async () => {
+    sessionService.listGroups.mockResolvedValue([group('999@g.us'), group('123@g.us'), group('456@g.us')]);
+    const apiKey = { allowedChats: ['123@g.us', '456@g.us'] } as ApiKey;
+
+    const out = await controller.getGroups('sess-uuid-1', apiKey, '1', '0');
+
+    expect(out).toEqual([group('123@g.us')]);
+  });
+
+  it('pages the whole list for an unrestricted key', async () => {
+    sessionService.listGroups.mockResolvedValue([group('1@g.us'), group('2@g.us'), group('3@g.us')]);
+    const out = await controller.getGroups('sess-uuid-1', { allowedChats: null } as ApiKey, '2', '1');
+    expect(out.map(g => g.id)).toEqual(['2@g.us', '3@g.us']);
+  });
+
+  it('caps an unbounded group list at the default limit (1000)', async () => {
+    sessionService.listGroups.mockResolvedValue(Array.from({ length: 1500 }, (_, i) => group(`${i}@g.us`)));
+    const out = await controller.getGroups('sess-uuid-1', { allowedChats: null } as ApiKey);
+    expect(out).toHaveLength(1000);
+  });
+});
