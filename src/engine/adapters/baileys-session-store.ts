@@ -164,9 +164,14 @@ function mergeContactTwins(a: ContactTwin, b: ContactTwin): ContactTwin {
 }
 
 /**
- * Per-session, in-memory snapshot of Baileys contacts + chats, fed from `sock.ev` events. Baileys has
- * no fetch-all; this data arrives via `contacts.*`/`chats.*`/`messaging-history.set` (a full re-sync on
- * each connect) and is mapped to the neutral `Contact`/`ChatSummary` on read. Holds no socket — pure data.
+ * Per-session, in-memory snapshot of Baileys contacts + chats, fed from `sock.ev` events and mapped to
+ * the neutral `Contact`/`ChatSummary` on read. Holds no socket, pure data. Baileys has no fetch-all,
+ * and `messaging-history.set` arrives only on the first link: once the account has synced, WhatsApp
+ * skips history sync on every later connect (see BaileysHistory.hydrateNames). A new engine (a process
+ * restart, a session stop and start, a reconnect the gateway runs itself) therefore starts with no
+ * chats: the groups hydrateNames re-fetches on every open come back at once, and a 1:1 chat comes back
+ * with its next message, since Baileys emits `chats.update` for every real message. Mute, archive and
+ * pin survive through the ChatStateStore. Contacts are rebuilt from the address-book snapshot instead.
  *
  * Every map is LRU-bounded (`BAILEYS_SESSION_STORE_MAX_ENTRIES`, default 5000 per map, 0 = unbounded)
  * because contacts/chats/lastMessages/lidToPn all grow from peer-controlled traffic — without a cap a

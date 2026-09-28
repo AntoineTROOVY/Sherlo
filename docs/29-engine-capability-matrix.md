@@ -941,6 +941,14 @@ adapter boundary — none silently stubs.
   the same engine, and the list with it.
   The `sendMessage(status@broadcast, {delete})` revoke shape is _empirically unverified_: only posting
   was live-spiked. On wwjs it calls `revokeStatusMessage(statusId)` (own status only).
+- **`getChats` after a restart (baileys).** Baileys keeps no chat list of its own, and WhatsApp
+  skips history sync on every connect after the first link, so a new engine (a process restart, a
+  session stop and start, or a reconnect the gateway runs itself, as for `deleteStatus` above) starts
+  with an empty one. `GET /chats` then lists the groups, re-fetched on every connect, and each 1:1
+  chat as its next message arrives; a quiet chat stays out of the list until then. Rows rebuilt this
+  way carry timestamp `0` and no `lastMessage` until a message arrives. A chat's archive, pin and mute
+  state is persisted and shows as soon as the chat is listed. The transient reconnects Baileys runs on
+  its own keep the list. whatsapp-web.js reads WhatsApp Web's own chat list and is unaffected.
 - **`getContactStatus` / `getContactStatuses` (wwjs).** `Status.type` is the `text|image|video`
   union — audio/other story types collapse to `text`.
 - **`archiveChat` / `clearChatMessages` / `deleteChat` / `sendSeen` / `markUnread` (baileys).** The
