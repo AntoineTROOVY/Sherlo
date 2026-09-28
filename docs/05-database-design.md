@@ -970,50 +970,10 @@ The 24-hour TTL itself is a fixed constant (`STATUS_TTL_MS`) and is not configur
 ## 5.8 Backup Strategy
 
 > [!NOTE]
-> This section is **operational guidance**, not a built-in feature. OpenWA ships no scheduler, encryption step, or S3 uploader for backups — the diagram and script below are a recommended setup you wire up externally (cron, your host's backup tooling, etc.). For SQLite, back up the `./data/*.sqlite` files (including `./data/main.sqlite`); for PostgreSQL, use `pg_dump`. The JSON export/import endpoints in §5.1 are a portability path, not a backup mechanism.
+> This section is **operational guidance**, not a built-in feature. OpenWA ships no scheduler, encryption step, S3 uploader or pruning for backups; wire those up externally (cron, your host's backup tooling, etc.). The JSON export/import endpoints in §5.1 are a portability path, not a backup mechanism.
 > The authoritative full-system backup is [`scripts/backup.sh`](../scripts/backup.sh), documented in the [operational runbook](./11-operational-runbooks.md#runbook-database-backup); it also captures engine auth state, including `BAILEYS_AUTH_DIR` for Baileys.
 
-### Backup Components
-
-```mermaid
-flowchart TB
-    subgraph Backup["Backup Strategy"]
-        DB[(Database)] --> DUMP[pg_dump]
-        DUMP --> COMPRESS[Compress]
-        COMPRESS --> ENCRYPT[Encrypt]
-        ENCRYPT --> S3[S3/Cloud Storage]
-    end
-
-    subgraph Schedule["Schedule (external, e.g. cron)"]
-        FULL[Full Backup<br/>Daily]
-        INCR[Incremental<br/>Hourly]
-    end
-
-    Schedule --> Backup
-```
-
-### Backup Script Example
-
-```bash
-#!/bin/bash
-# backup.sh
-
-DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="/backups"
-DB_NAME="openwa"
-
-# Create backup
-pg_dump -Fc $DB_NAME > $BACKUP_DIR/openwa_$DATE.dump
-
-# Compress
-gzip $BACKUP_DIR/openwa_$DATE.dump
-
-# Upload to S3 (optional)
-aws s3 cp $BACKUP_DIR/openwa_$DATE.dump.gz s3://backups/openwa/
-
-# Cleanup old backups (keep last 7 days)
-find $BACKUP_DIR -name "*.dump.gz" -mtime +7 -delete
-```
+Build any scheduled or off-site pipeline around the archive `scripts/backup.sh` writes, not around a bare `pg_dump` or a copy of the `.sqlite` files. The data store alone omits `main.sqlite` (API keys and the audit log) and the engine auth state, so a restore from it comes back with no API keys and every session unpaired. The flow, and which steps stay with the operator, is in [10.7 Backup & Recovery](./10-devops-infrastructure.md#107-backup--recovery).
 
 ---
 

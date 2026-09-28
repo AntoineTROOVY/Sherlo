@@ -1142,20 +1142,39 @@ These are the metrics OpenWA actually exports at `GET /api/metrics`:
 
 ### Backup Strategy
 
+`scripts/backup.sh` writes one local, unencrypted archive per run, created under `umask 077`. It does
+not schedule itself, encrypt, copy off-host or prune: a schedule, encryption at rest, an off-site copy
+and retention are the operator's to set up around the archive (see the
+[backup runbook](./11-operational-runbooks.md#runbook-database-backup)).
+
 ```mermaid
 flowchart TB
-    subgraph Daily["Daily Backup"]
-        DB[(Database)] --> DUMP[pg_dump]
-        DUMP --> COMPRESS[gzip]
-        COMPRESS --> ENCRYPT[encrypt]
-        ENCRYPT --> S3[S3 Storage]
+    subgraph Script["scripts/backup.sh (one run)"]
+        MAIN[(main.sqlite)] --> SNAP[sqlite3 .backup]
+        DATA[(data store)] --> SNAP
+        DATA -. DATABASE_TYPE=postgres .-> DUMP[pg_dump]
+        STATE["sessions/, baileys/, media/,<br/>plugin-packages/, plugin-state/,<br/>.env.generated, .api-key"] --> COPY[copy]
+        SNAP --> STAGE[staging dir]
+        DUMP --> STAGE
+        COPY --> STAGE
+        STAGE --> TAR[tar -czf + min-content check]
+        TAR --> ARCHIVE["BACKUP_DIR/openwa-backup-TIMESTAMP.tar.gz"]
     end
 
-    subgraph Retention["Retention Policy"]
-        D7[Daily: 7 days]
-        W4[Weekly: 4 weeks]
-        M12[Monthly: 12 months]
+    subgraph Operator["Operator-managed (not in the script)"]
+        CRON[schedule, e.g. cron]
+        ENC[encryption at rest]
+        OFF[off-host copy]
+        PRUNE[retention]
     end
+
+    ARCHIVE --> Operator
+```
+
+A retention step matching the script's default location and name, for example 30 days:
+
+```bash
+find ./backups -name 'openwa-backup-*.tar.gz' -mtime +30 -delete
 ```
 
 ### Backup Script
