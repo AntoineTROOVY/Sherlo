@@ -99,6 +99,17 @@ describe('webhook DTO custom-header validation', () => {
     expect(errs.some(e => e.property === 'headers')).toBe(true);
   });
 
+  // The HTTP client joins case-variant names into one comma-separated value, so neither value is
+  // sent as written and a receiver checking one credential sees both.
+  it('rejects two header names that differ only in case, on create and update', async () => {
+    const headers = { Authorization: 'Bearer a', authorization: 'Bearer b' };
+    const create = await errorsFor(CreateWebhookDto, { url: 'https://x.example/hook', headers });
+    expect(create.some(e => e.property === 'headers')).toBe(true);
+    const update = await errorsFor(UpdateWebhookDto, { headers });
+    expect(update.some(e => e.property === 'headers')).toBe(true);
+    expect(await errorsFor(UpdateWebhookDto, { headers: { 'X-A': '1', 'X-B': '2' } })).toHaveLength(0);
+  });
+
   it('UpdateWebhookDto applies the same header validation', async () => {
     const errs = await errorsFor(UpdateWebhookDto, { headers: { 'X-Evil': 'a\nb' } });
     expect(errs.some(e => e.property === 'headers')).toBe(true);

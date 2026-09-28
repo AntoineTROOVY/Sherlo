@@ -1,4 +1,5 @@
-import { postWebhookPayload, sanitizeCustomHeaders } from './deliver-once';
+import { Headers } from 'undici';
+import { buildDeliveryHeaders, postWebhookPayload, sanitizeCustomHeaders } from './deliver-once';
 
 /**
  * Direct coverage for the shared delivery core both paths (direct and queued processor) now route
@@ -57,6 +58,23 @@ describe('sanitizeCustomHeaders', () => {
         'X-OpenWA-Event': 'x',
       }),
     ).toEqual({ 'X-Custom': 'v', Authorization: 'Bearer t' });
+  });
+
+  it('drops a custom User-Agent in any spelling', () => {
+    expect(sanitizeCustomHeaders({ 'user-agent': 'x', 'USER-AGENT': 'y', 'User-Agent': 'z', 'X-Keep': 'v' })).toEqual({
+      'X-Keep': 'v',
+    });
+  });
+
+  it('keeps a custom header whose name only starts with User-Agent', () => {
+    expect(sanitizeCustomHeaders({ 'User-Agent-Version': '2' })).toEqual({ 'User-Agent-Version': '2' });
+  });
+
+  // Asserted through undici's Headers, which is what goes on the wire: a case-variant key there is
+  // joined with the system value rather than replaced by it.
+  it('sends only the system User-Agent when the custom map carries a lowercase one', () => {
+    const headers = buildDeliveryHeaders({ headers: { 'user-agent': 'custom' } }, 'message.received', 'k', 'd', '{}');
+    expect(new Headers(headers).get('user-agent')).toBe('OpenWA-Webhook/1.0.0');
   });
 
   // undici throws on several of these (every delivery then fails with "fetch failed") and a wrong
