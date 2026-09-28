@@ -101,6 +101,16 @@ jest.mock('qrcode', () => {
   return { ...actual, toDataURL: jest.fn().mockImplementation(actual.toDataURL) };
 });
 
+// The auth store takes the loaded library as an argument; route it through the library mock's
+// useMultiFileAuthState so the tests below keep controlling the auth state in one place.
+jest.mock('./baileys-auth-store', () => ({
+  useAtomicMultiFileAuthState: jest.fn((folder: string): unknown =>
+    jest
+      .requireMock<{ useMultiFileAuthState: (f: string) => unknown }>('@whiskeysockets/baileys')
+      .useMultiFileAuthState(folder),
+  ),
+}));
+
 jest.mock('@whiskeysockets/baileys', () => ({
   __esModule: true,
   default: jest.fn(() => {

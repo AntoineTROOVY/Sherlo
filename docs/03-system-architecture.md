@@ -1090,7 +1090,9 @@ export class WhatsAppWebJsAdapter implements IWhatsAppEngine {
 
 ```typescript
 // engine/adapters/baileys.adapter.ts
-import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys';
+import makeWASocket, { DisconnectReason } from '@whiskeysockets/baileys';
+import * as baileys from '@whiskeysockets/baileys';
+import { useAtomicMultiFileAuthState } from './baileys-auth-store';
 import {
   IWhatsAppEngine,
   EngineEventCallbacks,
@@ -1108,7 +1110,13 @@ export class BaileysAdapter implements IWhatsAppEngine {
     this.callbacks = callbacks;
     this.setStatus(EngineStatus.INITIALIZING);
 
-    const { state, saveCreds } = await useMultiFileAuthState(`${this.authDir}/${this.sessionId}`);
+    // Same file layout as Baileys' useMultiFileAuthState, but every write is atomic and an
+    // unparseable creds.json is moved aside with its key files before a new link starts.
+    const { state, saveCreds } = await useAtomicMultiFileAuthState(
+      `${this.authDir}/${this.sessionId}`,
+      baileys,
+      this.logger,
+    );
     this.socket = makeWASocket({ auth: state });
     this.socket.ev.on('creds.update', saveCreds);
     this.setupEventHandlers();

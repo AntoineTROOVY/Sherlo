@@ -328,7 +328,7 @@ CREATE TABLE sessions (
 > The **types** above are illustrative — the schema is defined by the TypeORM entity (`src/modules/session/entities/session.entity.ts`) and column types are dialect-portable (`jsonColumnType()` → `simple-json`, dates via `DateTransformer`). The **column names are literal**: see the naming note in §5.3 below before writing SQL against any of these tables. The `sessions` entity declares only the index implied by the `UNIQUE` constraint on `name`; there are no separate `status`/`phone`/`createdAt` indexes.
 
 > [!NOTE]
-> Auth state is **not** stored in this table. Both engines persist credentials on the **filesystem** (`whatsapp-web.js` LocalAuth; Baileys `useMultiFileAuthState`). The `baileys_stored_messages` table holds only Baileys' serialized message store (the library ships none), not credentials.
+> Auth state is **not** stored in this table. Both engines persist credentials on the **filesystem**: `whatsapp-web.js` through LocalAuth, Baileys in a multi-file auth dir with the layout of its `useMultiFileAuthState`, written atomically. An unparseable Baileys `creds.json` is moved aside with its key files to `corrupt-<ms>-<suffix>/` and the session relinks by QR. The `baileys_stored_messages` table holds only Baileys' serialized message store (the library ships none), not credentials.
 
 **Session Status Values:**
 
@@ -799,7 +799,7 @@ flowchart LR
 
     subgraph FS["Engine Auth (not in sessions table)"]
         FSAUTH[whatsapp-web.js: filesystem LocalAuth]
-        BAUTH[Baileys: filesystem useMultiFileAuthState]
+        BAUTH[Baileys: filesystem multi-file auth dir]
     end
 
     Memory -->|Sync| Persistent
