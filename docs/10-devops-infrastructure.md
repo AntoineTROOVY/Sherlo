@@ -454,6 +454,9 @@ LOG_FORMAT=json
 # REDIS_ENABLED=false
 # REDIS_HOST=localhost
 # REDIS_PORT=6379
+# REDIS_TLS=false      # true for a Redis that requires TLS (not the built-in container); every client
+#                      # (cache, rate limits, queue, WebSocket fan-out) uses it. Private CA: NODE_EXTRA_CA_CERTS
+# REDIS_CACHE_DB=1     # logical database for the cache
 # Redis-backed caching switches on when REDIS_ENABLED=true OR CACHE_ENABLED=true — enabling Redis
 # for the queue alone therefore also enables the cache.
 # CACHE_ENABLED=true

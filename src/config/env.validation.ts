@@ -443,6 +443,9 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     // Read at boot by the throttler factory (app.module.ts) and CacheService with `=== 'true'`: a
     // typo like `ture` silently downgrades rate-limit storage + cache to per-process in-memory.
     'REDIS_ENABLED',
+    // `=== 'true'` in redis-options.ts: a typo silently connects in plaintext to a Redis the operator
+    // expected to reach over TLS, which a TLS-only managed Redis then refuses.
+    'REDIS_TLS',
     // Read by the SSRF guard's redirect loop with `=== 'true'`: a typo silently keeps the secure
     // default, but an accidental 'true'-ish string is not the flag the operator meant to audit.
     'PLUGIN_DOWNLOAD_ALLOW_INSECURE_REDIRECTS',

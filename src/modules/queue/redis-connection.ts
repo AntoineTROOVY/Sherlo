@@ -1,36 +1,25 @@
 import { resolveNonNegativeIntEnv } from '../../config/configuration';
+import { redisConnectionOptions, type RedisConnectionOptions } from '../../config/redis-options';
 
 /**
- * BullMQ Redis connection options for the WEBHOOK queue's Worker.
- *
- * The webhook PRODUCER (the Queue) is configured on the shared `BullModule.forRootAsync` connection
- * with `enableOfflineQueue: false`, so `queue.add()` fails fast when Redis is unreachable and the
- * dispatch path can fall back to direct delivery instead of buffering forever.
- *
- * The WORKER must NOT inherit that producer-only fast-fail. Its blocking/internal commands
- * (moveToActive, lock renewal) need to tolerate a brief reconnect during a Redis blip/failover;
- * BullMQ explicitly recommends leaving the offline queue enabled for Worker connections. Because
- * @nestjs/bullmq otherwise builds the Worker from the same shared connection, the WebhookProcessor
- * overrides its connection with these options — host/port/username/password/timeout identical to the producer
- * (same env vars, same defaults as configuration.ts), but with the offline queue left at ioredis's
- * default of `true` so a transient outage no longer throws "Stream isn't writeable" and stalls jobs.
+ * BullMQ connection for the shared producer (`BullModule.forRootAsync` in queue.module.ts): the common
+ * Redis fields plus `enableOfflineQueue: false`, so `queue.add()` fails fast when Redis is unreachable
+ * and the dispatch path can fall back to direct delivery instead of buffering forever.
  */
-export interface WorkerConnectionOptions {
-  host: string;
-  port: number;
-  username?: string;
-  password?: string;
-  connectTimeout: number;
+export function queueConnectionOptions(): RedisConnectionOptions & { enableOfflineQueue: false } {
+  return { ...redisConnectionOptions(), enableOfflineQueue: false };
 }
 
-export function workerConnectionOptions(): WorkerConnectionOptions {
-  return {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
-    username: process.env.REDIS_USERNAME,
-    password: process.env.REDIS_PASSWORD,
-    connectTimeout: parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS || '5000', 10),
-  };
+/**
+ * BullMQ connection for the webhook and ingress Workers. It must NOT inherit the producer-only
+ * fast-fail above: the Worker's blocking/internal commands (moveToActive, lock renewal) need to
+ * tolerate a brief reconnect during a Redis blip/failover, and BullMQ recommends leaving the offline
+ * queue enabled for Worker connections. @nestjs/bullmq would otherwise build the Worker from the shared
+ * connection, so each processor passes these options instead; without the override a transient outage
+ * throws "Stream isn't writeable" and stalls jobs.
+ */
+export function workerConnectionOptions(): RedisConnectionOptions {
+  return redisConnectionOptions();
 }
 
 /** Default number of webhook deliveries the Worker processes in parallel. */

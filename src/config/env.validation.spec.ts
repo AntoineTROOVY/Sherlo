@@ -554,6 +554,13 @@ describe('validateEnv', () => {
     },
   );
 
+  it('accepts only an exact true or false for REDIS_TLS', () => {
+    expect(() => validateEnv({ REDIS_TLS: 'yes' })).toThrow(/REDIS_TLS must be "true" or "false"/);
+    expect(() => validateEnv({ REDIS_TLS: 'true ' })).toThrow(/REDIS_TLS/);
+    expect(() => validateEnv({ REDIS_TLS: 'true' })).not.toThrow();
+    expect(() => validateEnv({ REDIS_TLS: '' })).not.toThrow();
+  });
+
   it.each(['INGRESS_RETRY_DELAY_MS', 'REDIS_CACHE_DB'])('rejects a negative or non-integer %s and keeps 0', key => {
     for (const bad of ['-1', '1.5', 'abc']) {
       expect(() => validateEnv({ [key]: bad })).toThrow(new RegExp(`${key} must be a non-negative integer`));

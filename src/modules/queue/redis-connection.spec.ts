@@ -1,4 +1,9 @@
-import { ingressWorkerConcurrency, workerConnectionOptions, webhookWorkerConcurrency } from './redis-connection';
+import {
+  ingressWorkerConcurrency,
+  queueConnectionOptions,
+  workerConnectionOptions,
+  webhookWorkerConcurrency,
+} from './redis-connection';
 
 describe('workerConnectionOptions (webhook Worker connection)', () => {
   const ORIGINAL_ENV = process.env;
@@ -42,6 +47,12 @@ describe('workerConnectionOptions (webhook Worker connection)', () => {
       password: 'secret',
       connectTimeout: 1234,
     });
+  });
+
+  it('connects the Worker and the producer over TLS when REDIS_TLS=true', () => {
+    process.env = { ...ORIGINAL_ENV, REDIS_TLS: 'true' };
+    expect(workerConnectionOptions().tls).toEqual({});
+    expect(queueConnectionOptions()).toMatchObject({ tls: {}, enableOfflineQueue: false });
   });
 });
 

@@ -273,9 +273,7 @@ if (dashboardServingEnabled && dashboardBuildPresent) {
         // API. The client is built fail-fast (see throttler-redis.client.ts) so that fail-open
         // engages immediately instead of after a queue/timeout stall per request.
         const redisStorage =
-          process.env.REDIS_ENABLED === 'true'
-            ? new RedisThrottlerStorage(createThrottlerRedisClient(configService))
-            : undefined;
+          process.env.REDIS_ENABLED === 'true' ? new RedisThrottlerStorage(createThrottlerRedisClient()) : undefined;
         return { throttlers, ...(redisStorage ? { storage: redisStorage } : {}) };
       },
     }),
