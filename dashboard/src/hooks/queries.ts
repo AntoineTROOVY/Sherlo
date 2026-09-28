@@ -191,6 +191,7 @@ export function useCreateApiKeyMutation() {
       role: string;
       allowedIps?: string[];
       allowedSessions?: string[];
+      allowedChats?: string[];
       expiresAt?: string;
     }) => apiKeyApi.create(data),
     onSuccess: () => {
@@ -212,7 +213,8 @@ export function useUpdateApiKeyMutation() {
         role?: string;
         allowedIps?: string[];
         allowedSessions?: string[];
-        expiresAt?: string;
+        allowedChats?: string[];
+        expiresAt?: string | null;
       };
     }) => apiKeyApi.update(id, data),
     onSuccess: () => {

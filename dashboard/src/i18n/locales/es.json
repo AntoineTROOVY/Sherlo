@@ -582,6 +582,7 @@
     "createdTitle": "Clave API creada",
     "createdHint": "Copia esta clave ahora. No podrás verla de nuevo.",
     "namePlaceholder": "ej., Clave de producción",
+    "nameTooShort": "Usa al menos 3 caracteres.",
     "rolesTitle": "Referencia de roles",
     "roles": {
       "admin": "Administrador",
@@ -600,11 +601,13 @@
       "status": "Estado",
       "lastUsed": "Último uso",
       "actions": "Acciones",
-      "sessions": "Sesiones"
+      "sessions": "Sesiones",
+      "restrictions": "Restricciones"
     },
     "statuses": {
       "active": "Activa",
-      "revoked": "Revocada"
+      "revoked": "Revocada",
+      "expired": "Caducada"
     },
     "empty": {
       "title": "No hay claves API creadas",
@@ -625,7 +628,7 @@
       "copy": "Copiar",
       "revoke": "Revocar",
       "delete": "Eliminar",
-      "editSessions": "Editar sesiones"
+      "edit": "Editar acceso"
     },
     "sessions": {
       "label": "Acceso a sesiones",
@@ -633,10 +636,36 @@
       "all": "Todas las sesiones",
       "empty": "Todavía no hay sesiones. Esta clave podrá acceder a todas cuando existan.",
       "restricted": "{{count}} seleccionadas",
-      "editTitle": "Editar acceso a sesiones",
       "save": "Guardar",
       "choose": "Elegir sesiones",
       "leaveAll": "Dejar para todas las sesiones"
+    },
+    "edit": {
+      "title": "Editar acceso de la clave",
+      "signedIn": "Este panel ha iniciado sesión con esta clave. Cambiar su rol, direcciones IP, chats o caducidad puede cerrar tu sesión."
+    },
+    "restrictions": {
+      "none": "Ninguna",
+      "ips": "IP: {{count}}",
+      "chats": "Chats: {{count}}",
+      "expires": "Caduca el {{date}}",
+      "expired": "Caducó el {{date}}"
+    },
+    "ips": {
+      "label": "Direcciones IP permitidas (opcional)",
+      "hint": "Una dirección IP o un rango CIDR por línea. Déjalo vacío para aceptar cualquier dirección.",
+      "invalid": "No es una dirección IPv4 ni un rango CIDR: {{value}}"
+    },
+    "chats": {
+      "label": "Acceso a chats (opcional)",
+      "hint": "Un chat por línea: un ID de grupo que termina en @g.us, un ID de contacto que termina en @c.us o @lid, o un número de teléfono. Déjalo vacío para todos los chats. Una clave restringida a chats solo puede usar las rutas abiertas a ese tipo de clave; el WebSocket de eventos y MCP la rechazan.",
+      "invalid": "No es un ID de chat ni un número de teléfono: {{value}}"
+    },
+    "expiry": {
+      "label": "Caduca el (opcional)",
+      "hint": "En la zona horaria de este navegador. Déjalo vacío para una clave que nunca caduca.",
+      "clear": "Quitar caducidad",
+      "invalid": "Introduce una fecha y hora completas, no posteriores al año 9999, o vacía el campo para una clave que nunca caduca."
     }
   },
   "logs": {

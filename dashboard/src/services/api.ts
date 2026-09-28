@@ -1019,7 +1019,8 @@ export const apiKeyApi = {
       role?: string;
       allowedIps?: string[];
       allowedSessions?: string[];
-      expiresAt?: string;
+      /** null removes the expiry. */
+      expiresAt?: string | null;
       allowedChats?: string[];
     },
   ) =>

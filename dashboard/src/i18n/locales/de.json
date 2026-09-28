@@ -625,6 +625,7 @@
     "createdTitle": "API-Schlüssel erstellt",
     "createdHint": "Kopiere diesen Schlüssel jetzt. Du kannst ihn später nicht erneut anzeigen.",
     "namePlaceholder": "z. B. Produktionsschlüssel",
+    "nameTooShort": "Verwende mindestens 3 Zeichen.",
     "rolesTitle": "Rollenübersicht",
     "roles": {
       "admin": "Administrator",
@@ -643,11 +644,13 @@
       "status": "Status",
       "lastUsed": "Zuletzt verwendet",
       "actions": "Aktionen",
-      "sessions": "Sitzungen"
+      "sessions": "Sitzungen",
+      "restrictions": "Einschränkungen"
     },
     "statuses": {
       "active": "Aktiv",
-      "revoked": "Widerrufen"
+      "revoked": "Widerrufen",
+      "expired": "Abgelaufen"
     },
     "empty": {
       "title": "Keine API-Schlüssel erstellt",
@@ -668,7 +671,7 @@
       "copy": "Kopieren",
       "revoke": "Widerrufen",
       "delete": "Löschen",
-      "editSessions": "Sitzungen bearbeiten"
+      "edit": "Zugriff bearbeiten"
     },
     "sessions": {
       "label": "Sitzungszugriff",
@@ -676,10 +679,36 @@
       "all": "Alle Sitzungen",
       "empty": "Noch keine Sitzungen. Dieser Schlüssel kann auf alle zugreifen, sobald welche existieren.",
       "restricted": "{{count}} ausgewählt",
-      "editTitle": "Sitzungszugriff bearbeiten",
       "save": "Speichern",
       "choose": "Sitzungen wählen",
       "leaveAll": "Für alle Sitzungen belassen"
+    },
+    "edit": {
+      "title": "Schlüsselzugriff bearbeiten",
+      "signedIn": "Dieses Dashboard ist mit diesem Schlüssel angemeldet. Wenn du Rolle, IP-Adressen, Chats oder Ablauf änderst, kannst du abgemeldet werden."
+    },
+    "restrictions": {
+      "none": "Keine",
+      "ips": "IPs: {{count}}",
+      "chats": "Chats: {{count}}",
+      "expires": "Läuft ab am {{date}}",
+      "expired": "Abgelaufen am {{date}}"
+    },
+    "ips": {
+      "label": "Erlaubte IP-Adressen (optional)",
+      "hint": "Eine IP-Adresse oder ein CIDR-Bereich pro Zeile. Leer lassen, um jede Adresse zuzulassen.",
+      "invalid": "Keine IPv4-Adresse und kein CIDR-Bereich: {{value}}"
+    },
+    "chats": {
+      "label": "Chat-Zugriff (optional)",
+      "hint": "Ein Chat pro Zeile: eine Gruppen-ID mit @g.us, eine Kontakt-ID mit @c.us oder @lid oder eine Telefonnummer. Leer lassen für alle Chats. Ein auf Chats beschränkter Schlüssel kann nur die für solche Schlüssel freigegebenen Routen nutzen; der Events-WebSocket und MCP lehnen ihn ab.",
+      "invalid": "Keine Chat-ID und keine Telefonnummer: {{value}}"
+    },
+    "expiry": {
+      "label": "Läuft ab am (optional)",
+      "hint": "In der Zeitzone dieses Browsers. Leer lassen für einen Schlüssel, der nie abläuft.",
+      "clear": "Ablauf entfernen",
+      "invalid": "Datum und Uhrzeit vollständig eingeben, höchstens bis zum Jahr 9999, oder das Feld leeren, damit der Schlüssel nie abläuft."
     }
   },
   "logs": {

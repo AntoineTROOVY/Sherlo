@@ -625,6 +625,7 @@
     "createdTitle": "API 金鑰已建立",
     "createdHint": "請立即複製此金鑰。之後將無法再次查看。",
     "namePlaceholder": "例如：Production Key",
+    "nameTooShort": "請至少輸入 3 個字元。",
     "rolesTitle": "角色參考",
     "roles": {
       "admin": "管理員",
@@ -643,11 +644,13 @@
       "status": "狀態",
       "lastUsed": "上次使用",
       "actions": "操作",
-      "sessions": "工作階段"
+      "sessions": "工作階段",
+      "restrictions": "限制"
     },
     "statuses": {
       "active": "活躍",
-      "revoked": "已撤銷"
+      "revoked": "已撤銷",
+      "expired": "已過期"
     },
     "empty": {
       "title": "尚未建立 API 金鑰",
@@ -668,7 +671,7 @@
       "copy": "複製",
       "revoke": "撤銷",
       "delete": "刪除",
-      "editSessions": "編輯工作階段"
+      "edit": "編輯存取權限"
     },
     "sessions": {
       "label": "工作階段存取",
@@ -676,10 +679,36 @@
       "all": "全部工作階段",
       "empty": "尚未有工作階段。建立後，此密鑰便可存取全部工作階段。",
       "restricted": "已選 {{count}} 個",
-      "editTitle": "編輯工作階段存取",
       "save": "儲存",
       "choose": "選擇工作階段",
       "leaveAll": "保留為全部工作階段"
+    },
+    "edit": {
+      "title": "編輯金鑰存取權限",
+      "signedIn": "此控制台正以此金鑰登入。更改其角色、IP 位址、聊天或到期時間可能會令你登出。"
+    },
+    "restrictions": {
+      "none": "無",
+      "ips": "IP：{{count}}",
+      "chats": "聊天：{{count}}",
+      "expires": "{{date}} 到期",
+      "expired": "已於 {{date}} 過期"
+    },
+    "ips": {
+      "label": "允許的 IP 位址（選填）",
+      "hint": "每行一個 IP 位址或 CIDR 範圍。留空則接受任何位址。",
+      "invalid": "不是 IPv4 位址或 CIDR 範圍：{{value}}"
+    },
+    "chats": {
+      "label": "聊天存取（選填）",
+      "hint": "每行一個聊天：以 @g.us 結尾的群組 ID、以 @c.us 或 @lid 結尾的聯絡人 ID，或電話號碼。留空則允許所有聊天。受聊天限制的金鑰只可使用對此類金鑰開放的路由；事件 WebSocket 及 MCP 會拒絕它。",
+      "invalid": "不是聊天 ID 或電話號碼：{{value}}"
+    },
+    "expiry": {
+      "label": "到期時間（選填）",
+      "hint": "使用此瀏覽器的時區。留空則金鑰永不過期。",
+      "clear": "移除到期時間",
+      "invalid": "請填寫不晚於 9999 年的完整日期和時間，或清空此欄位使金鑰永不過期。"
     }
   },
   "logs": {

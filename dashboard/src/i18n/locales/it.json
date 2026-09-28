@@ -631,6 +631,7 @@
     "createdTitle": "Chiave API Creata",
     "createdHint": "Copia questa chiave ora. Non potrai più visualizzarla.",
     "namePlaceholder": "es., Chiave di Produzione",
+    "nameTooShort": "Usa almeno 3 caratteri.",
     "rolesTitle": "Riferimento Ruoli",
     "roles": {
       "admin": "Amministratore",
@@ -649,11 +650,13 @@
       "status": "Stato",
       "lastUsed": "Ultimo Utilizzo",
       "actions": "Azioni",
-      "sessions": "Sessioni"
+      "sessions": "Sessioni",
+      "restrictions": "Restrizioni"
     },
     "statuses": {
       "active": "Attiva",
-      "revoked": "Revocata"
+      "revoked": "Revocata",
+      "expired": "Scaduta"
     },
     "empty": {
       "title": "Nessuna chiave API creata",
@@ -674,7 +677,7 @@
       "copy": "Copia",
       "revoke": "Revoca",
       "delete": "Elimina",
-      "editSessions": "Modifica sessioni"
+      "edit": "Modifica accesso"
     },
     "sessions": {
       "label": "Accesso alle sessioni",
@@ -682,10 +685,36 @@
       "all": "Tutte le sessioni",
       "empty": "Non ci sono ancora sessioni. Questa chiave potrà accedere a tutte quando esisteranno.",
       "restricted": "{{count}} selezionate",
-      "editTitle": "Modifica accesso alle sessioni",
       "save": "Salva",
       "choose": "Scegli sessioni",
       "leaveAll": "Lascia per tutte le sessioni"
+    },
+    "edit": {
+      "title": "Modifica l'accesso della chiave",
+      "signedIn": "Questa dashboard ha effettuato l'accesso con questa chiave. Modificarne ruolo, indirizzi IP, chat o scadenza può disconnetterti."
+    },
+    "restrictions": {
+      "none": "Nessuna",
+      "ips": "IP: {{count}}",
+      "chats": "Chat: {{count}}",
+      "expires": "Scade il {{date}}",
+      "expired": "Scaduta il {{date}}"
+    },
+    "ips": {
+      "label": "Indirizzi IP consentiti (facoltativo)",
+      "hint": "Un indirizzo IP o un intervallo CIDR per riga. Lascia vuoto per accettare qualsiasi indirizzo.",
+      "invalid": "Non è un indirizzo IPv4 né un intervallo CIDR: {{value}}"
+    },
+    "chats": {
+      "label": "Accesso alle chat (facoltativo)",
+      "hint": "Una chat per riga: un ID di gruppo che termina con @g.us, un ID di contatto che termina con @c.us o @lid, oppure un numero di telefono. Lascia vuoto per tutte le chat. Una chiave limitata alle chat può usare solo le rotte aperte a questo tipo di chiave; il WebSocket degli eventi e MCP la rifiutano.",
+      "invalid": "Non è un ID chat né un numero di telefono: {{value}}"
+    },
+    "expiry": {
+      "label": "Scade il (facoltativo)",
+      "hint": "Nel fuso orario di questo browser. Lascia vuoto per una chiave che non scade mai.",
+      "clear": "Rimuovi scadenza",
+      "invalid": "Inserisci data e ora complete, non oltre l'anno 9999, oppure svuota il campo per una chiave che non scade mai."
     }
   },
   "logs": {

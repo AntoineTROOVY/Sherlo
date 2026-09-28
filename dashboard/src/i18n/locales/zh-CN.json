@@ -625,6 +625,7 @@
     "createdTitle": "API 密钥已创建",
     "createdHint": "请立即复制此密钥。之后将无法再次查看。",
     "namePlaceholder": "例如：Production Key",
+    "nameTooShort": "请至少输入 3 个字符。",
     "rolesTitle": "角色参考",
     "roles": {
       "admin": "管理员",
@@ -643,11 +644,13 @@
       "status": "状态",
       "lastUsed": "上次使用",
       "actions": "操作",
-      "sessions": "会话"
+      "sessions": "会话",
+      "restrictions": "限制"
     },
     "statuses": {
       "active": "活跃",
-      "revoked": "已撤销"
+      "revoked": "已撤销",
+      "expired": "已过期"
     },
     "empty": {
       "title": "尚未创建 API 密钥",
@@ -668,7 +671,7 @@
       "copy": "复制",
       "revoke": "撤销",
       "delete": "删除",
-      "editSessions": "编辑会话"
+      "edit": "编辑访问权限"
     },
     "sessions": {
       "label": "会话访问",
@@ -676,10 +679,36 @@
       "all": "全部会话",
       "empty": "暂无会话。创建会话后，此密钥将可以访问全部会话。",
       "restricted": "已选 {{count}} 个",
-      "editTitle": "编辑会话访问",
       "save": "保存",
       "choose": "选择会话",
       "leaveAll": "保留为全部会话"
+    },
+    "edit": {
+      "title": "编辑密钥访问权限",
+      "signedIn": "此仪表板正使用该密钥登录。更改其角色、IP 地址、聊天或过期时间可能会使你退出登录。"
+    },
+    "restrictions": {
+      "none": "无",
+      "ips": "IP：{{count}}",
+      "chats": "聊天：{{count}}",
+      "expires": "{{date}} 过期",
+      "expired": "已于 {{date}} 过期"
+    },
+    "ips": {
+      "label": "允许的 IP 地址（可选）",
+      "hint": "每行一个 IP 地址或 CIDR 范围。留空则接受任意地址。",
+      "invalid": "不是 IPv4 地址或 CIDR 范围：{{value}}"
+    },
+    "chats": {
+      "label": "聊天访问（可选）",
+      "hint": "每行一个聊天：以 @g.us 结尾的群组 ID、以 @c.us 或 @lid 结尾的联系人 ID，或电话号码。留空则允许所有聊天。受聊天限制的密钥只能使用对此类密钥开放的路由；事件 WebSocket 和 MCP 会拒绝它。",
+      "invalid": "不是聊天 ID 或电话号码：{{value}}"
+    },
+    "expiry": {
+      "label": "过期时间（可选）",
+      "hint": "使用此浏览器的时区。留空则密钥永不过期。",
+      "clear": "移除过期时间",
+      "invalid": "请填写不晚于 9999 年的完整日期和时间，或清空此字段使密钥永不过期。"
     }
   },
   "logs": {

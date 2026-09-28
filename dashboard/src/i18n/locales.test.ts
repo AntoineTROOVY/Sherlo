@@ -37,11 +37,18 @@ const SESSION_SCOPE_KEYS = [
   'apiKeys.sessions.all',
   'apiKeys.sessions.empty',
   'apiKeys.sessions.restricted',
-  'apiKeys.sessions.editTitle',
   'apiKeys.sessions.save',
   'apiKeys.sessions.choose',
   'apiKeys.sessions.leaveAll',
-  'apiKeys.actions.editSessions',
+  'apiKeys.actions.edit',
+  'apiKeys.edit.title',
+  'apiKeys.edit.signedIn',
+  'apiKeys.columns.restrictions',
+  'apiKeys.restrictions.ips',
+  'apiKeys.restrictions.chats',
+  'apiKeys.ips.label',
+  'apiKeys.chats.label',
+  'apiKeys.expiry.label',
 ];
 
 const NEW_PLUGIN_KEYS = [
