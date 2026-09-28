@@ -15,6 +15,7 @@ import { hashApiKey } from './api-key-hash';
 import { ApiKey, ApiKeyRole } from './entities/api-key.entity';
 import { CreateApiKeyDto, UpdateApiKeyDto } from './dto';
 import { createLogger } from '../../common/services/logger.service';
+import { setRequestActor } from '../../common/services/request-context';
 import { readBootstrapKey, removeBootstrapKey, writeBootstrapKey } from './bootstrap-key-file';
 import { ApiKeyUsageTracker } from './api-key-usage-tracker.service';
 import { apiKeyAuthorizationFingerprint, normalizeScopeList } from './api-key-authorization';
@@ -464,6 +465,11 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     if (!apiKey) {
       throw new UnresolvedApiKeyException('Invalid API key');
     }
+
+    // Name the key before any check below can refuse it, so the audit row every caller writes for a
+    // revoked, expired, IP- or session-refused key says which key to revoke or re-scope. No-op
+    // outside a request scope (WebSocket frames, workers).
+    setRequestActor({ apiKeyId: apiKey.id, apiKeyName: apiKey.name });
 
     if (!apiKey.isActive) {
       throw new UnauthorizedException('API key is revoked');

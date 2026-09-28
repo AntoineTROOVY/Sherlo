@@ -10,6 +10,7 @@ import { createHash, createHmac } from 'crypto';
 import * as fs from 'fs';
 import { AuthService, resolveSeedApiKey, bannerKeyLine, UnresolvedApiKeyException } from './auth.service';
 import { ApiKeyUsageTracker } from './api-key-usage-tracker.service';
+import { getRequestActor, runWithRequestId } from '../../common/services/request-context';
 import { ApiKey, ApiKeyRole } from './entities/api-key.entity';
 
 // Helpers
@@ -765,6 +766,24 @@ describe('AuthService', () => {
       const revoked = await service.validateApiKey('revoked').catch((err: unknown) => err);
       expect(revoked).toBeInstanceOf(UnauthorizedException);
       expect(revoked).not.toBeInstanceOf(UnresolvedApiKeyException);
+    });
+
+    it.each([
+      ['revoked', { isActive: false }, undefined, undefined],
+      ['expired', { expiresAt: new Date(Date.now() - 60_000) }, undefined, undefined],
+      ['IP-refused', { allowedIps: ['10.0.0.1'] }, '192.168.1.1', undefined],
+      ['session-refused', { allowedSessions: ['session-A'] }, undefined, 'session-B'],
+    ])('stamps the request actor with a %s key before refusing it', async (_label, overrides, ip, session) => {
+      (repository.findOne as jest.Mock).mockResolvedValue(
+        createMockApiKey({ id: 'key-9', name: 'Leaked', ...overrides }),
+      );
+
+      const actor = await runWithRequestId('req-1', async () => {
+        await expect(service.validateApiKey('raw', ip, session)).rejects.toThrow();
+        return getRequestActor();
+      });
+
+      expect(actor).toMatchObject({ apiKeyId: 'key-9', apiKeyName: 'Leaked' });
     });
 
     it('should throw UnauthorizedException for expired key', async () => {
