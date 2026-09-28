@@ -221,8 +221,11 @@ curl -X POST 'http://localhost:2785/api/infra/import-data' \
 OpenWA v0.2+ supports migrating media files between storage backends:
 
 On an S3/MinIO backend, confirm `GET /api/infra/status` reports `storage.s3Available: true` before the
-export (S3 to Local) and before the import (Local to S3). While the bucket is unusable these routes
-answer `503` instead of running against the local fallback directory.
+export (S3 to Local) and before the import (Local to S3). Until the bucket has been reachable once since
+boot, these routes answer `503` instead of running against the local fallback directory. `s3Available`
+does not go back to `false` until a restart, so it shows the bucket came up, not that it is still up: an
+outage after that makes the count and the export fail with `500`, and the import answer `imported: false`
+with the entries counted in `failed`.
 
 ```bash
 # Step 1: Check current storage file count
