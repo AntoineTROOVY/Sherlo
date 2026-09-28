@@ -222,6 +222,7 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     'CHAT_MEDIA_ARCHIVE_TTL_DAYS', // 0 = keep archived chat media forever
     'INGRESS_RETRY_DELAY_MS', // 0 = retry without backoff
     'REDIS_CACHE_DB',
+    'INBOUND_MEDIA_GLOBAL_CONCURRENCY', // 0 = no process-wide ceiling, only the per-session one
   ]) {
     checkNonNegativeInt(key);
   }

@@ -35,6 +35,7 @@ import {
   inboundMediaMaxBytes,
   inboundMediaTimeoutMs,
   isMediaDownloadEnabled,
+  runUnderGlobalMediaGate,
   withInboundDownloadTimeout,
 } from './inbound-media-cap';
 import type { Dispatcher } from 'undici';
@@ -1169,7 +1170,19 @@ export class BaileysEvents {
     // The timeout can fire before the stream exists (an expired-media re-upload wait, a slow response):
     // the abandoned download must then stop on its own instead of buffering outside the limiter.
     let timedOut = false;
-    const download = (async (): Promise<Buffer | { overflowBytes: number }> => {
+    // Settles the gate task at the deadline. Without it the process-wide slot is held until the body
+    // settles, and a fetch stuck before the stream exists (an expired-media re-upload the phone never
+    // answers waits with no timeout until the socket closes) would keep that slot for hours, starving
+    // every other session's media. Freeing it early is safe: nothing is buffered before the stream
+    // exists, and a stream that turns up late is destroyed by the `timedOut` check below.
+    let releaseSlot: () => void = () => undefined;
+    const deadlinePassed = new Promise<Buffer>(resolve => {
+      releaseSlot = () => resolve(Buffer.alloc(0));
+    });
+    const body = async (): Promise<Buffer | { overflowBytes: number }> => {
+      if (timedOut) {
+        return Buffer.alloc(0);
+      }
       const b = await this.host.loadLib();
       stream = (await b.downloadMediaMessage(
         msg,
@@ -1199,7 +1212,15 @@ export class BaileysEvents {
         chunks.push(chunk);
       }
       return Buffer.concat(chunks);
-    })();
+    };
+    // The wait for the process-wide gate sits inside the deadline below, so a contended gate cannot
+    // hold this session's inbound handler longer than MEDIA_DOWNLOAD_TIMEOUT_MS.
+    const download = runUnderGlobalMediaGate(() => {
+      const run = body();
+      // The abandoned body can still reject later (the socket closing under a re-upload wait).
+      run.catch(() => undefined);
+      return Promise.race([run, deadlinePassed]);
+    });
 
     // A slow/trickling sender never trips the byte cap, so without a deadline it pins a concurrency
     // slot (and, on Baileys, the whole inbound handler) indefinitely. On timeout, destroy the stream
@@ -1207,6 +1228,7 @@ export class BaileysEvents {
     return withInboundDownloadTimeout(download, inboundMediaTimeoutMs(), () => {
       timedOut = true;
       stream?.destroy?.();
+      releaseSlot();
     });
   }
 

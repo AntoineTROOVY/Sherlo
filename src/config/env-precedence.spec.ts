@@ -365,6 +365,7 @@ describe.each(['docker-compose.yml', 'docker-compose.dev.yml'])('%s forwards the
     'MEDIA_DOWNLOAD_MAX_BYTES',
     'MEDIA_DOWNLOAD_TIMEOUT_MS',
     'INBOUND_MEDIA_CONCURRENCY',
+    'INBOUND_MEDIA_GLOBAL_CONCURRENCY',
   ])('forwards %s', key => {
     expect(forwards(key)).toBe(true);
   });

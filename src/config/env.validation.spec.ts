@@ -67,6 +67,13 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ MEDIA_DOWNLOAD_TIMEOUT_MS: '30000' })).not.toThrow();
   });
 
+  it('accepts 0 for INBOUND_MEDIA_GLOBAL_CONCURRENCY (off) and rejects a negative or suffixed value', () => {
+    expect(() => validateEnv({ INBOUND_MEDIA_GLOBAL_CONCURRENCY: '0' })).not.toThrow();
+    expect(() => validateEnv({ INBOUND_MEDIA_GLOBAL_CONCURRENCY: '16' })).not.toThrow();
+    expect(() => validateEnv({ INBOUND_MEDIA_GLOBAL_CONCURRENCY: '-1' })).toThrow(/INBOUND_MEDIA_GLOBAL_CONCURRENCY/);
+    expect(() => validateEnv({ INBOUND_MEDIA_GLOBAL_CONCURRENCY: '4x' })).toThrow(/INBOUND_MEDIA_GLOBAL_CONCURRENCY/);
+  });
+
   // Unset and empty stay the operator's way of taking the default; compose forwards a blank.
   it('leaves an unset or blank media knob alone', () => {
     expect(() => validateEnv({})).not.toThrow();
