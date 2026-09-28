@@ -1,5 +1,11 @@
 import { Headers } from 'undici';
-import { buildDeliveryHeaders, isDeliverableWebhook, postWebhookPayload, sanitizeCustomHeaders } from './deliver-once';
+import {
+  buildDeliveryHeaders,
+  generateSignature,
+  isDeliverableWebhook,
+  postWebhookPayload,
+  sanitizeCustomHeaders,
+} from './deliver-once';
 
 /**
  * Direct coverage for the shared delivery core both paths (direct and queued processor) now route
@@ -109,5 +115,16 @@ describe('isDeliverableWebhook', () => {
     expect(isDeliverableWebhook(undefined, 'message.received')).toBe(false);
     expect(isDeliverableWebhook({ ...row, active: false }, 'message.received')).toBe(false);
     expect(isDeliverableWebhook(row, 'message.ack')).toBe(false);
+  });
+});
+
+describe('generateSignature', () => {
+  it('matches the vector the SDK signature helpers are tested against', () => {
+    const body =
+      '{"event":"message.received","timestamp":"2026-02-02T10:00:00.000Z","sessionId":"s1","idempotencyKey":"k",' +
+      '"deliveryId":"dlv_1","data":{"text":"h\u00e9llo \u{1F44B}"}}';
+    expect(generateSignature(body, 'test-secret-0123456789')).toBe(
+      'sha256=d74a41bb687f31ed4c932f76f524116100ca4120d2cabb7a469ee5d928122f70',
+    );
   });
 });

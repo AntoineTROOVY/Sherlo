@@ -7116,7 +7116,7 @@ function verify(rawBody, header, secret) {
 }
 ```
 
-Complete Express and FastAPI receivers are in [`examples/webhook-signature-verification.md`](examples/webhook-signature-verification.md).
+Complete Express and FastAPI receivers are in [`examples/webhook-signature-verification.md`](examples/webhook-signature-verification.md). From the next SDK release (after 0.5.0), the SDKs ship this check: `verifyWebhookSignature` (JavaScript), `verify_webhook_signature` (Python), `VerifyWebhookSignature` (Go), `WebhookSignature.verify` (Java) and `WebhookSignature::verify` (PHP).
 
 If no `secret` is configured the `X-OpenWA-Signature` header is omitted entirely.
 
