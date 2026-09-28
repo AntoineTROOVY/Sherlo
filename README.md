@@ -279,8 +279,14 @@ docker compose --profile full up -d
 
 A profile only starts the container; OpenWA keeps using SQLite and local storage until it is told
 to use the new service. The simplest route is **Dashboard > Infrastructure**: pick the built-in
-option, save, and restart from there, and OpenWA starts the container itself. To use a profile
-directly, set these in the `.env` next to `docker-compose.yml` first:
+option, save, and restart from there, and OpenWA starts the container itself. The built-in storage
+option creates its own `openwa-minio` container, so do not also start the `minio` or `full` profile
+for it. The same goes for built-in PostgreSQL and Redis: each built-in option creates its own
+container, and the compose profiles are for the manual `.env` route below. The compose `minio`
+service starts only once `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` are set in the `.env` next to
+`docker-compose.yml`; if it was already started without them, run `docker rm -f openwa-minio` before
+you enable built-in storage. To use a profile directly, set these in the `.env` next to
+`docker-compose.yml` first:
 
 - PostgreSQL: `DATABASE_TYPE=postgres`, `DATABASE_HOST=postgres`, `DATABASE_USERNAME=openwa`,
   `DATABASE_PASSWORD=<strong password>`
@@ -288,8 +294,8 @@ directly, set these in the `.env` next to `docker-compose.yml` first:
 - MinIO: `STORAGE_TYPE=s3`, `S3_ENDPOINT=http://minio:9000`, `S3_ACCESS_KEY_ID=<user>`,
   `S3_SECRET_ACCESS_KEY=<strong password>`
 
-PostgreSQL and MinIO refuse to initialize with an empty password, and a production boot rejects
-default credentials such as `openwa` or `minioadmin`.
+PostgreSQL refuses to initialize a new volume with an empty password, MinIO refuses to start
+without one, and a production boot rejects default credentials such as `openwa` or `minioadmin`.
 
 > The dashboard is bundled into the API image and served by NestJS on the API port, so it
 > needs no profile — it is always available wherever `openwa-api` runs. For TLS/public exposure,

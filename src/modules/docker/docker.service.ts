@@ -222,7 +222,8 @@ export class DockerService implements OnModuleInit {
    *
    * Deliberate differences from the compose services — do not "fix" these:
    *  - Credentials: the compose services are the MANUAL operator path and deliberately ship no
-   *    default secret (empty POSTGRES_PASSWORD / MINIO_ROOT_* fail fast on boot). The specs below
+   *    default secret (an empty POSTGRES_PASSWORD fails when the volume is first initialized; a
+   *    MINIO_ROOT_PASSWORD left on its sub-minimum placeholder fails at every start). The specs below
    *    are the dashboard built-in path: they provision the fixed built-in credentials
    *    (openwa/openwa, minioadmin/minioadmin) that infra-config.controller writes to data/.env.generated
    *    and that the production boot guard (bootstrap-security.ts) exempts only while the

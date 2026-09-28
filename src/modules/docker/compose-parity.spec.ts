@@ -399,11 +399,37 @@ describe('DockerService managed specs ↔ docker-compose.yml parity', () => {
     const cfg = await capture('minio');
     expect(cfg.Env).toEqual(['MINIO_ROOT_USER=minioadmin', 'MINIO_ROOT_PASSWORD=minioadmin']);
     const env = compose.services.minio.environment!;
-    // Compose (manual path) deliberately ships no default and fails fast on empty creds; the
-    // orchestrated path provisions the built-in default instead (see the getContainerSpec docblock).
+    // Compose (manual path) deliberately ships no default credentials; the orchestrated path
+    // provisions the built-in default instead (see the getContainerSpec docblock). The user default
+    // stays empty: a non-empty placeholder would be a valid access key paired with a real password.
     expect(env.MINIO_ROOT_USER).toBe('${S3_ACCESS_KEY_ID:-${S3_ACCESS_KEY:-}}');
-    expect(env.MINIO_ROOT_PASSWORD).toBe('${S3_SECRET_ACCESS_KEY:-${S3_SECRET_KEY:-}}');
+    expect(env.MINIO_ROOT_PASSWORD).toBe('${S3_SECRET_ACCESS_KEY:-${S3_SECRET_KEY:-unset}}');
   });
+
+  it('minio: compose falls back to a password too short to be valid, so no secret means no start', () => {
+    // Both credentials empty would start the server on its built-in default pair. A placeholder
+    // under the 8-character minimum stops it instead; a longer one would become a working default.
+    const placeholder = /:-([^:}]*)}}$/.exec(compose.services.minio.environment!.MINIO_ROOT_PASSWORD)?.[1];
+    expect(placeholder).toBeTruthy();
+    expect(placeholder!.length).toBeLessThan(8);
+  });
+
+  it.each(['README.md', 'docs/08-development-guidelines.md'])(
+    '%s tells a fresh install not to pair the minio profile with the dashboard built-in storage',
+    file => {
+      // The dashboard route writes its credentials to data/.env.generated, which compose never reads,
+      // so a compose minio started next to it has no password and never comes up. startService then
+      // finds that container by its label and only restarts it, so the built-in option cannot recover.
+      const text = readFileSync(join(__dirname, '../../..', file), 'utf8').replace(/\s+/g, ' ');
+      expect(text).toContain('do not also start the `minio` or `full` profile');
+      expect(text).toContain('docker rm -f openwa-minio');
+      // Built-in PostgreSQL and Redis also create their own containers. The compose postgres service
+      // refuses to initialize without DATABASE_PASSWORD, and startService would only restart it, so
+      // the dashboard route must not be told to start any profile.
+      expect(text).toContain('each built-in option creates its own container');
+      expect(text).not.toContain('--profile postgres --profile redis');
+    },
+  );
 
   it('minio: prefers the canonical S3 credential env vars, then the legacy ones', async () => {
     process.env.S3_ACCESS_KEY = 'legacy-user';

@@ -657,7 +657,12 @@ docker compose --profile full up -d
 
 A profile only starts the extra containers. Point OpenWA at them first, from Dashboard >
 Infrastructure or with the `.env` variables listed under Production Deployment in the README;
-otherwise it stays on SQLite and local storage.
+otherwise it stays on SQLite and local storage. The dashboard's built-in storage option creates its
+own `openwa-minio` container, so do not also start the `minio` or `full` profile for it. The same goes
+for built-in PostgreSQL and Redis: each built-in option creates its own container, and the compose
+profiles are for the manual `.env` route. The compose `minio` service starts only once
+`S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` are set in the `.env` next to `docker-compose.yml`; if it
+was already started without them, run `docker rm -f openwa-minio` before you enable built-in storage.
 
 ### VS Code Extensions
 
