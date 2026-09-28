@@ -208,10 +208,11 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
     credentials: corsPolicy.credentials,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'X-API-Key', 'Authorization', 'X-Request-ID'],
-    // The throttlers are named (short/medium/long, plus instance and ingress-ip on ingress), so
-    // @nestjs/throttler suffixes every rate-limit header with the throttler name. Expose the suffixed
-    // names so browser clients can actually read them, plus the plain `Retry-After` the guard adds
-    // on top of them, which is not CORS-safelisted either.
+    // The throttlers are named (short/medium/long, plus ingress-ip on ingress), so @nestjs/throttler
+    // suffixes every rate-limit header with the throttler name; IngressService emits the per-instance
+    // bucket's headers under the same `-instance` suffix. Expose the suffixed names so browser clients
+    // can actually read them, plus the plain `Retry-After` (added by the guard, or by IngressService
+    // for the instance bucket), which is not CORS-safelisted either.
     exposedHeaders: [
       'X-RateLimit-Limit-short',
       'X-RateLimit-Remaining-short',

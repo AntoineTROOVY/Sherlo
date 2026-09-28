@@ -291,10 +291,10 @@ Exceeding a window returns `429 Too Many Requests`. Because the windows are **na
 
 The ingress route (`ALL /api/ingress/:pluginId/:instanceId/*path`) is exempt from the global per-IP tiers (their 100/min medium window sits below the per-instance limit, so a provider fanning every tenant's webhooks through one egress IP was shed before the per-instance bound could fire). It carries its own two windows instead, both on `INGRESS_INSTANCE_TTL` (default 60000 ms):
 
-- `instance`, keyed on `(pluginId, instanceId)`, env `INGRESS_INSTANCE_LIMIT`, default 120. Sheds one noisy tenant without touching its neighbours.
-- `ingress-ip`, keyed on the client (proxy-aware, see `TRUSTED_PROXIES`), env `INGRESS_IP_LIMIT`, default 1200. The `instance` key is built from path segments the caller supplies, so varying them mints a fresh bucket; this window is the bound an unauthenticated caller cannot walk around. It is sized 10x the per-instance default so it never binds first for legitimate traffic.
+- `instance`, keyed on `(pluginId, instanceId)`, env `INGRESS_INSTANCE_LIMIT`, default 120. Sheds one noisy tenant without touching its neighbours. Charged only once a delivery passes signature verification, so unknown-instance, failed-challenge and oversized requests never touch it. A route declaring signature scheme `none` (allowed only with `ALLOW_UNSIGNED_INGRESS=true`) passes every request, so there any caller can spend this bucket.
+- `ingress-ip`, keyed on the client (proxy-aware, see `TRUSTED_PROXIES`), env `INGRESS_IP_LIMIT`, default 1200. It is checked before anything else and is the only bound on traffic that fails verification. It is sized 10x the per-instance default so it never binds first for legitimate traffic.
 
-Responses therefore carry `X-RateLimit-*-instance` and `X-RateLimit-*-ingress-ip`, and on saturation the `Retry-After-*` of whichever window shed the request, mirrored into a plain `Retry-After`.
+Every response the per-IP window admits carries `X-RateLimit-*-ingress-ip`, an acknowledged delivery also carries `X-RateLimit-*-instance`, and a `429` carries the `Retry-After-*` of whichever window shed the request, mirrored into a plain `Retry-After`.
 
 The API exposes the rate-limit headers via CORS (`exposedHeaders`) so browser clients can read them, the plain `Retry-After` included. The simplest backpressure signal remains the `429` status itself, with `Retry-After` as the retry delay.
 
