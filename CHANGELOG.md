@@ -27,15 +27,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Baileys: poll votes, in-chat pins, keep-in-chat toggles, album headers, encrypted reactions and event RSVPs no longer arrive as empty `unknown` messages on the live or history path ([#1568](https://github.com/rmyndharis/OpenWA/issues/1568)). Thanks @berodcdev for the report.
 - Baileys: a message received through a sender's broadcast list carries the sender as `author`.
 - Baileys: round video notes arrive as `video` messages with their media, quote and mentions instead of empty `unknown` messages.
-- Baileys: a connection that keeps dropping soon after it opens keeps backing off (1 s up to 60 s) and raises `session.reconnect_loop`, instead of redialing every 1 to 2 s; the count restarts once 5 minutes pass between drops.
+- Baileys: a connection that keeps dropping within 5 minutes of its previous drop keeps backing off (1 s up to 60 s) and raises `session.reconnect_loop`, instead of redialing every 1 to 2 s.
 - A session that drops shortly after reaching READY keeps backing off and raises `session.reconnect_loop` on schedule, instead of retrying at the base delay forever.
 - A session that kept failing to reconnect for about 84 hours no longer falls from the 5-minute backoff cap to a retry every 5 seconds.
 - A stop that answers `502` `SESSION_STOP_INCOMPLETE` releases the session claim, so another node's takeover no longer restarts the stopped session.
-- A node that adopts a session no longer marks FAILED the bulk batches it started itself while the adopted engine was still initializing.
+- A node that adopts a session no longer marks FAILED the bulk batches it started itself while the adopted engine was still initializing, or a batch that finished while the reap was reading it.
 - The lid-to-phone cache no longer keeps an empty reverse entry for every phone it evicted or re-mapped, so its memory stays within the cache bound.
 - Webhook custom header values with characters outside Latin-1 are rejected with `400`; they were accepted and made every delivery to that webhook fail.
 - The webhook outbox replay no longer delivers an event the webhook has since been unsubscribed from.
-- A delivery-failure row filed for a shed or shutdown-refused webhook delivery is removed once the outbox replay delivers or queues that event.
+- A webhook delivery that succeeds removes the delivery-failure rows filed under its idempotency key, so an event the outbox replay delivers after a shed or shutdown refusal is no longer listed as lost.
+- The delivery-failure row of a shed or shutdown-refused webhook delivery takes the reason its replay failed with, and the attempt count once the replay was sent.
 - `POST /api/sessions/:sessionId/webhooks/:id/test` sends a fresh `X-OpenWA-Idempotency-Key` on every call, so a deduplicating receiver runs each test.
 - A WebSocket `message` frame with no payload answers `INVALID_MESSAGE` instead of a generic exception.
 - On PostgreSQL, boot no longer runs FTS schema DDL when the `body_ts` column and its index already exist, so a restart no longer queues every read and write on `messages` behind the open ones.
@@ -50,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard Chats: a message that arrives as the chat list renders no longer triggers a refetch that discards its preview and unread count.
 - Dashboard Chats: the chat list refreshes after a WebSocket reconnect, and the open chat stays marked read.
 - Dashboard Plugins: the config editor frame and the uninstall toast use the localized plugin name.
-- Dashboard: the restart dialog shows the server's reason when a restart is refused, and lists built-in services that failed to start or stop instead of reloading over them.
+- Dashboard: the restart dialog shows the server's reason when a restart is refused, says the outcome is unknown when a reverse proxy times the request out, and lists built-in services that failed to start or stop instead of reloading over them.
 - Dashboard: a split-origin build connects the WebSocket to the `VITE_API_URL` origin when `VITE_WS_URL` is unset.
 - Dashboard: Safari's `Load failed` and a proxy `504` collapse into the single connection-lost toast.
 - A release tag with any `-` suffix is marked prerelease on GitHub as well, so it can no longer become the release the update check reads as latest.
@@ -71,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Upgrade notes (behavior changes)
 
 - Baileys: poll votes, in-chat pins, keep-in-chat toggles, album headers, encrypted reactions and event RSVPs no longer produce `message.received` or `message.sent` events or stored rows.
-- With a finite `maxReconnectAttempts`, a session that keeps dropping within 5 minutes of READY now spends its budget and ends `FAILED` instead of retrying forever.
+- With a finite `maxReconnectAttempts`, a session whose gateway reconnect keeps dropping within 5 minutes of READY now spends its budget and ends `FAILED` instead of retrying forever; a Baileys transient drop is still retried inside the engine without a cap.
 - A plugin whose `message:sending` handler refuses sends now also blocks `send-product`.
 - Webhooks already stored with a header value outside Latin-1 keep failing until their headers are updated.
 - `docker-compose.dev.yml` no longer forwards `QUEUE_ENABLED` from the host `.env`, the same as `docker-compose.yml`; turn the queue on in Dashboard > Infrastructure.
@@ -89,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Status media stored with a mixed-case `image/svg+xml` type, or several comma-joined types, is served as `application/octet-stream`.
 - Queued webhook jobs no longer copy the webhook's custom headers and signature into Redis, where the queue dashboard displayed them.
 - The JavaScript SDK release job pins npm 12.0.2 instead of installing `npm@latest` while it can mint a publish credential.
+- The Python SDK release workflow builds and tests in a job that cannot mint the PyPI publish credential; the publish job only downloads the built files and uploads them.
 
 ## [0.23.7] - 2026-09-25
 
