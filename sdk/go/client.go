@@ -289,7 +289,7 @@ func (c *Client) doRaw(ctx context.Context, method, path string, query url.Value
 
 	// Any non-2xx (including an unfollowed 3xx) is an error.
 	if resp.StatusCode >= 300 {
-		return nil, "", parseAPIError(resp.StatusCode, data, method+" "+path)
+		return nil, "", parseAPIError(resp.StatusCode, data, method+" "+path, resp.Header)
 	}
 	return data, resp.Header.Get("Content-Type"), nil
 }

@@ -12,7 +12,7 @@ import {
   OpenWATimeoutError,
 } from '../src';
 import type { FetchLike } from '../src';
-import { MockTransport } from './helpers';
+import { MockTransport, type MockResponseSpec } from './helpers';
 
 function client(transport: MockTransport): OpenWAClient {
   return new OpenWAClient({
@@ -251,6 +251,54 @@ describe('OpenWAClient', () => {
       });
       await expect(client(t).sessions.list()).rejects.toBeInstanceOf(cls);
     }
+  });
+
+  it('exposes the body code, the retry delay and the response headers on an API error', async () => {
+    const fail = async (spec: MockResponseSpec): Promise<OpenWAApiError> =>
+      (await client(new MockTransport().passthrough(spec))
+        .sessions.list()
+        .catch((e: unknown) => e)) as OpenWAApiError;
+
+    const throttled = await fail({
+      status: 429,
+      headers: { 'Retry-After': '7' },
+      body: { statusCode: 429, message: 'ThrottlerException: Too Many Requests' },
+    });
+    expect(throttled).toBeInstanceOf(OpenWARateLimitError);
+    expect(throttled.retryAfterSeconds).toBe(7);
+    expect(throttled.code).toBeUndefined();
+    expect(throttled.headers?.get('retry-after')).toBe('7');
+
+    // Send pacing puts its wait in the body; a header must not shorten it.
+    const pacing = {
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: 'Daily send cap reached',
+      code: 'SEND_PACING_LIMITED',
+      retryAfterSeconds: 34521,
+    };
+    for (const headers of [undefined, { 'Retry-After': '1' }]) {
+      const err = await fail({ status: 429, headers, body: pacing });
+      expect(err.code).toBe('SEND_PACING_LIMITED');
+      expect(err.retryAfterSeconds).toBe(34521);
+    }
+
+    const dated = await fail({ status: 503, headers: { 'Retry-After': new Date(Date.now() + 2000).toUTCString() } });
+    expect(dated.retryAfterSeconds).toBeGreaterThanOrEqual(0);
+    expect(dated.retryAfterSeconds).toBeLessThanOrEqual(3);
+    // Only whole seconds or an HTTP date count; Date.parse would read '-5' or '1.5' as a past date.
+    for (const bad of ['soon', '-5', '1.5', 'Tue 5']) {
+      expect((await fail({ status: 503, headers: { 'Retry-After': bad } })).retryAfterSeconds).toBeUndefined();
+    }
+
+    const logout = await fail({
+      status: 502,
+      body: { statusCode: 502, message: 'x', code: 'SESSION_LOGOUT_INCOMPLETE' },
+    });
+    expect(logout.code).toBe('SESSION_LOGOUT_INCOMPLETE');
+    const plain = await fail({ status: 500, text: 'oops', contentType: 'text/plain' });
+    expect(plain.code).toBeUndefined();
+    expect(plain.retryAfterSeconds).toBeUndefined();
   });
 
   it('falls back to the generic OpenWAApiError (with .status) for an unmapped status', async () => {

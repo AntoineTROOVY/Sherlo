@@ -225,7 +225,7 @@ public final class OpenWAClient {
             throw new OpenWAError("Invalid request — " + method + " " + path + ": " + e.getMessage());
         }
         if (res.status() < 200 || res.status() >= 300) {
-            throw OpenWAApiError.fromResponse(res.status(), "", utf8(res.body()), method + " " + path);
+            throw OpenWAApiError.fromResponse(res.status(), "", utf8(res.body()), method + " " + path, res.headers());
         }
         return res;
     }

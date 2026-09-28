@@ -209,7 +209,7 @@ async function send<T>(
     if (!res.ok) {
       const context = `${options.method} ${options.path}`;
       const apiError = await OpenWAApiError.fromResponse(res, context);
-      throw classifyApiError(apiError.status, apiError.message, apiError.body, apiError.errorKind);
+      throw classifyApiError(apiError.status, apiError.message, apiError.body, apiError.errorKind, apiError.headers);
     }
 
     return await consume(res);
