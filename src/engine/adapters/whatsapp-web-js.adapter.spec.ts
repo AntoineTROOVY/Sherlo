@@ -5793,20 +5793,21 @@ describe('WhatsAppWebJsAdapter navigation re-inject grace (#1081)', () => {
   });
 
   it('answers engine operations with a retryable 409 while the page is re-injecting', async () => {
-    const getChats = jest.fn();
-    const { adapter, client } = wireAdapter({ getChats });
+    const { adapter, client } = wireAdapter();
+    const evaluate = jest.fn().mockResolvedValue([]);
+    (client.pupPage as unknown as { evaluate: jest.Mock }).evaluate = evaluate;
 
     client.pupPage.emit('framenavigated', navFrame());
 
     await expect(adapter.getChats()).rejects.toBeInstanceOf(EngineNotReadyError);
     await expect(adapter.getChats()).rejects.toThrow(/reload/i);
-    expect(getChats).not.toHaveBeenCalled();
+    expect(evaluate).not.toHaveBeenCalled();
   });
 
   it('lets engine operations through again once the window has expired', async () => {
     jest.useFakeTimers();
-    const getChats = jest.fn().mockResolvedValue([]);
-    const { adapter, client } = wireAdapter({ getChats });
+    const { adapter, client } = wireAdapter();
+    (client.pupPage as unknown as { evaluate: jest.Mock }).evaluate = jest.fn().mockResolvedValue([]);
 
     client.pupPage.emit('framenavigated', navFrame());
     jest.setSystemTime(Date.now() + NAVIGATION_REINJECT_GRACE_MS);
@@ -8223,7 +8224,9 @@ describe('WhatsAppWebJsAdapter transport death is not a not-found', () => {
   // while the status still said READY, and the early-death signal never fired (#1081).
   it('getChats answers 503 for a dead page and feeds the death signal', async () => {
     const adapter = readyAdapter({
-      getChats: jest.fn().mockRejectedValue(new Error('Protocol error (Runtime.callFunctionOn): Target closed')),
+      pupPage: {
+        evaluate: jest.fn().mockRejectedValue(new Error('Protocol error (Runtime.callFunctionOn): Target closed')),
+      },
     });
 
     await expect(adapter.getChats()).rejects.toBeInstanceOf(EngineTransportError);
@@ -8232,7 +8235,7 @@ describe('WhatsAppWebJsAdapter transport death is not a not-found', () => {
 
   it('getChats rethrows a non-transport failure untouched', async () => {
     const boom = new TypeError("Cannot read properties of undefined (reading 'getChats')");
-    const adapter = readyAdapter({ getChats: jest.fn().mockRejectedValue(boom) });
+    const adapter = readyAdapter({ pupPage: { evaluate: jest.fn().mockRejectedValue(boom) } });
 
     await expect(adapter.getChats()).rejects.toBe(boom);
   });

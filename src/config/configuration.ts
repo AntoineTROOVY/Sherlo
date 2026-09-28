@@ -236,7 +236,7 @@ export default () => ({
       // is missing or incompatible (Alpine, ARM, custom base images).
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       // How long one CDP command may take. An account with thousands of chats can push a single
-      // `client.getChats()` past Puppeteer's own budget; raising this is the escape hatch. Left
+      // chat-list read past Puppeteer's own budget; raising this is the escape hatch. Left
       // UNDEFINED rather than defaulted to Puppeteer's number, so an unset or out-of-range value
       // means "whatever puppeteer-core's `timeout ?? 180_000` says" instead of pinning today's
       // figure here and silently outliving it. Out of range is not clamped either: see

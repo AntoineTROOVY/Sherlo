@@ -785,18 +785,18 @@ quoting the message it printed.
 
 **Symptoms:**
 
-- `GET /api/sessions/{id}/chats` (or another read that walks the whole store) fails on an account
-  with thousands of chats, while smaller accounts on the same deployment are fine
-- The chat and contact lists answer `503` with `WhatsApp Web did not answer the chat list read in time`
+- `GET /api/sessions/{id}/chats`, `GET /api/sessions/{id}/groups` (or another read that walks the
+  whole store) fails on an account with thousands of chats, while smaller accounts on the same deployment are fine
+- The chat, group and contact lists answer `503` with `WhatsApp Web did not answer the chat list read in time`
   (or `the contact list read`); another read may answer `500` with the raw error, which names a CDP
   method and the setting: `Runtime.callFunctionOn timed out. Increase the 'protocolTimeout' setting in launch/connect calls for a higher timeout if needed.`
 - The session stays `ready` and the next request works, so the page did not die
 
 **Cause:** Puppeteer gives every browser command a time budget, 180 000 ms by default, and one
-`getChats()` over a very large store can run past it. The renderer is still working; only the
+read of the whole chat list over a very large store can run past it. The renderer is still working; only the
 command is dropped. That is also why this is **not** treated as a dead page — a transport death
-takes the session down with it, while this is just a slow command on a live page. The chat and contact
-lists answer it with a `503` as well, but the session stays `ready`.
+takes the session down with it, while this is just a slow command on a live page. The chat, group and
+contact lists answer it with a `503` as well, but the session stays `ready`.
 
 **Solution:** raise the budget for that deployment.
 

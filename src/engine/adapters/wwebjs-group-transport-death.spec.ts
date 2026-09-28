@@ -22,7 +22,9 @@ describe('group reads distinguish a dead page from an ordinary failure', () => {
       info: {},
       // requireGroupChat runs before the guarded read, so it must resolve a real group.
       getChatById: jest.fn().mockResolvedValue({ isGroup: true }),
-      getChats: op === 'getGroups' ? jest.fn().mockRejectedValue(reject) : jest.fn().mockResolvedValue([]),
+      pupPage: {
+        evaluate: op === 'getGroups' ? jest.fn().mockRejectedValue(reject) : jest.fn().mockResolvedValue([]),
+      },
       getGroupMembershipRequests:
         op === 'getGroupMembershipRequests' ? jest.fn().mockRejectedValue(reject) : jest.fn().mockResolvedValue([]),
     };

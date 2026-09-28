@@ -20,6 +20,7 @@ import { InvalidInviteCodeError } from '../../common/errors/invalid-invite-code.
 import { toMessageMedia } from './wwebjs-messaging';
 import { type WwebjsEngineHost, withPage, reportPageDeath } from './wwebjs-host';
 import { isProtocolTimeout } from './wwebjs-lifecycle';
+import { listChats } from './wwebjs-chats';
 
 /**
  * Extracts the JID of the parent community a group is linked to, if any.
@@ -82,30 +83,28 @@ export class WwebjsGroups {
 
   async getGroups(): Promise<Group[]> {
     this.host.ensureReady();
-    return withPage(this.host, 'getGroups', async () => {
-      const client = this.client();
-      const chats = await client.getChats();
+    const client = this.client();
+    const chats = await listChats(this.host, 'getGroups');
 
-      // Filter only group chats
-      const groups = chats.filter(chat => chat.isGroup);
+    // Filter only group chats
+    const groups = chats.filter(chat => chat.isGroup);
 
-      // List path: read linkedParentJID synchronously from whatever metadata getChats()
-      // already loaded. We deliberately do NOT fall back to getChatById per group here —
-      // that would be an N+1 round-trip across every group on every list call. Groups
-      // whose metadata isn't loaded report null; the single-group endpoint (getGroupInfo,
-      // which loads full metadata via getChatById) is the authoritative source.
-      return groups.map(g => {
-        const groupChat = g as unknown as GroupChat;
-        return {
-          id: g.id._serialized,
-          name: g.name,
-          participantsCount: groupChat.participants?.length,
-          isAdmin: groupChat.participants?.some(
-            p => p.isAdmin && readWid(p.id) !== undefined && readWid(p.id) === readWid(client.info?.wid),
-          ),
-          linkedParentJID: extractLinkedParentJID(groupChat.groupMetadata),
-        };
-      });
+    // List path: read linkedParentJID synchronously from whatever metadata the chat list
+    // already loaded. We deliberately do NOT fall back to getChatById per group here:
+    // that would be an N+1 round-trip across every group on every list call. Groups
+    // whose metadata isn't loaded report null; the single-group endpoint (getGroupInfo,
+    // which loads full metadata via getChatById) is the authoritative source.
+    return groups.map(g => {
+      const groupChat = g as unknown as GroupChat;
+      return {
+        id: g.id._serialized,
+        name: g.name,
+        participantsCount: groupChat.participants?.length,
+        isAdmin: groupChat.participants?.some(
+          p => p.isAdmin && readWid(p.id) !== undefined && readWid(p.id) === readWid(client.info?.wid),
+        ),
+        linkedParentJID: extractLinkedParentJID(groupChat.groupMetadata),
+      };
     });
   }
 
