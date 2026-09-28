@@ -1237,6 +1237,8 @@ Delete a session.
 
 **Response** `204` — empty body (`@HttpCode(204)`, returns void). A `findOne` lookup runs first, so a missing id yields `404`.
 
+The delete removes, in one transaction, the session's messages, message batches, chat states, received statuses, webhooks, templates, stored Baileys messages, automation rules, webhook outbox rows, webhook delivery-failure records and integration dead-letter rows, then purges its on-disk auth data. It keeps the audit log, the LID mappings, and the integration conversation mappings (so a re-paired session keeps its provider conversations); ingress dedup rows age out on their own after `INGRESS_DEDUP_RETENTION_DAYS` (default 7).
+
 **Errors:** `401` missing/invalid key, or key not scoped to this session · `403` key role below OPERATOR · `404` session not found · `409` credential teardown for the same session name still in flight (retryable; body carries `code: 'SESSION_NAME_TEARDOWN_PENDING'`; on a `409` the row is **not** deleted and no hook/auth-purge runs — retry after cleanup settles)
 
 ### 6.4.2 Messages

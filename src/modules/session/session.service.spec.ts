@@ -38,6 +38,12 @@ import { Template } from '../template/entities/template.entity';
 import { BaileysStoredMessage } from '../../engine/adapters/baileys-stored-message.entity';
 import { ChatState } from '../../engine/adapters/baileys-chat-state.entity';
 import { StatusUpdate } from '../status-store/entities/status-update.entity';
+import { WebhookOutboxEvent } from '../webhook/entities/webhook-outbox-event.entity';
+import { WebhookDeliveryFailure } from '../webhook/entities/webhook-delivery-failure.entity';
+import { IntegrationDeliveryFailure } from '../integration/entities/integration-delivery-failure.entity';
+import { ConversationMapping } from '../integration/entities/conversation-mapping.entity';
+import { IngressEvent } from '../integration/entities/ingress-event.entity';
+import { LidMapping } from '../../engine/identity/lid-mapping.entity';
 import { EngineFactory } from '../../engine/engine.factory';
 import { EngineRegistry } from '../../engine/engine-registry.service';
 import type { KeyedMutationQueue } from '../../common/utils/keyed-mutation-queue';
@@ -1279,6 +1285,19 @@ describe('SessionService', () => {
       // chat_states and status_updates carry a plain sessionId with no FK at all.
       expect(managerDelete).toHaveBeenCalledWith(ChatState, { sessionId: 'sess-uuid-1' });
       expect(managerDelete).toHaveBeenCalledWith(StatusUpdate, { sessionId: 'sess-uuid-1' });
+      // Delivery records keyed on the session: outbox rows, lost-delivery records, dead-letter payloads.
+      expect(managerDelete).toHaveBeenCalledWith(WebhookOutboxEvent, { sessionId: 'sess-uuid-1' });
+      expect(managerDelete).toHaveBeenCalledWith(WebhookDeliveryFailure, { sessionId: 'sess-uuid-1' });
+      expect(managerDelete).toHaveBeenCalledWith(IntegrationDeliveryFailure, { sessionId: 'sess-uuid-1' });
+      // Kept on purpose: a re-paired session is rebound to its conversations, ingress rows are the
+      // instance-keyed dedup record, and LID mappings are a global cache.
+      const deleted = managerDelete.mock.calls.map(([entity]) => entity as unknown);
+      expect(deleted).not.toContain(ConversationMapping);
+      expect(deleted).not.toContain(IngressEvent);
+      expect(deleted).not.toContain(LidMapping);
+      // Children before the parent.
+      const removeOrder = managerRemove.mock.invocationCallOrder[0];
+      for (const order of managerDelete.mock.invocationCallOrder) expect(order).toBeLessThan(removeOrder);
       expect(managerRemove).toHaveBeenCalledWith(session);
     });
   });

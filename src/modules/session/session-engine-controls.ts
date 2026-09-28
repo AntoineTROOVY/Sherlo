@@ -5,6 +5,9 @@ import { Session, SessionStatus } from './entities/session.entity';
 import { Message } from '../message/entities/message.entity';
 import { MessageBatch } from '../message/entities/message-batch.entity';
 import { Webhook } from '../webhook/entities/webhook.entity';
+import { WebhookOutboxEvent } from '../webhook/entities/webhook-outbox-event.entity';
+import { WebhookDeliveryFailure } from '../webhook/entities/webhook-delivery-failure.entity';
+import { IntegrationDeliveryFailure } from '../integration/entities/integration-delivery-failure.entity';
 import { Template } from '../template/entities/template.entity';
 import { BaileysStoredMessage } from '../../engine';
 import { ChatState } from '../../engine/adapters/baileys-chat-state.entity';
@@ -580,7 +583,15 @@ export class SessionEngineControls {
       // creation — so their explicit deletes are belt-and-braces rather than required; they stay
       // because depending on a pragma neither this file nor a test pins is a thinner guarantee than
       // an explicit delete, and the ordering mirrors the restore path's explicit-clear. chat_states and
-      // status_updates are in the no-FK group too.
+      // status_updates are in the no-FK group too, and so are the session's webhook outbox rows,
+      // webhook delivery-failure records and integration dead-letter rows (which keep full payloads).
+      // Those three are point-in-time: a delivery still in flight can write one after the commit, and
+      // their retention windows cover it.
+      //
+      // Deliberately kept: conversation_mappings (a re-paired session is rebound to its provider
+      // conversations, see ConversationMappingService.rebindSession), ingress_events (the
+      // instance-keyed inbound dedup record, payload already dropped after dispatch, always pruned
+      // after INGRESS_DEDUP_RETENTION_DAYS), lid_mappings (a global cache by design) and audit_logs (the audit trail).
       await this.host.dataSource().transaction(async manager => {
         await manager.delete(Message, { sessionId: id });
         await manager.delete(MessageBatch, { sessionId: id });
@@ -589,6 +600,9 @@ export class SessionEngineControls {
         await manager.delete(Webhook, { sessionId: id });
         await manager.delete(Template, { sessionId: id });
         await manager.delete(BaileysStoredMessage, { sessionId: id });
+        await manager.delete(WebhookOutboxEvent, { sessionId: id });
+        await manager.delete(WebhookDeliveryFailure, { sessionId: id });
+        await manager.delete(IntegrationDeliveryFailure, { sessionId: id });
         await manager.remove(session);
       });
       parentDeleted = true;
