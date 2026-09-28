@@ -1999,6 +1999,70 @@ describe('SessionService', () => {
         delete process.env.WWEBJS_AUTH_TIMEOUT_MS;
       }
     });
+
+    it('registers the engine synchronously, before initializeEngine first awaits (start() captures it there)', () => {
+      (repository.update as jest.Mock).mockReturnValue(new Promise(() => undefined));
+      const init = (
+        lifecycle as unknown as { initializeEngine: (id: string, s: Session) => Promise<void> }
+      ).initializeEngine('sess-uuid-1', createMockSession());
+      init.catch(() => undefined);
+      expect(registry.get('sess-uuid-1')).toBe(mockEngine);
+    });
+
+    it('a stale init deadline leaves a replacement engine registered, alive, and its status and error untouched', async () => {
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      mockEngine.initialize.mockReturnValue(new Promise<void>(() => undefined));
+      const replacement = { forceDestroy: jest.fn().mockResolvedValue(undefined) };
+      const reconnectStates = (lifecycle as unknown as { reconnectStates: Map<string, unknown> }).reconnectStates;
+
+      jest.useFakeTimers();
+      try {
+        let caught: unknown;
+        const settled = service.start('sess-uuid-1').catch((e: unknown) => {
+          caught = e;
+        });
+        await jest.advanceTimersByTimeAsync(1_000);
+        // A stop() + start() (or a reconnect) registered a new engine while this init hangs.
+        registry.set('sess-uuid-1', replacement as never);
+        (repository.update as jest.Mock).mockClear();
+
+        await jest.advanceTimersByTimeAsync(60_000);
+        await settled;
+
+        expect((caught as HttpException).getStatus()).toBe(HttpStatus.GATEWAY_TIMEOUT);
+        expect(registry.get('sess-uuid-1')).toBe(replacement);
+        expect(replacement.forceDestroy).not.toHaveBeenCalled();
+        expect(mockEngine.forceDestroy).toHaveBeenCalled(); // the stale engine is still reaped
+        expect(repository.update).not.toHaveBeenCalled(); // no DISCONNECTED, no FAILED over the replacement
+        expect(intern().sessionErrors.get('sess-uuid-1')).toBeUndefined();
+        expect(reconnectStates.has('sess-uuid-1')).toBe(true); // the replacement keeps its reconnect state
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("start()'s catch leaves a replacement engine alone when its own engine was superseded mid-init", async () => {
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      let reject!: (e: Error) => void;
+      mockEngine.initialize.mockReturnValue(new Promise<void>((_, r) => (reject = r)));
+      const replacement = { forceDestroy: jest.fn().mockResolvedValue(undefined) };
+      const reconnectStates = (lifecycle as unknown as { reconnectStates: Map<string, unknown> }).reconnectStates;
+
+      const pending = service.start('sess-uuid-1');
+      await new Promise(resolve => setImmediate(resolve));
+      expect(mockEngine.initialize).toHaveBeenCalled();
+      // A mid-init disconnect scheduled a reconnect, which registered its own engine.
+      registry.set('sess-uuid-1', replacement as never);
+      reject(new Error('Target closed'));
+      await expect(pending).rejects.toThrow('Target closed');
+
+      expect(registry.get('sess-uuid-1')).toBe(replacement);
+      expect(replacement.forceDestroy).not.toHaveBeenCalled();
+      expect(repository.update).not.toHaveBeenCalledWith('sess-uuid-1', { status: SessionStatus.FAILED });
+      expect(reconnectStates.has('sess-uuid-1')).toBe(true);
+    });
   });
 
   describe('scheduleReconnect (max attempts)', () => {

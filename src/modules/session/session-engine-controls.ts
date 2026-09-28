@@ -222,13 +222,21 @@ export class SessionEngineControls {
       // Boot auto-start reaches here through this same method, so it re-arms too.
       this.stuckAuthRecoveryUsed.delete(id);
 
+      // initializeEngine registers its engine synchronously, before its first await, so the entry
+      // read right after the call is this start's own engine (undefined if creation threw first).
+      // The catch must use this capture, not a later lookup: a disconnect of this engine mid-init can
+      // schedule a reconnect that registers a replacement before initialize() rejects.
+      const before = this.engines.get(id);
+      const init = this.host.initializeEngine(id, session);
+      const registered = this.engines.get(id);
+      const mine = registered !== before ? registered : undefined;
       try {
-        await this.host.initializeEngine(id, session);
+        await init;
       } catch (err) {
-        // engine.initialize() failed AFTER the engine was registered (initializeEngine sets it before
-        // initializing). Evict + tear it down so the session doesn't wedge at "already started" with a
-        // leaked Chromium/socket permanently holding a concurrency slot. initializingSessions serializes
-        // start(), so the engine in the map here is the one this start just created.
+        // engine.initialize() failed AFTER the engine was registered. Evict + tear it down so the
+        // session doesn't wedge at "already started" with a leaked Chromium/socket permanently holding
+        // a concurrency slot. Identity-checked: a replacement registered by a reconnect is left alone,
+        // and so is its status (whoever evicted this start's engine owns the teardown).
         //
         // Use forceDestroy(), not destroy(): initialize() failing usually means the underlying
         // browser/CDP connection is already broken (e.g. a "Target closed" crash mid-injection), so
@@ -236,11 +244,9 @@ export class SessionEngineControls {
         // teardownEngineSafely's race, after which the orphaned Chromium process is never actually
         // killed. forceDestroy() SIGKILLs the OS process directly, the same recovery force-kill uses
         // for a wedged engine, which is exactly the state this catch block is handling.
-        const orphan = this.engines.get(id);
-        if (orphan) {
-          this.engines.delete(id);
+        if (mine && this.engines.deleteIfLive(id, mine)) {
           this.sessionErrors.set(id, err instanceof Error ? err.message : String(err));
-          await this.fences.teardownEngineSafely(id, orphan, e => e.forceDestroy(), 'force-destroy');
+          await this.fences.teardownEngineSafely(id, mine, e => e.forceDestroy(), 'force-destroy');
           // Fenced on ownership like the engine callbacks: initializeEngine can await a slow
           // Chromium launch for minutes, and this node's lease can lapse and be taken over inside
           // that window. FAILED is excluded from the boot reset AND from the takeover sweep, so
@@ -249,10 +255,13 @@ export class SessionEngineControls {
             await this.host.updateStatus(id, SessionStatus.FAILED).catch(() => undefined);
           }
         }
-        // Drop the reconnect state this start() armed up front: no engine was registered, so
-        // nothing will ever fire it, and leaving it behind is dead state a later liveness check
-        // would have to reason about. A retry builds its own.
-        this.host.cancelReconnect(id);
+        // Drop the reconnect state this start() armed up front when no engine is registered: nothing
+        // will ever fire it, and leaving it behind is dead state a later liveness check would have to
+        // reason about. A retry builds its own. A reconnect that already registered a replacement
+        // keeps its state.
+        if (!this.engines.has(id)) {
+          this.host.cancelReconnect(id);
+        }
         throw err;
       }
 

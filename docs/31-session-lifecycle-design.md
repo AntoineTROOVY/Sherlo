@@ -58,8 +58,11 @@ rejects, and neither does a navigation that never completes because WhatsApp Web
 a plain `await` hangs the start forever. The engine's own `authTimeoutMs` poll does not cover that
 case: whatsapp-web.js only starts it in `inject()`, after the page has loaded.
 **Defense:** `Promise.race` deadline in `initializeEngine`; on timeout the engine is evicted +
-force-destroyed + status DISCONNECTED + 504 to the caller. A REAL rejection is NOT treated as a
-timeout: it propagates so `start()` records FAILED with the reason.
+force-destroyed + status DISCONNECTED + 504 to the caller. The eviction, the recorded error and the
+DISCONNECTED write apply only while that engine is still the live one: a stale deadline (a stop +
+start replaced it mid-init) force-destroys its own engine and 504s, and leaves the replacement alone.
+A REAL rejection is NOT treated as a timeout: it propagates so `start()` records FAILED with the
+reason.
 **Pinned by:** `session.service.spec.ts` (start failure-path cases; the timeout/rejection
 split lives in `session.service.spec.ts`'s init-timeout describes).
 **Do not "simplify" the two paths into one** — the distinction is why a bad proxy config returns
@@ -162,7 +165,11 @@ Collected here so they survive refactors of the code around them:
 - `session-engine-controls.ts` (start): `session.config` is clamped to trusted keys because the
   row is client-writable; an unclamped spread would let a caller smuggle engine options.
 - `EngineRegistry`: identity-based `deleteIfLive` rather than `delete(id)` — see INV-3; every
-  site that bypassed this in review's history created the same phantom-callback bug.
+  site that bypassed this in review's history created the same phantom-callback bug. The eviction
+  helpers go through it too: `evictAndForceDestroy`, the init-timeout branch, and `start()`'s catch.
+  `start()` identifies its own engine by capturing the registry entry right after calling
+  `initializeEngine` (which registers it before its first await), not by a lookup in the catch: a
+  mid-init disconnect can schedule a reconnect that registers a replacement first.
 
 ## 31.4 What this document is NOT
 

@@ -691,23 +691,26 @@ export class SessionEngineLifecycle {
           sessionId: id,
           action: 'engine_init_timeout',
         });
-        this.sessionErrors.set(id, err.message);
         // Evict from the map BEFORE tearing down. forceDestroy() → beginClientTeardown → setStatus
         // fires onStateChanged SYNCHRONOUSLY while the engine is still live, so isLiveEngine would
         // pass and the callback would run a redundant DISCONNECTED write against this path; removing
         // the engine first makes isLiveEngine return false. Unlike delete()/stop()/forceKill(), this
-        // path has no stoppingSessions + cancelReconnect wrap to fall back on. Matches the canonical
-        // delete-before-teardown at evictAndForceDestroy() and start()'s catch.
+        // path has no stoppingSessions + cancelReconnect wrap to fall back on. Like
+        // evictAndForceDestroy() and start()'s catch, the eviction is identity-checked (deleteIfLive):
+        // a stop() + start() during a hung reconnect init may already have registered a new engine,
+        // and this stale deadline must neither evict it nor overwrite its error and status. The
+        // stale engine is force-destroyed either way, and the caller still gets the 504.
         //
         // Do NOT port this reorder to delete()/stop()/forceKill(): there, engines.has(id) staying
         // TRUE for the duration of the teardown await is the sole deterministic block on a concurrent
         // start() (start() clears stoppingSessions rather than rejecting on it), so delete-first would
         // open a start()-during-teardown orphan-engine window. Verified in the teardown-ordering audit.
-        this.engines.delete(id);
+        const wasLive = this.engines.deleteIfLive(id, engine);
+        if (wasLive) this.sessionErrors.set(id, err.message);
         // Force-kill whatever got launched so a retry doesn't collide with an orphaned browser.
         // teardownEngineSafely is itself time-bound, so this can't wedge a second time.
         await this.teardownEngineSafely(id, engine, e => e.forceDestroy(), 'force-destroy');
-        await this.updateStatus(id, SessionStatus.DISCONNECTED);
+        if (wasLive) await this.updateStatus(id, SessionStatus.DISCONNECTED);
         // Map to a diagnostic 504 like the auth-timeout branch below, so a wedged init doesn't escape as a
         // bare 500 (#733 follow-up). This deadline covers EVERY cause and cannot tell them apart: the
         // auth-timeout below only fires once the page has LOADED (whatsapp-web.js navigates with

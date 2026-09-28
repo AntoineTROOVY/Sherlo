@@ -192,9 +192,12 @@ export class SessionLifecycleFences {
    * concurrency slot and makes a later start() see the session as "already started"; forceDestroy()
    * (not the graceful destroy()) is used because such an engine's browser/CDP connection is typically
    * already broken, so a graceful close would only time out before the process is reaped.
+   *
+   * The eviction is identity-checked (deleteIfLive): if a replacement engine is already registered
+   * for `id`, it stays. The passed engine is force-destroyed either way, since it is dead or abandoned.
    */
   evictAndForceDestroy(id: string, engine: IWhatsAppEngine): void {
-    this.engines.delete(id);
+    this.engines.deleteIfLive(id, engine);
     void this.teardownEngineSafely(id, engine, e => e.forceDestroy(), 'force-destroy');
   }
 }
