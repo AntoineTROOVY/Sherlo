@@ -59,12 +59,17 @@ describe('resolveMaxConcurrentBatches', () => {
 /** Regression lock: orphaned (restart-interrupted) PROCESSING batches are transitioned. */
 describe('BulkMessageService.onApplicationBootstrap', () => {
   let service: BulkMessageService;
-  let repo: { find: jest.Mock; save: jest.Mock };
+  let repo: { find: jest.Mock; save: jest.Mock; update: jest.Mock };
+  const failedWrite = (id: string): [object, unknown] => [
+    { id, status: BatchStatus.PROCESSING },
+    expect.objectContaining({ status: BatchStatus.FAILED }) as unknown,
+  ];
 
   beforeEach(async () => {
     repo = {
       find: jest.fn().mockResolvedValue([]),
       save: jest.fn().mockImplementation(b => Promise.resolve(b)),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -102,14 +107,14 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
     await service.onApplicationBootstrap();
 
     expect(repo.find).toHaveBeenCalledWith({ where: { status: BatchStatus.PROCESSING } });
-    expect(batch.status).toBe(BatchStatus.FAILED);
-    expect(repo.save).toHaveBeenCalledWith(batch);
+    expect(repo.update).toHaveBeenCalledWith(...failedWrite('b1'));
+    expect(repo.save).not.toHaveBeenCalled();
   });
 
   it('does nothing when there are no orphaned batches', async () => {
     repo.find.mockResolvedValue([]);
     await service.onApplicationBootstrap();
-    expect(repo.save).not.toHaveBeenCalled();
+    expect(repo.update).not.toHaveBeenCalled();
   });
 
   /**
@@ -130,9 +135,26 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
 
     expect(repo.find).toHaveBeenCalledWith({ where: { status: BatchStatus.PROCESSING, sessionId: 'sess-a' } });
     expect(reaped).toBe(1);
-    expect(mine.status).toBe(BatchStatus.FAILED);
-    expect(repo.save).toHaveBeenCalledWith(mine);
-    expect(JSON.stringify(mine.messages)).not.toContain('x'.repeat(64));
+    expect(repo.update).toHaveBeenCalledWith(...failedWrite('b1'));
+    const written = (repo.update.mock.calls[0] as [unknown, Partial<MessageBatch>])[1];
+    expect(JSON.stringify(written.messages)).not.toContain('x'.repeat(64));
+  });
+
+  // The row was read as PROCESSING, but a batch can finalize before the write lands. The guard in the
+  // UPDATE matches nothing then, and the reap must neither count it nor touch its terminal state.
+  it('reapProcessingBatches does not count a batch that completed after it was read', async () => {
+    const stale = { id: 'b-done', sessionId: 'sess-a', status: BatchStatus.PROCESSING, messages: [] };
+    const orphan = { id: 'b-dead', sessionId: 'sess-a', status: BatchStatus.PROCESSING, messages: [] };
+    repo.find.mockResolvedValue([stale, orphan]);
+    repo.update.mockImplementation((where: { id: string }) =>
+      Promise.resolve({ affected: where.id === 'b-dead' ? 1 : 0 }),
+    );
+
+    const reaped = await service.reapProcessingBatches('sess-a', 'session adopted from a lapsed node');
+
+    expect(reaped).toBe(1);
+    expect(repo.update).toHaveBeenCalledWith(...failedWrite('b-done'));
+    expect(repo.save).not.toHaveBeenCalled();
   });
 
   it('reapProcessingBatches leaves alone a PROCESSING batch this process is still running', async () => {
@@ -146,10 +168,8 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
     const reaped = await service.reapProcessingBatches('sess-a', 'session adopted from a lapsed node');
 
     expect(reaped).toBe(1);
-    expect(running.status).toBe(BatchStatus.PROCESSING);
-    expect(orphan.status).toBe(BatchStatus.FAILED);
-    expect(repo.save).toHaveBeenCalledTimes(1);
-    expect(repo.save).toHaveBeenCalledWith(orphan);
+    expect(repo.update).toHaveBeenCalledTimes(1);
+    expect(repo.update).toHaveBeenCalledWith(...failedWrite('b-dead'));
   });
 
   /**
@@ -199,8 +219,7 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
 
       await (await withOwnership([])).onApplicationBootstrap();
 
-      expect(peers.status).toBe(BatchStatus.PROCESSING);
-      expect(repo.save).not.toHaveBeenCalled();
+      expect(repo.update).not.toHaveBeenCalled();
     });
 
     it('still reaps a batch whose session this node may claim', async () => {
@@ -209,8 +228,7 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
 
       await (await withOwnership(['my-session'])).onApplicationBootstrap();
 
-      expect(mine.status).toBe(BatchStatus.FAILED);
-      expect(repo.save).toHaveBeenCalledWith(mine);
+      expect(repo.update).toHaveBeenCalledWith(...failedWrite('b2'));
     });
 
     it('reaps only its own when both are present', async () => {
@@ -220,9 +238,8 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
 
       await (await withOwnership(['my-session'])).onApplicationBootstrap();
 
-      expect(mine.status).toBe(BatchStatus.FAILED);
-      expect(peers.status).toBe(BatchStatus.PROCESSING);
-      expect(repo.save).toHaveBeenCalledTimes(1);
+      expect(repo.update).toHaveBeenCalledTimes(1);
+      expect(repo.update).toHaveBeenCalledWith(...failedWrite('b2'));
     });
   });
 });
