@@ -115,6 +115,10 @@ ctx.registerHook('message:deleted', async hookCtx => {
 });
 ```
 
+Clearing a chat's messages (`DELETE /api/sessions/:sessionId/chats/:chatId/messages`) or deleting a chat
+(`POST /api/sessions/:sessionId/chats/delete`) also emits `message:deleted` for every stored row it removes, so
+the same handler keeps your index in step.
+
 **Backfill is the plugin's responsibility.** The hook fires only for live traffic. A plugin installed on
 a deployment with existing message history must perform its own one-time backfill (read the `messages`
 table via `ctx.engine.getChatHistory` or a direct query, and index) at `onEnable`. The built-in DB-FTS

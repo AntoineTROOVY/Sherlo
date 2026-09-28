@@ -691,7 +691,12 @@ export class SessionController {
   @Delete(':sessionId/chats/:chatId/messages')
   @RequireRole(ApiKeyRole.OPERATOR)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete every message in a chat, keeping the chat itself' })
+  @ApiOperation({
+    summary: 'Delete every message in a chat, keeping the chat itself',
+    description:
+      "On success the gateway also removes its stored copies of the chat's messages (rows, inline and archived " +
+      'media, search entries) and emits `message:deleted` for each. Changes made on the phone are not mirrored.',
+  })
   @ApiParam({ name: 'sessionId', description: 'Session ID' })
   @ApiParam({ name: 'chatId', description: "Chat JID, e.g. 1234567890-123@g.us (URL-encode the '@')" })
   @ApiResponse({
@@ -824,7 +829,12 @@ export class SessionController {
   @Post(':sessionId/chats/delete')
   @RequireRole(ApiKeyRole.OPERATOR)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete a chat from the chat list (e.g. a group you have left)' })
+  @ApiOperation({
+    summary: 'Delete a chat from the chat list (e.g. a group you have left)',
+    description:
+      "On success the gateway also removes its stored copies of the chat's messages (rows, inline and archived " +
+      'media, search entries) and emits `message:deleted` for each. Changes made on the phone are not mirrored.',
+  })
   @ApiParam({ name: 'sessionId', description: 'Session ID' })
   @ApiResponse({ status: 200, description: 'Chat deleted successfully', type: SessionActionResponseDto })
   @ApiResponse({ status: 400, description: 'Session not ready' })

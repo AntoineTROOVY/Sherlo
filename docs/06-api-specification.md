@@ -1025,6 +1025,8 @@ Delete every message in a chat, keeping the chat itself in the list.
 { "success": true }
 ```
 
+On success the gateway also removes its stored copies of the chat's messages (rows, inline and archived media, search entries) and emits `message:deleted` for each. Changes made on the phone are not mirrored.
+
 > **`success: false` is a real outcome**, as with `chats/archive`: an unknown chat on
 > whatsapp-web.js, or on Baileys a chat with no known history — the clear is an app-state
 > modification keyed to the chat's last message.
@@ -1193,6 +1195,8 @@ Delete a chat from the chat list (e.g. a group you have left).
 ```
 
 Returns HTTP `200`, matching the OpenAPI contract.
+
+On success the gateway also removes its stored copies of the chat's messages (rows, inline and archived media, search entries) and emits `message:deleted` for each. Changes made on the phone are not mirrored.
 
 **Errors:** `400` validation, or session not started · `401` · `403` · `404` session not found · `409` the session is not connected (engine exists but is not `ready`) · `503` WhatsApp did not answer within the request budget, or the engine’s browser page died — the change may or may not have been applied
 

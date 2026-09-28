@@ -12,7 +12,17 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { Repository, In, Not, IsNull, LessThan, DataSource, FindManyOptions, FindOptionsWhere } from 'typeorm';
+import {
+  Repository,
+  In,
+  Not,
+  IsNull,
+  LessThan,
+  LessThanOrEqual,
+  DataSource,
+  FindManyOptions,
+  FindOptionsWhere,
+} from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { setTimeout } from 'node:timers/promises';
 import { EngineTransportError } from '../../common/errors/engine-transport.error';
@@ -39,6 +49,9 @@ import { resolveFeatureFlags } from '../../config/feature-flags';
 import { IWhatsAppEngine, ChatSummary, ChatState } from '../../engine/interfaces/whatsapp-engine.interface';
 import { createLogger } from '../../common/services/logger.service';
 import { HookManager } from '../../core/hooks';
+import { LidMappingStoreService } from '../../engine/identity/lid-mapping-store.service';
+import { resolveJidCandidates } from '../../engine/identity/jid-candidates';
+import { Message } from '../message/entities/message.entity';
 import { SessionStoppedException } from './session-engine-controls';
 // Type-only: the module binds this class to PLUGIN_SESSION_PORT with a `useExisting` alias, which
 // TypeScript does not check, so `implements` is what keeps the two in step.
@@ -133,6 +146,8 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
   constructor(
     @InjectRepository(Session, 'data')
     private readonly sessionRepository: Repository<Session>,
+    @InjectRepository(Message, 'data')
+    private readonly messageRepository: Repository<Message>,
     @InjectDataSource('data')
     private readonly dataSource: DataSource,
     private readonly engineRegistry: EngineRegistry,
@@ -142,6 +157,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     private readonly presence: PresenceStore,
     private readonly hookManager: HookManager,
     private readonly engineLifecycle: SessionEngineLifecycle,
+    private readonly lidMappingStore: LidMappingStoreService,
     @Optional()
     private readonly configService?: ConfigService,
     // Trailing @Optional, like configService: the running app always provides it, while the
@@ -857,12 +873,16 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
   /**
    * Delete every message in a chat, keeping the chat itself. Resolves false when the engine could
    * not act — an unknown chat, or on Baileys a chat with no known history to key the change to.
+   * On success the gateway's stored copies of the chat's messages are removed too.
    */
   async clearChatMessages(id: string, chatId: string): Promise<boolean> {
     await this.findOne(id); // Verify session exists
     const engine = this.requireEngine(id);
 
-    return engine.clearChatMessages(chatId);
+    const cutoff = new Date();
+    const ok = await engine.clearChatMessages(chatId);
+    if (ok) await this.purgeStoredChat(id, chatId, cutoff);
+    return ok;
   }
 
   /**
@@ -900,11 +920,61 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     return engine.pinChat(chatId, pin);
   }
 
+  /** Delete a chat. On success the gateway's stored copies of its messages are removed too. */
   async deleteChat(id: string, chatId: string): Promise<boolean> {
     await this.findOne(id); // Verify session exists
     const engine = this.requireEngine(id);
 
-    return engine.deleteChat(chatId);
+    const cutoff = new Date();
+    const ok = await engine.deleteChat(chatId);
+    if (ok) await this.purgeStoredChat(id, chatId, cutoff);
+    return ok;
+  }
+
+  /**
+   * Remove the stored rows of a chat the engine just cleared or deleted, under every id form of the
+   * same chat (the GET messages filter's rules), and emit `message:deleted` per row so search
+   * providers drop them. The FTS index follows through its delete trigger, archived media through
+   * the orphan sweep. Runs only after the engine succeeded; a failure here is logged, not thrown:
+   * WhatsApp already applied the change, and repeating the call finishes the purge.
+   *
+   * Only rows stored before the second `cutoff` (taken before the engine call) falls in go: a busy
+   * chat keeps receiving messages while the batches run, and those arrived after the clear and still
+   * exist on WhatsApp. The bound stops short of that second because SQLite stores createdAt as whole
+   * seconds and compares it as text against a millisecond parameter, so a row stored later in the
+   * same second would match. A pre-clear row from that second stays until a repeat call.
+   */
+  private async purgeStoredChat(sessionId: string, chatId: string, cutoff: Date): Promise<void> {
+    const BATCH = 500;
+    const bound = new Date(Math.floor(cutoff.getTime() / 1000) * 1000 - 1);
+    try {
+      const expanded = await resolveJidCandidates(chatId, {
+        resolveLid: lid => this.lidMappingStore.findPhoneForLid(lid),
+        lidsForPhone: phone => this.lidMappingStore.findLidsForPhone(phone),
+      });
+      const chatIds = [...new Set([chatId, ...expanded])];
+      for (;;) {
+        const rows = await this.messageRepository.find({
+          where: { sessionId, chatId: In(chatIds), createdAt: LessThanOrEqual(bound) },
+          select: { id: true, waMessageId: true, chatId: true, sessionId: true },
+          take: BATCH,
+        });
+        if (rows.length === 0) return;
+        await this.messageRepository.delete({ id: In(rows.map(row => row.id)) });
+        for (const message of rows) {
+          void this.hookManager
+            .execute('message:deleted', { sessionId, message }, { sessionId, source: 'SessionService' })
+            .catch(() => undefined);
+        }
+        if (rows.length < BATCH) return;
+      }
+    } catch (error) {
+      this.logger.error(
+        'Failed to remove stored messages of a cleared chat',
+        error instanceof Error ? error.message : String(error),
+        { sessionId, action: 'chat_local_purge_failed' },
+      );
+    }
   }
 
   async sendChatState(id: string, chatId: string, state: ChatState): Promise<void> {

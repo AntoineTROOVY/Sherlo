@@ -3,7 +3,7 @@ import { SessionRestrictionStore } from './session-restriction-store.service';
 import { PresenceStore } from './presence-store.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
-import { Repository, DataSource, In, IsNull, Not, QueryFailedError } from 'typeorm';
+import { Repository, DataSource, In, IsNull, LessThanOrEqual, Not, QueryFailedError } from 'typeorm';
 import {
   NotFoundException,
   ConflictException,
@@ -181,6 +181,7 @@ describe('SessionService', () => {
       sendSeen: jest.fn().mockResolvedValue(true),
       markUnread: jest.fn().mockResolvedValue(true),
       deleteChat: jest.fn().mockResolvedValue(true),
+      clearChatMessages: jest.fn().mockResolvedValue(true),
       sendChatState: jest.fn().mockResolvedValue(undefined),
       setOnlinePresence: jest.fn().mockResolvedValue(undefined),
       resolveContactPhone: jest.fn().mockResolvedValue('628111222333'),
@@ -237,6 +238,8 @@ describe('SessionService', () => {
       remember: jest.fn().mockResolvedValue(undefined),
       getCached: jest.fn().mockReturnValue(undefined),
       lidsForPhone: jest.fn().mockReturnValue([]),
+      findPhoneForLid: jest.fn().mockResolvedValue(null),
+      findLidsForPhone: jest.fn().mockResolvedValue([]),
     };
 
     statusStore = {
@@ -7208,6 +7211,162 @@ describe('SessionService', () => {
       (repository.findOne as jest.Mock).mockResolvedValue(session);
 
       await expect(service.deleteChat('sess-uuid-1', '1234567890-123@g.us')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // ── stored copies of a cleared or deleted chat ────────────────────
+
+  describe('clearChatMessages / deleteChat: stored message removal', () => {
+    const rows = (n: number, from = 0) =>
+      Array.from({ length: n }, (_, i) => ({
+        id: `row-${from + i}`,
+        waMessageId: `wa-${from + i}`,
+        chatId: '123@c.us',
+        sessionId: 'sess-uuid-1',
+      }));
+    const deletedHooks = (): unknown[][] =>
+      ((hookManager.execute as jest.Mock).mock.calls as unknown[][]).filter(([e]) => e === 'message:deleted');
+
+    beforeEach(async () => {
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      messageRepository.delete = jest.fn().mockResolvedValue({ affected: 1 });
+      await service.start('sess-uuid-1');
+      (hookManager.execute as jest.Mock).mockClear();
+    });
+
+    it.each([
+      ['clearChatMessages', (id: string, chat: string) => service.clearChatMessages(id, chat)],
+      ['deleteChat', (id: string, chat: string) => service.deleteChat(id, chat)],
+    ] as const)('%s removes the rows of every id form of the chat and emits message:deleted', async (_, run) => {
+      (lidMappingStore.findLidsForPhone as jest.Mock).mockResolvedValue(['999']);
+      (messageRepository.find as jest.Mock).mockResolvedValueOnce(rows(2));
+
+      await expect(run('sess-uuid-1', '123@c.us')).resolves.toBe(true);
+
+      const [[{ where }]] = (messageRepository.find as jest.Mock).mock.calls as [[{ where: Record<string, unknown> }]];
+      expect(where).toEqual({
+        sessionId: 'sess-uuid-1',
+        chatId: In(['123@c.us', '123@s.whatsapp.net', '999@lid']),
+        createdAt: LessThanOrEqual(expect.any(Date)),
+      });
+      expect(messageRepository.delete).toHaveBeenCalledWith({ id: In(['row-0', 'row-1']) });
+      expect(deletedHooks()).toEqual([
+        ['message:deleted', { sessionId: 'sess-uuid-1', message: rows(1)[0] }, expect.anything()],
+        ['message:deleted', { sessionId: 'sess-uuid-1', message: rows(1, 1)[0] }, expect.anything()],
+      ]);
+    });
+
+    it('a group chat removes only its literal id', async () => {
+      await service.clearChatMessages('sess-uuid-1', '1234567890-123@g.us');
+
+      const [[{ where }]] = (messageRepository.find as jest.Mock).mock.calls as [[{ where: Record<string, unknown> }]];
+      expect(where).toMatchObject({ sessionId: 'sess-uuid-1', chatId: In(['1234567890-123@g.us']) });
+      expect(lidMappingStore.findLidsForPhone).not.toHaveBeenCalled();
+    });
+
+    // A busy chat keeps storing messages while the batches run. Those arrived after the clear and
+    // still exist on WhatsApp, so every batch is bounded by a cutoff taken before the engine call.
+    it.each([
+      ['clearChatMessages', 'clearChatMessages', (id: string, chat: string) => service.clearChatMessages(id, chat)],
+      ['deleteChat', 'deleteChat', (id: string, chat: string) => service.deleteChat(id, chat)],
+    ] as const)('%s keeps messages stored after the engine call', async (_, method, run) => {
+      let engineCalledAt = 0;
+      mockEngine[method].mockImplementationOnce(async () => {
+        engineCalledAt = Date.now();
+        await new Promise(resolve => setTimeout(resolve, 5));
+        return true;
+      });
+      (messageRepository.find as jest.Mock).mockResolvedValueOnce(rows(500)).mockResolvedValueOnce(rows(3, 500));
+
+      await run('sess-uuid-1', '123@c.us');
+
+      const calls = (messageRepository.find as jest.Mock).mock.calls as [{ where: { createdAt: unknown } }][];
+      expect(calls).toHaveLength(2);
+      const bounds = calls.map(([{ where }]) => where.createdAt as { value: Date });
+      for (const bound of bounds) {
+        expect(bound).toEqual(LessThanOrEqual(expect.any(Date)));
+        expect(bound.value.getTime()).toBeLessThanOrEqual(engineCalledAt);
+      }
+      expect(bounds[1].value).toBe(bounds[0].value);
+    });
+
+    // SQLite stores createdAt as whole seconds and compares it as text against the bound parameter,
+    // so a millisecond cutoff would also match a row stored later in the cutoff's own second.
+    describe('against a real database', () => {
+      let db: DataSource;
+      let messages: Repository<Message>;
+
+      beforeAll(async () => {
+        db = new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: [Message], synchronize: true });
+        await db.initialize();
+        messages = db.getRepository(Message);
+      });
+
+      afterAll(async () => {
+        await db.destroy();
+      });
+
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+
+      it("keeps a row stored in the cutoff's own second and removes the ones before it", async () => {
+        const seed = async (waMessageId: string, createdAt: string): Promise<void> => {
+          await messages.insert({ sessionId: 'sess-uuid-1', chatId: '123@c.us', from: 'a', to: 'b', waMessageId });
+          await messages.update({ waMessageId }, { createdAt: () => `'${createdAt}'` });
+        };
+        await seed('before', '2026-09-29 13:39:00');
+        Object.assign(service as unknown as Record<string, unknown>, { messageRepository: messages });
+        // Only the clock is frozen, so the cutoff lands mid-second; the driver still needs real timers.
+        jest.useFakeTimers({
+          now: Date.parse('2026-09-29T13:39:01.500Z'),
+          doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout'],
+        });
+        mockEngine.clearChatMessages.mockImplementationOnce(async () => {
+          await seed('after', '2026-09-29 13:39:01');
+          return true;
+        });
+
+        await expect(service.clearChatMessages('sess-uuid-1', '123@c.us')).resolves.toBe(true);
+
+        expect((await messages.find()).map(row => row.waMessageId)).toEqual(['after']);
+      });
+    });
+
+    it('removes in batches until a short one', async () => {
+      (messageRepository.find as jest.Mock).mockResolvedValueOnce(rows(500)).mockResolvedValueOnce(rows(3, 500));
+
+      await service.deleteChat('sess-uuid-1', '123@c.us');
+
+      expect(messageRepository.find).toHaveBeenCalledTimes(2);
+      expect(messageRepository.delete).toHaveBeenCalledTimes(2);
+      expect(deletedHooks()).toHaveLength(503);
+    });
+
+    it('keeps the stored rows when the engine declines or fails', async () => {
+      mockEngine.clearChatMessages.mockResolvedValueOnce(false);
+      await expect(service.clearChatMessages('sess-uuid-1', '123@c.us')).resolves.toBe(false);
+
+      mockEngine.deleteChat.mockRejectedValueOnce(new Error('timed out'));
+      await expect(service.deleteChat('sess-uuid-1', '123@c.us')).rejects.toThrow('timed out');
+
+      expect(messageRepository.find).not.toHaveBeenCalled();
+      expect(messageRepository.delete).not.toHaveBeenCalled();
+      expect(deletedHooks()).toHaveLength(0);
+    });
+
+    it('a failed removal after the engine succeeded is logged and the call still succeeds', async () => {
+      (messageRepository.find as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+      const logError = jest.spyOn((service as unknown as { logger: { error: jest.Mock } }).logger, 'error');
+
+      await expect(service.clearChatMessages('sess-uuid-1', '123@c.us')).resolves.toBe(true);
+
+      expect(logError).toHaveBeenCalledWith(
+        expect.any(String),
+        'db down',
+        expect.objectContaining({ action: 'chat_local_purge_failed' }),
+      );
     });
   });
 
