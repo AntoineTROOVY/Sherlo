@@ -109,7 +109,9 @@ curl -X POST "$BASE/api/sessions" \
 
 With an optional per-session egress proxy — only if your network can't reach WhatsApp directly. The
 proxy **must be a real, reachable host**; an unreachable value silently blocks the WhatsApp WebSocket
-(no QR is ever delivered) and `POST /api/sessions/:sessionId/start` returns `504` after ~30s:
+(no QR is ever delivered) and `POST /api/sessions/:sessionId/start` returns `504` after ~30s.
+
+Setting `proxyUrl` requires an unscoped ADMIN key; any other key gets `403`.
 
 ```bash
 curl -X POST "$BASE/api/sessions" \
@@ -129,7 +131,7 @@ curl "$BASE/api/sessions/$SESSION_ID/proxy" \
 
 #### PATCH /api/sessions/:sessionId/proxy
 
-Update per-session proxy settings (OPERATOR). No restart — changes apply on the next start. Send `"proxyUrl": null` to clear.
+Update per-session proxy settings (ADMIN, unscoped key). No restart — changes apply on the next start. Send `"proxyUrl": null` to clear.
 
 ```bash
 curl -X PATCH "$BASE/api/sessions/$SESSION_ID/proxy" \

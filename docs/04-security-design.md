@@ -93,6 +93,13 @@ The key-lifecycle routes (`/api/auth/api-keys`) are additionally fenced with `@R
 a session-scoped key is refused there whatever its role, so it cannot mint or widen credentials
 beyond its own confinement.
 
+A session's egress proxy (`proxyUrl` on `POST /api/sessions`, `PATCH /api/sessions/:sessionId/proxy`)
+is set only by an unscoped `admin` key; any other key gets `403`. The proxy is trusted egress chosen by
+the administrator, so its host is deliberately not checked against internal addresses (a loopback or
+private-network proxy sidecar works). The destinations of caller-supplied URLs fetched through it are
+still vetted by the SSRF guard. Reading the proxy (`GET /api/sessions/:sessionId/proxy`) returns only
+the masked host, type and a `hasCredentials` flag.
+
 ## 4.3 IP Whitelisting
 
 IP whitelisting adds an extra security layer by restricting API key access to specific IP addresses.

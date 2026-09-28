@@ -12,6 +12,7 @@ import {
   HttpStatus,
   ParseUUIDPipe,
   BadRequestException,
+  ForbiddenException,
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -92,8 +93,19 @@ export class SessionController {
     description: 'Session created',
     type: SessionResponseDto,
   })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Key lacks the OPERATOR role, is restricted to specific sessions, or set proxyUrl without the ADMIN role',
+  })
   @ApiResponse({ status: 409, description: 'Session name already exists' })
-  async create(@Body() dto: CreateSessionDto): Promise<SessionResponseDto> {
+  async create(@Body() dto: CreateSessionDto, @CurrentApiKey() apiKey?: ApiKey): Promise<SessionResponseDto> {
+    // A session proxy carries the session's egress, including the gateway's fetches of caller-supplied
+    // URLs, so choosing one is a deployment decision: ADMIN only, like PATCH :sessionId/proxy. The
+    // global guard always attaches the key, so a missing one is refused too.
+    if (dto.proxyUrl && apiKey?.role !== ApiKeyRole.ADMIN) {
+      throw new ForbiddenException('Setting proxyUrl requires an ADMIN key');
+    }
     const session = await this.sessionService.create(dto);
     await this.auditService.logInfo(AuditAction.SESSION_CREATED, {
       sessionId: session.id,
@@ -214,11 +226,11 @@ export class SessionController {
   }
 
   @Patch(':sessionId/proxy')
-  @RequireRole(ApiKeyRole.OPERATOR)
-  // Routing a session's whole egress through an attacker-chosen host is an instance-level decision,
-  // not a per-session one. Before this route existed, `proxyUrl` could only be set through POST
-  // /sessions, which is unscoped by the fence above, so a key restricted to specific sessions could
-  // never configure a proxy. Keep that reachability rather than widening it as a side effect.
+  // A session proxy carries all of the session's egress, including the gateway's fetches of
+  // caller-supplied URLs, and its host is not checked against internal addresses: it is trusted
+  // egress chosen by the deployment's administrator. Setting or clearing it is therefore ADMIN only,
+  // like proxyUrl on POST /sessions, and never open to a key restricted to specific sessions.
+  @RequireRole(ApiKeyRole.ADMIN)
   @RequireUnscopedKey()
   @ApiOperation({
     summary: 'Update the per-session egress proxy configuration',
@@ -233,6 +245,7 @@ export class SessionController {
     type: SessionProxyResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid proxyUrl' })
+  @ApiResponse({ status: 403, description: 'Key lacks the ADMIN role, or is restricted to specific sessions' })
   @ApiResponse({ status: 404, description: 'Session not found' })
   async updateProxy(
     @Param('sessionId', ParseUUIDPipe) id: string,

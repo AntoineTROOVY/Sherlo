@@ -7,8 +7,9 @@ import type { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../audit/entities/audit-log.entity';
 import { ChatScopeService } from '../auth/chat-scope.service';
 import type { ChatSummary } from '../../engine/interfaces/whatsapp-engine.interface';
-import type { ApiKey } from '../auth/entities/api-key.entity';
-import { BadGatewayException, BadRequestException, ConflictException } from '@nestjs/common';
+import { ApiKeyRole, type ApiKey } from '../auth/entities/api-key.entity';
+import { REQUIRED_ROLE_KEY, UNSCOPED_KEY } from '../auth/decorators/auth.decorators';
+import { BadGatewayException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 
 // POST /sessions declared a SessionResponseDto in its Swagger metadata but returned the raw
 // TypeORM entity, leaking internal columns (config, proxyUrl, proxyType) and the entity-only
@@ -99,6 +100,50 @@ describe('SessionController — create() response contract', () => {
       'session_created',
       expect.objectContaining({ sessionId: entity.id, sessionName: entity.name }),
     );
+  });
+});
+
+// A session proxy is deployment-level egress: setting or clearing one needs an ADMIN key on every
+// route that writes it.
+describe('SessionController: session proxy writes are ADMIN only', () => {
+  const key = (role: ApiKeyRole) => ({ id: 'k', role }) as ApiKey;
+  let sessionService: { create: jest.Mock; engineLoaded: jest.Mock };
+  let controller: SessionController;
+
+  beforeEach(() => {
+    sessionService = {
+      create: jest.fn().mockResolvedValue({ id: 'sess-uuid-1', name: 'with-proxy', config: {} }),
+      engineLoaded: jest.fn().mockReturnValue(false),
+    };
+    controller = new SessionControllerClass(
+      sessionService as unknown as SessionService,
+      { logInfo: jest.fn().mockResolvedValue(undefined) } as unknown as AuditService,
+      new ChatScopeService(),
+    );
+  });
+
+  it('PATCH :sessionId/proxy requires the ADMIN role and an unscoped key', () => {
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- reading route metadata, not invoking
+    const handler = SessionControllerClass.prototype.updateProxy;
+    expect(Reflect.getMetadata(REQUIRED_ROLE_KEY, handler)).toBe(ApiKeyRole.ADMIN);
+    expect(Reflect.getMetadata(UNSCOPED_KEY, handler)).toBe(true);
+  });
+
+  it.each([
+    ['an OPERATOR key', key(ApiKeyRole.OPERATOR)],
+    ['no key', undefined],
+  ])('POST /sessions with proxyUrl from %s is refused before anything is created', async (_, apiKey) => {
+    await expect(
+      controller.create({ name: 'with-proxy', proxyUrl: 'http://proxy.internal:8080' }, apiKey),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(sessionService.create).not.toHaveBeenCalled();
+  });
+
+  it('POST /sessions with proxyUrl from an ADMIN key, or without one from an OPERATOR key, creates', async () => {
+    await controller.create({ name: 'with-proxy', proxyUrl: 'http://proxy.internal:8080' }, key(ApiKeyRole.ADMIN));
+    await controller.create({ name: 'no-proxy' }, key(ApiKeyRole.OPERATOR));
+
+    expect(sessionService.create).toHaveBeenCalledTimes(2);
   });
 });
 
