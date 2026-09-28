@@ -358,3 +358,59 @@ describe('deployment docs describe what the entrypoint, probes and backup script
     expect(read('docs/11-operational-runbooks.md')).toContain(phrase);
   });
 });
+
+/**
+ * `ghcr.io/<repo>:main` is the channel an operator pulls to track main. Two things once decided which
+ * commit it pointed at: whichever push run finished its build last, even an older commit's, and a push
+ * that happened before the non-root smoke test, so an image that failed the smoke had already moved it.
+ * The branch tag is now a final step that runs only after the smoke passes and only while the commit is
+ * still the branch head; the build itself publishes nothing but the immutable `:<sha>` tag.
+ */
+describe('ci.yml moves the branch image tag only for the tested branch head', () => {
+  type CiStep = Step & { if?: string; id?: string };
+  type CiWorkflow = {
+    concurrency?: { group?: string; 'cancel-in-progress'?: boolean | string };
+    jobs?: Record<string, { steps?: CiStep[] }>;
+  };
+  const ci = (): CiWorkflow => workflowOf('ci.yml');
+  const dockerSteps = (): CiStep[] => ci().jobs?.docker?.steps ?? [];
+
+  it('finds the docker job and its steps', () => {
+    expect(dockerSteps().length).toBeGreaterThan(3);
+  });
+
+  // One group per pull request, so a new push cancels the superseded run; one group per push run
+  // (run_id), so pushes to main are never queued behind, or cancelled by, each other.
+  it('cancels superseded pull request runs without grouping push runs together', () => {
+    const concurrency = ci().concurrency;
+    expect(concurrency?.['cancel-in-progress']).toBe(true);
+    expect(concurrency?.group).toContain('github.event.pull_request.number');
+    expect(concurrency?.group).toContain('github.run_id');
+    // github.ref would put every push to main in one group, where a third push cancels the pending
+    // run of the second and that commit never gets tests or an image.
+    expect(concurrency?.group).not.toMatch(/github\.ref\b/);
+  });
+
+  it('never publishes the branch tag from the build step', () => {
+    const tagRules = dockerSteps()
+      .filter(step => (step.uses ?? '').startsWith('docker/metadata-action'))
+      .map(step => String((step.with as { tags?: string } | undefined)?.tags ?? ''));
+    expect(tagRules.length).toBe(1);
+    expect(executableLines(tagRules.join('\n'))).not.toContain('type=ref,event=branch');
+  });
+
+  it('re-points the branch tag as the last step, after the smoke, on push, only at the branch head', () => {
+    const steps = dockerSteps();
+    const smoke = steps.findIndex(step => executableLines(step.run ?? '').includes('smoke-test-non-root.sh'));
+    const retag = steps.findIndex(step => executableLines(step.run ?? '').includes('imagetools create'));
+    expect(smoke).toBeGreaterThan(-1);
+    expect(retag).toBeGreaterThan(smoke);
+    // Last, so every check added to this job gates the branch tag, not only the non-root smoke.
+    expect(retag).toBe(steps.length - 1);
+    const step = steps[retag];
+    expect(step.if ?? '').toContain("github.event_name == 'push'");
+    const run = executableLines(step.run ?? '');
+    expect(run).toMatch(/git ls-remote/);
+    expect(run).toMatch(/GITHUB_SHA/);
+  });
+});

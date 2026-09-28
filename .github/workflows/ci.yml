@@ -13,6 +13,14 @@ env:
 permissions:
   contents: read
 
+# A new push to a pull request cancels that pull request's superseded run. Push runs each get a group
+# of their own (run_id), so pushes to main never queue behind or cancel one another and
+# every commit keeps its tests and its `:<sha>` image; the docker job's last step decides which of
+# them the branch tag follows.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Lint
@@ -442,15 +450,17 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ghcr.io/${{ github.repository }}
-          # Branch + SHA tags only. `latest` is deliberately NOT set here: re-pointing it on
-          # every main push would bypass the boot-smoke → promote discipline in release.yml
-          # (a main-push image is build-gated only, never boot-tested). `latest` moves exclusively
-          # through the tested release path.
+          # SHA tag only. The branch tag (`:main`) is applied by the last step of this job,
+          # after the non-root smoke passes and only while this commit is still the branch head, so
+          # a slower run for an older commit cannot re-point it. `latest` is deliberately NOT set
+          # here: re-pointing it on every main push would bypass the boot-smoke → promote
+          # discipline in release.yml (a main-push image is build-gated only, never boot-tested).
+          # `latest` moves exclusively through the tested release path.
           tags: |
-            type=ref,event=branch
             type=sha,prefix=
 
       - name: Build and optionally push
+        id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
@@ -492,3 +502,20 @@ jobs:
         env:
           OPENWA_SMOKE_IMAGE: openwa-ci:non-root-smoke
         run: ./scripts/smoke-test-non-root.sh
+
+      # Re-point the branch tag at the image this run built, by digest. The head check sits seconds
+      # before the re-point rather than a whole build before it: a run whose commit has been
+      # superseded leaves the tag to the newer run.
+      - name: Move the branch tag to this image when it is still the branch head
+        if: github.event_name == 'push'
+        env:
+          REPO: ${{ github.repository }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          head="$(git ls-remote origin "$GITHUB_REF" | cut -f1)"
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::notice::$GITHUB_SHA is no longer the head of $GITHUB_REF_NAME ($head); leaving the branch tag alone"
+            exit 0
+          fi
+          docker buildx imagetools create --tag "ghcr.io/${REPO,,}:${GITHUB_REF_NAME}" "ghcr.io/${REPO,,}@${DIGEST}"
