@@ -63,8 +63,8 @@ cd openwa
 # 3. Add upstream remote
 git remote add upstream https://github.com/rmyndharis/OpenWA.git
 
-# 4. Install dependencies
-npm install
+# 4. Install the locked dependencies (also installs dashboard dependencies)
+npm ci
 
 # 5. Start development (API + dashboard). No .env is needed: the first boot writes
 #    data/.env.generated. A .env only pins values; if you copy .env.example, set

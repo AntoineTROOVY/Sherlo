@@ -188,6 +188,11 @@ docker compose -f docker-compose.dev.yml up -d
 # Swagger: http://localhost:2785/api/docs
 ```
 
+**Your API key.** The first boot generates an admin API key, prints it once in the log and stores it at
+`/app/data/.api-key` inside the container. Read it with `docker exec openwa-api cat /app/data/.api-key`,
+then use it to sign in to the dashboard and as the `X-API-Key` header wherever this README shows
+`YOUR_API_KEY`. Later boots log only a masked prefix. See [API Key](docs/README.md#api-key).
+
 > **Using Podman instead of Docker?**
 > Podman rootless mode requires the socket to be running and `DOCKER_HOST` to be set:
 >
@@ -217,6 +222,8 @@ npm run dev
 # API: http://localhost:2785/api
 # Swagger: http://localhost:2785/api/docs
 ```
+
+The first boot writes the admin API key to `data/.api-key` (read it with `cat data/.api-key`).
 
 Use `npm install` instead when intentionally changing dependencies. OpenWA's committed lockfile uses
 registry artifacts only, so npm 12 works with its secure default that blocks Git dependencies; do not
@@ -313,6 +320,22 @@ without one, and a production boot rejects default credentials such as `openwa` 
 > - `linux/amd64`
 > - `linux/arm64`
 
+To run a published image instead of building from source, add a `docker-compose.override.yml` next to
+`docker-compose.yml`:
+
+```yaml
+services:
+  openwa-api:
+    image: ghcr.io/rmyndharis/openwa:latest
+```
+
+Run `docker compose pull openwa-api && docker compose up -d --no-build`, and use the same command to
+upgrade. Pin a release by replacing `latest` with its version number. Once the image is pulled, Compose
+runs it and builds nothing. The service keeps its `build:` section, so if the pull fails (a mistyped tag,
+no registry access) Compose falls back to building from source and tags that build with the published
+name; `--no-build` makes that case fail instead. For the same reason, do not use `--build` or
+`docker compose build` with this override.
+
 ## 🔌 Ports
 
 | Service         | Port            | Description                                                                         |
@@ -324,6 +347,8 @@ without one, and a production boot rejects default credentials such as `openwa` 
 ---
 
 ## 📡 API Examples
+
+Replace `YOUR_API_KEY` with your admin key (see [Quick Start](#-quick-start) for where to find it).
 
 ### Create a Session
 

@@ -795,7 +795,7 @@ docker compose down
 #    The repo's compose file BUILDS the API image from source:
 git pull && docker compose up -d --build
 #    Deployments pinned to a published image instead (ghcr.io/rmyndharis/openwa:<version>)
-#    bump the tag in their compose file, then: docker compose pull && docker compose up -d
+#    bump the tag in their compose file, then: docker compose pull openwa-api && docker compose up -d --no-build
 
 # 4. Wait for health — every route lives under the /api prefix
 for i in {1..30}; do
@@ -919,7 +919,8 @@ cp "$BACKUP_DIR/.env" .
 cp "$BACKUP_DIR/docker-compose.yml" .
 
 # 5. Start the target version. The repo compose BUILDS the image, so check out the tag and rebuild;
-#    a deployment pinned to a published image bumps the tag and runs `docker compose pull` instead.
+#    a deployment pinned to a published image bumps the tag and runs
+#    `docker compose pull openwa-api && docker compose up -d --no-build` instead.
 echo "▶️ Starting v${TARGET_VERSION}..."
 git checkout "v${TARGET_VERSION}"
 docker compose up -d --build

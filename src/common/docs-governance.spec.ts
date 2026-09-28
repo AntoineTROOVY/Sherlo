@@ -67,4 +67,28 @@ describe('governance docs match the repository', () => {
     expect(documented.size).toBeGreaterThanOrEqual(20);
     expect(applied.filter(label => !documented.has(label))).toEqual([]);
   });
+
+  // The override keeps the service's `build:` section, so `--build` would tag a source build with the
+  // published image name. The README, the release guide and the migration guide give one upgrade command.
+  it('gives the published-image override one upgrade command in the README, docs/14 and docs/15', () => {
+    const command = 'docker compose pull openwa-api && docker compose up -d --no-build';
+    const readme = between(read('README.md'), 'To run a published image', '\n## ');
+    expect(readme).toContain(command);
+    expect(readme).not.toMatch(/still builds from source/);
+    // Compose pulls a missing image first; only a failed pull falls back to a source build.
+    expect(readme).not.toMatch(/missing image would be built/);
+    expect(readme).toMatch(/if the pull fails/);
+    expect(between(read('docs/15-project-roadmap.md'), 'Upgrading a Compose deployment', '\n## ')).toContain(command);
+    const migration = read('docs/14-migration-guide.md');
+    expect(between(migration, '# 3. Move to the new version', '# 4.')).toContain(command);
+    expect(between(migration, '# 5. Start the target version', 'echo')).toContain(command);
+  });
+
+  // `docker compose run` has no --no-build, so the runbook confirms the pull landed before step 7.
+  it('keeps the runbook published-image upgrade from building after a failed pull', () => {
+    const note = between(read('docs/11-operational-runbooks.md'), '> If you deploy the published image', '\n\n');
+    expect(note).toContain('`docker compose pull openwa-api`');
+    expect(note).toContain('`docker image inspect ghcr.io/rmyndharis/openwa:<tag>`');
+    expect(note).toContain('`docker compose up -d --no-build`');
+  });
 });

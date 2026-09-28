@@ -491,8 +491,11 @@ curl -X POST http://localhost:2785/api/sessions/{sessionId}/messages/send-text \
 ```
 
 > If you deploy the published image instead of building from source — your own compose file with
-> `image: ghcr.io/rmyndharis/openwa:<tag>` — replace steps 5-6 with editing that tag and running
-> `docker compose pull`.
+> `image: ghcr.io/rmyndharis/openwa:<tag>` — replace steps 5-6 with editing that tag, running
+> `docker compose pull openwa-api`, and confirming the image landed with
+> `docker image inspect ghcr.io/rmyndharis/openwa:<tag>`. `docker compose run` in step 7 has no
+> `--no-build`, so when the service keeps a `build:` section a failed pull would otherwise build from
+> source under the published name. Run step 8 as `docker compose up -d --no-build`.
 
 > On Kubernetes with the chart in `charts/openwa`, take the step 2 backup with the Helm lines in
 > Runbook: Database Backup and the step 3 export first, then replace steps 4-8 with checking out the
