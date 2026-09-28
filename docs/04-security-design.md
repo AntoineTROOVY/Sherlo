@@ -542,6 +542,7 @@ flowchart TB
 - [ ] CORS properly configured
 - [ ] Firewall rules set
 - [ ] Regular security updates
+- [ ] Release image (releases after 0.23.7; earlier images carry no attestation) verified as built by the release workflow at its tag: `gh attestation verify oci://ghcr.io/rmyndharis/openwa:<version> --repo rmyndharis/OpenWA --signer-workflow rmyndharis/OpenWA/.github/workflows/release.yml --source-ref refs/tags/v<version>` (the same digest, and so the same check, applies to `docker.io/rmyndharis/openwa`)
 
 ### Operations
 

@@ -125,3 +125,69 @@ describe('the release and weekly audits fail when the audit cannot run', () => {
     expect(steps.some(step => step.env?.CHECK_AUDIT_REQUIRED !== undefined)).toBe(false);
   });
 });
+
+/**
+ * BuildKit's provenance and SBOM travel inside the image index unsigned, so nothing a user could check
+ * tied a published image to this workflow. promote now records a signed build-provenance attestation
+ * for the tested digest, and verify-published checks it on every promoted tag of both registries.
+ */
+describe('released images carry a verifiable build-provenance attestation', () => {
+  type Perms = Record<string, string> | string | undefined;
+  type AttestStep = { uses?: string; run?: string; with?: Record<string, string> };
+  type AttestJob = { permissions?: Perms; steps?: AttestStep[] };
+  const jobs = (): Record<string, AttestJob> =>
+    (yaml.load(fs.readFileSync(path.join(workflowDir, 'release.yml'), 'utf8')) as { jobs?: Record<string, AttestJob> })
+      .jobs ?? {};
+  const grant = (perms: Perms, key: string): string | undefined =>
+    typeof perms === 'object' && perms !== null ? perms[key] : undefined;
+
+  // Attesting first means a failed attestation leaves no release tag published.
+  it('promote attests the tested digest before re-pointing the release tags', () => {
+    const promote = jobs().promote;
+    const steps = promote?.steps ?? [];
+    expect(steps.length).toBeGreaterThan(1);
+    const attest = steps.findIndex(step =>
+      /^actions\/attest(?:-build-provenance)?@[0-9a-f]{40}\b/.test(step.uses ?? ''),
+    );
+    const retag = steps.findIndex(step => executableLines(step.run ?? '').includes('imagetools create'));
+    expect(attest).toBeGreaterThan(-1);
+    expect(retag).toBeGreaterThan(attest);
+    expect(steps[attest].with?.['subject-digest']).toContain('needs.docker.outputs.digest');
+    expect(grant(promote?.permissions, 'id-token')).toBe('write');
+    expect(grant(promote?.permissions, 'attestations')).toBe('write');
+  });
+
+  // The signing grant stays on the one job that needs it, away from the build and test jobs.
+  it.each(['docker', 'boot-smoke', 'image-scan'])('%s cannot mint an OIDC token', job => {
+    expect(jobs()[job]).toBeDefined();
+    expect(grant(jobs()[job].permissions, 'id-token')).toBeUndefined();
+  });
+
+  it('verify-published checks the attestation of every promoted tag', () => {
+    const verify = jobs()['verify-published'];
+    const run = (verify?.steps ?? []).map(step => executableLines(step.run ?? '')).join('\n');
+    expect(run).toMatch(/gh attestation verify "oci:\/\/\$ref"/);
+    // The same pins the operator checklist below uses, so a green release proves what docs/04 promises.
+    expect(run).toContain('--signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml"');
+    expect(run).toContain('--source-ref "$GITHUB_REF"');
+    expect(grant(verify?.permissions, 'attestations')).toBe('read');
+  });
+
+  // Without the two pins, `gh attestation verify` accepts any workflow in the repository on any ref,
+  // which is less than the checklist promises. Image tags carry no `v`; release git tags do.
+  it('the operator checklist pins the release workflow and the tag it ran on', () => {
+    const doc = fs.readFileSync(path.join(__dirname, '..', '..', 'docs', '04-security-design.md'), 'utf8');
+    const command = /`(gh attestation verify [^`]*)`/.exec(doc)?.[1];
+    expect(command).toContain('oci://ghcr.io/rmyndharis/openwa:<version>');
+    expect(command).toContain('--signer-workflow rmyndharis/OpenWA/.github/workflows/release.yml');
+    expect(command).toContain('--source-ref refs/tags/v<version>');
+  });
+
+  // The attest step first ran after v0.23.7, so the check would reject every image published before it.
+  it('the operator checklist scopes the check to releases that carry an attestation', () => {
+    const doc = fs.readFileSync(path.join(__dirname, '..', '..', 'docs', '04-security-design.md'), 'utf8');
+    const item = doc.split('\n').find(line => line.includes('`gh attestation verify '));
+    expect(item).toMatch(/releases after 0\.23\.7/);
+    expect(item).toMatch(/earlier images carry no attestation/);
+  });
+});
