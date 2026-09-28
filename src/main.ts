@@ -12,6 +12,7 @@ import { LoggerService, LogLevel, createLogger } from './common/services/logger.
 import { createSwaggerConfig, dropUnexpressibleOperations, exemptPublicOperations } from './config/swagger.config';
 import { registerUncaughtExceptionMonitor, registerUnhandledRejectionHandler } from './config/process-error-monitor';
 import { runBootstrapOrExit } from './config/bootstrap-fatal';
+import { validateEnv } from './config/env.validation';
 import { resolveStorageRoot } from './config/storage-root';
 import { applyHttpTimeouts, HttpTimeoutConfig, HttpTimeoutSink } from './config/http-timeouts';
 import { applyGlobalValidation } from './config/app-validation';
@@ -38,8 +39,7 @@ let appInstance: INestApplication | undefined;
 
 async function bootstrap() {
   // Apply the operator-configured log verbosity (LOG_LEVEL) before anything logs. Unset means INFO.
-  // A misspelling is skipped here; env.validation.ts rejects it and the boot fails inside
-  // NestFactory.create.
+  // A misspelling is skipped here; validateEnv below rejects it before the boot has any side effect.
   const requestedLevel = process.env.LOG_LEVEL?.trim().toLowerCase();
   if (requestedLevel && (Object.values(LogLevel) as string[]).includes(requestedLevel)) {
     LoggerService.setLogLevel(requestedLevel as LogLevel);
@@ -54,6 +54,11 @@ async function bootstrap() {
   // raw stack to stderr, bypassing the structured log pipeline, and exits(1). Route the stack through the
   // logger WITHOUT swallowing the exception, so the crash-and-restart posture is unchanged (see the helper).
   registerUncaughtExceptionMonitor(bootstrapLogger);
+
+  // Validate the environment before anything acts on it. ConfigModule.forRoot runs the same check, but
+  // only once NestFactory.create awaits it, which is after the storage root is created and a built-in
+  // PostgreSQL container is started; an invalid config would do both and then be reported twice.
+  validateEnv(process.env);
 
   // Advisory (not enforced): an unset/blank NODE_ENV is the deliberate local-dev default, but it
   // silently degrades four controls to their dev posture (the default-secret guard, wildcard CORS,
