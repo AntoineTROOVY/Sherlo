@@ -14,7 +14,7 @@ import {
   recordWebhookDeliveryFailure,
   statusCodeFromError,
 } from '../../webhook/utils/record-delivery-failure';
-import { buildDeliveryHeaders, postWebhookPayload } from '../../webhook/utils/deliver-once';
+import { buildDeliveryHeaders, isDeliverableWebhook, postWebhookPayload } from '../../webhook/utils/deliver-once';
 import { HookManager } from '../../../core/hooks';
 import { redactSsrfError } from '../../../common/security/ssrf-guard';
 import { incrementWebhookDeliveryFailures } from '../../../common/metrics/webhook-delivery-metrics';
@@ -139,7 +139,7 @@ export class WebhookProcessor extends WorkerHost {
   /** The webhook row as it is now, or null when it was deleted, disabled or no longer takes `event`. */
   private async loadDeliverableWebhook(webhookId: string, event: string): Promise<Webhook | null> {
     const row = await this.webhookRepository.findOne({ where: { id: webhookId } });
-    return row && row.active && (row.events.includes(event) || row.events.includes('*')) ? row : null;
+    return isDeliverableWebhook(row, event) ? row : null;
   }
 
   /**

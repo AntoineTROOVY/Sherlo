@@ -9,7 +9,12 @@ import { Webhook } from './entities/webhook.entity';
 import { WebhookOutboxService } from './webhook-outbox.service';
 import { WebhookDeliveryFailure } from './entities/webhook-delivery-failure.entity';
 import { clearDeliveryFailureRows, recordWebhookDeliveryFailure } from './utils/record-delivery-failure';
-import { buildDeliveryHeaders, postWebhookPayload, recordTerminalFailure } from './utils/deliver-once';
+import {
+  buildDeliveryHeaders,
+  isDeliverableWebhook,
+  postWebhookPayload,
+  recordTerminalFailure,
+} from './utils/deliver-once';
 import { createLogger } from '../../common/services/logger.service';
 import { DEFAULT_WEBHOOK_MEDIA_INLINE_MAX_BYTES, shedInlineMedia } from '../../common/utils/inline-media';
 import { incrementWebhookDeliveryFailures } from '../../common/metrics/webhook-delivery-metrics';
@@ -300,8 +305,8 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Build one webhook delivery: payload + webhook:before hooks + identity re-assertion + size gate +
-   * headers. Returns null when the delivery must not proceed — either cancelled by a plugin (a debug
+   * Build one webhook delivery: payload + webhook:before hooks + identity re-assertion + size gate.
+   * Returns null when the delivery must not proceed: either cancelled by a plugin (a debug
    * log, not a failure) or after a failure already recorded via recordUndelivered.
    */
   private async preflightDelivery(
@@ -309,7 +314,7 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
     deliveryId: string,
     idempotencyKey: string,
     ctx: DispatchEventContext,
-  ): Promise<{ finalPayload: WebhookPayload; body: string; headers: Record<string, string> } | 'cancelled' | null> {
+  ): Promise<{ finalPayload: WebhookPayload; body: string } | 'cancelled' | null> {
     const { sessionId, event, baseData } = ctx;
     try {
       const payload: WebhookPayload = {
@@ -406,8 +411,7 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
         return null;
       }
 
-      const headers = buildDeliveryHeaders(webhook, event, idempotencyKey, deliveryId, body);
-      return { finalPayload, body, headers };
+      return { finalPayload, body };
     } catch (error) {
       await this.recordUndelivered(
         webhook,
@@ -447,23 +451,22 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
       // The remaining bail-outs record their own undelivered row before returning null.
       return 'failed';
     }
-    const { finalPayload, body, headers } = preflight;
+    const { finalPayload, body } = preflight;
     // Use queue if available, otherwise fallback to direct delivery
     if (this.queueEnabled && this.webhookQueue) {
       // A replay's attempts-0 row is not cleared here. It stays until the delivery resolves: a
       // successful POST (the processor's, or the fallback's when the add fails) clears it, and a
       // terminal failure replaces it right after filing its own row. A restart or a lost job at
       // any point before that still leaves the event on record.
-      return this.enqueueWithFallback(webhook, finalPayload, body, headers, deliveryId, idempotencyKey, ctx);
+      return this.enqueueWithFallback(webhook, finalPayload, body, deliveryId, idempotencyKey, ctx);
     }
-    return this.deliverDirect(webhook, finalPayload, body, headers, deliveryId, ctx);
+    return this.deliverDirect(webhook, finalPayload, body, deliveryId, ctx);
   }
 
   private async enqueueWithFallback(
     webhook: Webhook,
     finalPayload: WebhookPayload,
     body: string,
-    headers: Record<string, string>,
     deliveryId: string,
     idempotencyKey: string,
     ctx: DispatchEventContext,
@@ -526,7 +529,8 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
       // Redis before rejecting, the queued job AND this fallback may both POST. Both paths carry the
       // same X-OpenWA-Idempotency-Key / X-OpenWA-Delivery-Id, so a conformant receiver dedupes.
       try {
-        await this.deliverWebhook(webhook, finalPayload, headers, body);
+        // Removed, disabled or unsubscribed before a retry: nothing to report, as on the queued path.
+        if (!(await this.deliverWebhook(webhook, finalPayload, body))) return 'cancelled';
 
         await this.hookManager.execute(
           'webhook:delivered',
@@ -569,13 +573,13 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
     webhook: Webhook,
     finalPayload: WebhookPayload,
     body: string,
-    headers: Record<string, string>,
     deliveryId: string,
     ctx: DispatchEventContext,
   ): Promise<WebhookDeliveryOutcome> {
     const { sessionId, event } = ctx;
     try {
-      await this.deliverWebhook(webhook, finalPayload, headers, body);
+      // Removed, disabled or unsubscribed before a retry: nothing to report, as on the queued path.
+      if (!(await this.deliverWebhook(webhook, finalPayload, body))) return 'cancelled';
 
       // Execute hook after successful delivery
       await this.hookManager.execute(
@@ -732,77 +736,100 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
   /**
    * Direct delivery with in-process retries, up to `webhook.retryCount` attempts: the path every
    * delivery takes when the queue is disabled (the default), and the fallback when an enqueue fails.
-   * `body` is the pre-serialized payload from preflight — the exact bytes the size gate checked and
-   * (when a secret is set) the signature covers — so it is never re-serialized here.
+   * `body` is the pre-serialized payload from preflight, the exact bytes the size gate checked, so it
+   * is never re-serialized here.
+   *
+   * Like a queued job, every retry re-reads the webhook row: a webhook removed, disabled or
+   * unsubscribed since the dispatch gets nothing more and no failure row (resolves false), and a
+   * changed url, secret or header map applies from the next attempt. Retries back off exponentially
+   * (retryDelay, then twice that, and so on), the schedule BullMQ applies to a queued job.
    */
-  private async deliverWebhook(
-    webhook: Webhook,
-    payload: WebhookPayload,
-    headers: Record<string, string>,
-    body: string,
-    attempt = 1,
-  ): Promise<void> {
-    // Update retry count header
-    headers['X-OpenWA-Retry-Count'] = String(attempt - 1);
-
-    try {
-      await postWebhookPayload(webhook.url, body, headers, this.configService.get<number>('webhook.timeout', 10000));
-
-      // The receiver already answered 2xx — the delivery SUCCEEDED. A bookkeeping failure here (e.g.
-      // the lastTriggeredAt update on a flaky DB) must not reach the catch below: it would retry an
-      // already-delivered webhook (duplicate POST) and, on the last attempt, file a false dead-letter
-      // row. Log it and keep the success outcome.
+  private async deliverWebhook(webhook: Webhook, payload: WebhookPayload, body: string): Promise<boolean> {
+    const delay = this.configService.get<number>('webhook.retryDelay', 5000);
+    let current = webhook;
+    for (let attempt = 1; ; attempt++) {
       try {
-        await this.webhookRepository.update(webhook.id, {
-          lastTriggeredAt: new Date(),
-        });
-      } catch (bookkeepingError) {
-        this.logger.error(
-          `Webhook delivered to ${webhook.id} but lastTriggeredAt update failed`,
-          bookkeepingError instanceof Error ? bookkeepingError.message : String(bookkeepingError),
-          { webhookId: webhook.id, deliveryId: payload.deliveryId, action: 'webhook_bookkeeping_failed' },
+        if (attempt > 1) {
+          // Inside the try: a read error counts as a failed attempt, as it does for a queued job.
+          const row = await this.webhookRepository.findOne({ where: { id: webhook.id } });
+          if (!isDeliverableWebhook(row, payload.event)) {
+            this.logger.warn('Skipping webhook retry: webhook removed, disabled or unsubscribed', {
+              webhookId: webhook.id,
+              event: payload.event,
+              deliveryId: payload.deliveryId,
+              idempotencyKey: payload.idempotencyKey,
+              action: 'webhook_skipped_stale',
+            });
+            return false;
+          }
+          current = row;
+        }
+        const headers = buildDeliveryHeaders(
+          current,
+          payload.event,
+          payload.idempotencyKey,
+          payload.deliveryId,
+          body,
+          attempt - 1,
         );
-      }
-      // A delivered event must not stay listed as lost: a replay of a shed, refused or failed
-      // dispatch, or a re-emitted event, reuses the key an earlier failure row was filed under.
-      await clearDeliveryFailureRows(this.failureRepository, this.logger, webhook.id, payload.idempotencyKey);
+        await postWebhookPayload(current.url, body, headers, this.configService.get<number>('webhook.timeout', 10000));
 
-      this.logger.debug(`Webhook delivered to ${webhook.id}`, {
-        webhookId: webhook.id,
-        deliveryId: payload.deliveryId,
-        action: 'webhook_delivered',
-      });
-    } catch (error) {
-      this.logger.error(`Webhook delivery failed for ${webhook.id}`, String(error), {
-        webhookId: webhook.id,
-        attempt,
-        deliveryId: payload.deliveryId,
-        action: 'webhook_delivery_failed',
-      });
+        // The receiver already answered 2xx — the delivery SUCCEEDED. A bookkeeping failure here (e.g.
+        // the lastTriggeredAt update on a flaky DB) must not reach the catch below: it would retry an
+        // already-delivered webhook (duplicate POST) and, on the last attempt, file a false dead-letter
+        // row. Log it and keep the success outcome.
+        try {
+          await this.webhookRepository.update(webhook.id, {
+            lastTriggeredAt: new Date(),
+          });
+        } catch (bookkeepingError) {
+          this.logger.error(
+            `Webhook delivered to ${webhook.id} but lastTriggeredAt update failed`,
+            bookkeepingError instanceof Error ? bookkeepingError.message : String(bookkeepingError),
+            { webhookId: webhook.id, deliveryId: payload.deliveryId, action: 'webhook_bookkeeping_failed' },
+          );
+        }
+        // A delivered event must not stay listed as lost: a replay of a shed, refused or failed
+        // dispatch, or a re-emitted event, reuses the key an earlier failure row was filed under.
+        await clearDeliveryFailureRows(this.failureRepository, this.logger, webhook.id, payload.idempotencyKey);
 
-      if (attempt < webhook.retryCount) {
-        const delay = this.configService.get<number>('webhook.retryDelay', 5000);
-        await setTimeout(delay * attempt);
-        return this.deliverWebhook(webhook, payload, headers, body, attempt + 1);
+        this.logger.debug(`Webhook delivered to ${webhook.id}`, {
+          webhookId: webhook.id,
+          deliveryId: payload.deliveryId,
+          action: 'webhook_delivered',
+        });
+        return true;
+      } catch (error) {
+        this.logger.error(`Webhook delivery failed for ${webhook.id}`, String(error), {
+          webhookId: webhook.id,
+          attempt,
+          deliveryId: payload.deliveryId,
+          action: 'webhook_delivery_failed',
+        });
+
+        if (attempt < current.retryCount) {
+          await setTimeout(delay * 2 ** (attempt - 1));
+          continue;
+        }
+        // All direct-path retries exhausted — persist a durable failure record before giving up, mirroring
+        // the queued processor's final-attempt path so the queue-disabled path isn't a blind spot.
+        // The recorder writes this row first and only then removes an attempts-0 row of the same
+        // delivery (a shed or refused dispatch), so a restart at any point keeps a record.
+        const recorded = await recordTerminalFailure(this.failureRepository, this.logger, {
+          webhookId: webhook.id,
+          sessionId: payload.sessionId,
+          event: payload.event,
+          url: current.url,
+          idempotencyKey: payload.idempotencyKey,
+          deliveryId: payload.deliveryId,
+          attempts: attempt,
+          error,
+        });
+        if (recorded) {
+          incrementWebhookDeliveryFailures();
+        }
+        throw error;
       }
-      // All direct-path retries exhausted — persist a durable failure record before giving up, mirroring
-      // the queued processor's final-attempt path so the queue-disabled path isn't a blind spot.
-      // The recorder writes this row first and only then removes an attempts-0 row of the same
-      // delivery (a shed or refused dispatch), so a restart at any point keeps a record.
-      const recorded = await recordTerminalFailure(this.failureRepository, this.logger, {
-        webhookId: webhook.id,
-        sessionId: payload.sessionId,
-        event: payload.event,
-        url: webhook.url,
-        idempotencyKey: payload.idempotencyKey,
-        deliveryId: payload.deliveryId,
-        attempts: attempt,
-        error,
-      });
-      if (recorded) {
-        incrementWebhookDeliveryFailures();
-      }
-      throw error;
     }
   }
 }

@@ -10,6 +10,14 @@ jest.mock('undici', () => {
   return { __esModule: true, ...actual, fetch: jest.fn() };
 });
 
+// A pass-through spy, so a test can read the backoff the retry loop asked for without faking time
+// (jest's fake timers do not cover node:timers/promises).
+jest.mock('node:timers/promises', () => {
+  const actual = jest.requireActual<typeof import('node:timers/promises')>('node:timers/promises');
+  return { ...actual, setTimeout: jest.fn(actual.setTimeout) };
+});
+
+import { setTimeout as sleep } from 'node:timers/promises';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { getQueueToken } from '@nestjs/bullmq';
@@ -73,6 +81,12 @@ describe('WebhookDeliveryService', () => {
   beforeEach(async () => {
     repository = {
       find: jest.fn(),
+      // A direct retry re-reads its webhook. By default it reads back the row dispatch loaded, so a
+      // test changes the webhook between attempts by overriding this.
+      findOne: jest.fn().mockImplementation(async (opts: { where: { id: string } }) => {
+        const rows = (await (repository.find as jest.Mock)()) as Webhook[] | undefined;
+        return rows?.find(w => w.id === opts.where.id) ?? null;
+      }),
       update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
@@ -1714,6 +1728,25 @@ describe('WebhookDeliveryService', () => {
       );
     });
 
+    it('reports cancelled when the queue fallback finds the webhook gone before a retry', async () => {
+      const queueService = await buildQueueService(<T>(key: string, def?: T): T | boolean | number => {
+        if (key === 'queue.enabled') return true;
+        if (key === 'webhook.retryDelay') return 10;
+        return def as T;
+      });
+      const webhook = createMockWebhook({ retryCount: 2 });
+      (repository.findOne as jest.Mock).mockResolvedValue(null);
+      webhookQueue.add.mockRejectedValueOnce(new Error('redis down'));
+      const mockFetch = undiciFetch as jest.Mock;
+      (hookManager.execute as jest.Mock).mockResolvedValue({ continue: true, data: {} });
+      mockFetch.mockRejectedValue(new Error('receiver down'));
+
+      await expect(queueService.redeliver(webhook, 'sess-1', 'message.received', 'k', {})).resolves.toBe('cancelled');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(failureRepository.insert).not.toHaveBeenCalled();
+    });
+
     it('falls back to direct delivery when queue add fails', async () => {
       const queueService = await buildQueueService(<T>(key: string, def?: T): T | boolean | number => {
         if (key === 'queue.enabled') return true;
@@ -1752,6 +1785,92 @@ describe('WebhookDeliveryService', () => {
         expect.objectContaining({ webhookId: webhook.id, fallback: 'queue_failed' }),
         expect.anything(),
       );
+    });
+  });
+
+  describe('direct retries', () => {
+    const mockFetch = undiciFetch as jest.Mock;
+    type SentInit = { headers: Record<string, string>; body: string };
+
+    beforeEach(() => {
+      (hookManager.execute as jest.Mock).mockResolvedValue({ continue: true, data: {} });
+      mockFetch.mockReset();
+    });
+
+    afterEach(() => mockFetch.mockReset());
+
+    // A queued job re-reads its webhook before every attempt; the direct loop kept POSTing the
+    // snapshot taken at dispatch, then filed a dead-letter row for a webhook the operator removed.
+    it.each([
+      ['deleted', null],
+      ['disabled', { active: false }],
+      ['unsubscribed from the event', { events: ['message.ack'] }],
+    ])('stops retrying, files nothing and reports cancelled when the webhook was %s', async (_label, change) => {
+      const webhook = createMockWebhook({ retryCount: 3 });
+      (repository.findOne as jest.Mock).mockResolvedValue(change && { ...webhook, ...change });
+      mockFetch.mockRejectedValue(new Error('receiver down'));
+      const failuresBefore = getWebhookDeliveryFailuresTotal();
+
+      await expect(service.redeliver(webhook, 'sess-1', 'message.received', 'k', {})).resolves.toBe('cancelled');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(failureRepository.insert).not.toHaveBeenCalled();
+      expect(getWebhookDeliveryFailuresTotal()).toBe(failuresBefore);
+      const hooks = (hookManager.execute as jest.Mock).mock.calls.map(([name]) => name as string);
+      expect(hooks).not.toContain('webhook:delivered');
+      expect(hooks).not.toContain('webhook:after');
+    });
+
+    it('sends a retry to the current url, signed with the current secret', async () => {
+      const webhook = createMockWebhook({ retryCount: 2, secret: 'old-secret-0123456789' });
+      const moved = { ...webhook, url: 'https://moved.example/hook', secret: 'new-secret-0123456789' };
+      (repository.findOne as jest.Mock).mockResolvedValue(moved);
+      mockFetch.mockRejectedValueOnce(new Error('receiver down')).mockResolvedValueOnce({ ok: true, status: 200 });
+
+      await expect(service.redeliver(webhook, 'sess-1', 'message.received', 'k', {})).resolves.toBe('delivered');
+
+      const calls = mockFetch.mock.calls as Array<[string, SentInit]>;
+      expect(calls.map(([url]) => url)).toEqual(['https://example.com/webhook', 'https://moved.example/hook']);
+      const [, retry] = calls[1];
+      const expected = `sha256=${crypto.createHmac('sha256', 'new-secret-0123456789').update(retry.body).digest('hex')}`;
+      expect(retry.headers['X-OpenWA-Signature']).toBe(expected);
+      expect(retry.headers['X-OpenWA-Retry-Count']).toBe('1');
+    });
+
+    it('drops the signature from a retry once the secret is cleared', async () => {
+      const webhook = createMockWebhook({ retryCount: 2, secret: 'old-secret-0123456789' });
+      (repository.findOne as jest.Mock).mockResolvedValue({ ...webhook, secret: null });
+      mockFetch.mockRejectedValueOnce(new Error('receiver down')).mockResolvedValueOnce({ ok: true, status: 200 });
+
+      await service.redeliver(webhook, 'sess-1', 'message.received', 'k', {});
+
+      const calls = mockFetch.mock.calls as Array<[string, SentInit]>;
+      expect(calls[0][1].headers).toHaveProperty('X-OpenWA-Signature');
+      expect(calls[1][1].headers).not.toHaveProperty('X-OpenWA-Signature');
+    });
+
+    it('counts a failed re-read as a failed attempt', async () => {
+      const webhook = createMockWebhook({ retryCount: 2 });
+      (repository.findOne as jest.Mock).mockRejectedValue(new Error('db down'));
+      mockFetch.mockRejectedValue(new Error('receiver down'));
+
+      await expect(service.redeliver(webhook, 'sess-1', 'message.received', 'k', {})).resolves.toBe('failed');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(insertedFailures).toEqual([expect.objectContaining({ attempts: 2, lastError: 'db down' })]);
+    });
+
+    it('backs off exponentially between attempts, as the queue does', async () => {
+      const webhook = createMockWebhook({ retryCount: 4 });
+      (repository.findOne as jest.Mock).mockResolvedValue(webhook);
+      mockFetch.mockRejectedValue(new Error('receiver down'));
+      (sleep as unknown as jest.Mock).mockClear();
+
+      await expect(service.redeliver(webhook, 'sess-1', 'message.received', 'k', {})).resolves.toBe('failed');
+
+      // retryDelay is 100 here: 100, then 200, then 400.
+      expect((sleep as unknown as jest.Mock).mock.calls.map(([ms]) => ms as number)).toEqual([100, 200, 400]);
+      expect(mockFetch).toHaveBeenCalledTimes(4);
     });
   });
 

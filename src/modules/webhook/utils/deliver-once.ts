@@ -26,6 +26,19 @@ export function sanitizeCustomHeaders(custom: Record<string, string> | null | un
   return safe;
 }
 
+/**
+ * Whether a webhook row as read now may still receive `event`: it exists, is active and subscribes to
+ * the event or to '*'. Its filters are not re-applied here, since they need the event data. Every
+ * path that delivers after the dispatch moment (a queued job, a direct retry, an outbox replay) runs
+ * this against a fresh row, so a removed, disabled or unsubscribed webhook stops receiving the event.
+ */
+export function isDeliverableWebhook<T extends { active: boolean; events: string[] }>(
+  row: T | null | undefined,
+  event: string,
+): row is T {
+  return !!row && row.active && (row.events.includes(event) || row.events.includes('*'));
+}
+
 /** HMAC-SHA256 over the exact pre-serialized body, prefixed for receiver-side verification. */
 export function generateSignature(payload: string, secret: string): string {
   const hmac = crypto.createHmac('sha256', secret);

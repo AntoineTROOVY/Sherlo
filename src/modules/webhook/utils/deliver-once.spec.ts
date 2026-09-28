@@ -1,5 +1,5 @@
 import { Headers } from 'undici';
-import { buildDeliveryHeaders, postWebhookPayload, sanitizeCustomHeaders } from './deliver-once';
+import { buildDeliveryHeaders, isDeliverableWebhook, postWebhookPayload, sanitizeCustomHeaders } from './deliver-once';
 
 /**
  * Direct coverage for the shared delivery core both paths (direct and queued processor) now route
@@ -93,5 +93,21 @@ describe('sanitizeCustomHeaders', () => {
         'X-Keep': 'v',
       }),
     ).toEqual({ 'X-Keep': 'v' });
+  });
+});
+
+describe('isDeliverableWebhook', () => {
+  const row = { active: true, events: ['message.received'] };
+
+  it('accepts an active row subscribed to the event or to every event', () => {
+    expect(isDeliverableWebhook(row, 'message.received')).toBe(true);
+    expect(isDeliverableWebhook({ active: true, events: ['*'] }, 'message.ack')).toBe(true);
+  });
+
+  it('refuses a missing, disabled or unsubscribed row', () => {
+    expect(isDeliverableWebhook(null, 'message.received')).toBe(false);
+    expect(isDeliverableWebhook(undefined, 'message.received')).toBe(false);
+    expect(isDeliverableWebhook({ ...row, active: false }, 'message.received')).toBe(false);
+    expect(isDeliverableWebhook(row, 'message.ack')).toBe(false);
   });
 });
