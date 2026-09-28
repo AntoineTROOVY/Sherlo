@@ -478,8 +478,9 @@ export class WwebjsLifecycle {
     this.qrCode = null;
     this.setStatus(EngineStatus.INITIALIZING);
     if (!failed) return true;
-    // The old client may still emit late events from persisted page bindings; 'authenticated' and
-    // 'ready' have no source-client identity fence, so silence it before the new attempt starts.
+    // The old client may still emit late events from persisted page bindings. The qr, authenticated
+    // and ready listeners fence on the source client, but disconnected, auth_failure and the domain
+    // events do not, so silence it before the new attempt starts.
     failed.removeAllListeners();
     // Bounded DIRECT destroy — never this.destroy()/forceDestroy(), both of which latch the
     // teardown flags above.
@@ -508,6 +509,10 @@ export class WwebjsLifecycle {
 
   setupEventHandlers(): void {
     if (!this.client) return;
+    // Every listener below belongs to THIS client. Stuck-auth recovery and teardown null (or replace)
+    // this.client while the old page can still flush a buffered event through its bindings, so the
+    // qr, authenticated and ready listeners fence on this identity before touching this.client.
+    const source = this.client;
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     this.client.on('qr', async (qr: string) => {
@@ -557,6 +562,7 @@ export class WwebjsLifecycle {
       // replaced the engine for yet (#982). The initial status is DISCONNECTED too, so "finished" is
       // carried by the flags, never by the status alone.
       if (
+        this.client !== source ||
         this.tearingDown ||
         this.disconnectReported ||
         this.status === EngineStatus.AUTHENTICATING ||
@@ -571,6 +577,10 @@ export class WwebjsLifecycle {
     });
 
     this.client.on('ready', () => {
+      // A late 'ready' from a client that is no longer the live one (stuck-auth recovery nulled it, or
+      // teardown finished) must be dropped outright: dereferencing this.client would throw, and
+      // reading it optionally would promote a client-less adapter to READY.
+      if (this.client !== source || this.tearingDown || this.disconnectReported) return;
       // The library re-emits 'ready' at the end of EVERY completed (re)inject pipeline — for a
       // post-navigation re-inject this is the completion edge, and the only one it offers. Close the
       // navigation window HERE, before the guards below: markReadyFromClientInfo early-returns while
@@ -585,7 +595,7 @@ export class WwebjsLifecycle {
       // and let the attach's own completion re-emit `ready` (it always does), with the readiness
       // reconciliation as the backstop when the attach failed instead. `undefined` (unpatched
       // tree) keeps the legacy behaviour.
-      if ((this.client as Client & { eventsAttached?: boolean }).eventsAttached === false) {
+      if ((source as Client & { eventsAttached?: boolean }).eventsAttached === false) {
         this.host.logger.warn('Ignoring premature ready: the message event bridge is not attached yet', {
           sessionId: this.host.config.sessionId,
           action: 'premature_ready_ignored',

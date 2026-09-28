@@ -2161,6 +2161,45 @@ describe('WhatsAppWebJsAdapter ready reconciliation (#251/#273)', () => {
     expect(onReady).toHaveBeenCalledTimes(1);
   });
 
+  it('drops a late ready from the old client while stuck-auth recovery has nulled it', async () => {
+    jest.useFakeTimers();
+    const rm = deferredVoid();
+    const rmSpy = jest.spyOn(fs.promises, 'rm').mockReturnValue(rm.promise);
+
+    const adapter = newAdapter();
+    const { client, onReady } = attachFakeClient(adapter, { destroy: jest.fn().mockResolvedValue(undefined) });
+    client.emit('authenticated');
+
+    const recover = (adapter as unknown as { recoverFromStuckAuth: () => Promise<void> }).recoverFromStuckAuth.bind(
+      adapter,
+    );
+    const recovery = recover();
+    // The client is nulled and the profile rm is still pending: the old page flushes its READY.
+    expect(() => client.emit('ready')).not.toThrow();
+    expect(adapter.getStatus()).toBe(EngineStatus.AUTHENTICATING);
+    expect(onReady).not.toHaveBeenCalled();
+
+    rm.resolve();
+    await recovery;
+    expect(adapter.getStatus()).toBe(EngineStatus.DISCONNECTED);
+    expect(() => client.emit('ready')).not.toThrow();
+    expect(adapter.getStatus()).toBe(EngineStatus.DISCONNECTED);
+    expect(onReady).not.toHaveBeenCalled();
+    rmSpy.mockRestore();
+  });
+
+  it('drops a late ready from a client that was torn down', async () => {
+    const adapter = newAdapter();
+    const { client, onReady } = attachFakeClient(adapter, { destroy: jest.fn().mockResolvedValue(undefined) });
+    client.emit('authenticated');
+
+    await adapter.destroy();
+
+    expect(() => client.emit('ready')).not.toThrow();
+    expect(adapter.getStatus()).not.toBe(EngineStatus.READY);
+    expect(onReady).not.toHaveBeenCalled();
+  });
+
   it('deduplicates the genuine ready event after reconciliation promotes the adapter', async () => {
     jest.useFakeTimers();
 
