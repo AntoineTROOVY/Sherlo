@@ -14,6 +14,7 @@ import {
 } from '../interfaces/whatsapp-engine.interface';
 import {
   BAILEYS_NON_CONTENT_TYPES,
+  baileysChatJid,
   buildIncomingMessageFromBaileys,
   extractBaileysBody,
   extractBaileysButtonReply,
@@ -351,6 +352,9 @@ export class BaileysEvents {
     try {
       const b = await this.host.loadLib();
       const remoteJid = msg.key.remoteJid!;
+      // The chat the events below report: a received broadcast-list message belongs to its sender's
+      // chat. Store lookups and the foreign-message checks keep the raw key, which is what is stored.
+      const chatJid = baileysChatJid(remoteJid, msg.key.participant, msg.key.fromMe === true);
       // Learn any lid->pn pair the key carries BEFORE canonicalizing ids below, so a fresh @lid
       // sender resolves to its phone in this message and for later contact lookups (#362). The pairs
       // also write through to the persistent lid->phone table via addLidMappings.
@@ -370,22 +374,22 @@ export class BaileysEvents {
         if (pm?.type === b.proto.Message.ProtocolMessage.Type.REVOKE) {
           // A group admin may revoke anyone's message, so only the chat is checked there.
           if (await this.targetsForeignMessage(pm.key?.id, msg.key, !remoteJid.endsWith('@g.us'))) return;
-          const from = msg.key.fromMe === true ? this.host.normalizedSelfJid() : remoteJid;
-          const to = msg.key.fromMe === true ? remoteJid : this.host.normalizedSelfJid();
+          const from = msg.key.fromMe === true ? this.host.normalizedSelfJid() : chatJid;
+          const to = msg.key.fromMe === true ? chatJid : this.host.normalizedSelfJid();
           const revoked: RevokedMessage = {
             id: pm.key?.id ?? '',
             // The REVOKE protocolMessage's key points at the ORIGINAL deleted message,
             // so `id` already IS the original here. Mirror it into `revokedId` so that
             // field is the reliable cross-engine handle (wwebjs sets it separately).
             revokedId: pm.key?.id ?? undefined,
-            chatId: this.host.toNeutralJid(remoteJid),
+            chatId: this.host.toNeutralJid(chatJid),
             from: this.host.toNeutralJid(from),
             to: this.host.toNeutralJid(to),
             type: 'revoked',
             body: '',
             timestamp: toUnixSeconds(msg.messageTimestamp),
           };
-          this.host.recordMessageEdit(remoteJid, revoked.id, '');
+          this.host.recordMessageEdit(chatJid, revoked.id, '');
           // While the target is still being processed, the store change waits for it and lands after
           // this delete is announced, and a repeat delivery may already hold the content in the store:
           // record the delete now, checked against the target's own key.
@@ -440,7 +444,7 @@ export class BaileysEvents {
             editedContentType === 'documentWithCaptionMessage' ||
             editedContentType === 'stickerMessage';
           const edited: EditedMessage = buildEditedMessage(base, hasMedia);
-          this.host.recordMessageEdit(remoteJid, edited.messageId, edited.body);
+          this.host.recordMessageEdit(chatJid, edited.messageId, edited.body);
           const target = this.inboundInFlight.get(edited.messageId);
           if (target && this.mayChange(target.key, msg.key, false)) {
             this.editedWhileInFlight.delete(edited.messageId); // re-inserted as the newest
@@ -469,7 +473,7 @@ export class BaileysEvents {
         if (await this.targetsForeignMessage(rm?.key?.id, msg.key, false, 'reaction')) return;
         const event: ReactionEvent = {
           messageId: rm?.key?.id ?? '',
-          chatId: this.host.toNeutralJid(remoteJid),
+          chatId: this.host.toNeutralJid(chatJid),
           reaction: rm?.text ?? '',
           // A 1:1 key names the chat partner, not the author: for a reaction the account made from
           // its phone (fromMe) the reactor is the account itself. Group and status keys carry the
@@ -574,9 +578,9 @@ export class BaileysEvents {
       }
       this.host.recordMessage(msg);
       if (deleted) {
-        this.host.recordMessageEdit(remoteJid, storedId, '');
+        this.host.recordMessageEdit(chatJid, storedId, '');
       } else if (editedBody !== undefined && storedId !== null) {
-        this.host.recordMessageEdit(remoteJid, storedId, editedBody);
+        this.host.recordMessageEdit(chatJid, storedId, editedBody);
       }
     } catch (err) {
       this.host.logger.error(

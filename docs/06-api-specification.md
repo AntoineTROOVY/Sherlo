@@ -6600,7 +6600,9 @@ Omitted or empty conditions match every inbound message except channel, broadcas
 messages: a rule answers those only when its conditions include a `kind` condition that matches
 them (for example `kind is channel`). A rule without one skips those chats, because a reply into a
 channel the account administers is published to every follower, and anywhere else WhatsApp refuses
-it.
+it. On Baileys a message the account received through a contact's broadcast list is filed under the
+sender's own chat (`kind` `individual`), as WhatsApp lists it, so a rule without a `kind` condition
+matches it.
 
 Loop safety: a rule never answers the account's own (`fromMe`) messages, messages older than
 5 minutes get no automated answer (so a reconnect never burst-replies the offline-queued backlog),

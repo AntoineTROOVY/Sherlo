@@ -464,7 +464,9 @@ CREATE TABLE webhooks (
 
 Per-session single-message autoreply rules. `conditions` reuses the webhook filter shape verbatim
 (null/empty matches every inbound message except channel, broadcast-list and status messages, which
-need a `kind` condition); the reply goes through the ordinary send path.
+need a `kind` condition); the reply goes through the ordinary send path. On Baileys a message the
+account received through a contact's broadcast list is filed under the sender's own chat (`kind`
+`individual`), as WhatsApp lists it, so a rule without a `kind` condition matches it.
 
 ```sql
 CREATE TABLE automation_rules (

@@ -4,6 +4,7 @@ import { chatKind, parseWaId, toNeutralJid as canonicalizeWaId, userPart } from 
 import type { LidMappingStore } from '../identity/lid-mapping-store.service';
 import { mergeTwinStates, type ChatStateStore, type ChatStateValue } from './baileys-chat-state-store.service';
 import { resolveNonNegativeIntEnv } from '../../config/configuration';
+import { baileysChatJid } from './baileys-message-mapper';
 
 interface LastMessage {
   key: WAMessageKey;
@@ -372,24 +373,25 @@ export class BaileysSessionStore {
    * pairs flow through addLidMappings, so they also write through to the persistent table.
    */
   recordKeyLidMappings(key: Pick<WAMessageKey, 'remoteJid' | 'remoteJidAlt' | 'participant' | 'participantAlt'>): void {
+    // On a status or broadcast-list message `remoteJidAlt` is the SENDER's other dialect (Baileys fills
+    // it for every non-group chat), so it pairs with `participant`, not with the `@broadcast` id.
+    const broadcast = key.remoteJid?.endsWith('@broadcast');
     this.addLidMappings([
-      this.lidPnPair(key.remoteJid, key.remoteJidAlt),
+      this.lidPnPair(broadcast ? key.participant : key.remoteJid, key.remoteJidAlt),
       this.lidPnPair(key.participant, key.participantAlt),
     ]);
   }
 
-  /** Sorts a JID and its WhatsApp-supplied "Alt" counterpart into { lid, pn } by @lid suffix. */
+  /**
+   * Sorts a JID and its WhatsApp-supplied "Alt" counterpart into { lid, pn } by @lid suffix. The pn side
+   * must be a user id: anything else (a group, a list) would be persisted as that lid's phone number.
+   */
   private lidPnPair(jid?: string | null, alt?: string | null): { lid?: string; pn?: string } {
     if (!jid || !alt) {
       return {};
     }
-    if (jid.endsWith('@lid')) {
-      return { lid: jid, pn: alt };
-    }
-    if (alt.endsWith('@lid')) {
-      return { lid: alt, pn: jid };
-    }
-    return {};
+    const [lid, pn] = jid.endsWith('@lid') ? [jid, alt] : alt.endsWith('@lid') ? [alt, jid] : [];
+    return lid && pn && parseWaId(pn).kind === 'user' ? { lid, pn } : {};
   }
 
   /** Write a learned lid->phone pair through to the persistent table (bare digits, fire-and-forget). */
@@ -406,7 +408,8 @@ export class BaileysSessionStore {
     // newest-message guard so every inbound refreshes it; the timer is cached under both the raw and
     // neutral JID so an outbound send addressed in either dialect (phone or @lid) finds it.
     this.recordEphemeralFromMessage(chatId, msg);
-    const key = this.chatKey(chatId);
+    // A received broadcast-list message previews in its sender's chat, where Baileys lists it.
+    const key = this.chatKey(baileysChatJid(chatId, msg.key.participant, msg.key.fromMe === true));
     const timestamp = this.toUnixSeconds(msg.messageTimestamp);
     if (!msg.key.fromMe) {
       const inbound = this.lastInbound.get(key);

@@ -7,6 +7,7 @@ import { EngineTransportError } from '../../common/errors/engine-transport.error
 import { RecipientUnreachableError } from '../../common/errors/recipient-unreachable.error';
 import { LidNotMappedError } from '../../common/errors/lid-not-mapped.error';
 import { parseWaId, userPart } from '../identity/wa-id';
+import { storedKeyInChat } from './baileys-message-mapper';
 
 /**
  * Contacts/profile/chats-domain operations extracted from BaileysAdapter. The adapter keeps the
@@ -410,10 +411,11 @@ export class BaileysContacts {
     // lid to its phone user-part through the session's lid mapping, so both spellings of one chat
     // still meet. Anything that still differs falls back to the synthesised key for the ADDRESSED
     // chat, which is exactly what every id ran on before stored keys existed.
-    const chatKey = this.host.toNeutralJid(chatId);
     const keyById = new Map(
       stored
-        .filter(msg => msg.key?.id && msg.key.remoteJid && this.host.toNeutralJid(msg.key.remoteJid) === chatKey)
+        .filter(
+          msg => msg.key?.id && msg.key.remoteJid && storedKeyInChat(msg.key, chatId, j => this.host.toNeutralJid(j)),
+        )
         .map(msg => [msg.key.id as string, msg.key]),
     );
     return messageIds.map(id => keyById.get(id) ?? { remoteJid, id, fromMe: false });

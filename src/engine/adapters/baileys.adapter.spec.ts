@@ -3420,6 +3420,58 @@ describe('BaileysAdapter inbound fan-out', () => {
     );
   });
 
+  it("files an edit, a revoke and a reaction received through a broadcast list under the sender's chat", async () => {
+    baileys.getContentType.mockImplementation(realGetContentType);
+    baileys.normalizeMessageContent.mockImplementation((m: unknown) => m);
+    const onMessageEdited = jest.fn();
+    const onMessageRevoked = jest.fn();
+    const onMessageReaction = jest.fn();
+    const adapter = newAdapter();
+    await adapter.initialize({ onMessageEdited, onMessageRevoked, onMessageReaction });
+    fakeSock.user = { id: '628999:1@s.whatsapp.net', name: 'Me' };
+    const LIST = '1700000000@broadcast';
+    const key = (id: string, fromMe = false) =>
+      fromMe
+        ? { remoteJid: LIST, fromMe, id, participant: '628999@s.whatsapp.net' }
+        : { remoteJid: LIST, fromMe, id, participant: '628222@s.whatsapp.net' };
+    fakeSock.fire('messages.upsert', {
+      type: 'notify',
+      messages: [
+        {
+          key: key('LIST_EDIT'),
+          message: { protocolMessage: { key: { id: 'E1' }, type: 14, editedMessage: { conversation: 'fixed' } } },
+          messageTimestamp: 1700000050,
+        },
+        {
+          key: key('LIST_REVOKE'),
+          message: { protocolMessage: { key: { id: 'R1' }, type: 0 } },
+          messageTimestamp: 1700000051,
+        },
+        {
+          key: key('LIST_REACTION'),
+          message: { reactionMessage: { key: { id: 'X1' }, text: 'ok' } },
+          messageTimestamp: 1700000052,
+        },
+        {
+          key: key('OWN_REVOKE', true),
+          message: { protocolMessage: { key: { id: 'R2' }, type: 0 } },
+          messageTimestamp: 1700000053,
+        },
+      ],
+    });
+    await new Promise(r => setImmediate(r));
+    await new Promise(r => setImmediate(r));
+
+    expect(firstEditedMessage(onMessageEdited)).toMatchObject({ messageId: 'E1', chatId: '628222@c.us' });
+    expect(onMessageRevoked).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'R1', chatId: '628222@c.us', from: '628222@c.us' }),
+    );
+    expect(onMessageRevoked).toHaveBeenCalledWith(expect.objectContaining({ id: 'R2', chatId: LIST, to: LIST }));
+    expect(onMessageReaction).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: 'X1', chatId: '628222@c.us', senderId: '628222@c.us' }),
+    );
+  });
+
   it('reactionMessage: fires onMessageReaction and NOT onMessage', async () => {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const baileys = jest.requireMock('@whiskeysockets/baileys') as { getContentType: jest.Mock };
@@ -3622,6 +3674,57 @@ describe('BaileysAdapter inbound fan-out', () => {
     expect((await adapter.getChats())[0]?.lastMessage).toBe('sent to the wrong chat');
     await deliver('REVOKE_1', { protocolMessage: { key: { id: 'IN_LAST' }, type: 0 } }, 1700000060);
     expect((await adapter.getChats())[0]?.lastMessage).toBe('');
+  });
+
+  describe("a received broadcast-list message previewed in its sender's chat", () => {
+    const LIST = '1700000000@broadcast';
+    const listKey = (id: string) => ({ remoteJid: LIST, participant: '628222@s.whatsapp.net', fromMe: false, id });
+    const original = { key: listKey('L1'), message: { conversation: 'offer' }, messageTimestamp: 1700000050 };
+    const preview = async (adapter: BaileysAdapter) => (await adapter.getChats())[0]?.lastMessage;
+
+    const receive = async (): Promise<BaileysAdapter> => {
+      baileys.getContentType.mockImplementation(realGetContentType);
+      baileys.normalizeMessageContent.mockImplementation((m: unknown) => m);
+      const adapter = newAdapter();
+      await adapter.initialize({});
+      fakeSock.fire('connection.update', { connection: 'open' });
+      fakeSock.fire('chats.upsert', [{ id: '628222@s.whatsapp.net', name: 'Bob' }]);
+      await deliver(original);
+      expect(await preview(adapter)).toBe('offer');
+      fakeStore.getMessage.mockResolvedValue(original);
+      return adapter;
+    };
+    const deliver = async (msg: Record<string, unknown>) => {
+      fakeSock.fire('messages.upsert', { type: 'notify', messages: [msg] });
+      await new Promise(r => setImmediate(r));
+      await new Promise(r => setImmediate(r));
+    };
+
+    it('clears the preview when the sender deletes it', async () => {
+      const adapter = await receive();
+      await deliver({
+        key: listKey('REVOKE_L1'),
+        message: { protocolMessage: { key: { id: 'L1' }, type: 0 } },
+        messageTimestamp: 1700000060,
+      });
+      expect(await preview(adapter)).toBe('');
+    });
+
+    it('shows the edited text when the sender edits it', async () => {
+      const adapter = await receive();
+      await deliver({
+        key: listKey('EDIT_L1'),
+        message: { protocolMessage: { key: { id: 'L1' }, type: 14, editedMessage: { conversation: 'new offer' } } },
+        messageTimestamp: 1700000060,
+      });
+      expect(await preview(adapter)).toBe('new offer');
+    });
+
+    it('clears the preview when the account deletes it for itself', async () => {
+      const adapter = await receive();
+      await adapter.deleteMessage('628222@c.us', 'L1', false);
+      expect(await preview(adapter)).toBe('');
+    });
   });
 
   describe('contentless protocol traffic on the live path (#1568)', () => {
@@ -4117,6 +4220,35 @@ describe('BaileysAdapter store-backed ops', () => {
       MessageNotFoundError,
     );
     expect(fakeSock.sendMessage).not.toHaveBeenCalled();
+  });
+
+  describe('a received broadcast-list message, addressed by the sender chat it is filed under', () => {
+    const listMsg = {
+      key: { id: 'LIST1', remoteJid: '1700000000@broadcast', participant: '628111@s.whatsapp.net', fromMe: false },
+      message: { conversation: 'to everyone on my list' },
+    };
+
+    it('can be replied to and reacted to', async () => {
+      fakeStore.getMessage.mockResolvedValue(listMsg);
+      const adapter = await ready();
+      await adapter.replyToMessage('628111@c.us', 'LIST1', 'got it');
+      await adapter.reactToMessage('628111@c.us', 'LIST1', '👍');
+      expect(fakeSock.sendMessage).toHaveBeenCalledWith(
+        '628111@c.us',
+        { text: 'got it', linkPreview: null },
+        expect.objectContaining({ quoted: listMsg }),
+      );
+      expect(fakeSock.sendMessage).toHaveBeenCalledWith('628111@c.us', {
+        react: { text: '👍', key: listMsg.key },
+      });
+    });
+
+    it('is still found through the list id, and not through another chat', async () => {
+      fakeStore.getMessage.mockResolvedValue(listMsg);
+      const adapter = await ready();
+      await expect(adapter.reactToMessage('1700000000@broadcast', 'LIST1', '👍')).resolves.not.toThrow();
+      await expect(adapter.reactToMessage('628222@c.us', 'LIST1', '👍')).rejects.toBeInstanceOf(MessageNotFoundError);
+    });
   });
 
   it('forwardMessage forwards the stored message', async () => {

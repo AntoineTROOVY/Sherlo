@@ -615,6 +615,39 @@ describe('BaileysSessionStore', () => {
       expect(store.toNeutralJid('111@lid')).toBe('628111@c.us');
     });
 
+    it('pairs the sender of a broadcast-list or status message with its alt, never the list id', () => {
+      store.recordKeyLidMappings({
+        remoteJid: '1700000000@broadcast',
+        remoteJidAlt: '111@lid',
+        participant: '628222@s.whatsapp.net',
+      });
+      store.recordKeyLidMappings({
+        remoteJid: 'status@broadcast',
+        remoteJidAlt: '333@lid',
+        participant: '628444@s.whatsapp.net',
+      });
+      expect(store.resolvePhone('111@lid')).toBe('628222');
+      expect(store.resolvePhone('333@lid')).toBe('628444');
+    });
+
+    it('ignores a pair whose phone side is not a user id', () => {
+      store.recordKeyLidMappings({ remoteJid: '120363@g.us', remoteJidAlt: '555@lid' });
+      expect(store.resolvePhone('555@lid')).toBeNull();
+    });
+
+    it("files a received list message's preview under the sender's chat", () => {
+      store.upsertChats([{ id: '628222@s.whatsapp.net' }]);
+      store.recordMessage({
+        key: { remoteJid: '1700000000@broadcast', participant: '628222@s.whatsapp.net', fromMe: false, id: 'L1' },
+        message: { conversation: 'offer' },
+        messageTimestamp: 100,
+      });
+      expect(store.listChats()).toEqual([
+        expect.objectContaining({ id: '628222@c.us', lastMessage: 'offer', timestamp: 100 }),
+      ]);
+      expect(store.lastInboundMessage('628222@c.us')?.key.id).toBe('L1');
+    });
+
     it('ignores a key with no lid/pn pair', () => {
       store.recordKeyLidMappings({});
       store.recordKeyLidMappings({ remoteJid: '333@lid' }); // lid without an Alt counterpart

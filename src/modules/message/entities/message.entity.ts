@@ -59,8 +59,9 @@ export class Message {
 
   /**
    * Stable sender identity for a group, status or broadcast-list message: the JID who actually
-   * posted (`from` is the group or `@broadcast` id). Lets the chat view tell two same-named
-   * participants apart. Null on 1:1 messages, outgoing echoes, and legacy rows.
+   * posted (`from` is the group, `status@broadcast` or list id; on Baileys a list message the account
+   * received is filed under the sender, so `from` is the sender too). Lets the chat view tell two
+   * same-named participants apart. Null on 1:1 messages, outgoing echoes, and legacy rows.
    */
   @Column({ nullable: true })
   author?: string;
