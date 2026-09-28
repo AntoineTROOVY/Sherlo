@@ -301,11 +301,11 @@ in it is stored but ignored).
 ```
 
 `maxReconnectAttempts: null` means unlimited (the default); `reconnectBaseDelay` is milliseconds.
-Both bound the gateway's own reconnect, which on Baileys covers only the reconnect after a
-logged-out close: that engine retries a transient drop internally, with a fixed 1s to 60s backoff
-and no attempt cap. The attempt count restarts only once the session has stayed READY for 5 minutes,
-so a session that keeps dropping sooner than that spends its cap. See §5 (Database Design) for what
-each key does and the moment it is read.
+Both bound the gateway's own reconnect, whose attempt count restarts only once the session has
+stayed READY for 5 minutes, so a session that keeps dropping sooner than that spends its cap. On
+Baileys that covers only the reconnect after a logged-out close: that engine retries a transient drop
+internally, with a fixed 1s to 60s backoff and no attempt cap. See §5 (Database Design) for what each
+key does and the moment it is read.
 
 **Errors:** `401` missing/invalid key, or key not scoped to this session · `404` session not found
 
