@@ -136,10 +136,11 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
   const perClientCap = Math.max(1, Math.floor(budgetBytes * share));
   // Per-client in-flight bytes, keyed on the resolved client IP (an IPv6 client on its /64).
   // Entries are created lazily and deleted by the same exactly-once release that decrements the
-  // aggregate, so the map cannot
-  // leak a client that finished. A cap on the MAP itself guards the pathological many-spoofed-IPs
-  // case: past it, a NEW client key is treated as busiest (refused) rather than evicting a live
-  // one - refusing beats corrupting another client's accounting.
+  // aggregate, so the map cannot leak a client that finished. Only body-carrying requests are
+  // tracked. A cap on the MAP itself guards the pathological many-spoofed-IPs case: past it, a NEW
+  // client key sending a body is treated as busiest (refused) rather than evicting a live one -
+  // refusing beats corrupting another client's accounting. Bodyless requests (GETs, health
+  // probes) never touch the map, so a full map cannot refuse them.
   const clientInFlight = new Map<string, number>();
   const MAX_TRACKED_CLIENTS = 10_000;
   // Opening reservation for a body with no declared length (chunked). It is only a placeholder:
@@ -185,6 +186,7 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
     // A body with no declared length is expected only when the request is chunk-encoded (Node
     // ignores close-delimited request bodies on keep-alive HTTP/1.1). Anything else — GETs,
     // health checks, Content-Length: 0 — reserves nothing and is never reaped.
+    // It is never refused or tracked either: see the early return below the encoding guard.
     let reserved = declared ?? (req.headers['transfer-encoding'] !== undefined ? undeclaredReservation : 0);
 
     // Every quantity this budget works with — the declared length, and socket.bytesRead in the
@@ -209,6 +211,13 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
     const encoding = (req.headers['content-encoding'] ?? '').trim().toLowerCase();
     if (bodyIndicated && encoding !== '' && encoding !== 'identity') {
       rejectCompressed(req, res);
+      return;
+    }
+
+    // Nothing to reserve, so nothing to refuse, track or reap. This must stay BELOW the encoding
+    // guard: a compressed body with a zero or unusable Content-Length reserves 0 yet still gets 415.
+    if (reserved === 0) {
+      next();
       return;
     }
 

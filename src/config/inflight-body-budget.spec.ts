@@ -241,6 +241,44 @@ describe('createInflightBodyBudget middleware', () => {
     expect(req.listenerCount('data')).toBe(0);
   });
 
+  describe('with the client map at capacity', () => {
+    const fromIp = (ip: string, headers: Record<string, string> = {}): Request & EventEmitter => {
+      const req = makeReq(headers);
+      (req as unknown as { socket: { remoteAddress: string } }).socket.remoteAddress = ip;
+      return req;
+    };
+    const saturated = (): InflightBodyBudget => {
+      const budget = createInflightBodyBudget(1_000_000, { perClientShare: 1 });
+      for (let i = 0; i < 10_000; i++) {
+        const ip = `10.${Math.floor(i / 65536)}.${Math.floor(i / 256) % 256}.${i % 256}`;
+        expect(run(budget, fromIp(ip, { 'content-length': '10' })).next).toHaveBeenCalledTimes(1);
+      }
+      expect(budget.currentBytes()).toBe(100_000);
+      return budget;
+    };
+
+    it('still admits bodyless requests from a new client, without tracking them', () => {
+      const budget = saturated();
+      for (const headers of [{}, { 'content-length': '0' }] as Record<string, string>[]) {
+        const req = fromIp('192.0.2.200', headers);
+        const { next, state, res } = run(budget, req);
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(state.code).toBe(0);
+        expect(budget.clientBytes(req)).toBe(0);
+        expect(req.listenerCount('close')).toBe(0);
+        expect(res.listenerCount('finish')).toBe(0);
+      }
+      expect(budget.currentBytes()).toBe(100_000);
+    });
+
+    it('still refuses a body-carrying request from a new client', () => {
+      const budget = saturated();
+      const { next, state } = run(budget, fromIp('192.0.2.200', { 'content-length': '10' }));
+      expect(next).not.toHaveBeenCalled();
+      expect(state.code).toBe(503);
+    });
+  });
+
   it('drops the socket instead of writing a 503 when the response is already flushing', () => {
     const budget = createInflightBodyBudget(1000, { perClientShare: 1 });
     run(budget, makeReq({ 'content-length': '800' }));
