@@ -100,7 +100,7 @@ flowchart TB
     M1 --> A1[Rate limiting defaults]
     M2 --> A2[Documentation & warnings]
     M3 --> A3[Human-like delays]
-    M4 --> A4[Terms of service]
+    M4 --> A4[README disclaimer]
 ```
 
 **Built-in Safeguards:**
@@ -372,26 +372,9 @@ WhatsApp/Meta may take legal action against unofficial APIs, or users may misuse
 
 **Mitigation Strategies:**
 
-1. **Clear Disclaimers**
-
-```markdown
-## Disclaimer
-
-This project is not affiliated with, authorized, maintained,
-sponsored or endorsed by WhatsApp or any of its affiliates.
-
-This is an independent and unofficial software. Use at your own risk.
-
-By using this software, you agree that:
-
-1. You will not use it for spam or illegal activities
-2. You are responsible for compliance with local laws
-3. The maintainers are not liable for any misuse
-```
-
-2. **Terms of Service for Users**
-3. **No support for spam/illegal use cases**
-4. **Built-in anti-abuse measures**
+1. **Published disclaimer**: the [README](../README.md#disclaimer), the project site (https://www.open-wa.org) and the SDK READMEs state that OpenWA is not affiliated with or endorsed by WhatsApp or Meta.
+2. **No support for spam/illegal use cases**
+3. **Built-in anti-abuse measures**
 
 ---
 

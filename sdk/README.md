@@ -1,7 +1,8 @@
 # OpenWA SDKs
 
-Official client libraries for the [OpenWA](https://github.com/rmyndharis/OpenWA)
-WhatsApp API Gateway.
+Official client libraries for [OpenWA](https://github.com/rmyndharis/OpenWA), the
+open-source WhatsApp API Gateway. OpenWA is an independent project, not
+affiliated with or endorsed by WhatsApp or Meta.
 
 All five SDKs are **hand-written** against the exact API surface (paths, DTOs,
 response shapes) and **unit-tested with mocked HTTP transports** that assert on

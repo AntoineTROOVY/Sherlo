@@ -4,6 +4,9 @@ Idiomatic Go client for the [OpenWA](https://github.com/rmyndharis/OpenWA) Whats
 API Gateway. Stdlib-only (no dependencies), context-first, with typed errors and
 an injectable transport pipeline.
 
+OpenWA is an independent project, not affiliated with or endorsed by WhatsApp or
+Meta.
+
 ```bash
 go get github.com/rmyndharis/OpenWA/sdk/go
 ```

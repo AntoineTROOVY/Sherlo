@@ -1,6 +1,6 @@
 # @rmyndharis/openwa
 
-Official JavaScript/TypeScript SDK for the [OpenWA](https://github.com/rmyndharis/OpenWA) WhatsApp API Gateway.
+Official JavaScript/TypeScript SDK for [OpenWA](https://github.com/rmyndharis/OpenWA), the open-source WhatsApp API Gateway. OpenWA is an independent project, not affiliated with or endorsed by WhatsApp or Meta.
 
 Ships dual CJS + ESM builds with bundled type declarations.
 

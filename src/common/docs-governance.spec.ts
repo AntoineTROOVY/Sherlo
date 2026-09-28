@@ -91,4 +91,33 @@ describe('governance docs match the repository', () => {
     expect(note).toContain('`docker image inspect ghcr.io/rmyndharis/openwa:<tag>`');
     expect(note).toContain('`docker compose up -d --no-build`');
   });
+
+  // Registries show the package description on its own in search results, away from the README.
+  it('keeps the non-affiliation notice in every SDK registry description', () => {
+    const descriptions = [
+      (JSON.parse(read('sdk/javascript/package.json')) as { description: string }).description,
+      (JSON.parse(read('sdk/php/composer.json')) as { description: string }).description,
+      /^description = "([^"]+)"/m.exec(read('sdk/python/pyproject.toml'))?.[1],
+      /<description>([^<]+)<\/description>/.exec(read('sdk/java/pom.xml'))?.[1],
+    ];
+    for (const description of descriptions) {
+      expect(description).toMatch(
+        /^Official .+ SDK for OpenWA, the open-source WhatsApp API Gateway \(not affiliated with WhatsApp or Meta\)$/,
+      );
+    }
+  });
+
+  // The risk guide counts this published notice as the legal risk's mitigation.
+  // The project publishes no terms of service of its own, so no mitigation may rest on one.
+  it('counts the README disclaimer, not user terms of service, as a risk mitigation', () => {
+    const risks = read('docs/16-risk-management.md');
+    expect(risks).not.toMatch(/\[[^\]]*terms of service[^\]]*\]/i);
+    expect(risks).toMatch(/\[README disclaimer\]/);
+  });
+
+  it('keeps the README non-affiliation disclaimer', () => {
+    const section = between(read('README.md'), '## Disclaimer', '\n## ');
+    expect(section).toMatch(/not affiliated/);
+    expect(section).toMatch(/WhatsApp LLC/);
+  });
 });

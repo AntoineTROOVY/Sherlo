@@ -520,6 +520,14 @@ Please read our [Development Guidelines](./docs/08-development-guidelines.md) fo
 
 ---
 
+## Disclaimer
+
+OpenWA is an independent open-source project and is not affiliated, associated, authorized, endorsed by, or in any way officially connected with Meta Platforms, Inc., WhatsApp LLC, or any of their subsidiaries or affiliates. The official WhatsApp website can be found at [whatsapp.com](https://www.whatsapp.com). The name "WhatsApp" as well as related names, marks, emblems, and images are registered trademarks of their respective owners.
+
+Use it at your own risk; you are responsible for complying with WhatsApp's terms and the law where you operate.
+
+---
+
 ## 📄 License
 
 This project is licensed under the **MIT License** – free for personal and commercial use.

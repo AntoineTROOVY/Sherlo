@@ -1,7 +1,8 @@
 # OpenWA Java SDK
 
-Official Java client for the [OpenWA](https://github.com/rmyndharis/OpenWA)
-WhatsApp API Gateway.
+Official Java client for [OpenWA](https://github.com/rmyndharis/OpenWA), the
+open-source WhatsApp API Gateway. OpenWA is an independent project, not
+affiliated with or endorsed by WhatsApp or Meta.
 
 Hand-written against the exact API surface (paths, DTOs, response shapes) and
 unit-tested with a mock HTTP transport that asserts on the precise request URL,
