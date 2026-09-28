@@ -5,6 +5,8 @@ import { type createLogger } from '../../common/services/logger.service';
 import { BAILEYS_QUERY_BUDGET_MS, withQueryDeadline } from './baileys-query-deadline';
 import { EngineTransportError } from '../../common/errors/engine-transport.error';
 import { RecipientUnreachableError } from '../../common/errors/recipient-unreachable.error';
+import { LidNotMappedError } from '../../common/errors/lid-not-mapped.error';
+import { parseWaId, userPart } from '../identity/wa-id';
 
 /**
  * Contacts/profile/chats-domain operations extracted from BaileysAdapter. The adapter keeps the
@@ -22,6 +24,10 @@ export interface BaileysContactsHost {
   listContacts(): Contact[];
   findContact(contactId: string): Contact | null;
   resolvePhone(contactId: string): string | null;
+  /** The phone the persisted lid->phone table holds for a lid, or null; read when the caches miss. */
+  findPersistedLidPhone(lid: string): Promise<string | null>;
+  /** Learn a lid->phone pair (written through to the persisted table). */
+  recordLidMapping(lid: string, pn: string): void;
   listChats(): ChatSummary[];
   /**
    * The chat's last known message (the handle chatModify needs), or null when none.
@@ -322,10 +328,27 @@ export class BaileysContacts {
     this.blocklistGeneration += 1;
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
+  /**
+   * `resolvePhone` reads caches only, so for a lid its null means "not cached", not "no phone": the
+   * mapping may have been evicted, or sit past the preload cap after a restart. Answering null there
+   * told the sender resolver the lid had no phone, and it stored that null over the real mapping. So a
+   * lid miss reads the persisted table, then Baileys' own signal-key mapping, and rejects when neither
+   * knows it; a rejection is a transient unknown the resolver neither caches nor persists.
+   */
   async resolveContactPhone(contactId: string): Promise<string | null> {
     this.host.ensureReady();
-    return this.host.resolvePhone(contactId);
+    const cached = this.host.resolvePhone(contactId);
+    if (cached || parseWaId(contactId).kind !== 'lid') return cached;
+    const persisted = await this.host.findPersistedLidPhone(contactId);
+    if (persisted) return persisted;
+    const pn = await this.sock()
+      .signalRepository?.lidMapping?.getPNForLID(contactId)
+      .catch(() => null);
+    if (pn) {
+      this.host.recordLidMapping(contactId, pn);
+      return userPart(pn);
+    }
+    throw new LidNotMappedError(contactId);
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await

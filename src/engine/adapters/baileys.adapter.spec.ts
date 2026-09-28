@@ -174,6 +174,7 @@ import { ChannelNotFoundError } from '../../common/errors/channel-not-found.erro
 import { ChatLabelsUnsupportedError } from '../../common/errors/chat-labels-unsupported.error';
 import { Boom } from '@hapi/boom';
 import { EngineTransportError } from '../../common/errors/engine-transport.error';
+import { LidNotMappedError } from '../../common/errors/lid-not-mapped.error';
 import { loadRemoteMediaBuffer } from '../../common/media/load-remote-media';
 import * as safeLinkPreview from './safe-link-preview';
 
@@ -6147,6 +6148,68 @@ describe('BaileysAdapter contact + chat reads', () => {
     expect(await adapter.getContactById('628222@c.us')).toMatchObject({
       pushName: 'Bob',
       isMyContact: false,
+    });
+  });
+
+  describe('resolveContactPhone for a lid this session does not hold in memory', () => {
+    const makeLidStore = () => ({
+      getCached: jest.fn((): string | null | undefined => undefined),
+      resolveLid: jest.fn(() => null),
+      lidsForPhone: jest.fn((): string[] => []),
+      remember: jest.fn(() => Promise.resolve()),
+      findPhoneForLid: jest.fn((): Promise<string | null> => Promise.resolve(null)),
+    });
+    const readyWith = async (lidMappingStore: ReturnType<typeof makeLidStore>): Promise<BaileysAdapter> => {
+      const adapter = new BaileysAdapter({
+        sessionId: 'sess-1',
+        dbSessionId: 'db-uuid-1',
+        authDir: './data/baileys',
+        messageStore: fakeStore,
+        lidMappingStore,
+      });
+      await adapter.initialize({});
+      fakeSock.fire('connection.update', { connection: 'open' });
+      return adapter;
+    };
+    afterEach(() => {
+      fakeSock.signalRepository = undefined;
+    });
+
+    it('answers from the persisted table when the cache no longer holds the mapping', async () => {
+      const lidStore = makeLidStore();
+      lidStore.findPhoneForLid.mockResolvedValue('628111');
+      const adapter = await readyWith(lidStore);
+      expect(await adapter.resolveContactPhone('111@lid')).toBe('628111');
+      expect(lidStore.findPhoneForLid).toHaveBeenCalledWith('111@lid');
+      expect(lidStore.remember).not.toHaveBeenCalled();
+    });
+
+    it("asks Baileys' own mapping when the table has none, and records what it learns", async () => {
+      const lidStore = makeLidStore();
+      const getPNForLID = jest.fn().mockResolvedValue('628222@s.whatsapp.net');
+      fakeSock.signalRepository = { lidMapping: { getLIDForPN: jest.fn(), getPNForLID } };
+      const adapter = await readyWith(lidStore);
+      expect(await adapter.resolveContactPhone('111@lid')).toBe('628222');
+      expect(getPNForLID).toHaveBeenCalledWith('111@lid');
+      expect(lidStore.remember).toHaveBeenCalledWith('111', '628222', 'sess-1');
+    });
+
+    it('rejects instead of answering null when nothing maps the lid, so no null is stored', async () => {
+      const lidStore = makeLidStore();
+      fakeSock.signalRepository = {
+        lidMapping: { getLIDForPN: jest.fn(), getPNForLID: jest.fn().mockRejectedValue(new Error('no key')) },
+      };
+      const adapter = await readyWith(lidStore);
+      await expect(adapter.resolveContactPhone('111@lid')).rejects.toThrow(LidNotMappedError);
+      expect(lidStore.remember).not.toHaveBeenCalled();
+    });
+
+    it('answers a phone JID, and null for a group, without a lookup', async () => {
+      const lidStore = makeLidStore();
+      const adapter = await readyWith(lidStore);
+      expect(await adapter.resolveContactPhone('628333@s.whatsapp.net')).toBe('628333');
+      expect(await adapter.resolveContactPhone('120363@g.us')).toBeNull();
+      expect(lidStore.findPhoneForLid).not.toHaveBeenCalled();
     });
   });
 

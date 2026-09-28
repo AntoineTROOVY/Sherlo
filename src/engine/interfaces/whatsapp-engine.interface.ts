@@ -1133,9 +1133,11 @@ export interface ContactCapability {
   getNumberId(number: string): Promise<string | null>;
 
   /**
-   * Best-effort resolution of a contact id to a phone number (MSISDN digits), or `null` when the
-   * engine cannot map it (e.g. a privacy `@lid` the account has never seen). The contact id is the
-   * engine's native scheme; the adapter decides how to resolve it.
+   * Best-effort resolution of a contact id to a phone number (MSISDN digits). `null` is a definitive
+   * "no phone for this id"; a lookup that could not decide (a failed page read, or a lid no cache,
+   * table or key store maps) rejects instead, so a caller that stores the answer never overwrites a
+   * known mapping with a null. The contact id is the engine's native scheme; the adapter decides how
+   * to resolve it.
    */
   resolveContactPhone(contactId: string): Promise<string | null>;
 
