@@ -146,12 +146,25 @@ describe('InfraDataController.importData round-trips export-data (no silent mess
     expect(new Date(restored.leaseExpiresAt as unknown as string).toISOString()).toBe(leaseExpiresAt.toISOString());
   });
 
+  it('keeps a stopped session stopped across an export and import', async () => {
+    await seedSession('s1');
+    await seedSession('s2');
+    await ds.getRepository(Session).update({ id: 's1' }, { desiredState: 'stopped' });
+
+    const dump = await controller.exportData();
+    const res = await controller.importData({ tables: dump.tables });
+    expect(res.warnings).toEqual([]);
+
+    expect((await ds.getRepository(Session).findOneByOrFail({ id: 's1' })).desiredState).toBe('stopped');
+    expect((await ds.getRepository(Session).findOneByOrFail({ id: 's2' })).desiredState).toBeNull();
+  });
+
   it('carries LIVE claims forward by their remaining time, including a peer node’s', async () => {
     await seedSession('s1');
     await seedSession('s2');
     const dump = await controller.exportData();
 
-    // Seeded AFTER the export on purpose: the sessions importer writes 12 columns and none of them is
+    // Seeded AFTER the export on purpose: the sessions importer writes 13 columns and none of them is
     // ownership, so the dump cannot carry these values — and stamping them here keeps the assertion
     // margin free of the export's cost. That margin is consumed by the import preamble and the
     // commit, NOT by the stall below: a late timer moves the committed lease and `Date.now()` by the

@@ -30,6 +30,7 @@ describe('SessionController — create() response contract', () => {
     claimedAt: null,
     nodeUrl: null,
     leaseExpiresAt: null,
+    desiredState: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
   };
@@ -120,6 +121,7 @@ describe('SessionController — logout() audit + error forwarding contract', () 
     claimedAt: null,
     nodeUrl: null,
     leaseExpiresAt: null,
+    desiredState: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
   };
@@ -185,6 +187,7 @@ describe('SessionController — start/stop lifecycle', () => {
     claimedAt: null,
     nodeUrl: null,
     leaseExpiresAt: null,
+    desiredState: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T01:00:00Z'),
   };
@@ -217,6 +220,14 @@ describe('SessionController — start/stop lifecycle', () => {
     expect(result.status).toBe(SessionStatus.READY);
     expect(result.engineLoaded).toBe(true);
     expect(sessionService.engineLoaded).toHaveBeenCalledWith(expect.objectContaining({ id: 'sess-uuid-1' }));
+  });
+
+  it('start is an explicit start, which clears an operator stop', async () => {
+    sessionService.start.mockResolvedValue({ ...runningEntity });
+
+    await controller.start('sess-uuid-1');
+
+    expect(sessionService.start).toHaveBeenCalledWith('sess-uuid-1', { explicit: true });
   });
 
   it('start audits SESSION_STARTED once the service has resolved', async () => {

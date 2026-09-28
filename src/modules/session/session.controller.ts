@@ -292,10 +292,12 @@ export class SessionController {
       'SESSION_NAME_TEARDOWN_PENDING`; wait for it to settle and retry. No destructive side ' +
       'effect runs before this refusal. Also returned when another node currently holds this ' +
       "session's engine: only the owner may start it, and the claim is refused before any engine " +
-      'is launched, so no second connection to the account is opened.',
+      'is launched, so no second connection to the account is opened. Also returned, with no `code`, ' +
+      'when a stop or force-kill of this session finished while the start was waiting: the stop ' +
+      'stands, and a new POST /start clears it and starts the session.',
   })
   async start(@Param('sessionId', ParseUUIDPipe) id: string): Promise<SessionResponseDto> {
-    const session = await this.sessionService.start(id);
+    const session = await this.sessionService.start(id, { explicit: true });
     await this.auditService.logInfo(AuditAction.SESSION_STARTED, {
       sessionId: session.id,
       sessionName: session.name,

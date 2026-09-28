@@ -208,6 +208,7 @@ erDiagram
         timestamp claimedAt
         varchar nodeUrl
         timestamp leaseExpiresAt
+        varchar desiredState
         timestamp createdAt
         timestamp updatedAt
     }
@@ -319,6 +320,10 @@ CREATE TABLE sessions (
     "claimedAt" TIMESTAMP,
     "nodeUrl" VARCHAR(2048),
     "leaseExpiresAt" TIMESTAMP,
+    -- 'stopped' after POST /stop or /force-kill, NULL again after an explicit POST /start. Boot
+    -- auto-start and the takeover sweep skip a stopped row. Server-owned: not in any session
+    -- response, only in the /api/infra/export-data backup.
+    "desiredState" VARCHAR(20),
     "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
     "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
 );

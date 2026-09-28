@@ -636,7 +636,9 @@ No request body.
 
 Returned via `transformSession`. Status typically transitions to `initializing` / `qr_ready`.
 
-**Errors:** `400` session already started / already starting · `401` · `403` · `404` not found · `409` credential teardown for the same session name still in flight (retryable; body carries `code: 'SESSION_NAME_TEARDOWN_PENDING'`; no destructive side effect runs before the refusal — a retry after cleanup settles proceeds) · `504` the engine did not finish starting within its timeout (WhatsApp Web or the network unreachable, a stalled browser or resource limit, or an unreachable `proxyUrl`); the engine is torn down, so the start can be retried once the cause is addressed
+A session stopped with `POST /stop` or `POST /force-kill` is marked to run again only once the start gets past the `400` and `409` refusals below; a refused start leaves the stop in place.
+
+**Errors:** `400` session already started / already starting · `401` · `403` · `404` not found · `409` credential teardown for the same session name still in flight (retryable; body carries `code: 'SESSION_NAME_TEARDOWN_PENDING'`; no destructive side effect runs before the refusal — a retry after cleanup settles proceeds), or, with no `code`, a `POST /stop` or `POST /force-kill` of this session that finished while the start was waiting (the stop stands; a new `POST /start` clears it and starts the session) · `504` the engine did not finish starting within its timeout (WhatsApp Web or the network unreachable, a stalled browser or resource limit, or an unreachable `proxyUrl`); the engine is torn down, so the start can be retried once the cause is addressed
 
 #### POST /api/sessions/:sessionId/stop
 
@@ -671,6 +673,8 @@ No request body.
 ```
 
 Returned via `transformSession`; status typically becomes `disconnected`.
+
+A stopped session stays down: boot auto-start (`AUTO_START_SESSIONS`) and the multi-node takeover sweep skip it until an explicit `POST /start`. The stop is recorded before the teardown, so a `502` stop keeps it too; a `409` refusal records nothing.
 
 **Errors:** `401` · `403` · `404` not found · `409` another node currently holds this session's live engine (multi-node deployments) · `502` `SESSION_STOP_INCOMPLETE` — session stopped locally but the engine teardown did not complete (retryable; the graceful disconnect and the force-destroy escalation both failed, status `disconnected`, no success audit)
 
@@ -707,8 +711,8 @@ report which.
 With `AUTO_START_SESSIONS=true`, auto-start selects sessions whose `phone` is non-null. Both a `200`
 and a `502` logout clear `phone`, and a WhatsApp-initiated unlink reported by a running engine clears
 it the same way, so none of those are auto-started on boot — an incomplete-logout (`502`)
-session must be started explicitly and the logout retried by hand. A session that must stay down can
-simply be left as-is.
+session must be started explicitly and the logout retried by hand. A session stopped through
+`POST /stop` or `POST /force-kill` is not auto-started either, until an explicit `POST /start`.
 
 **Auth:** API key (OPERATOR) · **Scope:** session-scoped
 
@@ -777,6 +781,8 @@ No request body.
 ```
 
 Returned via `transformSession`.
+
+Like `stop`, a force-killed session stays down across restarts and takeover until an explicit `POST /start`; a `400` refusal records nothing.
 
 **Errors:** `400` session is not started (no live engine to kill) · `401` · `403` · `404` not found
 

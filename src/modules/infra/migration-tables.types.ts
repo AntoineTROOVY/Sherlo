@@ -12,6 +12,8 @@ export interface SessionRow {
   lastActiveAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // Absent from backups written before the column existed.
+  desiredState?: string | null;
 }
 
 export interface WebhookRow {

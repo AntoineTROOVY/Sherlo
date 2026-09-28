@@ -1,4 +1,10 @@
-import { BadGatewayException, BadRequestException, HttpStatus, NotFoundException } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  ConflictException,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Repository, DataSource } from 'typeorm';
 import { Session, SessionStatus } from './entities/session.entity';
@@ -31,6 +37,9 @@ import {
   resolveReconnectConfig,
   type ReconnectState,
 } from './session-engine-lifecycle.service';
+
+/** A start refused because an operator stopped the session. Same 409 on the wire as any conflict. */
+export class SessionStoppedException extends ConflictException {}
 
 /**
  * The deps + core call-ins SessionEngineControls needs from the lifecycle. Built ONCE in the
@@ -148,7 +157,12 @@ export class SessionEngineControls {
     }
   }
 
-  async start(id: string): Promise<Session> {
+  /**
+   * `explicit` marks an operator's POST /start, the only start that may clear an operator's stop
+   * (desiredState), and only a stop that was already on the row when it began. It clears it only
+   * once past every refusal below, so a refused start leaves the stop exactly as it found it.
+   */
+  async start(id: string, { explicit = false }: { explicit?: boolean } = {}): Promise<Session> {
     // Reserve the slot SYNCHRONOUSLY at entry — before even the requireSession await. Two
     // near-simultaneous start() calls must not both pass the check and orphan an engine (the has()
     // -> engines.set() window spans the awaited hook below), and the infra import pre-flight
@@ -163,6 +177,13 @@ export class SessionEngineControls {
 
     try {
       const session = await this.requireSession(id);
+
+      // An operator's stop outranks any start but POST /start, so this refuses boot auto-start and
+      // the takeover sweep, which pick their rows once and launch them seconds apart, when a stop
+      // landed after that read.
+      if (session.desiredState === 'stopped' && !explicit) {
+        throw new SessionStoppedException(`Session ${id} was stopped`);
+      }
 
       if (this.engines.has(id)) {
         throw new BadRequestException('Session is already started');
@@ -202,6 +223,20 @@ export class SessionEngineControls {
       // and destroy/replace the engine this start() is about to create (or orphan the Chromium
       // process). Idempotent: a no-op when no reconnect state exists (the common fresh-start case).
       this.host.cancelReconnect(id);
+
+      // The operator's stop, read again past every refusal and after the mark is cleared. A stop that
+      // finished while this start waited above had no engine to take down and just lost its mark,
+      // but its record is on the row: only a POST /start sent to an already stopped session clears
+      // it, and any other start yields to it with the mark put back. A stop from here on sets the
+      // mark again and retires this start after its init. A launch that fails after the clear still
+      // counts as the start the operator asked for.
+      if ((await this.requireSession(id)).desiredState === 'stopped') {
+        if (!explicit || session.desiredState !== 'stopped') {
+          this.stoppingSessions.add(id);
+          throw new SessionStoppedException(`Session ${id} was stopped`);
+        }
+        await this.sessionRepository.update({ id, desiredState: 'stopped' }, { desiredState: null });
+      }
 
       // Execute hook before starting
       await this.hookManager.execute(
@@ -477,6 +512,20 @@ export class SessionEngineControls {
     // Mark as tearing down BEFORE cleanup so an in-flight reconnect can't resurrect it.
     this.stoppingSessions.add(id);
     this.host.cancelReconnect(id);
+
+    // A force-kill is a stop too: the session stays down across restarts and takeover until an
+    // explicit start. Recorded only once there is an engine to kill, and before the teardown, so a
+    // POST /start that lands after the eviction clears it and stands. A failed write must not keep a
+    // wedged engine alive, so it is logged and the kill goes on.
+    await this.sessionRepository
+      .update(id, { desiredState: 'stopped' })
+      .catch((error: unknown) =>
+        this.logger.error(
+          'Failed to record the force-kill as a stop',
+          error instanceof Error ? error.message : String(error),
+          { sessionId: id, action: 'force_kill_keep_down_failed' },
+        ),
+      );
 
     // Announced by the write below rather than from the engine callback, as in stop().
     this.operatorTeardowns.set(id, engine);
