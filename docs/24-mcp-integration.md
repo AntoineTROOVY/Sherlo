@@ -97,7 +97,13 @@ flowchart LR
     Invoker --> Services[Existing module services]
 ```
 
-A tool call flows through four steps, in this order:
+Every `POST /mcp`, including `initialize` and `tools/list`, first passes the pre-auth per-IP
+throttle and then a key gate: a missing, unknown, revoked or expired key, or one the gate
+otherwise refuses, gets an HTTP error with a JSON-RPC body (`401` carries
+`WWW-Authenticate: Bearer`) and an `API_KEY_AUTH_FAILED` audit row (a missing or unknown
+key's row is capped at 10 per client IP a minute, a budget shared with REST and the queue
+dashboard), and no MCP method runs.
+Past the gate, a tool call flows through four steps, in this order:
 
 1. **Key extraction.** The adapter reads the API key from the `X-API-Key` header or
    `Authorization: Bearer …`.
@@ -158,6 +164,9 @@ only when an agent genuinely needs to send messages / mutate state.
 
 ## 24.5 Authentication & Security
 
+- **Every request needs a key.** The mount refuses any `POST /mcp` without a valid key before
+  the transport answers, so the server version and tool catalogue are never served to an
+  unauthenticated caller. Role, session and chat scope are still checked per tool call.
 - **Same authorization as REST.** Tool calls are authorized by `AuthService` — role and
   per-session `allowedSessions` scoping are enforced identically to REST. A key scoped to
   one session cannot act on another.
@@ -165,8 +174,8 @@ only when an agent genuinely needs to send messages / mutate state.
   MCP client (`OPERATOR` role at most). The plaintext key is shown once on creation; to
   rotate, create a new key and delete the old one.
 - **No IP allow-list over MCP.** There is no genuine client IP on a tool call, so a key
-  that carries an `allowedIps` list will be rejected. Use a key without `allowedIps` for
-  MCP.
+  that carries an `allowedIps` list is refused at the mount. Use a key without `allowedIps`
+  for MCP.
 - **Rate limiting.** A per-key limiter (keyed by the _authenticated_ key id) bounds tool
   calls. The key map is capped (approximate-LRU eviction at 50,000 keys), so a
   distinct-key flood cannot grow process memory without limit. This is independent of

@@ -453,7 +453,12 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     return this.apiKeyRepository.findBy({ id: In(ids) });
   }
 
-  async validateApiKey(rawKey: string, clientIp?: string, sessionId?: string): Promise<ApiKey> {
+  async validateApiKey(
+    rawKey: string,
+    clientIp?: string,
+    sessionId?: string,
+    { recordUsage = true }: { recordUsage?: boolean } = {},
+  ): Promise<ApiKey> {
     // Trim before hashing so every surface agrees on what the credential is. HTTP already strips
     // surrounding whitespace from header values, so a pasted key with a stray space/newline
     // authenticates over REST but fails on the WebSocket handshake (the CONNECT payload carries the
@@ -501,8 +506,9 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    // Advisory stats only; the tracker coalesces the write and never throws.
-    await this.usageTracker.record(apiKey);
+    // Advisory stats only; the tracker coalesces the write and never throws. A caller that validates
+    // the same key again later in the request (the MCP mount gate) opts out, so a request counts once.
+    if (recordUsage) await this.usageTracker.record(apiKey);
 
     return apiKey;
   }

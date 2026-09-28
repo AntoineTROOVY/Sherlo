@@ -708,6 +708,19 @@ describe('AuthService', () => {
       await expect(service.validateApiKey(` ${rawKey}\n`)).resolves.toMatchObject({ id: key.id });
     });
 
+    it('leaves the usage stats alone when the caller opts out of recording', async () => {
+      const rawKey = 'gate-key';
+      const key = createMockApiKey({ keyHash: hashKey(rawKey), lastUsedAt: new Date(Date.now() - 5 * 60_000) });
+      (repository.findOne as jest.Mock).mockResolvedValue(key);
+
+      const result = await service.validateApiKey(rawKey, undefined, undefined, { recordUsage: false });
+
+      expect(result.id).toBe(key.id);
+      expect(result.usageCount).toBe(0);
+      expect(repository.update).not.toHaveBeenCalled();
+      expect(repository.increment).not.toHaveBeenCalled();
+    });
+
     it('coalesces the usage-stat write within the throttle window', async () => {
       const rawKey = 'recent-key';
       const key = createMockApiKey({ keyHash: hashKey(rawKey), lastUsedAt: new Date(), usageCount: 5 });

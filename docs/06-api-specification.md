@@ -6275,7 +6275,7 @@ such an instance, so its rows could only fail again. Re-enable the instance to r
 
 MCP Streamable-HTTP / JSON-RPC 2.0 transport that exposes the agent-tool registry over the Model Context Protocol. **This is a transport, not a REST resource** — there is no NestJS controller, no DTO, and no `{success,data}` shape.
 
-**Auth:** API key — sent as `X-Api-Key: <key>` **or** `Authorization: Bearer <key>`. Auth is enforced **per tool call** inside the MCP layer (not by the global Nest guard), so an auth failure surfaces in-band, not as an HTTP `401`.
+**Auth:** API key — sent as `X-Api-Key: <key>` **or** `Authorization: Bearer <key>`. Every request, including `initialize` and `tools/list`, needs a valid key: a missing, unknown, revoked or expired key, or a key carrying `allowedIps` (there is no genuine client IP on this mount), is refused before any MCP method runs, with an HTTP error, a JSON-RPC error body (`code: -32000`, `id: null`) and `WWW-Authenticate: Bearer` on a `401`. The role, session and chat checks run **per tool call** inside the MCP layer (not by the global Nest guard) and surface in-band.
 
 Key facts:
 
@@ -6316,9 +6316,9 @@ Key facts:
 }
 ```
 
-For `tools/call` the result is an MCP `CallToolResult` (`content` array of `text` or embedded base64 `resource` items — payloads over 4096 bytes become a `resource`). **Tool-level failures are returned in-band as `CallToolResult` with `isError:true`** (HTTP stays 200), including missing/invalid API key (`name:'UnauthorizedException'`) and rate-limit hits (`message:'MCP rate limit exceeded'`).
+For `tools/call` the result is an MCP `CallToolResult` (`content` array of `text` or embedded base64 `resource` items — payloads over 4096 bytes become a `resource`). **Tool-level failures are returned in-band as `CallToolResult` with `isError:true`** (HTTP stays 200), including a role, session or chat refusal (`name:'ForbiddenException'`) and rate-limit hits (`message:'MCP rate limit exceeded'`).
 
-**Errors:** in-band JSON-RPC errors `-32601` (unknown method), `-32602` (invalid params / unknown tool), `-32700` (parse error), all at HTTP 200 · `500` only if the transport throws before headers are sent · `404` when `MCP_ENABLED` is not `true`
+**Errors:** `401` with a JSON-RPC error body for a missing or refused key · in-band JSON-RPC errors `-32601` (unknown method), `-32602` (invalid params / unknown tool), `-32700` (parse error), all at HTTP 200 · `500` if the key lookup fails for a reason other than a refused key, or if the transport throws before headers are sent · `404` when `MCP_ENABLED` is not `true`
 
 > The full catalog of MCP tools (names, tiers, schemas) is documented separately — see **doc 24, MCP Integration**. This section documents only the transport endpoint.
 
