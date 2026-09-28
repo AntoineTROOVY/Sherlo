@@ -223,6 +223,131 @@ describe('ChatStateStoreService', () => {
     });
   });
 
+  describe('a session whose rows all fit in the cache answers a miss without a query', () => {
+    const seeded = () =>
+      makeRepo([
+        { sessionId: 's', chatId: 'a', archived: true },
+        { sessionId: 's', chatId: 'b', pinned: true },
+      ]);
+
+    it('after refreshSession, an unknown chat reads undefined and costs no query', async () => {
+      const repo = seeded();
+      const svc = svcWith(repo);
+      await svc.refreshSession('s');
+      expect(svc.get('s', 'unknown')).toBeUndefined();
+      await tick();
+      expect(svc.get('s', 'unknown')).toBeUndefined();
+      expect(svc.get('s', 'a')).toEqual(expect.objectContaining({ archived: true }));
+      expect(repo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('a write on a complete session is persisted and read back', async () => {
+      const repo = seeded();
+      const svc = svcWith(repo);
+      await svc.refreshSession('s');
+      await svc.remember('s', 'new', { archived: true });
+      expect(repo.upsert).toHaveBeenCalledTimes(1);
+      expect(svc.get('s', 'new')).toEqual(expect.objectContaining({ archived: true }));
+    });
+
+    it('forget and clearSession keep it complete', async () => {
+      const repo = seeded();
+      const svc = svcWith(repo);
+      await svc.refreshSession('s');
+      await svc.forget('s', ['a']);
+      expect(svc.get('s', 'a')).toBeUndefined();
+      await svc.clearSession('s');
+      expect(svc.get('s', 'b')).toBeUndefined();
+      expect(repo.findOne).not.toHaveBeenCalled();
+    });
+
+    it('reads through again once one of its rows is evicted', async () => {
+      process.env[ENV] = '2';
+      const repo = makeRepo([{ sessionId: 's', chatId: 'a', archived: true }]);
+      const svc = svcWith(repo);
+      await svc.refreshSession('s');
+      await svc.remember('t', 'x', { pinned: true });
+      await svc.remember('t', 'y', { pinned: true }); // cap 2: evicts s/a
+      repo.findOne.mockClear();
+      expect(svc.get('s', 'a')).toBeUndefined();
+      await tick();
+      expect(repo.findOne).toHaveBeenCalledTimes(1);
+      expect(svc.get('s', 'a')).toEqual(expect.objectContaining({ archived: true }));
+    });
+
+    it('is not complete when the preload reached the cap', async () => {
+      process.env[ENV] = '2';
+      const repo = seeded();
+      const svc = svcWith(repo);
+      await svc.refreshSession('s');
+      svc.get('s', 'unknown');
+      expect(repo.findOne).toHaveBeenCalledTimes(1);
+    });
+
+    it('is not complete when the refresh read fails', async () => {
+      const repo = seeded();
+      const svc = svcWith(repo);
+      await svc.refreshSession('s');
+      repo.find.mockRejectedValueOnce(new Error('SQLITE_BUSY'));
+      await svc.refreshSession('s');
+      svc.get('s', 'unknown');
+      expect(repo.findOne).toHaveBeenCalledTimes(1);
+    });
+
+    it('is not complete when a write overlapped the refresh read', async () => {
+      const repo = seeded();
+      let release!: () => void;
+      repo.upsert.mockImplementationOnce(
+        (v: ChatState) =>
+          new Promise(resolve => {
+            release = () => {
+              repo.rows.set(KEY(v.sessionId, v.chatId), { ...v });
+              resolve(undefined);
+            };
+          }),
+      );
+      const svc = svcWith(repo);
+      const pending = svc.remember('s', 'late', { pinned: true });
+      await tick(); // the write is indexed and waiting on its upsert
+      await svc.refreshSession('s'); // the row is not in the table yet, so the refresh drops it
+      release();
+      await pending;
+      expect(svc.get('s', 'late')).toBeUndefined();
+      await tick();
+      expect(svc.get('s', 'late')).toEqual(expect.objectContaining({ pinned: true }));
+    });
+
+    it('a write whose read-through failed leaves the session incomplete, so the row is read back', async () => {
+      const repo = seeded();
+      const svc = svcWith(repo);
+      await svc.refreshSession('s');
+      repo.findOne.mockRejectedValueOnce(new Error('SQLITE_BUSY'));
+      // 'c' is not cached, so the write reads through first; that read fails and nothing is indexed.
+      await svc.remember('s', 'c', { pinned: true });
+      expect(svc.get('s', 'c')).toBeUndefined();
+      await tick();
+      expect(svc.get('s', 'c')).toEqual(expect.objectContaining({ pinned: true }));
+    });
+
+    it('reload marks every session of an untruncated preload complete, and none of a truncated one', async () => {
+      const repo = makeRepo([
+        { sessionId: 's', chatId: 'a', archived: true },
+        { sessionId: 't', chatId: 'b', pinned: true },
+      ]);
+      const svc = svcWith(repo);
+      await svc.reload();
+      svc.get('s', 'unknown');
+      svc.get('t', 'unknown');
+      expect(repo.findOne).not.toHaveBeenCalled();
+
+      process.env[ENV] = '2';
+      const capped = svcWith(repo);
+      await capped.reload();
+      capped.get('s', 'unknown');
+      expect(repo.findOne).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('forget drops the named chats of one session from the table and the cache, after their pending writes', async () => {
     const repo = makeRepo([
       { sessionId: 's', chatId: 'd', pinned: true },

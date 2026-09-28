@@ -35,7 +35,9 @@ const SEP = '\u0000'; // a null byte never appears in a session name or JID, so 
 // One global LRU across all sessions, default 5000, matching the other engine maps. A
 // many-session deployment with large chat lists should raise BAILEYS_CHAT_STATE_CACHE_MAX; an evicted
 // row stays persisted and both paths read-through on a miss (the read warms lazily, the write merges
-// the patch onto the persisted row), so eviction costs a re-read, never data loss.
+// the patch onto the persisted row), so eviction costs a re-read, never data loss. The first read of an
+// evicted row still answers undefined, so the chat list shows that chat's live record once; the first
+// eviction is logged for that reason.
 export const CHAT_STATE_CACHE_DEFAULT = 5000;
 
 /**
@@ -54,9 +56,22 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
   /**
    * Keys the table has no row for, so a chat never muted, archived or pinned (most of them) is not
    * queried again on every chat-list read. Kept apart from `states` so it never evicts a real row;
-   * bounded by the same cap, and a key leaves it the moment a state is indexed for it.
+   * bounded by the same cap, and a key leaves it the moment a state is indexed for it. Only consulted
+   * for a session that is not in {@link completeSessions}.
    */
   private readonly absent = new Set<string>();
+  /**
+   * Sessions whose every persisted row is in `states`, so a miss there means "no row" without a query.
+   * Proving absence key by key instead cost one query per never-muted chat per start, and once the
+   * chats across sessions outgrew the cap the FIFO `absent` set cycled and every chat list queried
+   * once per chat. A session joins after an untruncated load no write overlapped, and leaves when one
+   * of its rows is evicted or a write could not be indexed; every other write indexes before it
+   * persists, so the mark stays true.
+   */
+  private readonly completeSessions = new Set<string>();
+  /** Bumped by every write that indexes or persists, so a load can tell a write overlapped its read. */
+  private writeSeq = 0;
+  private warnedEviction = false;
   private readonly maxEntries: number;
   /** One write chain per chat, so each remember() merges onto the state the previous one left. */
   private readonly writes = new KeyedMutationQueue();
@@ -73,6 +88,7 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
   }
 
   async reload(): Promise<void> {
+    const seq = this.writeSeq;
     try {
       const rows = await this.repo.find({
         order: { updatedAt: 'DESC' },
@@ -80,6 +96,7 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
       });
       this.states.clear();
       this.absent.clear();
+      this.completeSessions.clear();
       // Oldest first, so the newest row ends at the most-recent end of the LRU rather than the first
       // one evicted (the query is DESC only so `take` keeps the newest rows).
       for (const row of [...rows].reverse()) {
@@ -88,6 +105,9 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
           archived: row.archived,
           pinned: row.pinned,
         });
+      }
+      if (this.loadWasWhole(rows.length, seq)) {
+        for (const row of rows) this.completeSessions.add(row.sessionId);
       }
       this.logger.log(
         `Loaded ${rows.length} chat states into cache${this.maxEntries ? ` (cap ${this.maxEntries})` : ''}`,
@@ -105,7 +125,7 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
       this.states.set(k, value);
       return value;
     }
-    if (!this.absent.has(k)) this.warmFromTable(k, sessionId, chatId);
+    if (!this.completeSessions.has(sessionId) && !this.absent.has(k)) this.warmFromTable(k, sessionId, chatId);
     return undefined;
   }
 
@@ -140,6 +160,9 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
       try {
         row = await this.repo.findOne({ where: { sessionId, chatId } });
       } catch {
+        // Persisted but not indexed, so the session's cache no longer holds all of its rows.
+        this.writeSeq++;
+        this.completeSessions.delete(sessionId);
         await this.persist(sessionId, chatId, patch);
         this.absent.delete(k);
         return;
@@ -155,6 +178,7 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
       this.index(k, next); // warm the cache even on a no-op so the next read is a hit
       return; // nothing changed against the current state; skip the write that would just churn updatedAt
     }
+    this.writeSeq++;
     this.index(k, next);
     await this.persist(sessionId, chatId, next);
   }
@@ -210,6 +234,8 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
    */
   async refreshSession(sessionId: string): Promise<void> {
     const prefix = `${sessionId}${SEP}`;
+    const seq = this.writeSeq;
+    this.completeSessions.delete(sessionId);
     let rows: ChatState[] | undefined;
     try {
       rows = await this.repo.find({
@@ -237,6 +263,17 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
         pinned: row.pinned,
       });
     }
+    // Marked after the loop: indexing these rows can evict other sessions' keys, never this one's.
+    if (this.loadWasWhole(rows.length, seq)) this.completeSessions.add(sessionId);
+  }
+
+  /**
+   * True when a load holds every row it asked for and no write ran meanwhile. A write in flight during
+   * the read may be missing from `rows` while its key was just dropped from the cache, so the session
+   * cannot be vouched for; skipping the mark only keeps the read-through path.
+   */
+  private loadWasWhole(count: number, seq: number): boolean {
+    return (this.maxEntries === 0 || count < this.maxEntries) && this.writeSeq === seq && this.writes.size === 0;
   }
 
   /** Warm a cache miss from the table. This lookup still returns undefined (the read cannot await); the next hits. */
@@ -273,6 +310,13 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
       const oldest = this.states.keys().next().value;
       if (oldest === undefined) break;
       this.states.delete(oldest);
+      this.completeSessions.delete(oldest.slice(0, oldest.indexOf(SEP)));
+      if (!this.warnedEviction) {
+        this.warnedEviction = true;
+        this.logger.warn(
+          `Chat state cache is full (${this.maxEntries}); raise BAILEYS_CHAT_STATE_CACHE_MAX so pin, mute and archive stay cached`,
+        );
+      }
     }
   }
 
