@@ -74,7 +74,10 @@ export type HostToWorkerMessage =
   // runs the plugin's search handler and replies with `search-result` (same `id` correlation as
   // hook/health-check/webhook). No per-session config: search is a global query; session scoping travels
   // inside SearchQuery.sessionIds (scoped by SearchService from the caller's API-key).
-  | { kind: 'search'; id: number; query: SearchQuery };
+  | { kind: 'search'; id: number; query: SearchQuery }
+  // Liveness probe, sent after a dispatch times out. The worker bootstrap answers it before any plugin
+  // code runs, so a slow async handler still answers and only a blocked event loop stays silent.
+  | { kind: 'ping'; id: number };
 
 export type WorkerToHostMessage =
   | { kind: 'ready' }
@@ -112,6 +115,7 @@ export type WorkerToHostMessage =
   // carries the handler's error (handler threw / no handler / etc.).
   | { kind: 'search-result'; id: number; ok: true; results: SearchResults }
   | { kind: 'search-result'; id: number; ok: false; error: string }
+  | { kind: 'pong'; id: number }
   | { kind: 'error'; error: string };
 
 /**

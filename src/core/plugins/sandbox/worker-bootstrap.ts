@@ -61,6 +61,13 @@ let context: Record<string, unknown> | null = null;
 let baseConfig: Record<string, unknown> = {};
 
 port.on('message', (message: HostToWorkerMessage) => {
+  // Answered here, before any plugin code, so a pending async handler never delays it. Dispatches
+  // queued ahead of it still do; the host counts their results as progress while it waits, so only a
+  // worker whose event loop is blocked (a synchronous loop in plugin code) goes silent.
+  if (message.kind === 'ping') {
+    send({ kind: 'pong', id: message.id });
+    return;
+  }
   if (message.kind === 'cap-result') {
     capClient.handleResult(message);
     return;

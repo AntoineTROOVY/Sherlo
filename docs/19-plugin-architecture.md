@@ -777,8 +777,12 @@ tier automatically. Key properties:
 - Each worker has a heap cap (`maxOldGenerationSizeMb`, default **256 MB**) — an OOM terminates the
   worker, not the host.
 - A sandboxed hook handler has a **5 s** time budget (`SANDBOX_HOOK_TIMEOUT_MS`); on timeout the host
-  resolves `{ continue: true }` (fail-open) so a slow/wedged handler never stalls the hook chain. The
-  same fail-open value drains in-flight hooks if the worker crashes.
+  resolves `{ continue: true }` (fail-open), so each sandboxed subscriber delays the hook chain by at most
+  5 s per event. The same fail-open value drains in-flight hooks if the worker crashes. The timeout is
+  logged at most once per event per minute and shows as the last hook error in plugin health.
+- After a hook, webhook or search dispatch times out, the host pings the worker. A worker whose event
+  loop is blocked (a synchronous loop) cannot answer within 5 s, so it is terminated and the plugin is
+  set to `ERROR`, as on a crash; a slow async handler answers and is left running.
 - Lifecycle methods (`load`/`onLoad`/`onEnable`/`onDisable`) and `healthCheck` are bounded by a **30 s**
   / **5 s** timeout respectively, so a wedged plugin can't hang an ADMIN enable/disable or the health endpoint.
 - The worker gets a **minimal allowlisted env** (`NODE_ENV`, `NODE_EXTRA_CA_CERTS`, `TZ`) — host secrets

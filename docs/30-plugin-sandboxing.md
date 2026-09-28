@@ -45,13 +45,18 @@ from disk is user-installed and sandboxed.
   host terminates, authenticates and enqueues the delivery first.
 - **Hook safety.** Hook handlers run in the worker and are dispatched with a **time budget**
   (`SANDBOX_HOOK_TIMEOUT_MS`, a hardcoded 5s). A slow or wedged handler is skipped (`continue: true`)
-  so it can never stall the host's hook chain.
+  once the budget runs out, so each sandboxed subscriber can delay the hook chain by at most 5 s per
+  event, never indefinitely.
 - **Resource & runaway containment.** Each worker has a heap cap (`maxOldGenerationSizeMb`, a hardcoded
   256 MB). An OOM terminates the worker, not the host. A wedged **lifecycle** call (load/unload) times out
   and tears the worker down, and a crash rejects its in-flight calls — the host survives either way. A
-  runaway **hook** handler (e.g. an infinite synchronous loop) is skipped on the hook timeout so it can't
-  stall the host's hook chain, but the worker keeps running it (pegging a core) until the plugin is
-  reloaded or hits the heap cap — it is contained to its own thread, not instantly force-killed.
+  runaway **hook** handler (e.g. an infinite synchronous loop) is skipped on the hook timeout. After any
+  hook, webhook or search dispatch times out, the host sends the worker a liveness ping that the worker
+  answers before running plugin code. A slow async handler answers at once and keeps running. A worker
+  still working through a backlog of dispatches reads the ping late, but every result it returns counts
+  as an answer. A worker whose event loop is blocked answers nothing for 5 s, so the host terminates it
+  and sets the plugin to `ERROR` (no automatic restart, the same as a crash); the operator re-enables it
+  once fixed.
 - **Memory-kind boundary.** The heap cap bounds the V8 heap only. `Buffer`/`ArrayBuffer` allocations
   are native memory outside `maxOldGenerationSizeMb`, and worker threads share the host's address
   space, so a plugin that accumulates Buffers grows host RSS until the container's memory limit
