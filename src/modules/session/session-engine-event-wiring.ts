@@ -138,10 +138,10 @@ export class SessionEngineEventWiring {
     // presence is the relink signal used below; its value gates onReady's account-binding check.
     const previouslyLinked = Boolean(previousPhone);
     let relinkWarned = false;
-    // When the session was last seen up before the current engine-internal reconnect (epoch ms),
-    // stamped on attempt 1 or on the first attempt after a READY, and cleared by onReady. An engine
-    // can carry its attempt counter across a short-lived READY (Baileys does, so a link that drops
-    // right after opening keeps backing off), and time spent READY is not downtime.
+    // When the current engine-internal reconnect streak started (epoch ms): stamped at attempt 1, or
+    // at the first reconnect attempt after a READY, and cleared by onReady. An engine can carry its
+    // attempt counter across a short-lived READY (Baileys does, so a link that drops right after
+    // opening keeps backing off), and time spent READY is not downtime.
     // Closure state rather than a Map: it is scoped to this engine instance. A service-level
     // reconnect builds a new engine and a new callback table, so nothing has to be cleaned up.
     let reconnectingSince = 0;

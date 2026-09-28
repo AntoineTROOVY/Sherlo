@@ -3844,7 +3844,7 @@ describe('SessionService', () => {
 
     // Baileys keeps its attempt counter across a READY that lasted under five minutes, so the next
     // drop can arrive as attempt 5. The time the session spent READY is not downtime.
-    it('measures the downtime from the last READY when the attempt count carries across it', async () => {
+    it('measures the downtime from the first drop after the last READY when the attempt count carries across it', async () => {
       const callbacks = await startAndCapture();
       const sessionErrors = (service as unknown as { sessionErrors: SessionErrorStore }).sessionErrors;
       const start = Date.now();
