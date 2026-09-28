@@ -780,7 +780,7 @@ test(
       fireEvent.click(within(dialog).getByRole('button', { name: 'Restart Now' }));
 
       await within(dialog).findByText(
-        'The proxy timed out before the server answered. The restart may still be in progress; reload in a minute to check.',
+        'The proxy returned an error before the server answered, so it is not known whether the restart is in progress. Reload in a minute to check.',
       );
       assert.equal(within(dialog).queryByText('Restart failed'), null);
       assert.equal(within(dialog).queryByText('HTTP 504'), null);
@@ -819,7 +819,7 @@ test('a proxy 502 without a gateway code on the restart request reports an unkno
   const dialog = await clickRestartNow();
 
   await within(dialog).findByText(
-    'The proxy timed out before the server answered. The restart may still be in progress; reload in a minute to check.',
+    'The proxy returned an error before the server answered, so it is not known whether the restart is in progress. Reload in a minute to check.',
   );
   assert.equal(within(dialog).queryByText('Restart failed'), null);
 });
