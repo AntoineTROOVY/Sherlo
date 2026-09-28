@@ -12,7 +12,9 @@
 > resets only the sessions it may claim, instead of reporting a live peer's sessions as
 > disconnected. Claims are released on a clean shutdown and expire otherwise, so failover
 > does not depend on one. `NODE_ID` names the process; it defaults to the hostname and must
-> be stable across restarts.
+> be stable across restarts and unique per running process: two processes sharing a hostname
+> (host networking, pm2 cluster mode) must each set it, and a node that sees another process
+> renewing leases under its `NODE_ID` logs `duplicate_node_id`.
 >
 > A node that loses its claim gives up the engine. A lease can lapse while the process is
 > perfectly healthy — a slow query is enough — after which a peer may legitimately take the
