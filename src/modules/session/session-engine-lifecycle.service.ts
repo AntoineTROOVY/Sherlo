@@ -58,6 +58,12 @@ export interface ReconnectState extends ReconnectAttemptState {
   parkedFailure?: { run: () => void; terminal: boolean };
   /** When the session last reached READY; consumed by the next scheduleReconnect (see STABLE_READY_MS). */
   readyAt?: number;
+  /**
+   * When that READY stretch ended inside the engine (it reported a non-READY state without a drop the
+   * gateway sees, e.g. a Baileys in-engine reconnect). The stretch is measured to here, not to the next
+   * READY or drop, so time spent reconnecting inside the engine never counts as READY time.
+   */
+  readyEndedAt?: number;
 }
 
 // Reconnect-backoff bounds. An OPERATOR-supplied session.config feeds this math, so the values
@@ -343,6 +349,7 @@ export class SessionEngineLifecycle {
       handleEngineDisconnected: (id, engine, reason) => this.handleEngineDisconnected(id, engine, reason),
       updateStatus: (id, status) => this.updateStatus(id, status),
       cancelReconnect: id => this.cancelReconnect(id),
+      endReadyStretch: id => this.endReadyStretch(id),
       parkReconnectInitFailure: (id, run, reason) => this.parkReconnectInitFailure(id, run, reason),
       evictAndForceDestroy: (id, engine) => this.evictAndForceDestroy(id, engine),
       trackPendingCredentialTeardown: (sessionName, raw) => this.trackPendingCredentialTeardown(sessionName, raw),
@@ -529,6 +536,21 @@ export class SessionEngineLifecycle {
     return (
       reconnect != null && (reconnect.timer !== null || (reconnect.attempts > 0 && reconnect.readyAt === undefined))
     );
+  }
+
+  /** Whether the last READY stretch lasted STABLE_READY_MS, measured to where it ended (or to now). */
+  private readyStretchHeld(state: ReconnectState): boolean {
+    return state.readyAt !== undefined && (state.readyEndedAt ?? Date.now()) - state.readyAt >= STABLE_READY_MS;
+  }
+
+  /**
+   * The live engine left READY without a drop the gateway handles (it reports the new state itself,
+   * e.g. a Baileys in-engine reconnect). Records when the READY stretch ended; readyAt stays set, so
+   * isEngineActive does not read the session as a pending gateway reconnect.
+   */
+  endReadyStretch(id: string): void {
+    const state = this.reconnectStates.get(id);
+    if (state?.readyAt !== undefined && state.readyEndedAt === undefined) state.readyEndedAt = Date.now();
   }
 
   // --- Leaf-event delegates (SessionEngineLeafEvents) ------------------------------------------
@@ -833,12 +855,13 @@ export class SessionEngineLifecycle {
     // only if this READY held for STABLE_READY_MS, so a session that flaps keeps backing off.
     // Baileys fires READY again on every internal socket reopen, with no drop reported in between:
     // a previous READY that already held the window ends the streak here, before it is overwritten.
+    // The stretch is measured to where it ended (readyEndedAt), so an in-engine reconnect in between
+    // is not counted as READY time.
     const reconnectState = this.reconnectStates.get(id);
     if (reconnectState) {
-      if (reconnectState.readyAt !== undefined && Date.now() - reconnectState.readyAt >= STABLE_READY_MS) {
-        reconnectState.attempts = 0;
-      }
+      if (this.readyStretchHeld(reconnectState)) reconnectState.attempts = 0;
       reconnectState.readyAt = Date.now();
+      reconnectState.readyEndedAt = undefined;
       if (reconnectState.timer) {
         clearTimeout(reconnectState.timer);
         reconnectState.timer = null;
@@ -1066,8 +1089,9 @@ export class SessionEngineLifecycle {
     // this drop starts a fresh streak; a shorter one is the same flap and keeps the streak growing.
     // Cleared either way, so a later re-init failure inside this episode never resets it.
     if (state.readyAt !== undefined) {
-      if (Date.now() - state.readyAt >= STABLE_READY_MS) state.attempts = 0;
+      if (this.readyStretchHeld(state)) state.attempts = 0;
       state.readyAt = undefined;
+      state.readyEndedAt = undefined;
     }
 
     // All the backoff rules (budget, exponential delay, loop cadence) live in the

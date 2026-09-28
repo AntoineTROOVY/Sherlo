@@ -2365,6 +2365,52 @@ describe('SessionService', () => {
       }
     });
 
+    it('measures a READY stretch to where the engine left READY, not to the next READY', async () => {
+      // Baileys handles a transient close inside the engine: it reports INITIALIZING and retries, and
+      // never reports a drop to the gateway. Those minutes spent reconnecting are not READY time.
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      let callbacks: EngineEventCallbacks = {};
+      mockEngine.initialize.mockImplementationOnce((cb: EngineEventCallbacks) => {
+        callbacks = cb;
+        return Promise.resolve();
+      });
+      await service.start('sess-uuid-1');
+      jest.useFakeTimers();
+      try {
+        const i = internals();
+        jest.spyOn(i, 'executeReconnect').mockResolvedValue(undefined);
+        const state = i.reconnectStates.get('sess-uuid-1')!;
+        state.attempts = 3;
+
+        // READY for 10s, then six minutes of in-engine reconnecting, then READY again.
+        i.handleEngineReady('sess-uuid-1', mockEngine, '628123', 'Tester');
+        jest.advanceTimersByTime(10_000);
+        callbacks.onStateChanged?.(EngineStatus.INITIALIZING);
+        jest.advanceTimersByTime(6 * 60_000);
+        i.handleEngineReady('sess-uuid-1', mockEngine, '628123', 'Tester');
+        expect(state.attempts).toBe(3);
+
+        // Same shape, but the READY held the window before the engine left it: the streak ends.
+        jest.advanceTimersByTime(STABLE_READY_MS);
+        callbacks.onStateChanged?.(EngineStatus.INITIALIZING);
+        jest.advanceTimersByTime(60_000);
+        i.handleEngineReady('sess-uuid-1', mockEngine, '628123', 'Tester');
+        expect(state.attempts).toBe(0);
+
+        // A gateway drop after an in-engine one measures the same way.
+        state.attempts = 3;
+        jest.advanceTimersByTime(10_000);
+        callbacks.onStateChanged?.(EngineStatus.INITIALIZING);
+        jest.advanceTimersByTime(6 * 60_000);
+        i.scheduleReconnect('sess-uuid-1', createMockSession());
+        expect(state.attempts).toBe(4);
+      } finally {
+        jest.clearAllTimers();
+        jest.useRealTimers();
+      }
+    });
+
     it('keeps the streak when a second READY follows one that did not hold the stability window', () => {
       jest.useFakeTimers();
       try {

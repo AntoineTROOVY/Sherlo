@@ -113,7 +113,9 @@ before touching anything in the logout/forceKill path.
 **Defense:** `reconnect-policy.ts` — a pure decision function (attempt budget, loop alerts)
 consumed by the lifecycle, which resets the budget only when the session held READY for
 `STABLE_READY_MS` (5 min) before its next drop or its next READY, so a session that flaps keeps
-backing off and still alerts; the clamps exist because a naive `delay * 2^attempt` reaches values
+backing off and still alerts. The stretch ends where the engine first reports a non-READY state
+(`readyEndedAt`), so a Baileys in-engine reconnect between two READYs is not counted as READY time;
+the clamps exist because a naive `delay * 2^attempt` reaches values
 `setTimeout` silently truncates, and overflows to `Infinity` on a long enough streak.
 **Pinned by:** `reconnect-policy.spec.ts`, `session.service.spec.ts` (scheduleReconnect cases).
 
