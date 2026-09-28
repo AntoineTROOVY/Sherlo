@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, HttpException, PayloadTooLargeException } from '@nestjs/common';
+import { BadRequestException, HttpException, Logger, PayloadTooLargeException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { In, Not } from 'typeorm';
 import {
@@ -115,6 +115,23 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
     repo.find.mockResolvedValue([]);
     await service.onApplicationBootstrap();
     expect(repo.update).not.toHaveBeenCalled();
+  });
+
+  it('counts on startup only the batches the guarded update actually failed', async () => {
+    const stale = { id: 'b-done', status: BatchStatus.PROCESSING, messages: [] };
+    const orphan = { id: 'b-dead', status: BatchStatus.PROCESSING, messages: [] };
+    repo.find.mockResolvedValue([stale, orphan]);
+    repo.update.mockImplementation((where: { id: string }) =>
+      Promise.resolve({ affected: where.id === 'b-dead' ? 1 : 0 }),
+    );
+    const warn = jest.spyOn((service as unknown as { logger: Logger }).logger, 'warn').mockImplementation();
+
+    await service.onApplicationBootstrap();
+
+    expect(repo.update).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledWith(
+      'Marked 1 orphaned PROCESSING batch(es) FAILED on startup (interrupted by a restart)',
+    );
   });
 
   /**
