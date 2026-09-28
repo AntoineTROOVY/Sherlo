@@ -144,17 +144,22 @@ describe('a job that runs a repo script checks the repo out', () => {
  * published most recently at tag time; pin the exact version the way the Dockerfile pins its npm.
  *
  * Python installs cannot be pinned that way: `pip install` resolves the ranges in pyproject.toml, and
- * `python -m build` fetches its build backend into an isolated environment no pin reaches. So an
- * id-token job runs neither; the install, test and build happen in a job without the grant.
+ * `python -m build` fetches its build backend into an isolated environment no pin reaches. The same
+ * holds for pipx, uv, uvx, poetry and pyproject-build. So an id-token job runs none of them; the
+ * install, test and build happen in a job without the grant.
+ *
+ * Only these two families are checked: other installers (npx, a local npm install, gem, go) in an
+ * id-token job are not caught here.
  */
-describe('a job that can mint a publish credential installs no floating third-party code', () => {
+describe('a job that can mint a publish credential pins global npm installs and runs no Python installer', () => {
   type Permissions = Record<string, string> | string | null | undefined;
   type OidcJob = { permissions?: Permissions; steps?: Step[] };
   type OidcWorkflow = { permissions?: Permissions; jobs?: Record<string, OidcJob> };
   const workflows = fs.readdirSync(workflowDir).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
   const GLOBAL_INSTALL = /\bnpm\s+(?:install|i|add)\s+(?:-g|--global)\s+([^\n;&|]+)/g;
   // `pip`, `pip3`, `python -m pip` and `uv pip` all contain `pip install`.
-  const PYTHON_INSTALL = /\bpip[\d.]*\s+install\b|\bpython[\d.]*\s+-m\s+build\b/g;
+  const PYTHON_INSTALL =
+    /\bpip[\d.]*\s+(?:install|wheel|download)\b|\bpython[\d.]*\s+-m\s+build\b|\bpyproject-build\b|\bpipx\s+(?:install|run)\b|\buvx\b|\buv\s+(?:sync|build|run|add|tool)\b|\bpoetry\s+(?:install|build|add)\b/g;
 
   // A job without its own `permissions` inherits the workflow-level block; `write-all` grants id-token too.
   const grantsIdToken = (perms: Permissions): boolean =>
@@ -229,7 +234,26 @@ describe('a job that can mint a publish credential installs no floating third-pa
     expect(runCommandsOf('python-sdk-release.yml').join('\n')).toMatch(PYTHON_INSTALL);
   });
 
-  it.each(workflows)('%s: id-token jobs run no pip install or python -m build', file => {
+  it('finds the other Python installers and build frontends in an id-token job', () => {
+    const commands = [
+      'pipx install twine',
+      'pipx run build',
+      'uvx twine upload dist/*',
+      'uv sync',
+      'uv build',
+      'uv tool install twine',
+      'poetry install',
+      'poetry build',
+      'pyproject-build',
+      'python -m pip wheel .',
+    ];
+    const job: OidcWorkflow = {
+      jobs: { publish: { permissions: { 'id-token': 'write' }, steps: commands.map(run => ({ run })) } },
+    };
+    expect(pythonInstallsInOidcJobs(job)).toHaveLength(commands.length);
+  });
+
+  it.each(workflows)('%s: id-token jobs run no Python installer or build frontend', file => {
     expect(pythonInstallsInOidcJobs(file)).toEqual([]);
   });
 });
