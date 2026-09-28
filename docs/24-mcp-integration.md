@@ -198,6 +198,33 @@ only when an agent genuinely needs to send messages / mutate state.
 - **Do not expose `/mcp` to the public internet** without a fronting authentication proxy.
   The static API key is appropriate for a self-hosted, locally/network-reached deployment;
   public exposure should wait for OAuth 2.1 support (planned).
+- **Chat-restricted keys are refused.** A key carrying `allowedChats` gets an `isError` tool
+  result naming `ForbiddenException` ("API key is restricted to selected chats") on every tool
+  call, the same default deny REST applies to routes with no chat dimension. Use a session-scoped
+  key for MCP instead.
+- **IP-restricted keys are refused.** The `/mcp` gate cannot check the client address, so a key
+  with `allowedIps` gets `403` on every request. Use a key without an IP allow-list for MCP.
+
+### Threat model: untrusted message content
+
+The read tools return what other WhatsApp users wrote, verbatim: message bodies and captions
+(`MessageList`, `MessageHistory`), last-message previews and chat names (`SessionGetChats`,
+`LabelListChats`), push names and contact names (`ContactFindAll`, `ContactFindOne`), and group
+subjects and descriptions (`GroupFindAll`, `GroupFindOne`). Treat any read tool that returns a name
+or message text the same way. Anyone who can message the account, or join or rename a group it is
+in, controls that text. An agent that reads it may treat instructions embedded in it as its own.
+
+- In the default read-only mode, injected text can at most steer what the agent reads and
+  reports back.
+- With `MCP_READONLY=false`, the same text can steer the agent into sends, replies, forwards
+  or group changes on the key's behalf.
+
+Keep the blast radius small:
+
+- Leave `MCP_READONLY` at its default unless the agent must write.
+- Give a read-only agent a `VIEWER` key, and scope every MCP key to the sessions it needs
+  (`allowedSessions`).
+- When write tools are on, have the MCP client ask a human to confirm each write call.
 
 ## 24.6 Enabling & Client Setup
 
