@@ -1059,7 +1059,7 @@ describe('BaileysAdapter reconnect policy — unlimited backoff (I4 hardening)',
     expect(baileys().default).toHaveBeenCalledTimes(3);
   });
 
-  it('a connection that stayed open past the stability window restarts the backoff at attempt 1', async () => {
+  it('a drop more than 5 minutes after the previous drop restarts a climbed backoff at attempt 1', async () => {
     const onReconnecting = jest.fn();
     await initWithRealTimers({ onReconnecting });
     jest.useFakeTimers();
@@ -1072,7 +1072,8 @@ describe('BaileysAdapter reconnect policy — unlimited backoff (I4 hardening)',
     await jest.advanceTimersByTimeAsync(2_000);
     fakeSock.fire('connection.update', { connection: 'open' });
 
-    // Up for the whole window, then dropped: a fresh incident, so attempt 1 (1 s), not attempt 3.
+    // The opens in between do not reset the counter, but a drop more than 5 minutes after the
+    // previous one is a fresh incident: attempt 1 (1 s), not attempt 3.
     jest.setSystemTime(Date.now() + 5 * 60_000);
     fireRecoverableClose();
     expect(onReconnecting).toHaveBeenLastCalledWith(1, 1_000);

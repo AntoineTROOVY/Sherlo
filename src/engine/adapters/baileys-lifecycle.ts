@@ -177,9 +177,8 @@ export interface BaileysLifecycleHost {
 }
 
 export class BaileysLifecycle {
-  /** A connection that stayed open this long, or a close this long after the previous close, means the
-   *  connection had been healthy: the backoff counter restarts from scratch instead of inheriting an
-   *  old incident's attempts. */
+  /** A close more than this long after the previous close means the connection had been healthy in
+   *  between: the backoff counter restarts from scratch instead of inheriting an old incident's attempts. */
   private static readonly RECONNECT_STABILITY_RESET_MS = 5 * 60_000;
   /** How long a first link's history sync must stay silent before the address-book pull runs. */
   private static readonly ADDRESSBOOK_QUIET_MS = 20_000;
@@ -202,8 +201,6 @@ export class BaileysLifecycle {
   private addressbookTimer?: ReturnType<typeof setTimeout>;
   /** Date.now() of the last close that scheduled a reconnect — input to the stability reset. */
   private lastConnectionCloseAt = 0;
-  /** Date.now() of the last 'open' not yet followed by a close, or 0: how long the connection stayed up. */
-  private lastOpenAt = 0;
   /** Lazily loaded @whiskeysockets/baileys module (ESM-only; loaded on first connect, not at boot). */
   private lib?: typeof BaileysLib;
   /** The session proxy's fetch dispatcher, built once: the proxy URL is fixed for the adapter's life. */
@@ -613,9 +610,8 @@ export class BaileysLifecycle {
         this.host.addLidMappings([{ lid: `${userPart(me.lid)}@lid`, pn: `${userPart(me.id)}@s.whatsapp.net` }]);
       }
       // The reconnect counter is not reset here: a connection that drops seconds after the handshake
-      // would otherwise redial at attempt 1 forever. The close branch resets it once the connection
-      // has stayed up for the stability window.
-      this.lastOpenAt = Date.now();
+      // would otherwise redial at attempt 1 forever. The close branch resets it once more than the
+      // stability window passes between drops.
       this.setStatus(EngineStatus.READY);
       this.host.getOnReady()?.(this.phoneNumber ?? '', this.pushName ?? '');
       // WhatsApp only PUSHES a timelock when it changes, so a gateway that starts (or reconnects)
@@ -703,22 +699,16 @@ export class BaileysLifecycle {
         return;
       }
 
-      // Stability reset: a connection that stayed open for the stability window, or a close that long
-      // after the previous one, means the connection had been healthy, so the backoff starts fresh
-      // instead of inheriting the old counter. One that drops sooner keeps climbing it, so a link
-      // that fails right after each handshake backs off instead of redialing every second or two.
+      // Stability reset: a close more than 5 minutes after the previous one means the connection had
+      // been healthy in between, so the backoff starts fresh instead of inheriting the old counter. A
+      // drop sooner than that keeps climbing it, so a link that fails right after each handshake backs
+      // off instead of redialing every second or two.
       // A QR window that ran out resets it too: WhatsApp answered, and a QR left unscanned for hours
       // must not add up to a reconnect loop.
       const now = Date.now();
-      const stayedOpen = this.lastOpenAt > 0 && now - this.lastOpenAt >= BaileysLifecycle.RECONNECT_STABILITY_RESET_MS;
-      if (
-        qrWindowEnded ||
-        stayedOpen ||
-        now - this.lastConnectionCloseAt > BaileysLifecycle.RECONNECT_STABILITY_RESET_MS
-      ) {
+      if (qrWindowEnded || now - this.lastConnectionCloseAt > BaileysLifecycle.RECONNECT_STABILITY_RESET_MS) {
         this.reconnectAttempts = 0;
       }
-      this.lastOpenAt = 0;
       this.lastConnectionCloseAt = now;
       this.scheduleReconnect(!qrWindowEnded);
     }
