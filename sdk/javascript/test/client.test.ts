@@ -105,6 +105,20 @@ describe('OpenWAClient', () => {
     expect(t.calls).toHaveLength(2);
   });
 
+  it('sends a raw path with a trailing slash, a double slash or only a slash as written', async () => {
+    const t = new MockTransport().passthrough({ status: 200, body: [] });
+    const c = client(t);
+    for (const path of ['/api/sessions/', '/api/sessions//x', '/']) {
+      await c.request({ method: 'GET', path });
+      expect(t.lastCall!.url).toBe(`http://localhost:2785${path}`);
+    }
+    await c.requestBytes({ method: 'GET', path: '/api/search/', query: { q: 'x' } });
+    expect(t.lastCall!.url).toBe('http://localhost:2785/api/search/?q=x');
+    // A space before an appended query is not trailing, so `.. ` is sent as `..%20`, not as a dot segment.
+    await c.request({ method: 'GET', path: '/api/labels/.. ', query: { q: 'x' } });
+    expect(t.calls).toHaveLength(5);
+  });
+
   it('serializes query params and skips null/undefined', async () => {
     const t = new MockTransport().on('GET', /\/messages/, { body: [] });
     await client(t).messages.list('s1', { chatId: 'a@c.us', from: undefined, limit: 10 });
