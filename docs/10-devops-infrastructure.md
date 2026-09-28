@@ -378,6 +378,15 @@ LOG_FORMAT=json
 # ===========================================
 # MEDIA STORAGE (choose one)
 # ===========================================
+# What the selected store holds: received status media, always, under statuses/<sessionId>/.
+# Chat message media is copied there only with CHAT_MEDIA_ARCHIVE_ENABLED=true, under
+# chat-media/<sessionId>/; media this account sent also needs CHAT_MEDIA_ARCHIVE_OUTBOUND=true.
+# With the archive off, chat media stays inline on the message row (up to MEDIA_DOWNLOAD_MAX_BYTES),
+# where GET /api/sessions/:sessionId/messages/:chatId/:messageId/media still serves it.
+# On S3 every key sits under the S3_KEY_PREFIX root (default media/, so media/chat-media/...).
+# While S3 has not been reachable since boot, or its credentials are missing, files go to
+# STORAGE_LOCAL_PATH instead.
+# The other CHAT_MEDIA_* settings (size cap, TTL, orphan sweep) are in .env.example.
 # STORAGE_TYPE accepts only `local` or `s3` — env validation rejects anything else and the app
 # FAILS TO BOOT ("Invalid environment configuration"). There is no silent fallback to local disk.
 # Option 1: Local filesystem (default)

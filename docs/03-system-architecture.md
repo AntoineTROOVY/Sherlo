@@ -1283,7 +1283,9 @@ internally on `storageType` — there is no `I*Adapter` interface, separate adap
 The main producer/consumer is the storage export/import migration and backup flow; the status store
 also writes status media through `putFile` (under `statuses/`) and sweeps orphans back out with
 `deleteFile`. Incoming and outgoing message media is returned inline to REST/webhook consumers and is
-**not** automatically written through `StorageService`.
+**not** written through `StorageService` unless `CHAT_MEDIA_ARCHIVE_ENABLED=true`, which archives a copy
+under `chat-media/<sessionId>/` (media this account sent also needs `CHAT_MEDIA_ARCHIVE_OUTBOUND=true`).
+On S3 every key sits under the `S3_KEY_PREFIX` root (default `media/`).
 **MinIO is not a separate type** — it is the `s3` backend. The S3 client is created from credentials
 alone, so plain AWS S3 works with no endpoint (the SDK derives one from the region); `S3_ENDPOINT` is
 for S3-compatible stores (MinIO, R2, …), and setting it is also what enables `forcePathStyle: true`.
