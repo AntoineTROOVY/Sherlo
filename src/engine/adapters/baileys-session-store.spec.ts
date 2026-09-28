@@ -282,6 +282,35 @@ describe('BaileysSessionStore', () => {
       expect(chatOn(s, { name: 'Renamed' })).toMatchObject({ muted: true, archived: true });
     });
 
+    // A decoded proto.Conversation (what history sync hands over) carries archived, pinned and
+    // muteEndTime as null defaults on its PROTOTYPE, and sets an own property only for a field that
+    // was on the wire. Modelled here without importing the ESM-only WAProto.
+    const historyChat = (own: Record<string, unknown>) =>
+      Object.assign(Object.create({ archived: null, pinned: null, muteEndTime: null }) as object, {
+        id: CHAT,
+        name: 'Alice',
+        ...own,
+      }) as Record<string, unknown>;
+
+    it('a history chat that omits the fields does not reset persisted pin, archive and mute', () => {
+      chatOn(newStore(), { muteEndTime: -1, archived: true, pinned: 2 });
+      for (const s of [newStore(), newStore()]) {
+        s.upsertChats([historyChat({})]);
+        expect(s.listChats()[0]).toMatchObject({ muted: true, archived: true, pinned: true });
+      }
+      expect(fake.get(SID, CHAT)).toEqual({ muteEndTime: -1, archived: true, pinned: true });
+    });
+
+    it('a history chat that omits the fields writes no row for a chat never seen', () => {
+      newStore().upsertChats([historyChat({})]);
+      expect(fake.rows.size).toBe(0);
+    });
+
+    it('a history chat that carries a field on the wire still persists it', () => {
+      newStore().upsertChats([historyChat({ pinned: 5 })]);
+      expect(fake.get(SID, CHAT)).toEqual({ muteEndTime: null, archived: false, pinned: true });
+    });
+
     it('normalizes a seconds-scale muteEndTime to ms on persist', () => {
       const nowS = Math.floor(Date.now() / 1000);
       chatOn(newStore(), { muteEndTime: nowS + 3600 });
