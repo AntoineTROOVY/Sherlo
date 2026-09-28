@@ -305,7 +305,9 @@ jobs:
       - name: Build dashboard
         run: cd dashboard && npm run build
 
+      # --test-timeout in test:unit fails a hung test by name; this bounds a hang it cannot see.
       - name: Run dashboard unit tests
+        timeout-minutes: 10
         run: cd dashboard && npm run test:unit
 
   # The repo ships several host-level shell smoke scripts (scripts/smoke-test-*.sh, plus

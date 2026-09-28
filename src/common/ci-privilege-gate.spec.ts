@@ -441,3 +441,39 @@ describe('every workflow job declares a bounded timeout', () => {
     expect(unbounded).toEqual([]);
   });
 });
+
+/**
+ * The dashboard's unit tests stalled for half an hour on a leaked timer and still reported green,
+ * because node:test waits for the event loop to drain and nothing bounded it. The per-test timeout
+ * turns that into a failure naming the file; the step timeout backstops a hang the runner cannot
+ * attribute to a test.
+ */
+describe('the dashboard unit tests are bounded', () => {
+  const dashboardScripts = (): Record<string, string> =>
+    (
+      JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'dashboard', 'package.json'), 'utf8')) as {
+        scripts: Record<string, string>;
+      }
+    ).scripts;
+
+  it('runs test:unit and test:cov with a per-test timeout, and test through test:unit', () => {
+    const scripts = dashboardScripts();
+    expect(scripts['test:unit']).toMatch(/--test-timeout=\d+/);
+    expect(scripts['test:cov']).toMatch(/--test-timeout=\d+/);
+    // --test-force-exit would hide the very leak the timeout exposes.
+    expect(scripts['test:unit']).not.toContain('--test-force-exit');
+    expect(scripts.test).toBe('npm run test:unit');
+  });
+
+  it.each(['ci.yml', 'release.yml'])('%s bounds the dashboard unit test step', file => {
+    type TimedStep = Step & { 'timeout-minutes'?: unknown };
+    const workflow = yaml.load(fs.readFileSync(path.join(workflowDir, file), 'utf8')) as {
+      jobs?: Record<string, { steps?: TimedStep[] }>;
+    };
+    const steps = Object.values(workflow.jobs ?? {})
+      .flatMap(job => job.steps ?? [])
+      .filter(step => executableLines(step.run ?? '').includes('npm run test:unit'));
+    expect(steps.length).toBe(1);
+    expect(steps[0]['timeout-minutes']).toEqual(expect.any(Number));
+  });
+});
