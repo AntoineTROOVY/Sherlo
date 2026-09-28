@@ -11,13 +11,18 @@ mkdir -p /app/data/sessions /app/data/media /app/data/plugins
 # so clearing them lets sessions re-launch after a crash/restart. (#259)
 rm -f /app/data/sessions/*/Singleton* 2>/dev/null || true
 
-# Re-own everything under /app/data except symlinks. Some bind mounts (Docker Desktop's file
-# sharing) refuse to change a symlink's owner, which a link never needs, so a `chown -R` that met
-# any link (a Chromium lock under a custom SESSION_DATA_PATH, a relocated session profile, a backup
-# staging copy) failed under `set -e` and crash-looped the container on every start (#1722).
-# Neither find nor `chown -h` follows a link, so a path swapped for a link between the walk and
-# the chown never re-owns the link's target. A real chown failure still stops the script.
-find /app/data ! -type l -exec chown -h openwa:openwa {} +
+# Re-own every path under /app/data that is not already openwa:openwa, except symlinks. Some bind
+# mounts (Docker Desktop's file sharing) refuse to change a symlink's owner, which a link never
+# needs, so a `chown -R` that met any link (a Chromium lock under a custom SESSION_DATA_PATH, a
+# relocated session profile, a backup staging copy) failed under `set -e` and crash-looped the
+# container on every start (#1722). Neither find nor `chown -h` follows a link, so a path swapped
+# for a link between the walk and the chown never re-owns the link's target. The ownership test
+# keeps a steady-state start to one stat per path: a chown is a metadata write even when the owner
+# is unchanged, which on a large session or media volume (or NFS) held boot for minutes. The walk
+# itself stays, because a file restored or copied in as root must still be re-owned. The
+# parentheses matter: without them `-o` would let the group branch bypass `! -type l`. A real
+# chown failure still stops the script.
+find /app/data ! -type l \( ! -user openwa -o ! -group openwa \) -exec chown -h openwa:openwa {} +
 
 # Chromium resolves its home from the passwd entry (no /home/openwa exists), so it hard-crashes at
 # launch unless its config/cache dirs exist and are writable. XDG_CONFIG_HOME/XDG_CACHE_HOME (set in

@@ -262,9 +262,9 @@ COPY --from=builder /app/dashboard/dist ./dashboard/dist
 
 # Create data directories with correct ownership. Only ./data is chowned, NOT all of /app: the app
 # tree (node_modules, dist) only needs read access, which root-owned files already grant, and the
-# entrypoint re-chowns /app/data at every container start for the mounted-volume case. A full
-# /app chown walks every production dependency file (issue #1045: ~35 minutes on a small VPS) and
-# duplicates their metadata into a new image layer.
+# entrypoint re-owns any wrong-owned path under /app/data at every start for the mounted-volume
+# case. A full /app chown walks every production dependency file (issue #1045: ~35 minutes on a
+# small VPS) and duplicates their metadata into a new image layer.
 RUN mkdir -p ./data/sessions ./data/media ./data/plugins && \
     chown -R openwa:openwa ./data
 

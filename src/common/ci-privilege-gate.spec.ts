@@ -95,11 +95,16 @@ describe('the non-root drop is enforced, not merely documented', () => {
   // sharing) failed a recursive chown under `set -e` and crash-looped the container (#1722), and a
   // lock cleanup can only cover the default path. The ownership fix itself has to skip links.
   // `-h` too: find tests the type before the batched chown runs, so without it a path replaced by a
-  // link in between would have root re-own the link's target.
-  it('re-owns /app/data without touching symlinks', () => {
+  // link in between would have root re-own the link's target. Only wrong-owned paths are chowned: a
+  // chown is a metadata write even when nothing changes, so re-owning the whole volume on every start
+  // held boot for minutes on a large one. The ownership test is parenthesised so `! -type l` still
+  // governs both of its branches.
+  it('re-owns only wrong-owned paths under /app/data, never symlinks', () => {
     const entrypoint = fs.readFileSync(path.join(__dirname, '..', '..', 'docker-entrypoint.sh'), 'utf8');
     const cleanup = entrypoint.search(/^rm -f \/app\/data\/sessions\/\*\/Singleton\*/m);
-    const chown = entrypoint.search(/^find \/app\/data ! -type l -exec chown -h openwa:openwa \{\} \+$/m);
+    const chown = entrypoint.search(
+      /^find \/app\/data ! -type l \\\( ! -user openwa -o ! -group openwa \\\) -exec chown -h openwa:openwa \{\} \+$/m,
+    );
     expect(entrypoint).not.toMatch(/^\s*chown\s+-R\b.*\/app\/data/m);
     // Swallowing the failure would hide a real refusal (NFS root_squash, SELinux).
     expect(entrypoint).not.toMatch(/-exec chown[^\n]*\|\|/);
