@@ -140,39 +140,49 @@ describe('a job that runs a repo script checks the repo out', () => {
 
 /**
  * A job granted `id-token: write` can mint a registry publish credential, so every tool it installs
- * globally runs with that ability. A floating spec (`npm@latest`, a bare major) resolves to whatever
- * was published most recently at tag time; pin the exact version the way the Dockerfile pins its npm.
+ * runs with that ability. A floating spec (`npm@latest`, a bare major) resolves to whatever was
+ * published most recently at tag time; pin the exact version the way the Dockerfile pins its npm.
+ *
+ * Python installs cannot be pinned that way: `pip install` resolves the ranges in pyproject.toml, and
+ * `python -m build` fetches its build backend into an isolated environment no pin reaches. So an
+ * id-token job runs neither; the install, test and build happen in a job without the grant.
  */
-describe('a job that can mint a publish credential installs only exact global versions', () => {
+describe('a job that can mint a publish credential installs no floating third-party code', () => {
   type Permissions = Record<string, string> | string | null | undefined;
   type OidcJob = { permissions?: Permissions; steps?: Step[] };
   type OidcWorkflow = { permissions?: Permissions; jobs?: Record<string, OidcJob> };
   const workflows = fs.readdirSync(workflowDir).filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
   const GLOBAL_INSTALL = /\bnpm\s+(?:install|i|add)\s+(?:-g|--global)\s+([^\n;&|]+)/g;
+  // `pip`, `pip3`, `python -m pip` and `uv pip` all contain `pip install`.
+  const PYTHON_INSTALL = /\bpip[\d.]*\s+install\b|\bpython[\d.]*\s+-m\s+build\b/g;
 
   // A job without its own `permissions` inherits the workflow-level block; `write-all` grants id-token too.
   const grantsIdToken = (perms: Permissions): boolean =>
     perms === 'write-all' || (typeof perms === 'object' && perms !== null && perms['id-token'] === 'write');
 
-  const globalInstallsInOidcJobs = (source: string | OidcWorkflow): Array<{ job: string; spec: string }> => {
+  const oidcJobRuns = (source: string | OidcWorkflow): Array<{ job: string; run: string }> => {
     const workflow =
       typeof source === 'string'
         ? (yaml.load(fs.readFileSync(path.join(workflowDir, source), 'utf8')) as OidcWorkflow)
         : source;
     return Object.entries(workflow.jobs ?? {})
       .filter(([, def]) => grantsIdToken(def.permissions !== undefined ? def.permissions : workflow.permissions))
-      .flatMap(([job, def]) =>
-        (def.steps ?? []).flatMap(step =>
-          [...executableLines(step.run ?? '').matchAll(GLOBAL_INSTALL)].flatMap(match =>
-            match[1]
-              .trim()
-              .split(/\s+/)
-              .filter(arg => !arg.startsWith('-'))
-              .map(spec => ({ job, spec })),
-          ),
-        ),
-      );
+      .flatMap(([job, def]) => (def.steps ?? []).map(step => ({ job, run: executableLines(step.run ?? '') })));
   };
+
+  const globalInstallsInOidcJobs = (source: string | OidcWorkflow): Array<{ job: string; spec: string }> =>
+    oidcJobRuns(source).flatMap(({ job, run }) =>
+      [...run.matchAll(GLOBAL_INSTALL)].flatMap(match =>
+        match[1]
+          .trim()
+          .split(/\s+/)
+          .filter(arg => !arg.startsWith('-'))
+          .map(spec => ({ job, spec })),
+      ),
+    );
+
+  const pythonInstallsInOidcJobs = (source: string | OidcWorkflow): string[] =>
+    oidcJobRuns(source).flatMap(({ job, run }) => [...run.matchAll(PYTHON_INSTALL)].map(m => `${job}: ${m[0]}`));
 
   // Non-vacuity: the JS SDK release job installs its own npm, so the finder must see it.
   it('finds the global npm install in the JS SDK publish job', () => {
@@ -195,5 +205,31 @@ describe('a job that can mint a publish credential installs only exact global ve
   it.each(workflows)('%s: global installs in id-token jobs are pinned to an exact version', file => {
     const floating = globalInstallsInOidcJobs(file).filter(entry => !/@\d+\.\d+\.\d+$/.test(entry.spec));
     expect(floating).toEqual([]);
+  });
+
+  // Non-vacuity: the single-job shape the PyPI release used to have, and the Python install that
+  // still exists in the release workflow, just outside the id-token job.
+  it('finds pip installs and python -m build in an id-token job', () => {
+    const singleJob: OidcWorkflow = {
+      jobs: {
+        publish: {
+          permissions: { contents: 'read', 'id-token': 'write' },
+          steps: [
+            { run: "pip install -e '.[dev]'\npytest" },
+            { run: 'python -m pip install --upgrade build\npython -m build' },
+          ],
+        },
+      },
+    };
+    expect(pythonInstallsInOidcJobs(singleJob)).toEqual([
+      'publish: pip install',
+      'publish: pip install',
+      'publish: python -m build',
+    ]);
+    expect(runCommandsOf('python-sdk-release.yml').join('\n')).toMatch(PYTHON_INSTALL);
+  });
+
+  it.each(workflows)('%s: id-token jobs run no pip install or python -m build', file => {
+    expect(pythonInstallsInOidcJobs(file)).toEqual([]);
   });
 });
