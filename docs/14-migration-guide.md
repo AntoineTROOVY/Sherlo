@@ -125,6 +125,21 @@ curl -X POST 'http://localhost:2785/api/infra/import-data' \
 > (`EXPORT_INLINE_MEDIA_BUDGET_BYTES`, 8 MiB by default); for a byte-exact copy including media, use
 > `scripts/backup.sh`, which snapshots the database file itself.
 
+> [!IMPORTANT]
+> **The import is one request, bounded by the target's `BODY_SIZE_LIMIT`** (default `25mb`); a larger
+> file is refused with `413`. Compare `ls -l data-backup.json` with that limit before Step 4. If the
+> file is bigger, set `BODY_SIZE_LIMIT` on the target to at least its size (for example `50mb`) and
+> restart, since the value is read at boot; put it back afterwards, because it applies to every route.
+> An explicit `INFLIGHT_BODY_BUDGET_BYTES` must stay at least twice the file size, because one caller
+> may hold only half of it; a body above that share is refused with `503`. `EXPORT_INLINE_MEDIA_BUDGET_BYTES`
+> bounds inline media only, so a long text history can still pass the limit and needs the memory to
+> parse it on both ends.
+>
+> **Credentials do not travel.** Webhooks are restored without their `secret` and custom `headers`, so
+> deliveries go unsigned until you set them again with `PUT /api/sessions/:sessionId/webhooks/:id`. A
+> session `proxyUrl` keeps its host but loses its `user:pass`, so a proxy that needs authentication
+> fails the session's next start until you re-enter it with `PATCH /api/sessions/:sessionId/proxy`.
+
 > [!NOTE]
 > **Session statuses in the backup describe the source host.** An active status (`ready`,
 > `initializing`, ...) is restored as `disconnected` (the import response counts them in a notice),
