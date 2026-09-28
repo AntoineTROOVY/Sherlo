@@ -615,8 +615,12 @@ export function Chats() {
       // since the snapshot still counts them (the same rule a live frame and opening a chat follow).
       const readChatId = canWrite ? activeChatId : undefined;
       if (readChatId) markChatRead(readChatId);
+      // The zeroing waits for the refetch, by when another session's list may be on screen; like a send's
+      // promote, it applies only while the list is still this session's.
       void loadChats(selectedSessionId, { background: true }).then(() => {
-        if (readChatId) setChats(prev => prev.map(c => (c.id === readChatId ? { ...c, unreadCount: 0 } : c)));
+        if (readChatId && chatsSessionRef.current === selectedSessionId) {
+          setChats(prev => prev.map(c => (c.id === readChatId ? { ...c, unreadCount: 0 } : c)));
+        }
       });
     }
   }, [isConnected, connectionFailed, selectedSessionId, queryClient, loadChats, activeChatId, canWrite, markChatRead]);

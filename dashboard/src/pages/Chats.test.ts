@@ -889,6 +889,46 @@ test('a socket reconnect keeps the open chat read instead of badging it with the
   assert.ok(findFetchCall('POST', `/api/sessions/${SESSION.id}/chats/read`), 'the gap messages were not marked read');
 });
 
+test("a reconnect refetch that settles after a session switch leaves the new session's unread badge", async () => {
+  const { screen, fireEvent, within, act, waitFor } = rtl;
+  twoSessions = true;
+  try {
+    const { container } = renderChats();
+    await screen.findByText('Main (15551234567)');
+    fireEvent.click(await screen.findByText('Alice'));
+    await within(container.querySelector('.room-messages') as HTMLElement).findByText('hello from alice');
+
+    // Session 1's reconnect refetch stays out; session 2 lists Alice too (a contact both accounts
+    // share), unread there, and its list lands first.
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>(resolve => {
+      releaseFirst = resolve;
+    });
+    chatsResponder = sessionId =>
+      sessionId === SESSION.id
+        ? firstGate.then(() => jsonResponse([CHAT, CHAT_2]))
+        : Promise.resolve(jsonResponse([{ ...CHAT, unreadCount: 3, lastMessage: 'alice on two' }, CHAT_2]));
+    const socket = lastSocket();
+    assert.ok(socket, 'expected the page to have opened a socket');
+    act(() => socket.receive('disconnect', 'transport close'));
+    act(() => socket.receive('connect'));
+    await waitFor(() => assert.equal(countFetchCalls('GET', `/api/sessions/${SESSION.id}/chats`) >= 2, true));
+
+    fireEvent.change(container.querySelector('select.session-selector') as HTMLSelectElement, {
+      target: { value: SESSION_2.id },
+    });
+    await screen.findByText('alice on two');
+    assert.ok(screen.queryByLabelText('3 unread messages'), "session 2's unread count is not shown");
+
+    releaseFirst();
+    await flush();
+    await flush();
+    assert.ok(screen.queryByLabelText('3 unread messages'), "session 1's refetch cleared session 2's unread badge");
+  } finally {
+    twoSessions = false;
+  }
+});
+
 test('a read-only key opening a chat sends no mark-as-read', async () => {
   const { screen, fireEvent, within, waitFor } = rtl;
   resetFetchCalls();
