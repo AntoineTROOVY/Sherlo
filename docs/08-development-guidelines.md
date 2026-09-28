@@ -148,7 +148,7 @@ export class ExampleModule {}
 
 ```typescript
 // modules/example/example.controller.ts
-import { Controller, Get, Post, Body, Headers, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ExampleService } from './example.service';
 import { CreateExampleDto } from './dto/create-example.dto';
@@ -163,11 +163,8 @@ export class ExampleController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create example' })
   @ApiResponse({ status: 201, type: ExampleResponseDto })
-  async create(
-    @Body() dto: CreateExampleDto,
-    @Headers('x-request-id') requestId?: string,
-  ): Promise<ExampleResponseDto> {
-    return this.exampleService.create(dto, { requestId });
+  async create(@Body() dto: CreateExampleDto): Promise<ExampleResponseDto> {
+    return this.exampleService.create(dto);
   }
 
   @Get(':id')
@@ -213,7 +210,8 @@ export class ExampleService {
 
 ```typescript
 // modules/example/example.service.ts
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { createLogger } from '../../common/services/logger.service';
 import { ExampleRepository } from './example.repository';
 import { CreateExampleDto } from './dto/create-example.dto';
 import { Example } from './entities/example.entity';
@@ -224,8 +222,8 @@ export class ExampleService {
 
   constructor(private readonly repository: ExampleRepository) {}
 
-  async create(dto: CreateExampleDto, context?: { requestId?: string }): Promise<Example> {
-    this.logger.log(`Creating example: ${dto.name}`, context);
+  async create(dto: CreateExampleDto): Promise<Example> {
+    this.logger.log(`Creating example: ${dto.name}`);
 
     const example = this.repository.create(dto);
     return this.repository.save(example);
@@ -796,28 +794,22 @@ ENABLE_SWAGGER=false
 
 ```typescript
 // Use createLogger from the shared LoggerService, not console.*
-import { Inject, Scope } from '@nestjs/common';
-import { REQUEST } from '@nestjs/core';
-import { Request } from 'express';
+import { Injectable } from '@nestjs/common';
 import { createLogger } from '../common/services/logger.service';
 
-@Injectable({ scope: Scope.REQUEST })
+@Injectable()
 export class MyService {
   private readonly logger = createLogger('MyService');
 
-  constructor(@Inject(REQUEST) private readonly request: Request) {}
-
   async doSomething(id: string): Promise<void> {
-    // Log entry with context
-    const requestId = this.request?.requestId;
-    this.logger.log(`Processing item`, { id, requestId });
+    this.logger.log('Processing item', { id });
 
     try {
       await this.process(id);
-      this.logger.log(`Item processed successfully`, { id, requestId });
+      this.logger.log('Item processed successfully', { id });
     } catch (error) {
       // Log error with full stack
-      this.logger.error(`Failed to process item`, error.stack, { id, requestId });
+      this.logger.error('Failed to process item', error instanceof Error ? error.stack : String(error), { id });
       throw error;
     }
   }
@@ -825,43 +817,17 @@ export class MyService {
 ```
 
 > [!NOTE]
-> Propagate `X-Request-ID` from controller to service and include it in all logs for easier cross-component tracing.
+> LoggerService stamps the request ID on every log line on its own (it reads it through `getRequestId()`). Do
+> not pass `X-Request-ID` from controller to service, and do not make a provider request-scoped to reach it;
+> call `getRequestId()` from `common/services/request-context` when code needs the value.
 
-### Request ID Interceptor (Optional)
+### Request ID
 
-Use an interceptor to ensure every request has a `requestId` and propagate it to the response header.
-
-```typescript
-// common/interceptors/request-id.interceptor.ts
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
-import { Observable } from 'rxjs';
-
-@Injectable()
-export class RequestIdInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest();
-    const response = context.switchToHttp().getResponse();
-
-    const requestId = request.headers['x-request-id'] || `req_${Date.now()}`;
-    request.requestId = requestId;
-    response.setHeader('X-Request-ID', requestId);
-
-    return next.handle();
-  }
-}
-```
-
-```typescript
-// main.ts
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.useGlobalInterceptors(new RequestIdInterceptor());
-  await app.listen(3000);
-}
-```
-
-> [!NOTE]
-> If you use `REQUEST` injection in a service, make sure the provider is **request-scoped** (`@Injectable({ scope: Scope.REQUEST })`) so requestId does not get mixed across requests.
+`requestContextMiddleware` (`src/common/middleware/request-context.middleware.ts`, registered in
+`src/configure-app.ts`) gives every request an ID. It keeps a client `X-Request-ID` only when it matches
+`^[A-Za-z0-9-]{1,128}$` and otherwise generates a UUID, echoes it on the `X-Request-ID` response header,
+and runs the request inside AsyncLocalStorage (`runWithRequestId`), so `getRequestId()`, every log line
+and every audit row carry it. There is no request-ID interceptor.
 
 ### Debug WhatsApp Engine
 
@@ -999,8 +965,7 @@ export class EngineTeardownService {
 
 ### WhatsApp Engine Issues
 
-```markdown
-## QR Code Not Generated
+#### QR Code Not Generated
 
 **Symptom:** Session stuck in 'initializing' status
 
@@ -1017,7 +982,7 @@ export class EngineTeardownService {
 3. **WhatsApp rate limit**
    - Wait 5-10 minutes before retrying
 
-## Session Disconnects Randomly
+#### Session Disconnects Randomly
 
 **Causes & Solutions:**
 
@@ -1032,12 +997,10 @@ export class EngineTeardownService {
 3. **WhatsApp detected automation**
    - Add random delays between messages
    - Avoid sending too many messages quickly
-```
 
 ### Database Issues
 
-````markdown
-## Connection Pool Exhausted
+#### Connection Pool Exhausted
 
 **Symptom:** "too many clients already" error
 
@@ -1055,9 +1018,8 @@ export class EngineTeardownService {
   },
 }
 ```
-````
 
-## Migration Fails
+#### Migration Fails
 
 **Symptom:** "relation already exists" error
 
@@ -1074,33 +1036,18 @@ npm run migration:revert
 npm run migration:generate --name=FixMigration
 ```
 
-````
-
 ### TypeScript/NestJS Issues
 
-```markdown
-## Circular Dependency
+#### Circular Dependency
 
-**Symptom:** "Cannot read property 'X' of undefined"
+**Symptom:** "Nest can't resolve dependencies" or an undefined injected provider at startup
 
-**Solution:**
-```typescript
-// Use forwardRef for circular deps
-@Module({
-  imports: [
-    forwardRef(() => SessionModule),
-  ],
-})
-export class WebhookModule {}
+**Solution:** this codebase does not use `forwardRef`. Break the cycle by moving the shared piece into
+a lower module that both sides import (for example the global `EngineModule`'s `EngineRegistry`), or
+by one-directional delegation, as `SessionService` does to `SessionEngineLifecycle` (see the class
+comment on `SessionService` in `src/modules/session/session.service.ts`).
 
-// In service
-constructor(
-  @Inject(forwardRef(() => SessionService))
-  private readonly sessionService: SessionService,
-) {}
-````
-
-## DI Token Not Found
+#### DI Token Not Found
 
 **Symptom:** "Nest can't resolve dependencies"
 
@@ -1110,17 +1057,15 @@ constructor(
 - Check if module is imported where needed
 - Use @Injectable() decorator on services
 
-````
-
 ### Docker Issues
 
-```markdown
-## Container Keeps Restarting
+#### Container Keeps Restarting
 
 **Check logs:**
+
 ```bash
 docker compose logs openwa-api --tail 100
-````
+```
 
 **Common causes:**
 
@@ -1128,7 +1073,7 @@ docker compose logs openwa-api --tail 100
 2. Database not ready (use depends_on + healthcheck)
 3. Port already in use
 
-## Chrome Crashes in Docker
+#### Chrome Crashes in Docker
 
 **Solution:**
 
@@ -1145,8 +1090,6 @@ services:
     shm_size: '2gb'
 ```
 
-````
-
 ## 8.12 Contributing Guide
 
 ### Getting Started
@@ -1161,7 +1104,7 @@ services:
 7. Commit: `git commit -m 'feat(scope): add amazing feature'`
 8. Push: `git push origin feat/amazing-feature`
 9. Open Pull Request
-````
+```
 
 ### Code Review Checklist
 

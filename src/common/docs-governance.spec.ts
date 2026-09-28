@@ -68,6 +68,13 @@ describe('governance docs match the repository', () => {
     expect(applied.filter(label => !documented.has(label))).toEqual([]);
   });
 
+  it('points the circular-dependency advice at the comment that explains the delegation', () => {
+    const section = between(read('docs/08-development-guidelines.md'), '#### Circular Dependency', '\n#### ');
+    const cited = /`(src\/[^`]+\.ts)`/.exec(section)?.[1];
+    expect(cited).toBeDefined();
+    expect(read(cited!)).toMatch(/delegates .*one-directionally/);
+  });
+
   // The override keeps the service's `build:` section, so `--build` would tag a source build with the
   // published image name. The README, the release guide and the migration guide give one upgrade command.
   it('gives the published-image override one upgrade command in the README, docs/14 and docs/15', () => {
