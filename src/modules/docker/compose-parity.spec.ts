@@ -374,6 +374,19 @@ describe('DockerService managed specs ↔ docker-compose.yml parity', () => {
     expect(api?.ports).toEqual([expect.stringMatching(/:\$\{API_PORT:-2785\}:2785$/)]);
   });
 
+  it('openwa-api uses the same readiness healthcheck in both compose files and the image', () => {
+    const root = join(__dirname, '../../..');
+    const apiHealthcheck = (file: string): string[] | undefined => {
+      const parsed = yaml.load(readFileSync(join(root, file), 'utf8')) as ComposeFile;
+      return Object.values(parsed.services).find(service => service.container_name === 'openwa-api')?.healthcheck?.test;
+    };
+    const url = 'http://localhost:2785/api/health/ready';
+    expect(apiHealthcheck('docker-compose.yml')).toEqual(['CMD', 'curl', '-f', url]);
+    expect(apiHealthcheck('docker-compose.dev.yml')).toEqual(apiHealthcheck('docker-compose.yml'));
+    const dockerfile = readFileSync(join(root, 'Dockerfile'), 'utf8');
+    expect(dockerfile).toContain(`CMD curl -f ${url} || exit 1`);
+  });
+
   it('redis: sets the noeviction maxmemory policy BullMQ requires, on both launch paths', async () => {
     const cfg = await capture('redis');
     // The parity assertion above only proves the two launch paths AGREE — dropping the flag from

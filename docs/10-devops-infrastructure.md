@@ -39,89 +39,35 @@ flowchart TB
 
 ### Dockerfile
 
+The repo `Dockerfile` is the source of truth; this section quotes the directives that matter
+rather than a second full copy. It is a two-stage build on a digest-pinned `node:22-slim`:
+
 ```dockerfile
-# Dockerfile (multi-stage build)
+# Builder stage. --include=dev is required: a platform that leaks NODE_ENV=production into the
+# build (Coolify does) would otherwise skip @nestjs/cli and fail with `nest: not found`.
+RUN PUPPETEER_SKIP_DOWNLOAD=true npm ci --include=dev
+RUN npm run build && npm run dashboard:ci -- --include=dev && npm run dashboard:build && rm -f dist/*.tsbuildinfo
 
-# Build stage
-FROM node:22-slim AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
+# Production stage: runtime dependencies only, without install scripts; the dependency patchers
+# run in the same RUN, and any one failing fails the build.
+RUN npm ci --omit=dev --ignore-scripts \
+    && node scripts/patch-wwebjs-201832.js \
+    # ... one `&& node scripts/patch-*.js \` line per patcher ...
+    && npm cache clean --force
 
-# Runtime stage
-FROM node:22-slim
-
-# Install Chrome dependencies (avoid Debian's chromium package due to SIGTRAP in non-root)
-RUN apt-get update && apt-get install -y \
-    curl \
-    fonts-ipafont-gothic \
-    fonts-wqy-zenhei \
-    fonts-thai-tlwg \
-    fonts-kacst \
-    fonts-freefont-ttf \
-    libxss1 \
-    libnss3 \
-    libnspr4 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set Puppeteer skip download (we install it dynamically later)
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-
-# Create app directory
-WORKDIR /app
-
-# Copy package files & install production dependencies
-COPY package*.json ./
-RUN npm ci --only=production
-
-# NOTE: this example targets linux/amd64. The repo's image keeps Debian's chromium on arm64 by
-# choice (Chrome for Testing publishes linux-arm64 builds only from 153 on). For arm64, install
-# Debian's `chromium` package and point PUPPETEER_EXECUTABLE_PATH to /usr/bin/chromium — see the
-# repo's Dockerfile for the mixed multi-arch build.
-# Download Chrome for Testing via Puppeteer and point ENV to it
-RUN mkdir -p /opt/puppeteer && \
-    PUPPETEER_CACHE_DIR=/opt/puppeteer ./node_modules/.bin/puppeteer browsers install 'chrome@153.0.8010.36' && \
-    chrome_path=$(find /opt/puppeteer/chrome/linux*/chrome-linux64/chrome | head -n 1) && \
-    test -n "$chrome_path" && \
-    ln -s "$chrome_path" /usr/local/bin/puppeteer-chrome
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/local/bin/puppeteer-chrome
-
-# Copy build output (the stage above is named "builder")
-COPY --from=builder /app/dist ./dist
-
-# Create the unprivileged user the entrypoint drops to. The real image deliberately has NO
-# `USER openwa` directive and no `chown -R openwa /app /opt/puppeteer`: a full /app chown walks
-# every production dependency (issue #1045: ~35 minutes on a small VPS), and the container itself
-# is the Chromium confinement boundary (cap_drop ALL, read_only rootfs). Instead the image starts
-# as root, the entrypoint chowns ONLY the writable ./data volume and then drops privileges via
-# `exec gosu openwa node dist/main.js` (no-new-privileges blocks any setuid path back up). The ids
-# are pinned so the image can also be started as openwa directly (`--user 997:997`, runAsUser 997).
-RUN groupadd -r -g 997 openwa && useradd -r -u 997 -g openwa openwa
-
-# Expose port
-EXPOSE 2785
-
-# Health check (global API prefix is 'api'; readiness probes both databases)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:2785/api/health/ready || exit 1
 
-# Start app through the privilege-dropping entrypoint
-CMD ["docker-entrypoint.sh", "node", "dist/main.js"]
+# dumb-init is PID 1; the entrypoint runs as root, fixes /app/data ownership, then drops to the
+# openwa user with gosu before it execs the command.
+ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/docker-entrypoint.sh"]
+CMD ["node", "dist/main"]
 ```
+
+The image deliberately has no `USER openwa` directive and no `chown -R` over `/app`: a full chown
+walks every production dependency (#1045), so the entrypoint re-owns only the writable data volume
+and then drops privileges. Chromium comes from Chrome for Testing on amd64 and from Debian's
+`chromium` package on arm64; see the `Dockerfile` for the multi-arch build.
 
 ### Docker Compose (Development)
 

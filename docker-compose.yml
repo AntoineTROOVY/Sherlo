@@ -410,13 +410,7 @@ services:
         condition: service_healthy
         required: false
     healthcheck:
-      test:
-        [
-          'CMD',
-          'node',
-          '-e',
-          "require('http').get('http://localhost:2785/api/health/ready', (r) => process.exit(r.statusCode === 200 ? 0 : 1))",
-        ]
+      test: ['CMD', 'curl', '-f', 'http://localhost:2785/api/health/ready']
       interval: 30s
       timeout: 10s
       retries: 3

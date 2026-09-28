@@ -105,17 +105,18 @@ at evalTypeScript (node:internal/process/execution:256:22)
 **Cause:** Node 22 routes `node -e` through its TypeScript evaluator which rejects arrow-function
 syntax. Podman also splits quoted shell commands on whitespace, truncating the `-e` argument.
 
-**Fix:** Use `curl` for the healthcheck instead of `node -e`:
+**Fix:** Use `curl` for the healthcheck instead of `node -e`. The shipped image, `docker-compose.yml`
+and `docker-compose.dev.yml` already do; this applies to a healthcheck you wrote yourself:
 
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:2785/api/health || exit 1
+    CMD curl -f http://localhost:2785/api/health/ready || exit 1
 ```
 
 ```yaml
-# docker-compose.dev.yml
+# docker-compose healthcheck
 healthcheck:
-  test: ['CMD', 'curl', '-f', 'http://localhost:2785/api/health']
+  test: ['CMD', 'curl', '-f', 'http://localhost:2785/api/health/ready']
 ```
 
 Ensure `curl` is installed in the production stage:
