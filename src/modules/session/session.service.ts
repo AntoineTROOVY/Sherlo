@@ -44,7 +44,7 @@ import { PresenceStore, type ChatPresence } from './presence-store.service';
 import { SessionEngineLifecycle, resolveReconnectConfig } from './session-engine-lifecycle.service';
 import { SessionOwnershipService } from './session-ownership.service';
 import { paginate, ListOptions, resolveListWindow } from '../../common/utils/paginate';
-import { isUniqueViolation } from '../../common/utils/db-errors';
+import { isTransientDbError, isUniqueViolation } from '../../common/utils/db-errors';
 import { resolveFeatureFlags } from '../../config/feature-flags';
 import { IWhatsAppEngine, ChatSummary, ChatState } from '../../engine/interfaces/whatsapp-engine.interface';
 import { createLogger } from '../../common/services/logger.service';
@@ -61,17 +61,6 @@ import type { PluginSessionPort } from '../../core/plugins/plugin-host-ports';
 const SESSION_START_RETRY_DELAY_MS = 2_000;
 
 /**
- * Driver codes meaning "locked, try again", not "your query is wrong".
- *
- * These are unreachable through the message regex below, which is why the code is read separately.
- * better-sqlite3 reports lock contention as `code: 'SQLITE_BUSY'` with the message `database is
- * locked`, and TypeORM's QueryFailedError copies the driver's own properties onto itself while
- * rewriting the message to `SqliteError: database is locked`. So the code survives the wrap and the
- * token never appears in any message: matching `SQLITE_BUSY` as text could not fire on either shape.
- */
-const TRANSIENT_DB_CODES = new Set(['SQLITE_BUSY', 'SQLITE_LOCKED']);
-
-/**
  * A launch failure worth one retry: infrastructure said "not now" (a 5xx, a transport death, a
  * database error while persisting status), not the session or the caller being refused. HTTP 4xx
  * and the documented 409 not-ready are deliberate answers, and a lost-claim ConflictException is a
@@ -86,10 +75,7 @@ function isTransientLaunchFailure(error: unknown): boolean {
   if (error instanceof EngineTransportError) return true;
   if (error instanceof HttpException) return false;
   // TypeORM QueryFailedError and driver errors carry no HttpException shape.
-  if (!(error instanceof Error)) return false;
-  const code: unknown = (error as { code?: unknown }).code;
-  if (typeof code === 'string' && TRANSIENT_DB_CODES.has(code)) return true;
-  return /connection|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|terminating connection/i.test(error.message);
+  return error instanceof Error && isTransientDbError(error);
 }
 
 /** Pause between sequential auto-start launches so a burst of Chromium boots does not spike the host. */

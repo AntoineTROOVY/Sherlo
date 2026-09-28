@@ -11,7 +11,7 @@ import { SessionLidResolver } from './session-lid-resolver.service';
 import { buildMessageMetadata, storableWaMessageId } from './message-row.mapper';
 import { MessageMutationProjector } from './message-mutation-projector';
 import { persistHistoryMessages } from './message-history-projector';
-import { isUniqueViolation } from '../../common/utils/db-errors';
+import { isTransientDbError, isUniqueViolation } from '../../common/utils/db-errors';
 import { resolveFeatureFlags } from '../../config/feature-flags';
 import { StatusStoreService } from '../status-store/status-store.service';
 import { ChatMediaArchiveService } from '../chat-media/chat-media-archive.service';
@@ -57,6 +57,20 @@ import { isMessagePayload } from '../../core/hooks/hook-results';
  * retry after this delay closes that race; the forward-only transition guard keeps it idempotent.
  */
 export const ACK_RECONCILE_DELAY_MS = 750;
+
+/**
+ * Delay before the single retry of a message insert that failed transiently (lock contention, a
+ * dropped connection, a pool timeout). The engine delivers each message once, so without the retry
+ * one busy moment loses the row for good.
+ */
+export const PERSIST_RETRY_DELAY_MS = 300;
+
+/**
+ * How a message insert ended: `yes` the row landed, `dup` a unique violation (`retried` says whether
+ * it came from the retry, when the first attempt may have committed before its error), `failed` a
+ * non-conflict error, `stale` the engine was retired while the retry waited.
+ */
+type InsertOutcome = { landed: 'yes' | 'failed' | 'stale' } | { landed: 'dup'; retried: boolean };
 
 /** Persist-stage outcome threaded into the inbound dispatch stage (was closure state in the hook continuation). */
 interface InboundPersistOutcome {
@@ -343,31 +357,64 @@ export class MessageProjector {
     // near-simultaneous re-fire loses the race and is skipped here, so persist + webhook + WS
     // happen exactly once. Fail-open: a non-conflict DB error still dispatches, so a real
     // message is never dropped by a transient DB failure.
-    let isNewMessage = true;
-    let persisted = false;
-    try {
-      // `insert()` (not `save()`) is load-bearing: the UNIQUE(sessionId, waMessageId) constraint
-      // makes a duplicate insert throw, which is the atomic dedup oracle for #464 re-fires.
-      // Unlike `save()`, `insert()` does NOT merge DB-generated columns (@PrimaryGeneratedColumn,
+    const outcome = await this.insertWithRetry(id, engine, dbMessage, 'incoming');
+    if (outcome.landed === 'yes') {
+      this.applyChangesMadeInFlight(id, incoming.id);
+      return { dbMessage, persisted: true };
+    }
+    if (outcome.landed === 'stale') return null;
+    // A duplicate on the first attempt is a re-fire: the original already persisted and dispatched.
+    // A duplicate on the retry is ambiguous: the first attempt may have committed before its error,
+    // in which case nothing dispatched yet, so dispatch fail-open (without the row-bound hook), and
+    // that row still has to take a revoke or edit that arrived in flight.
+    if (outcome.landed === 'dup' && !outcome.retried) return null;
+    if (outcome.landed === 'dup') this.applyChangesMadeInFlight(id, incoming.id);
+    return { dbMessage, persisted: false };
+  }
+
+  /**
+   * Insert a message row under the UNIQUE(sessionId, waMessageId) dedup oracle. `insert()` (not
+   * `save()`) is load-bearing: a duplicate insert throws, which is the atomic dedup oracle for #464
+   * re-fires. A transient failure is retried once after {@link PERSIST_RETRY_DELAY_MS}, re-checking
+   * that the engine is still live so a retired session never gets an orphan row. On success the
+   * DB-generated columns are merged onto `dbMessage`.
+   */
+  private async insertWithRetry(
+    id: string,
+    engine: IWhatsAppEngine,
+    dbMessage: Message,
+    direction: 'incoming' | 'outgoing',
+  ): Promise<InsertOutcome> {
+    const label = `Failed to save ${direction} message ${dbMessage.waMessageId} to database`;
+    const insert = async (): Promise<InsertOutcome> => {
+      const result = await this.messageRepository.insert(dbMessage as unknown as QueryDeepPartialEntity<Message>);
+      // `insert()` (not `save()`) does NOT merge DB-generated columns (@PrimaryGeneratedColumn,
       // @CreateDateColumn) back onto the entity instance — so merge them explicitly here, before
       // the `message:persisted` emit. `identifiers[0]` always carries the PK on both SQLite and
       // Postgres; `generatedMaps[0]` adds createdAt where the driver returns it (Postgres yes;
       // SQLite historically does not — acceptable; the PK is the load-bearing field for plugins).
-      const result = await this.messageRepository.insert(dbMessage as unknown as QueryDeepPartialEntity<Message>);
       Object.assign(dbMessage, result.identifiers[0] ?? {}, result.generatedMaps?.[0] ?? {});
-      persisted = true;
-      this.applyChangesMadeInFlight(id, incoming.id);
+      return { landed: 'yes' };
+    };
+    try {
+      return await insert();
     } catch (err) {
-      if (isUniqueViolation(err)) {
-        isNewMessage = false;
-      } else {
-        this.logger.error(`Failed to save incoming message ${incoming.id} to database`, String(err));
+      if (isUniqueViolation(err)) return { landed: 'dup', retried: false };
+      if (!isTransientDbError(err)) {
+        this.logger.error(label, String(err));
+        return { landed: 'failed' };
       }
+      this.logger.warn(`${label}, retrying once`, { sessionId: id, error: String(err) });
     }
-    if (!isNewMessage) {
-      return null; // duplicate re-fire — the original already persisted and dispatched
+    await new Promise(resolve => setTimeout(resolve, PERSIST_RETRY_DELAY_MS));
+    if (!this.engines.isLive(id, engine)) return { landed: 'stale' };
+    try {
+      return await insert();
+    } catch (err) {
+      if (isUniqueViolation(err)) return { landed: 'dup', retried: true };
+      this.logger.error(label, String(err));
+      return { landed: 'failed' };
     }
-    return { dbMessage, persisted };
   }
 
   /**
@@ -499,20 +546,12 @@ export class MessageProjector {
           // awaits. Re-check liveness so a late continuation can't persist an orphan row
           // (mirrors onMessage).
           if (!this.engines.isLive(id, engine)) return;
-          let persisted = false;
-          try {
-            const result = await this.messageRepository.insert(dbMessage as unknown as QueryDeepPartialEntity<Message>);
-            Object.assign(dbMessage, result.identifiers[0] ?? {}, result.generatedMaps?.[0] ?? {});
-            persisted = true;
-          } catch (err) {
-            // Unique violation = the REST send path already persisted this API-originated send —
-            // the dedup oracle working as intended, not an error. Anything else is a real DB
-            // failure; fail open so a real send is never dropped on a transient DB fault.
-            if (!isUniqueViolation(err)) {
-              this.logger.error(`Failed to save outgoing message ${outgoing.id} to database`, String(err));
-            }
-          }
-          if (persisted) {
+          // A unique violation means the REST send path already persisted this API-originated
+          // send: the dedup oracle working as intended, not an error. Any other failure (after the
+          // one transient retry) fails open, so a real send is never dropped on a DB fault.
+          const outcome = await this.insertWithRetry(id, engine, dbMessage, 'outgoing');
+          if (outcome.landed === 'stale') return;
+          if (outcome.landed === 'yes') {
             // Fire-and-forget, mirroring onMessage: plugin providers (search etc.) see phone-
             // composed sends exactly like API sends.
             void this.hookManager

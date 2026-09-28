@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { MessageProjector } from './message-projector.service';
+import { MessageProjector, PERSIST_RETRY_DELAY_MS } from './message-projector.service';
 import { EngineRegistry } from '../../engine/engine-registry.service';
 import type { Repository } from 'typeorm';
 import { Message, MessageDirection } from '../message/entities/message.entity';
@@ -716,6 +716,139 @@ describe('MessageProjector (inbound projection)', () => {
         expect(webhookService.dispatch).toHaveBeenCalledWith(SESSION_ID, 'message.received', expect.anything());
         expect(eventsGateway.emitMessage).toHaveBeenCalledWith(SESSION_ID, expect.anything());
       });
+    });
+  });
+
+  // One transient insert failure (lock contention, a dropped connection, a pool timeout) used to lose
+  // the row for good: the engine delivers each message once, and nothing retried the insert.
+  describe('a transient insert failure', () => {
+    const busy = (): Error => Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY' });
+    const dup = (): Error => Object.assign(new Error('UNIQUE constraint failed'), { code: 'SQLITE_CONSTRAINT_UNIQUE' });
+    const flush = async (): Promise<void> => {
+      for (let i = 0; i < 5; i++) await new Promise(resolve => setImmediate(resolve));
+    };
+    const persistedHooks = (): unknown[] => hookManager.execute.mock.calls.filter(([e]) => e === 'message:persisted');
+    const received = (): unknown[] => webhookService.dispatch.mock.calls.filter(([, e]) => e === 'message.received');
+
+    beforeEach(() => jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick'] }));
+    afterEach(() => jest.useRealTimers());
+
+    const receive = async (engine: IWhatsAppEngine): Promise<void> => {
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming());
+      await flush();
+    };
+
+    it('retries the insert once and persists the row', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      messageRepository.insert.mockRejectedValueOnce(busy());
+
+      await receive(engine);
+      expect(messageRepository.insert).toHaveBeenCalledTimes(1);
+      expect(received()).toHaveLength(0);
+      await jest.advanceTimersByTimeAsync(PERSIST_RETRY_DELAY_MS);
+      await flush();
+
+      expect(messageRepository.insert).toHaveBeenCalledTimes(2);
+      expect(persistedHooks()).toHaveLength(1);
+      expect(received()).toHaveLength(1);
+      expect(chatMediaArchive.archive).toHaveBeenCalledTimes(1);
+    });
+
+    it('dispatches fail-open without the row hook when the retry fails too', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      messageRepository.insert.mockRejectedValueOnce(busy()).mockRejectedValueOnce(busy());
+
+      await receive(engine);
+      await jest.advanceTimersByTimeAsync(PERSIST_RETRY_DELAY_MS);
+      await flush();
+
+      expect(messageRepository.insert).toHaveBeenCalledTimes(2);
+      expect(persistedHooks()).toHaveLength(0);
+      expect(received()).toHaveLength(1);
+    });
+
+    it('does not retry a duplicate: a re-fire is still dropped', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      messageRepository.insert.mockRejectedValueOnce(dup());
+
+      await receive(engine);
+      await jest.advanceTimersByTimeAsync(PERSIST_RETRY_DELAY_MS);
+      await flush();
+
+      expect(messageRepository.insert).toHaveBeenCalledTimes(1);
+      expect(received()).toHaveLength(0);
+    });
+
+    it('still dispatches when the retry hits the row its first attempt may have committed', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      messageRepository.insert.mockRejectedValueOnce(busy()).mockRejectedValueOnce(dup());
+
+      await receive(engine);
+      await jest.advanceTimersByTimeAsync(PERSIST_RETRY_DELAY_MS);
+      await flush();
+
+      expect(messageRepository.insert).toHaveBeenCalledTimes(2);
+      expect(persistedHooks()).toHaveLength(0);
+      expect(received()).toHaveLength(1);
+    });
+
+    it('still clears that row when a revoke landed while its hook chain ran', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      messageRepository.insert.mockRejectedValueOnce(busy()).mockRejectedValueOnce(dup());
+      let releaseHook!: () => void;
+      hookManager.execute.mockImplementationOnce(async (_event: string, data: unknown) => {
+        await new Promise<void>(resolve => (releaseHook = resolve));
+        return { continue: true, data };
+      });
+
+      await receive(engine);
+      projector.handleMessageRevoked(SESSION_ID, engine, { id: 'wamid.1' } as never);
+      releaseHook();
+      await flush();
+      await jest.advanceTimersByTimeAsync(PERSIST_RETRY_DELAY_MS);
+      await flush();
+
+      const retriedAt = messageRepository.insert.mock.invocationCallOrder[1];
+      const afterRetry = messageRepository.update.mock.calls.filter(
+        (_call, i) => messageRepository.update.mock.invocationCallOrder[i] > retriedAt,
+      );
+      expect(afterRetry).toEqual([
+        [{ sessionId: SESSION_ID, waMessageId: 'wamid.1' }, expect.objectContaining({ body: '', type: 'revoked' })],
+      ]);
+    });
+
+    it('drops the retry when the engine is retired while it waits', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      messageRepository.insert.mockRejectedValueOnce(busy());
+
+      await receive(engine);
+      engines.set(SESSION_ID, makeEngine());
+      await jest.advanceTimersByTimeAsync(PERSIST_RETRY_DELAY_MS);
+      await flush();
+
+      expect(messageRepository.insert).toHaveBeenCalledTimes(1);
+      expect(received()).toHaveLength(0);
+    });
+
+    it('retries an own-send echo the same way', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      messageRepository.insert.mockRejectedValueOnce(busy());
+
+      projector.handleOwnSendEcho(SESSION_ID, engine, makeIncoming({ fromMe: true }));
+      await flush();
+      await jest.advanceTimersByTimeAsync(PERSIST_RETRY_DELAY_MS);
+      await flush();
+
+      expect(messageRepository.insert).toHaveBeenCalledTimes(2);
+      expect(persistedHooks()).toHaveLength(1);
+      expect(webhookService.dispatch.mock.calls.filter(([, e]) => e === 'message.sent')).toHaveLength(1);
     });
   });
 
