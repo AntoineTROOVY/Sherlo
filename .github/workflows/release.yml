@@ -385,6 +385,10 @@ jobs:
       - name: Build project
         run: npm run build
 
+      # Same lane as ci.yml's build job: inbound messages through the real Baileys library.
+      - name: Run inbound messages through the real Baileys library
+        run: npm run test:engine-real
+
   # ──── Create GitHub Release ───────────────────────────────────────
   release:
     name: GitHub Release
@@ -575,7 +579,24 @@ jobs:
           IMAGE: ${{ steps.image.outputs.ref }}
         run: OPENWA_SMOKE_IMAGE="$IMAGE" ./scripts/smoke-test-non-root.sh
 
+      # Boot below proves the image starts, not that either engine can: Baileys is imported on the
+      # first session start and the browser is launched per session, and both differ by
+      # architecture. Hermetic, so a WhatsApp outage cannot block a release. Both architectures are
+      # tried even if the first fails, and the boot check below still runs, so logs name both.
+      # arm64 runs under QEMU on this amd64 runner, so there the script runs the browser binary
+      # instead of launching it.
+      - name: Load both engine libraries on each architecture
+        env:
+          IMAGE: ${{ steps.image.outputs.ref }}
+        run: |
+          rc=0
+          for platform in linux/amd64 linux/arm64; do
+            OPENWA_SMOKE_IMAGE="$IMAGE" OPENWA_SMOKE_PLATFORM="$platform" ./scripts/smoke-test-engine-libs.sh || rc=1
+          done
+          exit "$rc"
+
       - name: Boot + liveness check on each architecture
+        if: ${{ !cancelled() }}
         env:
           IMAGE: ${{ steps.image.outputs.ref }}
         run: |

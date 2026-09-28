@@ -177,3 +177,33 @@ describe('useAtomicMultiFileAuthState', () => {
     expect(logger.warn).toHaveBeenCalled();
   });
 });
+
+// scripts/smoke-test-engine-libs.sh imports the real Baileys module in the built image and fails on a
+// missing export. Its list has to follow what the adapter reads, or an upstream rename ships unnoticed.
+describe('engine library smoke export list', () => {
+  const root = path.join(__dirname, '..', '..', '..');
+  const script = fs.readFileSync(path.join(root, 'scripts', 'smoke-test-engine-libs.sh'), 'utf8');
+  const used = [.../const used = \[([^\]]*)\]/.exec(script)![1].matchAll(/'([^']+)'/g)].map(m => m[1]);
+
+  it('covers every export the auth store takes from the module', () => {
+    const source = fs.readFileSync(path.join(__dirname, 'baileys-auth-store.ts'), 'utf8');
+    const picked = /Pick<typeof BaileysLib, ([^>]+)>/
+      .exec(source)![1]
+      .match(/'[^']+'/g)!
+      .map(n => n.slice(1, -1));
+    expect(picked.length).toBeGreaterThan(0);
+    expect(used).toEqual(expect.arrayContaining(picked));
+  });
+
+  it('lists only exports the engine code still uses', () => {
+    const dir = path.join(root, 'src', 'engine');
+    const code = fs
+      .readdirSync(dir, { recursive: true, encoding: 'utf8' })
+      .filter(f => f.endsWith('.ts') && !f.endsWith('.spec.ts'))
+      .map(f => fs.readFileSync(path.join(dir, f), 'utf8'))
+      .join('\n')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    expect(used.filter(name => name !== 'default' && !new RegExp(`\\b${name}\\b`).test(code))).toEqual([]);
+  });
+});

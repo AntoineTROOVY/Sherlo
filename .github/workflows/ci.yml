@@ -416,6 +416,11 @@ jobs:
       - name: Build project
         run: npm run build
 
+      # Every jest lane stubs @whiskeysockets/baileys, so this is the one place the real library
+      # types and unwraps inbound messages, through the compiled adapter. Needs the build above.
+      - name: Run inbound messages through the real Baileys library
+        run: npm run test:engine-real
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -505,6 +510,14 @@ jobs:
         env:
           OPENWA_SMOKE_IMAGE: openwa-ci:non-root-smoke
         run: ./scripts/smoke-test-non-root.sh
+
+      # Boot never loads Baileys (imported on the first session start) or launches the browser
+      # whatsapp-web.js drives, so a broken Dockerfile patch or a missing library would otherwise
+      # pass every gate. Hermetic: no network, no WhatsApp account.
+      - name: Load both engine libraries in the image
+        env:
+          OPENWA_SMOKE_IMAGE: openwa-ci:non-root-smoke
+        run: ./scripts/smoke-test-engine-libs.sh
 
       # Re-point the branch tag at the image this run built, by digest. The head check sits seconds
       # before the re-point rather than a whole build before it: a run whose commit has been

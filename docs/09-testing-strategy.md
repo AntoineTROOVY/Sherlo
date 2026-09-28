@@ -40,6 +40,8 @@ npm --prefix dashboard run test:unit
 | `npm run test:e2e`                                               | Run smoke-level e2e tests from `test/`                                   |
 | `npm run test:pg-smoke`                                          | Run the PostgreSQL migration and UUID-default smoke test                 |
 | `npm run test:scripts`                                           | Run the repo-level script tests on the Node test runner                  |
+| `npm run build && npm run test:engine-real`                      | Feed inbound messages through the real Baileys library and built adapter |
+| `OPENWA_SMOKE_IMAGE=<image> ./scripts/smoke-test-engine-libs.sh` | Import Baileys and launch the browser inside a built image               |
 | `./scripts/smoke-test-backup-restore.sh`                         | Run the backup/restore smoke test used by the `scripts-smoke` job        |
 | `npm run lint`                                                   | Run backend ESLint with type-aware rules                                 |
 | `npm run format:check`                                           | Check Prettier formatting for backend source and specs                   |
@@ -268,8 +270,8 @@ request's superseded run; push runs on `main` are never cancelled or queued behi
 | `dashboard`     | dashboard install, lint, formatting, type-check, i18n parity, build, unit tests                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `scripts-smoke` | shellcheck on `docker-entrypoint.sh` and every `scripts/*.sh`, plus the backup/restore smoke test                                                                                                                                                                                                                                                                                                                                                                                     |
 | `chart`         | helm lint, helm template with default and fully-toggled values, kubeconform on both renders, the rendered-behaviour check, actionlint on the workflows                                                                                                                                                                                                                                                                                                                                |
-| `build`         | backend build after lint/audit/test/dashboard/scripts-smoke/chart jobs pass                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `docker`        | multi-arch Docker build on pushes and pull requests, then `scripts/smoke-test-non-root.sh` against the built image so the entrypoint's root→openwa drop is verified, not assumed; publishes to GHCR only on push, so fork pull requests validate both architectures without publishing. A push publishes `:<sha>` from the build and moves the branch tag (`:main`, `:develop`) to that image only after the non-root smoke passes and only while the commit is still the branch head |
+| `build`         | backend build after lint/audit/test/dashboard/scripts-smoke/chart jobs pass, then `test:engine-real`, which feeds proto-built inbound messages through the real Baileys library and the compiled adapter (every jest lane stubs Baileys)                                                                                                                                                                                                                                              |
+| `docker`        | multi-arch build on pushes and pull requests, then against the built image `scripts/smoke-test-non-root.sh` (the entrypoint's root→openwa drop) and `scripts/smoke-test-engine-libs.sh` (imports Baileys, launches the browser; emulated arm64 only runs its binary). Publishes only on push: `:<sha>` from the build, then the branch tag (`:main`) once the smokes pass and only while the commit is still the branch head                                                          |
 
 SDK CI is defined in `.github/workflows/sdk-ci.yml` and is path-filtered to SDK sources plus server
 contract surfaces that SDKs mirror (`src/**/dto/**`, `src/**/*.controller.ts`, `src/**/*.service.ts`, and
@@ -357,7 +359,9 @@ Live WhatsApp checks require an operator-owned account and should not be part of
 
 ## 9.9 Known Gaps
 
-- No default CI job exercises a real WhatsApp connection.
+- No default CI job exercises a real WhatsApp connection. The engine libraries themselves are exercised
+  hermetically: `test:engine-real` runs the real Baileys helpers over the compiled adapter, and the image
+  smoke imports Baileys and launches the browser, neither of which needs WhatsApp to be reachable.
 - The default `test` job uses SQLite; PostgreSQL 16 is only exercised by the dedicated `test-postgres` job.
 - No default CI job exercises S3/MinIO or Docker socket proxy integration. (Redis is no longer a gap: the
   `test` job starts a `redis:7-alpine` service container so the queue-on e2e suite has a broker. That suite
