@@ -271,7 +271,7 @@ flowchart LR
 
 ### Windows
 
-Each window is counted **per route handler per client IP** (the IP resolved through `TRUSTED_PROXIES`) by a global `ThrottlerGuard`, so a client gets the full budget on every endpoint; for an aggregate per-client cap, add a limiter at your reverse proxy. There is **no per-endpoint limit table**: these three windows apply to every non-exempt route, and exceeding any one returns `429 Too Many Requests`:
+Each window is counted **per route handler per client IP** (the IP resolved through `TRUSTED_PROXIES`) by a global `ThrottlerGuard`, so a client gets the full budget on every endpoint; for an aggregate per-client cap, add a limiter at your reverse proxy. There is **no per-endpoint limit table**: these three windows apply to every non-exempt REST controller route, and exceeding any one returns `429 Too Many Requests`:
 
 | Window   | Default limit | Window length | Env overrides                                       |
 | -------- | ------------- | ------------- | --------------------------------------------------- |
@@ -279,7 +279,7 @@ Each window is counted **per route handler per client IP** (the IP resolved thro
 | `medium` | 100 requests  | 60 s          | `RATE_LIMIT_MEDIUM_TTL` / `RATE_LIMIT_MEDIUM_LIMIT` |
 | `long`   | 1000 requests | 3600 s        | `RATE_LIMIT_LONG_TTL` / `RATE_LIMIT_LONG_LIMIT`     |
 
-TTL values are in milliseconds. The `/api/metrics` and `/api/health*` routes are exempt (`@SkipThrottle`); `/api/health` still looks up at most 30 failed key presentations per client per minute, and past that answers without `version` and without a key lookup. To enforce tighter per-route limits, lower the global windows or add a limiter at your reverse proxy.
+TTL values are in milliseconds. The `/api/metrics` and `/api/health*` routes are exempt (`@SkipThrottle`), and the ingress route has its own windows (below); `/api/health` still looks up at most 30 failed key presentations per client per minute, and past that answers without `version` and without a key lookup. The MCP endpoint (`/mcp`) and the Bull Board UI (`/api/admin/queues`) are raw Express mounts the guard never sees: RATE_LIMIT_* does not apply to them, and each is bounded by its own pre-auth per-IP throttle (`MCP_IP_RATE_LIMIT_MAX` / `MCP_IP_RATE_LIMIT_WINDOW_MS`). To enforce tighter per-route limits, lower the global windows or add a limiter at your reverse proxy.
 
 An IPv6 client is keyed on its /64, so rotating addresses inside one allocation does not mint fresh buckets. The same key is used by every other per-client limit: the MCP and Bull Board pre-auth throttles, the WebSocket limits below, the per-client share of the in-flight body budget for requests without an API key, the health route's key-lookup budget and auth-failure audit bound, and the REST, queue-dashboard and MCP auth-failure audit bound. `allowedIps` matching and audit rows still see the full address.
 
