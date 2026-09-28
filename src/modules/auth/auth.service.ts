@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
   UnauthorizedException,
   OnModuleInit,
   OnModuleDestroy,
@@ -19,6 +20,7 @@ import { createLogger } from '../../common/services/logger.service';
 import { setRequestActor } from '../../common/services/request-context';
 import { readBootstrapKey, removeBootstrapKey, writeBootstrapKey } from './bootstrap-key-file';
 import { ApiKeyUsageTracker } from './api-key-usage-tracker.service';
+import { ActiveKeyIndex } from './active-key-index';
 import { apiKeyAuthorizationFingerprint, normalizeScopeList } from './api-key-authorization';
 import { normalizeChatAllowList } from '../../common/security/chat-scope';
 import { EventsGateway, type ApiKeyEvictionReason } from '../events/events.gateway';
@@ -78,6 +80,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     private readonly apiKeyRepository: Repository<ApiKey>,
     private readonly usageTracker: ApiKeyUsageTracker,
     private readonly moduleRef: ModuleRef,
+    @Optional() private readonly keyIndex?: ActiveKeyIndex,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -209,6 +212,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     });
 
     const saved = await this.apiKeyRepository.save(apiKey);
+    this.keyIndex?.refreshSoon();
     this.logger.log(`API key created: ${saved.name}`, {
       keyId: saved.id,
       role: saved.role,
@@ -281,6 +285,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       // The row's post-write state, for the eviction comparison below.
       saved = await this.findOne(id);
     }
+    this.keyIndex?.refreshSoon();
 
     // One fingerprint definition, two callers: this immediate eviction and the gateway's periodic
     // re-validation sweep. Sharing it keeps the two from disagreeing about what an authorization
@@ -307,6 +312,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     this.usageTracker.forget(id);
     this.removeBootstrapKeyFileIfMatching(apiKey);
     this.evictActiveSockets(id, 'deleted');
+    this.keyIndex?.refreshSoon();
     this.logger.log(`API key deleted: ${apiKey.name}`, {
       keyId: id,
       action: 'api_key_deleted',
@@ -335,6 +341,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     // Kick any WebSocket connections already authenticated with this key: without this, a revoked
     // key keeps receiving events on already-subscribed sockets until they happen to disconnect.
     this.evictActiveSockets(id, 'revoked');
+    this.keyIndex?.refreshSoon();
     return saved;
   }
 

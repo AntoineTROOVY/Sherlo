@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import { AuthService, resolveSeedApiKey, bannerKeyLine, UnresolvedApiKeyException } from './auth.service';
 import { ApiKeyUsageTracker } from './api-key-usage-tracker.service';
 import { getRequestActor, runWithRequestId } from '../../common/services/request-context';
+import { ActiveKeyIndex } from './active-key-index';
 import { ApiKey, ApiKeyRole } from './entities/api-key.entity';
 
 // Helpers
@@ -112,8 +113,10 @@ describe('AuthService', () => {
   let committedWrites: Array<{ mode: 'update' | 'delete'; patch?: Record<string, unknown>; guarded: boolean }>;
   /** The raw AND-fragment the last-admin guard binds, so the SQL predicate itself is asserted. */
   let lastAdminFragments: string[];
+  let keyIndex: { refreshSoon: jest.Mock };
 
   beforeEach(async () => {
+    keyIndex = { refreshSoon: jest.fn() };
     repository = {
       count: jest.fn(),
       find: jest.fn(),
@@ -135,6 +138,7 @@ describe('AuthService', () => {
           provide: getRepositoryToken(ApiKey, 'main'),
           useValue: repository,
         },
+        { provide: ActiveKeyIndex, useValue: keyIndex },
       ],
     }).compile();
 
@@ -413,6 +417,22 @@ describe('AuthService', () => {
       await expect(service.delete('uuid-1')).resolves.toBeUndefined();
       await expect(service.findOne('uuid-1')).rejects.toThrow(NotFoundException); // one delete committed
       await expect(service.findOne('uuid-2')).resolves.toBeDefined(); // the survivor is intact
+    });
+  });
+
+  describe('active key index', () => {
+    it('is refreshed after every key write', async () => {
+      (repository.create as jest.Mock).mockImplementation((dto: Partial<ApiKey>) => ({ ...dto, id: 'uuid-new' }));
+      await service.createApiKey({ name: 'new' });
+      expect(keyIndex.refreshSoon).toHaveBeenCalledTimes(1);
+
+      setupKeys([createMockApiKey({ id: 'uuid-1' }), createMockApiKey({ id: 'uuid-2' })]);
+      await service.update('uuid-1', { name: 'renamed' });
+      expect(keyIndex.refreshSoon).toHaveBeenCalledTimes(2);
+      await service.revoke('uuid-1');
+      expect(keyIndex.refreshSoon).toHaveBeenCalledTimes(3);
+      await service.delete('uuid-2');
+      expect(keyIndex.refreshSoon).toHaveBeenCalledTimes(4);
     });
   });
 

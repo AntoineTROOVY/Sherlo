@@ -3,11 +3,13 @@ import { NestFactory } from '@nestjs/core';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'fs';
+import { request as httpRequest } from 'http';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { configureApp } from '../src/configure-app';
 import { applyGlobalValidation } from '../src/config/app-validation';
 import { DASHBOARD_CSP_NONCE_PLACEHOLDER } from '../src/config/dashboard-csp';
+import { ActiveKeyIndex } from '../src/modules/auth/active-key-index';
 
 /**
  * The production HTTP surface, run for real. Every other e2e builds a bare Nest app, so the stack
@@ -159,5 +161,65 @@ describe('production HTTP surface (configureApp)', () => {
       .send('{}');
 
     expect(res.status).toBe(415);
+  });
+});
+
+describe('in-flight body budget tiers (configureApp)', () => {
+  let app: INestApplication<App>;
+  const previousBodyLimit = process.env.BODY_SIZE_LIMIT;
+
+  // Stands in for the real index: only 'known-key' is an active key.
+  const keyIndex = {
+    recognise: (headers: { 'x-api-key'?: unknown }) => (headers['x-api-key'] === 'known-key' ? 'h' : undefined),
+  };
+
+  @Module({ controllers: [EchoController], providers: [{ provide: ActiveKeyIndex, useValue: keyIndex }] })
+  class TieredSurfaceModule {}
+
+  beforeAll(async () => {
+    // 1mb cap: a 4mb budget whose anonymous pool is 2mb, 1mb per client address.
+    process.env.BODY_SIZE_LIMIT = '1mb';
+    app = await NestFactory.create<INestApplication<App>>(TieredSurfaceModule, { bodyParser: false, logger: false });
+    configureApp(app);
+    applyGlobalValidation(app);
+    await app.listen(0, '127.0.0.1');
+  });
+
+  afterAll(async () => {
+    await app?.close();
+    if (previousBodyLimit === undefined) delete process.env.BODY_SIZE_LIMIT;
+    else process.env.BODY_SIZE_LIMIT = previousBodyLimit;
+  });
+
+  it('keeps room for a recognised key while an unrecognised client holds its whole share', async () => {
+    const { port } = new URL(await app.getUrl());
+    // Declares a full-size body, this address's whole share, and never finishes sending it.
+    const held = httpRequest({
+      host: '127.0.0.1',
+      port,
+      path: '/api/echo',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': String(1024 * 1024) },
+    });
+    held.on('error', () => undefined);
+    held.write('{"a":"');
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    try {
+      const anonymous = await request(app.getHttpServer())
+        .post('/api/echo')
+        .set('Content-Type', 'application/json')
+        .send({ small: true });
+      expect(anonymous.status).toBe(503);
+
+      const keyed = await request(app.getHttpServer())
+        .post('/api/echo')
+        .set('Content-Type', 'application/json')
+        .set('X-API-Key', 'known-key')
+        .send({ small: true });
+      expect(keyed.status).toBe(201);
+    } finally {
+      held.destroy();
+    }
   });
 });

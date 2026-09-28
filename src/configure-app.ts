@@ -1,11 +1,17 @@
 import { INestApplication } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import helmet from 'helmet';
 import { Request, Response, NextFunction, json, urlencoded } from 'express';
 import { randomBytes } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
 import { extname, join } from 'path';
 import { DASHBOARD_DIST, dashboardServingEnabled, dashboardBuildPresent } from './app.module';
-import { createInflightBodyBudget, resolveInflightBodyBudgetBytes } from './config/inflight-body-budget';
+import {
+  createInflightBodyBudget,
+  parseBodyLimitBytes,
+  resolveInflightBodyBudgetBytes,
+} from './config/inflight-body-budget';
+import { ActiveKeyIndex } from './modules/auth/active-key-index';
 import { requestContextMiddleware } from './common/middleware/request-context.middleware';
 import { injectDashboardCspNonce } from './config/dashboard-csp';
 import { resolveCorsPolicy, isUpgradeInsecureRequestsEnabled, resolveBodyLimit } from './config/bootstrap-security';
@@ -60,19 +66,30 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
     process.env.INFLIGHT_BODY_BUDGET_BYTES,
     process.env.BODY_SIZE_LIMIT,
   );
+  // Cap request body size (DoS hardening). Media sends carry base64 in the JSON body,
+  // so the default is generous; tune with BODY_SIZE_LIMIT.
+  const bodyLimit = resolveBodyLimit(process.env.BODY_SIZE_LIMIT);
+  // Requests without a recognised API key share a pool of a quarter of the budget, never less than
+  // two BODY_SIZE_LIMIT bodies (half the default budget). With no AuthModule in the app (some test
+  // modules) every request is unrecognised, which is the stricter side.
+  // Looked up through ModuleRef: a failed app.get() aborts the process instead of throwing.
+  let keyIndex: ActiveKeyIndex | undefined;
+  try {
+    keyIndex = app.get(ModuleRef).get(ActiveKeyIndex, { strict: false });
+  } catch {
+    keyIndex = undefined;
+  }
   app.use(
     createInflightBodyBudget(inflightBudgetBytes, {
       trustedProxies: (process.env.TRUSTED_PROXIES || '')
         .split(',')
         .map(p => p.trim())
         .filter(Boolean),
+      classify: (req, clientIp) => keyIndex?.recognise(req.headers, clientIp),
+      bodyLimitBytes: parseBodyLimitBytes(bodyLimit),
       requestTimeoutMs: resolveRequestTimeoutMs(process.env.REQUEST_TIMEOUT_MS),
     }).middleware,
   );
-
-  // Cap request body size (DoS hardening). Media sends carry base64 in the JSON body,
-  // so the default is generous; tune with BODY_SIZE_LIMIT.
-  const bodyLimit = resolveBodyLimit(process.env.BODY_SIZE_LIMIT);
   // The `verify` callback stashes the EXACT bytes json() received on req.rawBody, byte-identical to
   // what a provider signed, so the @Public ingress controller can HMAC-verify over the raw body
   // (JSON.stringify(req.body) is NOT byte-identical). Cheap for every route; non-ingress routes ignore it.

@@ -125,6 +125,20 @@ export interface InflightBodyBudgetOptions {
    */
   perClientShare?: number;
   /**
+   * Turns on the anonymous tier. Returns a stable id (the stored key hash) when the request carries
+   * an API key known to be active, undefined otherwise. Unrecognised requests share a pool of
+   * ANONYMOUS_POOL_FRACTION of the budget (at least two body caps), so they can never take the rest
+   * away from keyed traffic; a recognised key draws on the whole budget with its own per-key share, wherever it
+   * connects from. Without this option every request draws on the whole budget with a per-IP share.
+   */
+  classify?: (req: Request, clientIp: string) => string | undefined;
+  /**
+   * The per-request body cap (BODY_SIZE_LIMIT) in bytes. An anonymous request is never charged
+   * more: the parser refuses a longer declared body with 413 without buffering it. Default 25 MiB,
+   * the parser's own default.
+   */
+  bodyLimitBytes?: number;
+  /**
    * Node's request timeout (REQUEST_TIMEOUT_MS) in milliseconds. A body that falls behind the pace
    * needed to deliver its reservation within it (the declared size, or a chunked body's
    * placeholder) is dropped. Default 300 000, Node's own default; 0 or less
@@ -137,9 +151,14 @@ export interface InflightBodyBudget {
   middleware: (req: Request, res: Response, next: NextFunction) => void;
   /** Aggregate bytes currently attributed to in-flight request bodies (observability/tests). */
   currentBytes: () => number;
-  /** Bytes currently attributed to one client's in-flight bodies (observability/tests). */
+  /** Bytes currently attributed to one client IP's in-flight bodies (observability/tests). */
   clientBytes: (req: Request) => number;
+  /** Bytes currently charged to the anonymous tier (observability/tests). */
+  anonymousBytes: () => number;
 }
+
+/** Share of the budget open to requests without a recognised API key (see the classify option). */
+const ANONYMOUS_POOL_FRACTION = 0.25;
 
 export function createInflightBodyBudget(budgetBytes: number, options?: InflightBodyBudgetOptions): InflightBodyBudget {
   let inFlightBytes = 0;
@@ -147,7 +166,19 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
   const trustedProxies = options?.trustedProxies ?? [];
   const share = Math.min(1, Math.max(Number.EPSILON, options?.perClientShare ?? 0.5));
   const perClientCap = Math.max(1, Math.floor(budgetBytes * share));
+  const classify = options?.classify;
+  const bodyLimitBytes = options?.bodyLimitBytes ?? FALLBACK_LIMIT_BYTES;
   const requestTimeoutMs = options?.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  // The anonymous pool holds at least two full-size bodies, so with the default half share one
+  // client never fills it and other unkeyed senders, ingress deliveries among them, keep room. A
+  // budget below three body caps leaves keyed traffic less than a full-size body, which the docs
+  // call out.
+  const anonPool = Math.min(
+    budgetBytes,
+    Math.max(2 * bodyLimitBytes, Math.floor(budgetBytes * ANONYMOUS_POOL_FRACTION)),
+  );
+  const anonClientCap = Math.max(Math.min(bodyLimitBytes, anonPool), Math.floor(anonPool * share));
+  let anonInFlight = 0;
   // Per-client in-flight bytes, keyed on the resolved client IP (an IPv6 client on its /64).
   // Entries are created lazily and deleted by the same exactly-once release that decrements the
   // aggregate, so the map cannot leak a client that finished. Only body-carrying requests are
@@ -238,15 +269,32 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
     // Admission control on the RESERVED size: a request that would push the aggregate OR ITS
     // CLIENT'S SHARE past the budget is refused before a single byte of its body is buffered.
     // The per-client share bounds what one source can hold.
-    const clientKey = limiterKeyForIp(resolveClientIp(req, trustedProxies));
+    // A recognised key is shared per key (its entries are bounded by the key count, so they are
+    // exempt from the map cap); anything else per client IP.
+    const clientIp = resolveClientIp(req, trustedProxies);
+    const keyId = classify?.(req, clientIp);
+    const anonymous = classify !== undefined && keyId === undefined;
+    const clientKey = keyId !== undefined ? `key:${keyId}` : limiterKeyForIp(clientIp);
+    const shareCap = anonymous ? anonClientCap : perClientCap;
+    const ceiling = anonymous ? bodyLimitBytes : Infinity;
     const clientBusy = clientInFlight.get(clientKey) ?? 0;
-    const mapAtCapacity = clientInFlight.size >= MAX_TRACKED_CLIENTS && !clientInFlight.has(clientKey);
-    if (inFlightBytes + reserved > budgetBytes || clientBusy + reserved > perClientCap || mapAtCapacity) {
+    const mapAtCapacity =
+      keyId === undefined && clientInFlight.size >= MAX_TRACKED_CLIENTS && !clientInFlight.has(clientKey);
+    // The aggregate check uses the full declared size; the tier and share checks the charged size.
+    const charge = Math.min(reserved, ceiling);
+    if (
+      inFlightBytes + reserved > budgetBytes ||
+      clientBusy + charge > shareCap ||
+      (anonymous && anonInFlight + charge > anonPool) ||
+      mapAtCapacity
+    ) {
       rejectBusy(req, res);
       return;
     }
 
+    reserved = charge;
     inFlightBytes += reserved;
+    if (anonymous) anonInFlight += reserved;
     clientInFlight.set(clientKey, clientBusy + reserved);
 
     let released = false;
@@ -265,6 +313,7 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
       released = true;
       disarmStallReaper();
       inFlightBytes -= reserved;
+      if (anonymous) anonInFlight -= reserved;
       const busy = (clientInFlight.get(clientKey) ?? reserved) - reserved;
       if (busy > 0) clientInFlight.set(clientKey, busy);
       else clientInFlight.delete(clientKey);
@@ -289,21 +338,23 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
     // A declared body keeps its declared size until it is released. A chunked body is re-priced at
     // the bytes that have arrived, never below its opening placeholder until it is complete: budget
     // handed back mid-stream would be taken back, unchecked, by a body that then completes between
-    // polls. Growth that crosses the aggregate or the client share aborts the
+    // polls. Growth that crosses the aggregate, the client share or the anonymous pool aborts the
     // request mid-stream, the same bound a declared length gets at admission. A complete body is
     // re-priced at its real size but never aborted: it is already buffered. reserved is updated
     // BEFORE release() so the exactly-once decrement subtracts the reconciled size.
     const reconcile = (complete: boolean): void => {
       if (released || declared !== undefined) return;
       const floor = complete ? 0 : undeclaredReservation;
-      const actual = Math.max(floor, socket.bytesRead - startBytes);
+      const actual = Math.min(Math.max(floor, socket.bytesRead - startBytes), ceiling);
       const delta = actual - reserved;
       if (delta === 0) return;
       inFlightBytes += delta;
+      if (anonymous) anonInFlight += delta;
       reserved = actual;
       const busy = (clientInFlight.get(clientKey) ?? 0) + delta;
       clientInFlight.set(clientKey, busy);
-      if (!complete && delta > 0 && (busy > perClientCap || inFlightBytes > budgetBytes)) {
+      const overTier = anonymous && anonInFlight > anonPool;
+      if (!complete && delta > 0 && (busy > shareCap || inFlightBytes > budgetBytes || overTier)) {
         release();
         req.destroy();
       }
@@ -364,6 +415,7 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
     middleware,
     currentBytes: () => inFlightBytes,
     clientBytes: req => clientInFlight.get(limiterKeyForIp(resolveClientIp(req, trustedProxies))) ?? 0,
+    anonymousBytes: () => anonInFlight,
   };
 }
 
