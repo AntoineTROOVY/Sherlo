@@ -545,6 +545,33 @@
       "call.missed": "Quando una chiamata resta senza risposta",
       "status.received": "Quando un contatto pubblica uno stato",
       "all": "Tutti gli eventi"
+    },
+    "auth": {
+      "title": "Autenticazione delle consegne",
+      "hint": "Facoltativo. I valori salvati non vengono più mostrati.",
+      "editHint": "Il segreto e le intestazioni salvati non vengono mai mostrati. Lascia invariata questa sezione per mantenerli.",
+      "secret": "Segreto di firma",
+      "secretHint": "Da 16 a 255 caratteri. Ogni consegna include una firma HMAC-SHA256 nell'intestazione X-OpenWA-Signature.",
+      "secretKeepPlaceholder": "Lascia vuoto per mantenere il segreto attuale",
+      "generateSecret": "Genera",
+      "copySecret": "Copia",
+      "secretCopied": "Segreto di firma copiato",
+      "removeSecret": "Smetti di firmare le consegne (rimuovi il segreto)",
+      "headers": "Intestazioni personalizzate",
+      "headerName": "Nome intestazione",
+      "headerValue": "Valore intestazione",
+      "addHeader": "Aggiungi intestazione",
+      "removeHeader": "Rimuovi intestazione",
+      "replaceHeaders": "Sostituisci le intestazioni personalizzate",
+      "replaceHint": "Queste righe sostituiscono tutte le intestazioni salvate. Senza righe, le intestazioni salvate vengono rimosse.",
+      "errors": {
+        "headerName": "I nomi delle intestazioni possono contenere solo lettere, cifre e trattini.",
+        "headerValue": "I valori delle intestazioni sono limitati a 1024 caratteri, senza caratteri di controllo né caratteri al di fuori di Latin-1.",
+        "headerReserved": "Content-Type, User-Agent, X-OpenWA-* e le intestazioni di connessione sono impostate dal gateway e non possono essere usate.",
+        "headerDuplicate": "Ogni nome di intestazione può essere usato una sola volta.",
+        "tooMany": "Sono consentite al massimo 50 intestazioni personalizzate.",
+        "secretLength": "Il segreto di firma deve essere lungo da 16 a 255 caratteri."
+      }
     }
   },
   "templates": {

@@ -539,6 +539,33 @@
       "call.missed": "来电未接听时",
       "status.received": "联系人发布状态时",
       "all": "所有事件"
+    },
+    "auth": {
+      "title": "投递认证",
+      "hint": "可选。保存后，已存储的值不会再次显示。",
+      "editHint": "已存储的密钥和请求头永远不会显示。保持此部分不变即可保留它们。",
+      "secret": "签名密钥",
+      "secretHint": "16 到 255 个字符。每次投递都会在 X-OpenWA-Signature 请求头中携带 HMAC-SHA256 签名。",
+      "secretKeepPlaceholder": "留空以保留当前密钥",
+      "generateSecret": "生成",
+      "copySecret": "复制",
+      "secretCopied": "已复制签名密钥",
+      "removeSecret": "停止为投递签名（删除密钥）",
+      "headers": "自定义请求头",
+      "headerName": "请求头名称",
+      "headerValue": "请求头值",
+      "addHeader": "添加请求头",
+      "removeHeader": "移除请求头",
+      "replaceHeaders": "替换自定义请求头",
+      "replaceHint": "这些行将替换所有已存储的请求头。没有任何行时，将删除已存储的请求头。",
+      "errors": {
+        "headerName": "请求头名称只能包含字母、数字和连字符。",
+        "headerValue": "请求头值最多 1024 个字符，不能包含控制字符或 Latin-1 以外的字符。",
+        "headerReserved": "Content-Type、User-Agent、X-OpenWA-* 和连接类请求头由网关设置，不能使用。",
+        "headerDuplicate": "每个请求头名称只能使用一次。",
+        "tooMany": "最多允许 50 个自定义请求头。",
+        "secretLength": "签名密钥长度必须为 16 到 255 个字符。"
+      }
     }
   },
   "templates": {

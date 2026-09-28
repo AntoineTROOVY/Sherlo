@@ -545,6 +545,33 @@
       "call.missed": "Quando uma chamada não é atendida",
       "status.received": "Quando um contato publica um status",
       "all": "Todos os eventos"
+    },
+    "auth": {
+      "title": "Autenticação de entrega",
+      "hint": "Opcional. Os valores salvos nunca mais são exibidos.",
+      "editHint": "O segredo e os cabeçalhos salvos nunca são exibidos. Deixe esta seção inalterada para mantê-los.",
+      "secret": "Segredo de assinatura",
+      "secretHint": "De 16 a 255 caracteres. Cada entrega leva uma assinatura HMAC-SHA256 no cabeçalho X-OpenWA-Signature.",
+      "secretKeepPlaceholder": "Deixe em branco para manter o segredo atual",
+      "generateSecret": "Gerar",
+      "copySecret": "Copiar",
+      "secretCopied": "Segredo de assinatura copiado",
+      "removeSecret": "Parar de assinar as entregas (remover o segredo)",
+      "headers": "Cabeçalhos personalizados",
+      "headerName": "Nome do cabeçalho",
+      "headerValue": "Valor do cabeçalho",
+      "addHeader": "Adicionar cabeçalho",
+      "removeHeader": "Remover cabeçalho",
+      "replaceHeaders": "Substituir os cabeçalhos personalizados",
+      "replaceHint": "Estas linhas substituem todos os cabeçalhos salvos. Sem linhas, os cabeçalhos salvos são removidos.",
+      "errors": {
+        "headerName": "Nomes de cabeçalho podem conter apenas letras, dígitos e hifens.",
+        "headerValue": "Valores de cabeçalho são limitados a 1024 caracteres, sem caracteres de controle nem caracteres fora do Latin-1.",
+        "headerReserved": "Content-Type, User-Agent, X-OpenWA-* e cabeçalhos de conexão são definidos pelo gateway e não podem ser usados.",
+        "headerDuplicate": "Cada nome de cabeçalho pode ser usado apenas uma vez.",
+        "tooMany": "São permitidos no máximo 50 cabeçalhos personalizados.",
+        "secretLength": "O segredo de assinatura deve ter de 16 a 255 caracteres."
+      }
     }
   },
   "apiKeys": {

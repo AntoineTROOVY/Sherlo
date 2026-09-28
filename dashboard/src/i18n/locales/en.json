@@ -539,6 +539,33 @@
       "call.missed": "When a call goes unanswered",
       "status.received": "When a contact posts a status",
       "all": "All events"
+    },
+    "auth": {
+      "title": "Delivery authentication",
+      "hint": "Optional. Stored values are never shown again after saving.",
+      "editHint": "The stored secret and headers are never shown. Leave this section untouched to keep them.",
+      "secret": "Signing secret",
+      "secretHint": "16 to 255 characters. Each delivery carries an HMAC-SHA256 signature in the X-OpenWA-Signature header.",
+      "secretKeepPlaceholder": "Leave blank to keep the current secret",
+      "generateSecret": "Generate",
+      "copySecret": "Copy",
+      "secretCopied": "Signing secret copied",
+      "removeSecret": "Stop signing deliveries (remove the secret)",
+      "headers": "Custom headers",
+      "headerName": "Header name",
+      "headerValue": "Header value",
+      "addHeader": "Add header",
+      "removeHeader": "Remove header",
+      "replaceHeaders": "Replace custom headers",
+      "replaceHint": "These rows replace every stored header. With no rows, the stored headers are removed.",
+      "errors": {
+        "headerName": "Header names may contain only letters, digits and hyphens.",
+        "headerValue": "Header values are limited to 1024 characters, without control characters or characters outside Latin-1.",
+        "headerReserved": "Content-Type, User-Agent, X-OpenWA-* and connection headers are set by the gateway and cannot be used.",
+        "headerDuplicate": "Each header name can be used only once.",
+        "tooMany": "At most 50 custom headers are allowed.",
+        "secretLength": "The signing secret must be 16 to 255 characters long."
+      }
     }
   },
   "templates": {

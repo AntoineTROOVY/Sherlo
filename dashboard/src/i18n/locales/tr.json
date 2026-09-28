@@ -539,6 +539,33 @@
       "call.missed": "Bir arama yanıtsız kaldığında",
       "status.received": "Bir kişi durum paylaştığında",
       "all": "Tüm olaylar"
+    },
+    "auth": {
+      "title": "Teslimat kimlik doğrulaması",
+      "hint": "İsteğe bağlı. Kaydedilen değerler bir daha gösterilmez.",
+      "editHint": "Kayıtlı gizli anahtar ve başlıklar hiçbir zaman gösterilmez. Korumak için bu bölüme dokunmayın.",
+      "secret": "İmzalama gizli anahtarı",
+      "secretHint": "16 ile 255 karakter arası. Her teslimat, X-OpenWA-Signature başlığında bir HMAC-SHA256 imzası taşır.",
+      "secretKeepPlaceholder": "Mevcut gizli anahtarı korumak için boş bırakın",
+      "generateSecret": "Oluştur",
+      "copySecret": "Kopyala",
+      "secretCopied": "İmzalama gizli anahtarı kopyalandı",
+      "removeSecret": "Teslimatları imzalamayı durdur (gizli anahtarı kaldır)",
+      "headers": "Özel başlıklar",
+      "headerName": "Başlık adı",
+      "headerValue": "Başlık değeri",
+      "addHeader": "Başlık ekle",
+      "removeHeader": "Başlığı kaldır",
+      "replaceHeaders": "Özel başlıkları değiştir",
+      "replaceHint": "Bu satırlar kayıtlı tüm başlıkların yerini alır. Satır yoksa kayıtlı başlıklar kaldırılır.",
+      "errors": {
+        "headerName": "Başlık adları yalnızca harf, rakam ve kısa çizgi içerebilir.",
+        "headerValue": "Başlık değerleri en fazla 1024 karakter olabilir; kontrol karakterleri ve Latin-1 dışındaki karakterler kullanılamaz.",
+        "headerReserved": "Content-Type, User-Agent, X-OpenWA-* ve bağlantı başlıkları ağ geçidi tarafından ayarlanır ve kullanılamaz.",
+        "headerDuplicate": "Her başlık adı yalnızca bir kez kullanılabilir.",
+        "tooMany": "En fazla 50 özel başlığa izin verilir.",
+        "secretLength": "İmzalama gizli anahtarı 16 ile 255 karakter arasında olmalıdır."
+      }
     }
   },
   "templates": {

@@ -539,6 +539,33 @@
       "call.missed": "통화에 응답하지 않았을 때",
       "status.received": "연락처가 상태를 게시했을 때",
       "all": "모든 이벤트"
+    },
+    "auth": {
+      "title": "전송 인증",
+      "hint": "선택 사항입니다. 저장된 값은 저장 후 다시 표시되지 않습니다.",
+      "editHint": "저장된 시크릿과 헤더는 표시되지 않습니다. 유지하려면 이 섹션을 변경하지 마세요.",
+      "secret": "서명 시크릿",
+      "secretHint": "16~255자. 모든 전송에는 X-OpenWA-Signature 헤더에 HMAC-SHA256 서명이 포함됩니다.",
+      "secretKeepPlaceholder": "현재 시크릿을 유지하려면 비워 두세요",
+      "generateSecret": "생성",
+      "copySecret": "복사",
+      "secretCopied": "서명 시크릿이 복사되었습니다",
+      "removeSecret": "전송 서명 중지 (시크릿 제거)",
+      "headers": "사용자 지정 헤더",
+      "headerName": "헤더 이름",
+      "headerValue": "헤더 값",
+      "addHeader": "헤더 추가",
+      "removeHeader": "헤더 제거",
+      "replaceHeaders": "사용자 지정 헤더 교체",
+      "replaceHint": "이 행들이 저장된 모든 헤더를 대체합니다. 행이 없으면 저장된 헤더가 제거됩니다.",
+      "errors": {
+        "headerName": "헤더 이름에는 문자, 숫자, 하이픈만 사용할 수 있습니다.",
+        "headerValue": "헤더 값은 최대 1024자이며 제어 문자나 Latin-1 범위 밖의 문자를 사용할 수 없습니다.",
+        "headerReserved": "Content-Type, User-Agent, X-OpenWA-* 및 연결 헤더는 게이트웨이가 설정하므로 사용할 수 없습니다.",
+        "headerDuplicate": "각 헤더 이름은 한 번만 사용할 수 있습니다.",
+        "tooMany": "사용자 지정 헤더는 최대 50개까지 허용됩니다.",
+        "secretLength": "서명 시크릿은 16~255자여야 합니다."
+      }
     }
   },
   "templates": {

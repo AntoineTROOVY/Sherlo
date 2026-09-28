@@ -155,6 +155,26 @@ export interface Webhook {
   updatedAt: string;
 }
 
+// Request bodies for webhook writes. `secret` and `headers` are write-only: no webhook read returns them.
+export interface CreateWebhookRequest {
+  url: string;
+  events: string[];
+  filters?: WebhookFilters | null;
+  secret?: string;
+  headers?: Record<string, string>;
+}
+
+export interface UpdateWebhookRequest {
+  url?: string;
+  events?: string[];
+  active?: boolean;
+  filters?: WebhookFilters | null;
+  /** An empty string removes the stored secret. */
+  secret?: string;
+  /** Replaces the stored map wholesale; `{}` removes every custom header. */
+  headers?: Record<string, string>;
+}
+
 export interface MessageTemplate {
   id: string;
   sessionId: string;
@@ -893,12 +913,12 @@ export const sessionApi = {
 export const webhookApi = {
   listBySession: (sessionId: string) => request<Webhook[]>(`/sessions/${sessionId}/webhooks`),
   listAll: () => request<Webhook[]>('/webhooks'),
-  create: (sessionId: string, data: { url: string; events: string[]; filters?: WebhookFilters | null }) =>
+  create: (sessionId: string, data: CreateWebhookRequest) =>
     request<Webhook>(`/sessions/${sessionId}/webhooks`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  update: (sessionId: string, id: string, data: Partial<Webhook>) =>
+  update: (sessionId: string, id: string, data: UpdateWebhookRequest) =>
     request<Webhook>(`/sessions/${sessionId}/webhooks/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

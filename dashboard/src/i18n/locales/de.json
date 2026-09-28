@@ -539,6 +539,33 @@
       "call.missed": "Wenn ein Anruf unbeantwortet bleibt",
       "status.received": "Wenn ein Kontakt einen Status veröffentlicht",
       "all": "Alle Ereignisse"
+    },
+    "auth": {
+      "title": "Zustellungsauthentifizierung",
+      "hint": "Optional. Gespeicherte Werte werden nach dem Speichern nie wieder angezeigt.",
+      "editHint": "Das gespeicherte Geheimnis und die Header werden nie angezeigt. Lass diesen Abschnitt unverändert, um sie zu behalten.",
+      "secret": "Signaturgeheimnis",
+      "secretHint": "16 bis 255 Zeichen. Jede Zustellung trägt eine HMAC-SHA256-Signatur im Header X-OpenWA-Signature.",
+      "secretKeepPlaceholder": "Leer lassen, um das aktuelle Geheimnis zu behalten",
+      "generateSecret": "Generieren",
+      "copySecret": "Kopieren",
+      "secretCopied": "Signaturgeheimnis kopiert",
+      "removeSecret": "Zustellungen nicht mehr signieren (Geheimnis entfernen)",
+      "headers": "Benutzerdefinierte Header",
+      "headerName": "Header-Name",
+      "headerValue": "Header-Wert",
+      "addHeader": "Header hinzufügen",
+      "removeHeader": "Header entfernen",
+      "replaceHeaders": "Benutzerdefinierte Header ersetzen",
+      "replaceHint": "Diese Zeilen ersetzen alle gespeicherten Header. Ohne Zeilen werden die gespeicherten Header entfernt.",
+      "errors": {
+        "headerName": "Header-Namen dürfen nur Buchstaben, Ziffern und Bindestriche enthalten.",
+        "headerValue": "Header-Werte sind auf 1024 Zeichen begrenzt, ohne Steuerzeichen und ohne Zeichen außerhalb von Latin-1.",
+        "headerReserved": "Content-Type, User-Agent, X-OpenWA-* und Verbindungs-Header setzt das Gateway selbst; sie können nicht verwendet werden.",
+        "headerDuplicate": "Jeder Header-Name darf nur einmal vorkommen.",
+        "tooMany": "Höchstens 50 benutzerdefinierte Header sind erlaubt.",
+        "secretLength": "Das Signaturgeheimnis muss 16 bis 255 Zeichen lang sein."
+      }
     }
   },
   "templates": {
