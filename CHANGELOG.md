@@ -68,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The migration guide checks that both queues are drained with a header-authenticated Bull Board call, and confirms `s3Available` before a storage migration.
 - `SECURITY.md` says the bundled Docker Compose files are affected by a legacy `ENABLE_SWAGGER=true` in `.env`, and lists plugin activation and the session proxy route among the routes fenced from session-scoped keys.
 - Java SDK: clear a webhook's filters with `new WebhookFilters(List.of())`; `filters(null)` leaves them unchanged.
+- The webhook runbook reads delivery failures with an ADMIN key and says a URL the SSRF guard blocks only at delivery time is recorded there.
 
 ### Upgrade notes (behavior changes)
 
