@@ -136,10 +136,9 @@ export function isApiKeyPepperMissingInProduction(nodeEnv?: string, apiKeyPepper
 }
 
 /**
- * Whether to warn that the main (auth/audit) DB schema is managed by synchronize in production.
- * Synchronize rebuilds api_keys/audit_logs from whatever release is running, so a rollback to an
- * older image reshapes them (dropping columns it does not know) and the migration chain no longer
- * applies. Advisory only: the explicit opt-in keeps working.
+ * Whether to warn that the main (auth/audit) DB schema is also managed by synchronize in production.
+ * After the migrations-main chain, synchronize alters api_keys/audit_logs to this release's entities
+ * without recording those changes in the migration ledger. Advisory only: the explicit opt-in keeps working.
  */
 export function isMainDbSynchronizeInProduction(nodeEnv?: string, mainDbSynchronize?: string): boolean {
   return nodeEnv === 'production' && mainDbSynchronize === 'true';

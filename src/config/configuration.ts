@@ -163,8 +163,8 @@ export default () => ({
     // Schema management for the auth/audit DB. By default the main-owned migrations run at boot
     // (they also adopt a file an earlier release built with synchronize); run them by hand with
     // `npm run migration:run:main` (or `migration:run:main:prod` for the compiled image), since the
-    // plain `migration:run` only manages the data connection. MAIN_DATABASE_SYNCHRONIZE=true opts
-    // into synchronize instead, which main.ts warns about in production.
+    // plain `migration:run` only manages the data connection. MAIN_DATABASE_SYNCHRONIZE=true also
+    // synchronizes after the chain, which main.ts warns about in production.
     synchronize: process.env.MAIN_DATABASE_SYNCHRONIZE === 'true',
     logging: process.env.DATABASE_LOGGING === 'true',
   },

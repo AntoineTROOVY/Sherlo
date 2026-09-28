@@ -104,9 +104,9 @@ async function bootstrap() {
   // Advisory (not enforced): the main DB normally runs its migration chain; synchronize is an opt-in.
   if (isMainDbSynchronizeInProduction(process.env.NODE_ENV, process.env.MAIN_DATABASE_SYNCHRONIZE)) {
     bootstrapLogger.warn(
-      'MAIN_DATABASE_SYNCHRONIZE=true in production: the auth/audit database schema is rebuilt from the ' +
-        "running release's entities instead of its migrations, so running an older release against it " +
-        'reshapes api_keys and audit_logs. Unset it to use the main migrations.',
+      'MAIN_DATABASE_SYNCHRONIZE=true in production: after its migrations the auth/audit schema is also ' +
+        "synchronized to this release's entities, and those changes are not recorded in the migration ledger. " +
+        'Unset it to use the main migrations alone.',
     );
   }
 

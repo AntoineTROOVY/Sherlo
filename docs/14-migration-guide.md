@@ -726,12 +726,12 @@ Upgrades are cumulative: migrations apply in order from wherever the schema curr
 straight to the current release is supported. There is no required intermediate stop — but read every
 intervening `CHANGELOG.md` entry, because behavior changes are not replayed by migrations.
 
-Schema migrations run automatically at boot on the **data** connection only — always on PostgreSQL,
-and on SQLite unless `DATABASE_SYNCHRONIZE=true` puts the data store in synchronize mode. The Main
-(auth/audit) connection defaults to synchronize instead, and under that default runs no migrations at
-boot. Setting `MAIN_DATABASE_SYNCHRONIZE=false` switches it to its own migration chain, which then
-also runs at boot (`migrationsRun` is the inverse of `synchronize` on both connections); run that
-chain by hand with `npm run migration:run:main`.
+Schema migrations run automatically at boot on both connections. The **data** connection always runs
+them on PostgreSQL, and on SQLite unless `DATABASE_SYNCHRONIZE=true` puts the data store in synchronize
+mode. The Main (auth/audit) connection runs its own `migrations-main/` chain at every boot. The chain is
+idempotent, so a `main.sqlite` that an earlier release built with synchronize is adopted in place (rows
+kept, missing columns added, the ledger written). `MAIN_DATABASE_SYNCHRONIZE=true` only adds a
+synchronize pass after the chain. Run the main chain by hand with `npm run migration:run:main`.
 
 ### Upgrade Steps
 

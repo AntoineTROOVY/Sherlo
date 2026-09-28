@@ -10,7 +10,7 @@ import { createThrottlerRedisClient } from './common/throttler/throttler-redis.c
 import configuration from './config/configuration';
 import { validateEnv } from './config/env.validation';
 import { createBootDataSource } from './database/pg-boot-migrations';
-import { mainConnectionOptions } from './database/main-connection';
+import { createMainDataSource, mainConnectionOptions } from './database/main-connection';
 import { SessionModule } from './modules/session/session.module';
 import { MessageModule } from './modules/message/message.module';
 import { TemplateModule } from './modules/template/template.module';
@@ -130,8 +130,10 @@ if (dashboardServingEnabled && dashboardBuildPresent) {
       name: 'main',
       imports: [ConfigModule],
       inject: [ConfigService],
-      // Migrations by default, synchronize only on MAIN_DATABASE_SYNCHRONIZE=true (see the helper).
+      // Migrations always, then synchronize on MAIN_DATABASE_SYNCHRONIZE=true; the factory refuses a
+      // file whose schema does not match this release (see main-connection.ts).
       useFactory: (configService: ConfigService) => mainConnectionOptions(configService),
+      dataSourceFactory: createMainDataSource,
     }),
 
     // Data Storage Database (pluggable - user data)
