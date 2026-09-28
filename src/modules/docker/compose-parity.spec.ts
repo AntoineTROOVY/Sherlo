@@ -475,13 +475,13 @@ describe('DockerService managed specs ↔ docker-compose.yml parity', () => {
     }
   });
 
-  it('minio: publishes the same localhost-only ports as compose', async () => {
+  it('minio: built-in publishes no host ports, compose keeps its loopback ports', async () => {
+    // The built-in container runs the fixed built-in credentials, which the boot guard exempts only
+    // because nothing outside the internal network can reach it. Compose is the manual path with
+    // operator-set credentials, so it keeps its loopback publish.
     const cfg = await capture('minio');
+    expect(cfg.HostConfig.PortBindings).toBeUndefined();
     expect(compose.services.minio.ports).toEqual(['127.0.0.1:9000:9000', '127.0.0.1:9001:9001']);
-    expect(cfg.HostConfig.PortBindings).toEqual({
-      '9000/tcp': [{ HostIp: '127.0.0.1', HostPort: '9000' }],
-      '9001/tcp': [{ HostIp: '127.0.0.1', HostPort: '9001' }],
-    });
   });
 });
 

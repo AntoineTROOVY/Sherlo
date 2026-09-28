@@ -447,8 +447,8 @@ LOG_FORMAT=json
 # STORAGE_TYPE=s3
 # S3_ENDPOINT=http://minio:9000
 # S3_BUCKET=openwa
-# S3_ACCESS_KEY_ID=minioadmin
-# S3_SECRET_ACCESS_KEY=minioadmin
+# S3_ACCESS_KEY_ID=your-access-key
+# S3_SECRET_ACCESS_KEY=your-secret-key
 
 # One deployment per bucket and key prefix. S3_KEY_PREFIX (default media/) is the key root: give a
 # second deployment with its own database its own bucket or a non-overlapping prefix (neither may

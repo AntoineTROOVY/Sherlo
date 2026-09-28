@@ -217,7 +217,8 @@ export function assertNoDefaultSecretsInProduction(env: SecretCheckEnv): void {
   const isWeak = (value?: string): boolean => !value || FORBIDDEN_PROD_SECRETS.has(value.trim().toLowerCase());
   const problems: string[] = [];
 
-  // Built-in datastores run on the internal-only Docker network (not published), so their fixed
+  // Built-in datastores run on the internal-only Docker network (the managed container specs in
+  // docker.service.ts publish no host ports), so their fixed
   // 'openwa'/'minioadmin' credentials are not internet-reachable — exempt them so selecting the
   // built-in option doesn't crash-loop a production boot. The exemption requires BOTH the built-in
   // flag AND an internal host: a host-pinned EXTERNAL datastore (even with the built-in flag set) is

@@ -232,6 +232,10 @@ export class DockerService implements OnModuleInit {
    *    checkout to support a custom POSTGRES_SCHEMA. The Docker-API path cannot know a host path
    *    to mount, and the built-in flow always pins POSTGRES_SCHEMA=public, so no init script (or
    *    POSTGRES_SCHEMA env) is set here.
+   *  - Host ports: compose's minio (the manual path, operator-set credentials) publishes
+   *    127.0.0.1:9000/9001. The specs below publish nothing, like postgres and redis: they run the
+   *    fixed built-in credentials, which the boot guard exempts only because the container is
+   *    reachable on the internal network alone. The app reaches it by its `minio` alias.
    *  - Resource limits: neither path sets CPU/memory/PID limits on the datastore containers;
    *    only openwa-api carries mem_limit/pids_limit (in compose).
    */
@@ -244,7 +248,6 @@ export class DockerService implements OnModuleInit {
     volumes?: { name: string; path: string }[];
     healthcheck?: { test: string[]; interval: number; timeout: number; retries: number };
     labels: Record<string, string>;
-    ports?: { container: number; host: number }[];
     securityOpt: string[];
   } | null {
     // A container outlives the process that creates it, and after a dashboard save the restart that
@@ -309,10 +312,6 @@ export class DockerService implements OnModuleInit {
           `MINIO_ROOT_PASSWORD=${nextBoot('S3_SECRET_ACCESS_KEY') || nextBoot('S3_SECRET_KEY') || 'minioadmin'}`,
         ],
         volumes: [{ name: 'openwa_minio-data', path: '/data' }],
-        ports: [
-          { container: 9000, host: 9000 },
-          { container: 9001, host: 9001 },
-        ],
         healthcheck: {
           test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live'],
           interval: 10000000000,
@@ -397,10 +396,6 @@ export class DockerService implements OnModuleInit {
           RestartPolicy: { Name: 'unless-stopped' },
           Binds: spec.volumes?.map(v => `${v.name}:${v.path}`),
           SecurityOpt: spec.securityOpt,
-          PortBindings: spec.ports?.reduce<Record<string, { HostIp: string; HostPort: string }[]>>((acc, p) => {
-            acc[`${p.container}/tcp`] = [{ HostIp: '127.0.0.1', HostPort: p.host.toString() }];
-            return acc;
-          }, {}),
         },
         Healthcheck: spec.healthcheck
           ? {
