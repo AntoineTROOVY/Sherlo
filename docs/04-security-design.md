@@ -299,6 +299,15 @@ Every response the per-IP window admits carries `X-RateLimit-*-ingress-ip`, an a
 
 The API exposes the rate-limit headers via CORS (`exposedHeaders`) so browser clients can read them, the plain `Retry-After` included. The simplest backpressure signal remains the `429` status itself, with `Retry-After` as the retry delay.
 
+### In-flight request bodies
+
+The windows above run at the routing layer, after a request body has been buffered, so they cannot bound memory held by slow uploads. A pre-routing middleware does: it caps the request-body bytes in flight across all connections at `INFLIGHT_BODY_BUDGET_BYTES` (default 4 x `BODY_SIZE_LIMIT`) and answers a request that would cross it with `503` and `Retry-After`, before reading its body.
+
+- One client (IPv6 on its /64) may hold at most half of the budget.
+- A request holds its declared `Content-Length` until it finishes. After a 15-second grace it must keep up the pace that lands the whole body within `REQUEST_TIMEOUT_MS` (by default 25 MiB in 300 seconds, about 85 KiB/s); a request that falls behind is dropped and its reservation released. A chunked body holds a 1 MiB placeholder, or the bytes that have arrived once they pass it, and must deliver the placeholder at the same pace (about 3.4 KiB/s by default). If that growth crosses the budget or its client's half, that request is aborted.
+- A body that sends nothing for 15 seconds is dropped and its reservation released.
+- Requests without a body are never refused for lack of budget.
+
 ### WebSocket (`/events`) limits
 
 Socket.IO frames never pass through the Nest enhancer pipeline, so the HTTP windows above do **not** apply to the WebSocket surface. `EventsGateway` enforces its own in-process limits instead (all keyed in-memory per process; any blank/non-positive/non-numeric env value falls back to the default):

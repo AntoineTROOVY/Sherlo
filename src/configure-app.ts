@@ -9,6 +9,7 @@ import { createInflightBodyBudget, resolveInflightBodyBudgetBytes } from './conf
 import { requestContextMiddleware } from './common/middleware/request-context.middleware';
 import { injectDashboardCspNonce } from './config/dashboard-csp';
 import { resolveCorsPolicy, isUpgradeInsecureRequestsEnabled, resolveBodyLimit } from './config/bootstrap-security';
+import { resolveRequestTimeoutMs } from './config/http-timeouts';
 
 /** Where the bundled dashboard documents come from, and whether to serve them at all. */
 export interface DashboardSource {
@@ -65,6 +66,7 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
         .split(',')
         .map(p => p.trim())
         .filter(Boolean),
+      requestTimeoutMs: resolveRequestTimeoutMs(process.env.REQUEST_TIMEOUT_MS),
     }).middleware,
   );
 

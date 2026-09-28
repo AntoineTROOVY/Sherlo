@@ -2,6 +2,7 @@ import * as path from 'path';
 import { computeFeatureFlags } from './feature-flags';
 import { computeSendPacingConfig } from '../modules/message/send-pacing.config';
 import { resolveInflightBodyBudgetBytes } from './inflight-body-budget';
+import { resolveRequestTimeoutMs } from './http-timeouts';
 import { readWsRateLimitConfig } from '../modules/events/ws-rate-limit';
 
 /**
@@ -111,7 +112,7 @@ export default () => ({
   // requires headers > keepAlive, and main.ts normalizes it anyway). Set any to 0 at your own risk;
   // env.validation rejects 0 so a bound is never silently disabled.
   http: {
-    requestTimeoutMs: parseInt(process.env.REQUEST_TIMEOUT_MS || '300000', 10),
+    requestTimeoutMs: resolveRequestTimeoutMs(process.env.REQUEST_TIMEOUT_MS),
     headersTimeoutMs: parseInt(process.env.HEADERS_TIMEOUT_MS || '65000', 10),
     keepAliveTimeoutMs: parseInt(process.env.KEEPALIVE_TIMEOUT_MS || '5000', 10),
     // Aggregate cap on request-body bytes buffered across ALL connections (the pre-body-parser

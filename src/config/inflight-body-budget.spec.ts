@@ -341,7 +341,7 @@ describe('stall reaper', () => {
     expect(budget.currentBytes()).toBe(0);
   });
 
-  it('does not reap a connection that keeps making progress, however slow', () => {
+  it('does not reap a connection that keeps making progress, and keeps its declared size', () => {
     const budget = createInflightBodyBudget(1000, { perClientShare: 1 });
     const req = makeReq({ 'content-length': '400' });
     run(budget, req);
@@ -354,6 +354,148 @@ describe('stall reaper', () => {
     }
     expect(destroyMock(req)).not.toHaveBeenCalled();
     expect(budget.currentBytes()).toBe(400);
+    expect(budget.clientBytes(req)).toBe(400);
+  });
+
+  describe('reservation of a slow body', () => {
+    const socketOf = (req: Request): { bytesRead: number; remoteAddress: string } =>
+      (req as unknown as { socket: { bytesRead: number; remoteAddress: string } }).socket;
+    const trickle = (reqs: Request[], bytes: number, ms: number): void => {
+      for (let t = 0; t < ms; t += 1_000) {
+        jest.advanceTimersByTime(1_000);
+        if ((t + 1_000) % 4_000 === 0) for (const r of reqs) socketOf(r).bytesRead += bytes;
+      }
+    };
+
+    it('drops a declared body that falls behind the pace the request timeout allows, releasing it once', () => {
+      const budget = createInflightBodyBudget(1000, { perClientShare: 1 });
+      const req = makeReq({ 'content-length': '400' });
+      const { res } = run(budget, req);
+
+      // One byte every 4 s: never idle long enough for the stall reaper, far too slow to finish.
+      trickle([req], 1, 20_000);
+      expect(destroyMock(req)).toHaveBeenCalledTimes(1);
+      expect(budget.currentBytes()).toBe(0);
+      expect(budget.clientBytes(req)).toBe(0);
+
+      // The terminal events the destroy triggers do not release it a second time.
+      const other = makeReq({ 'content-length': '1000' });
+      expect(run(budget, other).next).toHaveBeenCalledTimes(1);
+      req.emit('close');
+      res.emit('close');
+      expect(budget.currentBytes()).toBe(1000);
+    });
+
+    it('keeps a declared body that arrives fast enough to finish within the request timeout', () => {
+      const budget = createInflightBodyBudget(2000, { perClientShare: 1, requestTimeoutMs: 100_000 });
+      const req = makeReq({ 'content-length': '1000' });
+      run(budget, req);
+
+      // 10 bytes/s finishes 1000 bytes in exactly the 100 s timeout.
+      trickle([req], 40, 96_000);
+      expect(destroyMock(req)).not.toHaveBeenCalled();
+      expect(budget.currentBytes()).toBe(1000);
+    });
+
+    it('measures the pace against the configured request timeout', () => {
+      const budget = createInflightBodyBudget(2000, { perClientShare: 1, requestTimeoutMs: 100_000 });
+      const req = makeReq({ 'content-length': '1000' });
+      run(budget, req);
+
+      // Half the pace a 100 s timeout needs; the default 300 s timeout would still allow it.
+      trickle([req], 20, 40_000);
+      expect(destroyMock(req)).toHaveBeenCalledTimes(1);
+      expect(budget.currentBytes()).toBe(0);
+    });
+
+    it('drops a chunked body that trickles below the pace its placeholder needs, releasing it once', () => {
+      const budget = createInflightBodyBudget(2 * MB, { perClientShare: 1 });
+      const req = makeReq({ 'transfer-encoding': 'chunked' });
+      const { res } = run(budget, req);
+
+      trickle([req], 1, 20_000);
+      expect(destroyMock(req)).toHaveBeenCalledTimes(1);
+      expect(budget.currentBytes()).toBe(0);
+      expect(budget.clientBytes(req)).toBe(0);
+
+      const other = makeReq({ 'content-length': String(2 * MB) });
+      expect(run(budget, other).next).toHaveBeenCalledTimes(1);
+      req.emit('close');
+      res.emit('close');
+      expect(budget.currentBytes()).toBe(2 * MB);
+    });
+
+    it('keeps a chunked body that stays on pace, and stops pacing it once it passes the placeholder', () => {
+      const budget = createInflightBodyBudget(64 * MB, { perClientShare: 1, requestTimeoutMs: 100_000 });
+      const req = makeReq({ 'transfer-encoding': 'chunked' });
+      run(budget, req);
+
+      // 10.5 KB/s delivers the 1 MiB placeholder inside the 100 s timeout, then keeps going past it.
+      trickle([req], 42_000, 200_000);
+      expect(destroyMock(req)).not.toHaveBeenCalled();
+      expect(budget.currentBytes()).toBeGreaterThan(MB);
+    });
+
+    it('keeps a client share held by trickling requests', () => {
+      const budget = createInflightBodyBudget(1000); // share 0.5 -> cap 500
+      const a = makeReq({ 'content-length': '250' });
+      const b = makeReq({ 'content-length': '250' });
+      run(budget, a);
+      run(budget, b);
+
+      trickle([a, b], 1, 16_000);
+      expect(budget.clientBytes(a)).toBe(500);
+      expect(run(budget, makeReq({ 'content-length': '200' })).state.code).toBe(503);
+
+      // Once they fall behind the pace the request timeout allows, both are dropped and the share frees.
+      trickle([a, b], 1, 10_000);
+      expect(destroyMock(a)).toHaveBeenCalledTimes(1);
+      expect(destroyMock(b)).toHaveBeenCalledTimes(1);
+      expect(budget.clientBytes(a)).toBe(0);
+      expect(run(budget, makeReq({ 'content-length': '200' })).next).toHaveBeenCalledTimes(1);
+    });
+
+    it('never lets trickling bodies that complete together exceed the budget', () => {
+      const budget = createInflightBodyBudget(1000, { perClientShare: 1 });
+      const live: Request[] = [];
+      // A new 200-byte body every second for two minutes, each trickling one byte every 4 s.
+      for (let s = 1; s <= 120; s++) {
+        const req = makeReq({ 'content-length': '200' });
+        socketOf(req).remoteAddress = `198.51.100.${s}`;
+        if (run(budget, req).next.mock.calls.length > 0) live.push(req);
+        jest.advanceTimersByTime(1_000);
+        if (s % 4 === 0) for (const r of live) socketOf(r).bytesRead += 4;
+      }
+
+      // Every live body then lands before the next poll.
+      for (const r of live) {
+        socketOf(r).bytesRead = 200;
+        (r as unknown as { complete: boolean }).complete = true;
+      }
+      jest.advanceTimersByTime(5_000);
+      expect(budget.currentBytes()).toBeLessThanOrEqual(1000);
+      expect(live).toHaveLength(5);
+      for (const r of live) expect(destroyMock(r)).not.toHaveBeenCalled();
+    });
+
+    it('refuses a new body while a trickling one holds its declaration, and settles it at its size', () => {
+      const budget = createInflightBodyBudget(1000, { perClientShare: 1 });
+      const req = makeReq({ 'content-length': '400' });
+      const { res } = run(budget, req);
+      trickle([req], 5, 16_000);
+      expect(budget.currentBytes()).toBe(400);
+      expect(run(budget, makeReq({ 'content-length': '900' })).state.code).toBe(503);
+
+      // The rest of the body lands between polls and Node marks the message complete.
+      socketOf(req).bytesRead = 400;
+      (req as unknown as { complete: boolean }).complete = true;
+      jest.advanceTimersByTime(5_000);
+      expect(destroyMock(req)).not.toHaveBeenCalled();
+      expect(budget.currentBytes()).toBe(400);
+
+      res.emit('finish');
+      expect(budget.currentBytes()).toBe(0);
+    });
   });
 
   it('stops reaping once the declared body has fully arrived', () => {
@@ -375,10 +517,12 @@ describe('stall reaper', () => {
     const req = makeReq({ 'transfer-encoding': 'chunked' });
     const { res } = run(budget, req);
 
+    // A finished chunked body is priced at what arrived, not the opening placeholder.
+    (req as unknown as { socket: { bytesRead: number } }).socket.bytesRead = 300;
     req.emit('end');
     jest.advanceTimersByTime(120_000);
     expect(destroyMock(req)).not.toHaveBeenCalled();
-    expect(budget.currentBytes()).toBe(1000);
+    expect(budget.currentBytes()).toBe(300);
 
     res.emit('finish');
     expect(budget.currentBytes()).toBe(0);
