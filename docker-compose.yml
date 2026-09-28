@@ -7,8 +7,8 @@ services:
     image: tecnativa/docker-socket-proxy:v0.4.2
     container_name: openwa-docker-proxy
     restart: unless-stopped
-    # Only on the isolated internal network — reachable solely by openwa-api, NOT the
-    # dashboard or any other peer. `internal: true` also denies the proxy
+    # Only on the isolated internal network, reachable solely by openwa-api (including any
+    # plugin loaded into it), NOT the dashboard or any other peer. `internal: true` also denies the proxy
     # outbound access; it only needs the locally-mounted docker socket.
     networks:
       - internal-docker
@@ -544,6 +544,7 @@ networks:
     name: openwa-network
   # Isolated network for the Docker socket proxy. `internal: true` means no external
   # connectivity; only openwa-api joins it, so nothing else can reach docker-proxy:2375.
+  # Plugins run inside openwa-api, so a loaded plugin can reach it too (see SECURITY.md).
   internal-docker:
     name: openwa-internal-docker
     internal: true

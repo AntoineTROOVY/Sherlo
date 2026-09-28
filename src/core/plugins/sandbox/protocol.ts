@@ -1,9 +1,10 @@
 /**
- * Wire protocol between the host (PluginWorkerHost) and an untrusted plugin worker.
+ * Wire protocol between the host (PluginWorkerHost) and a plugin worker.
  *
- * The worker has exactly one channel out — these messages — and no ambient access to the host. The
- * host validates every request before acting on it, so a hostile worker cannot escalate beyond what
- * its manifest declares.
+ * These messages are the worker's channel to the `ctx.*` capabilities, and the host validates every
+ * request against the manifest's permissions before acting on it. They are not the worker's only way
+ * out: the worker is a thread in the host process and can use Node built-ins directly, so this is
+ * fault containment, not a security boundary (see worker-bootstrap.ts and docs/30).
  *
  * Phase B1 scope: lifecycle only (load + onLoad/onEnable/onDisable/onUnload). The capability bridge
  * (B2) and hook bridge (B3) add more message kinds later.

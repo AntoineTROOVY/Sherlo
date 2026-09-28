@@ -27,12 +27,12 @@ public contract — Integration SDK v1** — because the contract, not any singl
 
 ## 25.2 Design principle: one new primitive, everything else a clone
 
-The overriding goal is to preserve the untrusted-worker safety invariants _by construction_. OpenWA
-plugins run in a capability-gated worker thread with no ambient host access (see
-[30 - Plugin Sandboxing](./30-plugin-sandboxing.md)). Every host↔worker message is a serializable POJO
-across a `structuredClone` boundary; host-initiated calls fail open on a timeout and drain on a worker
-crash; permissions are manifest-static and cannot be widened by configuration; session scope is enforced
-host-side.
+The overriding goal is to preserve the sandboxed-worker safety invariants _by construction_. OpenWA
+plugins reach the host through a capability-gated worker bridge; the worker is fault containment, not a
+security boundary against a malicious plugin (see [30 - Plugin Sandboxing](./30-plugin-sandboxing.md)).
+Every host↔worker message is a serializable POJO across a `structuredClone` boundary; host-initiated
+calls fail open on a timeout and drain on a worker crash; permissions are manifest-static and cannot be
+widened by configuration; session scope is enforced host-side.
 
 Rather than invent new machinery that would have to re-earn those properties, the Integration Fabric is
 **~90% a faithful clone of seams OpenWA already ships**:
@@ -196,8 +196,9 @@ Four tables live on the data connection, each created by a hand-authored dual-di
 - **Raw-body content types.** Signature verification observes exact bytes for `application/json` and
   `application/x-www-form-urlencoded`. Plain text, XML, octet streams, and non-UTF JSON charsets are not
   supported ingress body formats and fail verification/content handling rather than being re-serialized.
-- **Egress.** The only outbound path remains the existing SSRF-guarded `ctx.net.fetch`, scoped to the
-  manifest's allowed hosts.
+- **Egress.** The only sanctioned outbound path remains the SSRF-guarded `ctx.net.fetch`, scoped to the
+  manifest's allowed hosts; a direct Node socket opened by the worker is not covered (see [30 - Plugin
+  Sandboxing](./30-plugin-sandboxing.md)).
 - **Re-entrancy.** A reply issued _inside_ an ingress handler seeds the in-flight hook set, so an adapter's
   own outbound message hook cannot echo-loop the reply back out to the external system.
 
@@ -245,7 +246,7 @@ dedup rows and re-admit their replays, which is worse than the bounded growth it
 
 ## 25.8 The Integration SDK (v1)
 
-The stable surface untrusted adapters consume. A plugin declares `sdkVersion: "1"` and an `ingress`
+The stable surface sandboxed adapters consume. A plugin declares `sdkVersion: "1"` and an `ingress`
 descriptor (the route, which is a single URL path segment such as `chatwoot` and never contains a `/`, its
 signature scheme, replay tolerance, dedup header, and an optional verification handshake) in its manifest,
 and requests the `webhook:ingress` and `conversation:send` permissions. The host refuses to load an
