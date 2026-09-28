@@ -133,6 +133,14 @@ describe('production HTTP surface (configureApp)', () => {
     expect(await nonceOf()).not.toEqual(await nonceOf());
   });
 
+  it('allows styles and fonts only from its own origin', async () => {
+    const res = await request(app.getHttpServer()).get('/').set('Accept', 'text/html').expect(200);
+
+    const csp = res.headers['content-security-policy'];
+    expect(csp).toMatch(/(?:^|;)font-src 'self'(?:;|$)/);
+    expect(csp).toMatch(/(?:^|;)style-src 'self' 'unsafe-inline'(?:;|$)/);
+  });
+
   it('echoes the CORS header for an allowed Origin', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/echo')

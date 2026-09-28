@@ -431,15 +431,15 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      // The bundled dashboard pulls webfonts from Google Fonts.
-      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      // The dashboard bundles its fonts; Bull Board's Google Fonts link is blocked (system-font fallback).
+      styleSrc: ["'self'", "'unsafe-inline'"],
       // Per-response nonce; the served dashboard document carries the same value.
       scriptSrc: ["'self'", (_req, res) => `'nonce-${res.locals.cspNonce}'`],
       // blob: for the outgoing attachment preview, data: for chat media rendered inline.
       imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
       mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
       connectSrc: ["'self'"],
-      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       // On in production, unless CSP_UPGRADE_INSECURE_REQUESTS opts an HTTP-only
       // private-network deployment out (#611).

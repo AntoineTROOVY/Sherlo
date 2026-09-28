@@ -138,10 +138,10 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          // The bundled dashboard pulls webfonts from Google Fonts (CSS from fonts.googleapis.com,
-          // font files from fonts.gstatic.com). Now that NestJS serves the dashboard under this CSP,
-          // allow those origins or the @import'd fonts are blocked and the UI falls back to system fonts.
-          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          // The dashboard bundles its fonts, so no third-party style or font origin is allowed. The Bull Board
+          // UI (/api/admin/queues) links IBM Plex from Google Fonts; that stylesheet is blocked and it falls
+          // back to system fonts.
+          styleSrc: ["'self'", "'unsafe-inline'"],
           scriptSrc: ["'self'", (_req, res) => `'nonce-${(res as Response).locals.cspNonce as string}'`],
           // `blob:` is needed for the outgoing image-attachment preview, which the dashboard renders
           // from a URL.createObjectURL(file) blob before the message is sent (Chats.tsx).
@@ -151,7 +151,7 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
           // Mirror imgSrc so audio/video render the same way images already do.
           mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
           connectSrc: ["'self'"],
-          fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+          fontSrc: ["'self'"],
           objectSrc: ["'none'"],
           // Auto-upgrade HTTP→HTTPS in production, unless CSP_UPGRADE_INSECURE_REQUESTS opts out for an
           // HTTP-only private-network deployment (otherwise the browser forces the dashboard to https). (#611)
