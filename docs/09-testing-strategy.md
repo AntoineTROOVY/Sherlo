@@ -154,6 +154,7 @@ test/
 ├── fixtures/
 ├── app.e2e-spec.ts
 ├── baileys-engine.e2e-spec.ts
+├── chat-scope.e2e-spec.ts
 ├── ingress-instance-throttle.e2e-spec.ts
 ├── integration-fabric.e2e-spec.ts
 ├── integration-instance.e2e-spec.ts
