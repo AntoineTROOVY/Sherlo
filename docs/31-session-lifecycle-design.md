@@ -8,11 +8,11 @@
 
 The lifecycle is split across three files with one rule each:
 
-| File                                                                                | Owns                                                                   |
-| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `session-engine-lifecycle.service.ts` (~1,100 lines)                                | Engine creation/initialization, status transitions, teardown           |
-| `session-engine-controls.ts` (~660 lines)                                           | The seven control verbs (start/stop/logout/forceKill/delete/reconnect) |
-| `session-ownership.service.ts` + `src/modules/takeover/session-takeover.service.ts` | Cross-node leases, adoption, orphan reaping                            |
+| File                                                                                | Owns                                                                                                  |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `session-engine-lifecycle.service.ts`                                               | Engine creation/initialization, status transitions, the reconnect loop (`executeReconnect`), teardown |
+| `session-engine-controls.ts`                                                        | The seven control verbs (start/stop/logout/forceKill/delete/shutdown/stopOrphanEngines)               |
+| `session-ownership.service.ts` + `src/modules/takeover/session-takeover.service.ts` | Cross-node leases, adoption, orphan reaping                                                           |
 
 ---
 
@@ -70,12 +70,15 @@ FAILED + reason while an init that never completes returns 504 + eviction.
 
 ### INV-5 — Delete racing a start re-purges auth directories after init resolves
 
-**Interleaving:** delete runs (purges dirs, tombstones the row); the in-flight start's
-`initialize()` resolves and re-creates the auth dir; a phantom session lingers on disk.
-**Defense:** post-init resurrection guards re-check the tombstone and re-purge
-(`session-engine-controls.ts` start path, after the awaited init).
+**Interleaving:** delete runs (purges dirs, removes the session row and its child rows in one
+transaction); the in-flight start's `initialize()` resolves and re-creates the auth dir; a phantom
+session lingers on disk.
+**Defense:** the post-init guards in `start()` (`session-engine-controls.ts`) and `executeReconnect`
+(`session-engine-lifecycle.service.ts`) call `isSessionRetired`, which treats a stop mark or a missing
+row as retired (delete clears its mark before a slow init resolves), then tear down the
+just-registered engine and re-purge with `purgeAuthDirsIfDeleted`.
 **Pinned by:** `session.service.spec.ts` ('tears down the just-initialized engine if a
-stop/delete lands during start() — no resurrection to READY').
+stop/delete lands during start() (no resurrection to READY)').
 
 ### INV-6 — Lease loss tears down local engines only; it never writes session rows
 
@@ -104,7 +107,7 @@ worth resuming: unauthenticated, mid-pairing, or operator-flagged failed').
 **Interleaving:** `client.logout()` chains `authStrategy.logout()` → `fs.rm(userDataDir)` while
 the Chromium process still holds file handles → rm fails or races a browser re-write.
 **Defense:** the logout path force-destroys the browser first, waits, then removes the dir; the
-475-line spec enumerates the interleavings.
+spec enumerates the interleavings.
 **Pinned by:** `logout-teardown-race.spec.ts` — the module's most complete race corpus. Read it
 before touching anything in the logout/forceKill path.
 
@@ -167,7 +170,7 @@ Collected here so they survive refactors of the code around them:
 - `session-engine-controls.ts` (start): `session.config` is clamped to trusted keys because the
   row is client-writable; an unclamped spread would let a caller smuggle engine options.
 - `EngineRegistry`: identity-based `deleteIfLive` rather than `delete(id)` — see INV-3; every
-  site that bypassed this in review's history created the same phantom-callback bug. The eviction
+  site that bypassed this in the past created the same phantom-callback bug. The eviction
   helpers go through it too: `evictAndForceDestroy`, the init-timeout branch, and `start()`'s catch.
   `start()` identifies its own engine by capturing the registry entry right after calling
   `initializeEngine` (which registers it before its first await), not by a lookup in the catch: a
