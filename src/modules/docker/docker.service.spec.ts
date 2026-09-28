@@ -8,6 +8,11 @@ jest.mock('dockerode');
 // onModuleInit/isDockerAvailable tests steer the daemon by replacing its implementation.
 const DockerMock = Docker as unknown as jest.Mock;
 
+/** A daemon with no local copy of any image: inspect answers 404, so createService pulls. */
+const imageNotCached = () => ({
+  inspect: jest.fn().mockRejectedValue(Object.assign(new Error('no such image'), { statusCode: 404 })),
+});
+
 describe('DockerService.getRunningBuiltinServices', () => {
   const container = (name: string, service: string, state: string) => ({
     id: name,
@@ -186,6 +191,7 @@ describe('DockerService.onModuleInit', () => {
   const happyDocker = () => ({
     ping: jest.fn().mockResolvedValue(undefined),
     listContainers: jest.fn().mockResolvedValue([]),
+    getImage: imageNotCached,
     pull: (_image: string, cb: (err: Error | null, stream: null) => void) => cb(null, null),
     modem: { followProgress: (_stream: null, cb: (err: Error | null) => void) => cb(null) },
     createVolume: jest.fn().mockResolvedValue({}),
@@ -455,6 +461,7 @@ describe('DockerService.createService', () => {
   it('pulls, creates the volume and container, and starts it (a pre-existing volume is fine)', async () => {
     const start = jest.fn().mockResolvedValue(undefined);
     const docker = {
+      getImage: imageNotCached,
       pull: (_image: string, cb: (err: Error | null, stream: null) => void) => cb(null, null),
       modem: { followProgress: (_stream: null, cb: (err: Error | null) => void) => cb(null) },
       // EEXIST races are normal — the volume may survive from an earlier run.
@@ -475,6 +482,7 @@ describe('DockerService.createService', () => {
 
   it('returns false when the daemon rejects the image pull', async () => {
     const docker = {
+      getImage: imageNotCached,
       pull: (_image: string, cb: (err: Error | null, stream: null) => void) =>
         cb(new Error('pull access denied'), null),
     };
@@ -482,6 +490,42 @@ describe('DockerService.createService', () => {
     jest.spyOn(service, 'getContainerByService').mockResolvedValue(null);
 
     await expect(service.createService('redis')).resolves.toBe(false);
+  });
+
+  it('creates the container from a cached image without pulling it', async () => {
+    const start = jest.fn().mockResolvedValue(undefined);
+    const getImage = jest.fn(() => ({ inspect: jest.fn().mockResolvedValue({ Id: 'sha256:abc' }) }));
+    const docker = {
+      getImage,
+      pull: jest.fn(),
+      createVolume: jest.fn().mockResolvedValue({}),
+      createContainer: jest.fn().mockResolvedValue({ start }),
+    };
+    const service = withDocker(docker);
+    jest.spyOn(service, 'getContainerByService').mockResolvedValue(null);
+
+    await expect(service.createService('redis')).resolves.toBe(true);
+
+    expect(getImage).toHaveBeenCalledWith('redis:7-alpine');
+    expect(docker.pull).not.toHaveBeenCalled();
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it('pulls the pinned image once when it is not on the host', async () => {
+    const pull = jest.fn((_image: string, cb: (err: Error | null, stream: null) => void) => cb(null, null));
+    const docker = {
+      getImage: imageNotCached,
+      pull,
+      modem: { followProgress: (_stream: null, cb: (err: Error | null) => void) => cb(null) },
+      createVolume: jest.fn().mockResolvedValue({}),
+      createContainer: jest.fn().mockResolvedValue({ start: jest.fn().mockResolvedValue(undefined) }),
+    };
+    const service = withDocker(docker);
+    jest.spyOn(service, 'getContainerByService').mockResolvedValue(null);
+
+    await expect(service.createService('redis')).resolves.toBe(true);
+    expect(pull).toHaveBeenCalledTimes(1);
+    expect(pull).toHaveBeenCalledWith('redis:7-alpine', expect.any(Function));
   });
 });
 

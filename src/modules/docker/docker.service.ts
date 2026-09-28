@@ -360,17 +360,29 @@ export class DockerService implements OnModuleInit {
         return true;
       }
 
-      // Pull image first
-      this.logger.log(`Pulling image: ${spec.image}`);
-      await new Promise<void>((resolve, reject) => {
-        void this.docker!.pull(spec.image, (err: Error | null, stream: NodeJS.ReadableStream) => {
-          if (err) return reject(err);
-          this.docker!.modem.followProgress(stream, (err2: Error | null) => {
-            if (err2) return reject(err2);
-            resolve();
+      // Pull only when the image is not already on the host, as compose's default
+      // `pull_policy: missing` does: a host that has the image keeps working when the registry is
+      // unreachable or has withdrawn it. As with compose, a cached floating tag is not refreshed
+      // here. Any inspect failure falls back to pulling.
+      const cached = await this.docker
+        .getImage(spec.image)
+        .inspect()
+        .then(
+          () => true,
+          () => false,
+        );
+      if (!cached) {
+        this.logger.log(`Pulling image: ${spec.image}`);
+        await new Promise<void>((resolve, reject) => {
+          void this.docker!.pull(spec.image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+            if (err) return reject(err);
+            this.docker!.modem.followProgress(stream, (err2: Error | null) => {
+              if (err2) return reject(err2);
+              resolve();
+            });
           });
         });
-      });
+      }
 
       // Create volume if needed
       if (spec.volumes) {

@@ -86,6 +86,7 @@ async function capture(profile: string, Service: typeof DockerService = DockerSe
   jest.spyOn(service, 'getContainerByService').mockResolvedValue(null);
   let captured: CapturedConfig | undefined;
   const fakeDocker = {
+    getImage: () => ({ inspect: () => Promise.reject(Object.assign(new Error('no such image'), { statusCode: 404 })) }),
     pull: (_image: string, cb: (err: Error | null, stream: null) => void) => cb(null, null),
     modem: { followProgress: (_stream: null, cb: (err: Error | null) => void) => cb(null) },
     createVolume: jest.fn().mockResolvedValue({}),
