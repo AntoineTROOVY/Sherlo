@@ -50,6 +50,7 @@ export const BLANK_SHADOWED_ENV_KEYS: string[] = [
   'STORAGE_TYPE',
   'STORAGE_LOCAL_PATH',
   'S3_BUCKET',
+  'S3_KEY_PREFIX',
   'S3_ENDPOINT',
   'S3_REGION',
   'S3_ACCESS_KEY_ID',

@@ -1329,7 +1329,7 @@ export class StorageService {
   async putFile(filePath: string, data: Buffer): Promise<void> {
     if (!isSafeStorageKey(filePath)) throw new Error(`Refusing unsafe storage key: ${filePath}`);
     return this.storageType === 's3' && this.s3Client
-      ? this.putS3File(filePath, data) // keyed under media/<filePath>
+      ? this.putS3File(filePath, data) // keyed under <S3_KEY_PREFIX, default media/><filePath>
       : this.putLocalFile(filePath, data);
   }
 
@@ -1337,7 +1337,7 @@ export class StorageService {
     /* mirrors putFile */
   }
   async listFiles(): Promise<string[]> {
-    /* local recurse, or S3 ListObjectsV2 under media/ */
+    /* local recurse, or S3 ListObjectsV2 under <S3_KEY_PREFIX, default media/> */
   }
   // createExportStream(): tar.gz of all files; importFromStream(): extract with zip-bomb caps
 }

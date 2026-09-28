@@ -194,6 +194,7 @@ services:
       - S3_SECRET_KEY=${S3_SECRET_KEY:-}
       - S3_REGION=${S3_REGION:-}
       - S3_BUCKET=${S3_BUCKET:-}
+      - S3_KEY_PREFIX=${S3_KEY_PREFIX:-}
       # Chat-media archiving (opt-in). Forwarded explicitly: this file has no env_file, so a
       # variable absent from this list simply never reaches the container and the feature stays off
       # no matter what the operator's .env says.

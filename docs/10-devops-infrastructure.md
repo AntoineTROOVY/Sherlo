@@ -450,6 +450,14 @@ LOG_FORMAT=json
 # S3_ACCESS_KEY_ID=minioadmin
 # S3_SECRET_ACCESS_KEY=minioadmin
 
+# One deployment per bucket and key prefix. S3_KEY_PREFIX (default media/) is the key root: give a
+# second deployment with its own database its own bucket or a non-overlapping prefix (neither may
+# start with the other: use siblings such as prod/ and staging/, never media/ and media/staging/).
+# An overlap puts the other deployment's objects in this one's storage stats and export, and each
+# one's orphan sweeps delete the other's media. The same applies to a shared STORAGE_LOCAL_PATH. Changing the prefix on a
+# live deployment hides existing objects: export storage, change it, then import.
+# S3_KEY_PREFIX=media/
+
 # ===========================================
 # CACHE & QUEUE
 # ===========================================

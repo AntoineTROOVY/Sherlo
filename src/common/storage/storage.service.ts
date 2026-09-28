@@ -14,6 +14,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { createLogger } from '../services/logger.service';
 import { isSafeStorageKey } from '../utils/path-safety';
+import { DEFAULT_S3_KEY_PREFIX, normalizeS3KeyPrefix } from './s3-key-prefix';
 import { createExportStream, ExportFileSource, importFromStream } from './storage-transfer';
 import {
   listLocalFiles,
@@ -30,6 +31,7 @@ interface S3Config {
   secretAccessKey?: string;
   region?: string;
   bucket?: string;
+  keyPrefix?: string;
 }
 
 /** How often an S3-configured service re-probes a bucket that was unreachable at boot. */
@@ -63,6 +65,7 @@ export class StorageService implements OnModuleDestroy {
   private readonly localPath: string;
   private s3Client: S3Client | null = null;
   private s3Bucket = 'openwa';
+  private s3KeyRoot = DEFAULT_S3_KEY_PREFIX;
   private s3Available = false;
   private s3ReprobeTimer: NodeJS.Timeout | null = null;
   private readonly s3ReprobeIntervalMs = positiveIntFromEnv('S3_REPROBE_INTERVAL_MS', DEFAULT_S3_REPROBE_INTERVAL_MS);
@@ -97,6 +100,9 @@ export class StorageService implements OnModuleDestroy {
           ...(endpoint ? { forcePathStyle: true } : {}), // Required for path-style stores (MinIO)
         });
         this.s3Bucket = process.env.S3_BUCKET || s3Config.bucket || 'openwa';
+        const keyRoot = normalizeS3KeyPrefix(process.env.S3_KEY_PREFIX || s3Config.keyPrefix);
+        if (!keyRoot) throw new Error('S3_KEY_PREFIX is not a safe relative key prefix');
+        this.s3KeyRoot = keyRoot;
         void this.initializeS3Bucket();
         this.startS3Reprobe();
       } else {
@@ -294,7 +300,7 @@ export class StorageService implements OnModuleDestroy {
 
   async getFile(filePath: string): Promise<Buffer> {
     // Mirror putFile: getLocalFile has its own isPathWithin guard, but getS3File builds
-    // `media/${filePath}` with none — contain both read backends at this boundary.
+    // `${s3KeyRoot}${filePath}` with none, so contain both read backends at this boundary.
     if (!isSafeStorageKey(filePath)) {
       throw new Error(`Refusing to read an unsafe storage key: ${filePath}`);
     }
@@ -320,7 +326,7 @@ export class StorageService implements OnModuleDestroy {
 
   async putFile(filePath: string, data: Buffer): Promise<void> {
     // Centralized containment so BOTH backends inherit it: putLocalFile has its own isPathWithin
-    // guard, but putS3File builds `media/${filePath}` with none — reject a traversing key here.
+    // guard, but putS3File builds `${s3KeyRoot}${filePath}` with none, so reject a traversing key here.
     if (!isSafeStorageKey(filePath)) {
       throw new Error(`Refusing to store an unsafe storage key: ${filePath}`);
     }
@@ -404,15 +410,17 @@ export class StorageService implements OnModuleDestroy {
       const response = await this.s3Client!.send(
         new ListObjectsV2Command({
           Bucket: this.s3Bucket,
-          Prefix: 'media/',
+          Prefix: this.s3KeyRoot,
           ContinuationToken: continuationToken,
         }),
       );
 
       for (const obj of response.Contents ?? []) {
+        const key = this.stripS3KeyRoot(obj.Key);
+        if (key === null) continue;
         count += 1;
         sizeBytes += obj.Size ?? 0;
-        if (obj.Key) keys.push(obj.Key.replace(/^media\//, ''));
+        keys.push(key);
       }
 
       continuationToken = response.NextContinuationToken;
@@ -505,20 +513,23 @@ export class StorageService implements OnModuleDestroy {
       const response = await this.s3Client.send(
         new ListObjectsV2Command({
           Bucket: this.s3Bucket,
-          Prefix: `media/${prefix}`,
+          Prefix: `${this.s3KeyRoot}${prefix}`,
           ContinuationToken: continuationToken,
         }),
       );
 
       for (const obj of response.Contents ?? []) {
-        if (obj.Key) {
-          // Remove 'media/' prefix
-          yield obj.Key.replace(/^media\//, '');
-        }
+        const key = this.stripS3KeyRoot(obj.Key);
+        if (key !== null) yield key;
       }
 
       continuationToken = response.NextContinuationToken;
     } while (continuationToken);
+  }
+
+  /** The store-relative key for a listed object, or null for one outside this deployment's key root. */
+  private stripS3KeyRoot(key: string | undefined): string | null {
+    return key?.startsWith(this.s3KeyRoot) ? key.slice(this.s3KeyRoot.length) : null;
   }
 
   private async getS3File(filePath: string): Promise<Buffer> {
@@ -538,7 +549,7 @@ export class StorageService implements OnModuleDestroy {
       response = await this.s3Client.send(
         new GetObjectCommand({
           Bucket: this.s3Bucket,
-          Key: `media/${filePath}`,
+          Key: `${this.s3KeyRoot}${filePath}`,
         }),
       );
     } catch (error: unknown) {
@@ -568,7 +579,7 @@ export class StorageService implements OnModuleDestroy {
     await this.s3Client.send(
       new PutObjectCommand({
         Bucket: this.s3Bucket,
-        Key: `media/${filePath}`,
+        Key: `${this.s3KeyRoot}${filePath}`,
         Body: data,
       }),
     );
@@ -580,7 +591,7 @@ export class StorageService implements OnModuleDestroy {
     await this.s3Client.send(
       new DeleteObjectCommand({
         Bucket: this.s3Bucket,
-        Key: `media/${filePath}`,
+        Key: `${this.s3KeyRoot}${filePath}`,
       }),
     );
   }
