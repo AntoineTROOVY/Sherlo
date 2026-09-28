@@ -231,9 +231,17 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
   defineTableImporter({
     key: 'chatStates',
     label: 'chat state',
-    sql: `INSERT INTO chat_states ("sessionId", "chatId", "muteEndTime", archived, pinned, "updatedAt") VALUES ($1, $2, $3, $4, $5, $6)`,
+    sql: `INSERT INTO chat_states ("sessionId", "chatId", "muteEndTime", archived, pinned, observed, "updatedAt") VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     id: (cs: ChatStateRow) => `${cs.sessionId}/${cs.chatId}`,
-    map: (cs: ChatStateRow) => [cs.sessionId, cs.chatId, cs.muteEndTime ?? null, cs.archived, cs.pinned, cs.updatedAt],
+    map: (cs: ChatStateRow) => [
+      cs.sessionId,
+      cs.chatId,
+      cs.muteEndTime ?? null,
+      cs.archived,
+      cs.pinned,
+      cs.observed ?? null,
+      cs.updatedAt,
+    ],
   }),
 
   // Import plugin instances (Integration Fabric config + ingress HMAC secret)

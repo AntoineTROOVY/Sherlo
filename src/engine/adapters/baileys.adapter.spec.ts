@@ -4780,6 +4780,7 @@ describe('BaileysAdapter store-backed ops', () => {
     const chatStateStore = {
       get: jest.fn(),
       remember: jest.fn().mockResolvedValue(undefined),
+      fold: jest.fn().mockResolvedValue(undefined),
       reload: jest.fn().mockResolvedValue(undefined),
       clearSession: jest.fn(),
       forget: jest.fn().mockResolvedValue(undefined),
