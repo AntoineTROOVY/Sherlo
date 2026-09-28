@@ -265,8 +265,8 @@ export class InfraStorageController implements OnApplicationBootstrap {
     // archive whose every entry was refused (the store rejects writes) wrote nothing and says so.
     const imported = !(failed > 0 && count === 0);
 
-    // Audit the bulk media-import (files written into the active storage backend); one that wrote
-    // nothing is recorded as a warning.
+    // Audit the bulk media-import (files written into the active storage backend); one whose every
+    // entry was refused is recorded as a warning.
     const audit = { metadata: { count, failed, storageType } };
     if (imported) {
       await this.auditService?.logInfo(AuditAction.INFRA_STORAGE_IMPORTED, audit);

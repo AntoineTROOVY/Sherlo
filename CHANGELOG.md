@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Webhooks already stored with a header value outside Latin-1 keep failing until their headers are updated.
 - `docker-compose.dev.yml` no longer forwards `QUEUE_ENABLED` from the host `.env`, the same as `docker-compose.yml`; turn the queue on in Dashboard > Infrastructure.
 - `TRUSTED_PROXIES` and `allowedIps` entries that are not a valid IP or CIDR (a leading-zero octet, an empty or padded prefix) are ignored, with a boot warning for `TRUSTED_PROXIES`.
-- An IPv6 address or range already stored in an API key's `allowedIps` (possible only for keys created before v0.4.3) is now matched as written; before, it never matched.
+- An IPv6 range already stored in an API key's `allowedIps` (possible only for keys created before v0.4.3) now matches, and a stored IPv6 address matches however it is written; before, a range never matched and an address matched only when written exactly as the client address.
 - A restore that drops a session-wide (wildcard) plugin instance leaves that instance's settings in the plugin's base config; overwrite them with `PUT /api/plugins/:id/config`.
 - Status media is served with its base type only (`audio/ogg; codecs=opus` becomes `audio/ogg`), and a stored type that is not one well-formed image, video or audio type is served as `application/octet-stream`.
 
