@@ -306,47 +306,24 @@ new module is the standard template above: declare `exports` and let consumers `
 
 ### Branch Strategy
 
-```mermaid
-gitGraph
-    commit id: "initial"
-    branch develop
-    commit id: "setup"
-    branch feature/session-api
-    commit id: "session controller"
-    commit id: "session service"
-    checkout develop
-    merge feature/session-api
-    branch feature/webhook
-    commit id: "webhook impl"
-    checkout develop
-    merge feature/webhook
-    checkout main
-    merge develop tag: "v1.0.0"
-    checkout develop
-    branch hotfix/bug-fix
-    commit id: "fix bug"
-    checkout main
-    merge hotfix/bug-fix tag: "v1.0.1"
-    checkout develop
-    merge hotfix/bug-fix
-```
+`main` is the only long-lived branch. Each change is made on a short-lived branch cut from `main`,
+opened as a pull request against `main`, and merged with a merge commit once CI passes. Releases are
+tagged from `main`; see [15.7 Cutting a Release](./15-project-roadmap.md#157-cutting-a-release).
 
 ### Branch Naming
 
 ```
-main            # Production-ready code
-develop         # Integration branch
-feature/*       # New features
-bugfix/*        # Bug fixes
-hotfix/*        # Production hotfixes
-release/*       # Release preparation
+fix/*       # Bug fixes
+feat/*      # New features
+docs/*      # Documentation only
+chore/*     # Tooling, dependencies, release housekeeping
+refactor/*  # Restructuring without a behavior change
+test/*      # Tests only
 
 Examples:
-feature/session-management
-feature/webhook-retry
-bugfix/qr-code-timeout
-hotfix/security-patch
-release/1.0.0
+fix/qr-code-timeout
+feat/webhook-retry
+docs/update-api-reference
 ```
 
 ### Commit Message Convention
@@ -1176,13 +1153,13 @@ services:
 
 ```markdown
 1. Fork the repository
-2. Create feature branch: `git checkout -b feature/amazing-feature`
+2. Create feature branch: `git checkout -b feat/amazing-feature`
 3. Make changes following our coding standards
 4. Write/update tests
 5. Run linter: `npm run lint`
 6. Run tests: `npm test`
 7. Commit: `git commit -m 'feat(scope): add amazing feature'`
-8. Push: `git push origin feature/amazing-feature`
+8. Push: `git push origin feat/amazing-feature`
 9. Open Pull Request
 ````
 

@@ -251,9 +251,9 @@ an illustrative design sketch; the chart is the authoritative artifact.
 
 ### GitHub Actions Workflow
 
-`.github/workflows/ci.yml` (`name: CI`) runs on pushes and pull requests targeting `main` /
-`develop`. It is **integration only** — no job deploys anywhere. The final job publishes branch and
-SHA image tags to GHCR; `latest` is deliberately not set there and moves only through the separate,
+`.github/workflows/ci.yml` (`name: CI`) runs on pushes and pull requests targeting `main`. It is
+**integration only** — no job deploys anywhere. The final job publishes branch and SHA image
+tags to GHCR; `latest` is deliberately not set there and moves only through the separate,
 boot-smoke-gated release workflow.
 
 The per-job step lists live in [docs/09 §9.6](./09-testing-strategy.md#96-ci-checks), which a spec

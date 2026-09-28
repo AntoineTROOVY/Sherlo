@@ -6,7 +6,7 @@ name: SDK CI
 # dual-format packaging smoke test (require() + import() both consumable).
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       [
         'sdk/**',
@@ -17,7 +17,7 @@ on:
         'src/engine/interfaces/whatsapp-engine.interface.ts',
       ]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       [
         'sdk/**',

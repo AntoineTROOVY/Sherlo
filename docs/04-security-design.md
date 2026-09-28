@@ -742,7 +742,7 @@ name: Security Scan
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   schedule:
     - cron: '0 0 * * 1' # Weekly on Monday
 

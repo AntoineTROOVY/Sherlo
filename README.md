@@ -486,9 +486,9 @@ Comprehensive documentation is available in the `docs/` folder:
 We welcome contributions! Here's how to get started:
 
 1. **Fork** the repository
-2. **Create** your feature branch (`git checkout -b feature/amazing-feature`)
+2. **Create** your feature branch (`git checkout -b feat/amazing-feature`)
 3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
+4. **Push** to the branch (`git push origin feat/amazing-feature`)
 5. **Open** a Pull Request
 
 Please read our [Development Guidelines](./docs/08-development-guidelines.md) for coding standards and best practices.

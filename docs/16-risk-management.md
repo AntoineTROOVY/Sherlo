@@ -270,7 +270,7 @@ flowchart TB
     R --> M3[Automation]
     R --> M4[Contributor onboarding]
 
-    M1 --> A1[Active Discord/forum]
+    M1 --> A1[GitHub Discussions]
     M2 --> A2[Comprehensive docs]
     M3 --> A3[CI/CD automation]
     M4 --> A4[Contributing guide]
@@ -291,12 +291,12 @@ flowchart TB
 3. **Community Building**
    - Recognize contributors
    - Good first issues
-   - Mentorship program
+   - GitHub Discussions for questions and design talk
 
-4. **Multiple Maintainers**
-   - Bus factor > 1
-   - Clear ownership areas
-   - Succession planning
+4. **Bus Factor**
+   - One maintainer today; a bus factor of 1 is the open risk
+   - The docs, CI gates and tag-driven releases above are what let someone else pick the project up
+   - Additional maintainers, ownership areas and succession planning are not in place yet
 
 ---
 
@@ -422,6 +422,8 @@ flowchart TB
 
 ### Weekly Risk Review
 
+Optional template: the project does not run this review on a schedule.
+
 ```markdown
 ## Weekly Risk Review Template
 
@@ -517,7 +519,8 @@ Hour 8-24:
 ### Access
 
 - [ ] GitHub owner transfer
-- [ ] npm publish rights
+- [ ] Repository secrets: `DOCKERHUB_USERNAME`/`DOCKERHUB_TOKEN`, `RELEASE_PAT`, `MAVEN_CENTRAL_USERNAME`/`MAVEN_CENTRAL_PASSWORD`, `GPG_PRIVATE_KEY`/`GPG_PASSPHRASE`, `PHP_SDK_SPLIT_TOKEN`
+- [ ] Registries: Docker Hub `rmyndharis/openwa`, npm `@rmyndharis/openwa` and PyPI `rmyndharis-openwa` (trusted publishers bound to this repository), Maven Central `com.rmyndharis`, Packagist `rmyndharis/openwa` via the `rmyndharis/openwa-php` mirror; GHCR images and Go module tags follow the GitHub repository
 - [ ] Domain ownership
 - [ ] Cloud accounts
 
@@ -716,6 +719,8 @@ flowchart LR
 
 ### Weekly Risk Report Template
 
+Optional template: the project does not run this review on a schedule.
+
 ```markdown
 ## Weekly Risk Report - Week XX
 
@@ -767,17 +772,6 @@ flowchart LR
 | R006 | Legal Issues       | Low         | Critical | 🟡 Medium   | Mitigated           |
 | R007 | Rate Limiting      | High        | Medium   | 🟡 Medium   | Partially mitigated |
 | R008 | Data Loss          | Low         | High     | 🟡 Medium   | Mitigated           |
-
-### Risk Trend
-
-```mermaid
-xychart-beta
-    title "Risk Trend Over Time"
-    x-axis [Jan, Feb, Mar, Apr, May, Jun]
-    y-axis "Risk Score" 0 --> 100
-    bar [65, 55, 45, 40, 35, 30]
-    line [65, 55, 45, 40, 35, 30]
-```
 
 ---
 
