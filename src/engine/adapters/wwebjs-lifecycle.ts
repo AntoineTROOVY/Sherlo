@@ -300,7 +300,12 @@ export class WwebjsLifecycle {
       // #251/#488). DEFAULT: auto-resolve a settled build from the wa-version registry and pin its
       // remote HTML (no integrity check — resolveWebVersionPin logs a loud warning); only
       // WWEBJS_WEB_VERSION=off leaves whatsapp-web.js to use the first-party build from WhatsApp.
-      const versionPin = await resolveWebVersionPin();
+      // The pinned HTML is downloaded (bounded) onto the writable data volume and served from there,
+      // so an unreachable mirror is named in the log instead of silently loading the live build.
+      const versionPin = await resolveWebVersionPin(
+        undefined,
+        path.join(path.resolve(this.host.config.sessionDataPath), '.wa-web-cache'),
+      );
       // Assigned on every init, including the unpinned case, so a pin from an earlier init is never
       // compared against the page this one loads.
       this.requestedWebVersion = versionPin?.webVersion;
@@ -451,7 +456,9 @@ export class WwebjsLifecycle {
       // Unpinned, whatsapp-web.js defaults to a local HTML cache at the cwd-relative
       // './.wwebjs_cache/' and writes it after the link, before `ready`. The image's /app is not
       // writable (root-owned, read-only in compose and Helm), so that write throws and the session
-      // never reaches ready. 'none' caches nothing and serves WhatsApp's live build.
+      // never reaches ready. 'none' caches nothing and serves WhatsApp's live build. A pin is a
+      // strict local cache under SESSION_DATA_PATH (see resolveWebVersionPin), which the library
+      // only reads: it persists nothing when the cache served the page.
       ...(versionPin ?? { webVersionCache: { type: 'none' as const } }),
     });
     this.client = client;

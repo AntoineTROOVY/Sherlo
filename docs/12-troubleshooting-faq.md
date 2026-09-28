@@ -343,20 +343,24 @@ WWEBJS_WEB_VERSION=<a build from that registry's html/ folder>
 
 Restart the container after changing it. Pick the build from
 [wppconnect-team/wa-version](https://github.com/wppconnect-team/wa-version) (the `html/` folder) — a
-build the registry no longer serves is fetched, missed, and ignored, leaving you on the default
-behaviour rather than the pin you asked for (the `ready`-time warning below names both builds). With
+build the registry no longer serves cannot be fetched, and the session starts on the live build rather
+than the pin you asked for, with a warning at start (action `web_version_html_unavailable`, naming the
+build, the URL and the reason). With
 `WWEBJS_WEB_VERSION` unset, `latest`, or `auto` (the default), OpenWA auto-resolves a settled build
 from that registry and pins its HTML — note this HTML is fetched from a third-party repository and
 executed inside the `web.whatsapp.com` origin without an integrity check. Set
 `WWEBJS_WEB_VERSION=off` to disable pinning and use the first-party build served by WhatsApp. An
 unpinned session (this setting, or an auto-resolve that could not reach the registry) caches nothing to
-disk, so it also works on the image's read-only root filesystem.
+disk, so it also works on the image's read-only root filesystem. A pinned build's HTML is downloaded
+at start, with a 10 s bound, into `<SESSION_DATA_PATH>/.wa-web-cache/` on the writable data volume and
+served from there; a build no session has started on for a week is removed.
 
 A pin is not guaranteed to hold. whatsapp-web.js applies it by answering the page's document request
 with the pinned HTML, and that can miss in two ways: a pin whose HTML could not be fetched is dropped
-and the live build loads, and WhatsApp Web's service worker can serve its own cached build without the
-request reaching whatsapp-web.js. Either way the page can run a different build than the one
-requested, while the startup line `Pinning WhatsApp Web version …` still names the requested build.
+at start (the `web_version_html_unavailable` warning above) and the live build loads, and WhatsApp
+Web's service worker can serve its own cached build without the request reaching whatsapp-web.js. In
+the second case the page runs a different build than the one requested, while the startup line
+`Pinning WhatsApp Web version …` still names the requested build.
 When a session reaches `ready`, OpenWA reads the build the page reports and logs it (action
 `web_version_running`); when a pin was requested and the page runs a different build, it logs a
 warning naming both (action `web_version_pin_not_applied`). The comparison ignores the registry's
@@ -364,9 +368,8 @@ suffix such as `-alpha`, so a pin and the same bare build count as a match.
 
 The warning changes nothing about the session. It reached `ready` on the build the warning names, so
 the pin did not cover that page load, and a session that works on that build needs no action.
-If the pin is one you set yourself, check that the registry still serves it. Whether the service worker
-answers can differ from one page load to the next, so a later restart may load the pin. When you report
-a problem with the session, include both builds.
+Whether the service worker answers can differ from one page load to the next, so a later restart may
+load the pin. When you report a problem with the session, include both builds.
 
 ### Issue: QR generation times out on slow first boot (WSL2 / low-resource)
 
