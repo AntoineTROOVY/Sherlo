@@ -58,6 +58,9 @@ class WebhookFiltersDto {
 
 const FILTERS_API_DESCRIPTION =
   'Optional smart pre-filter. When set, every condition must match (AND) for the webhook to fire. Omit or null to fire on every subscribed event.';
+// An update applies `filters` only when the field is present, so omission keeps the stored filter.
+const UPDATE_FILTERS_API_DESCRIPTION =
+  'Optional smart pre-filter. When set, every condition must match (AND) for the webhook to fire. Omit to keep the stored filters; send null or { conditions: [] } to clear them, so the webhook fires on every subscribed event.';
 const FILTERS_API_EXAMPLE = {
   conditions: [
     { field: 'sender', operator: 'is', value: ['1234567890@c.us'] },
@@ -245,7 +248,7 @@ export class UpdateWebhookDto {
   // sends and accepts.
   @ApiPropertyOptional({
     type: WebhookFiltersDto,
-    description: FILTERS_API_DESCRIPTION,
+    description: UPDATE_FILTERS_API_DESCRIPTION,
     example: FILTERS_API_EXAMPLE,
     nullable: true,
   })

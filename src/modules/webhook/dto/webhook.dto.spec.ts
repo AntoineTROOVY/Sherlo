@@ -52,6 +52,18 @@ describe('webhook DTO event validation', () => {
     expect(await errorsFor(UpdateWebhookDto, {})).toHaveLength(0);
     expect(await errorsFor(UpdateWebhookDto, { filters: null })).toHaveLength(0);
   });
+
+  // WebhookService.update applies filters only when the field is present, so an update that omits it
+  // keeps the stored filter. The published schema must not offer omission as a way to clear one.
+  it('UpdateWebhookDto: documents that an omitted filters keeps the stored one', () => {
+    const descriptionOf = (target: object): string | undefined =>
+      (Reflect.getMetadata('swagger/apiModelProperties', target, 'filters') as { description?: string } | undefined)
+        ?.description;
+
+    expect(descriptionOf(UpdateWebhookDto.prototype)).toContain('Omit to keep the stored filters');
+    expect(descriptionOf(UpdateWebhookDto.prototype)).not.toContain('Omit or null to fire');
+    expect(descriptionOf(CreateWebhookDto.prototype)).toContain('Omit or null to fire');
+  });
 });
 
 describe('webhook DTO custom-header validation', () => {
