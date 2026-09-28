@@ -252,9 +252,11 @@ curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions/{sessionId}/webhooks
 
 # 2. Check recent webhook deliveries — this admin-only endpoint lists abandoned deliveries
-#    most-recent-first: those that exhausted every retry, plus those never attempted at all
-#    (recorded with `attempts: 0` — payload over the cap or an unserializable payload
-#    (preflight), inline waiter-queue overflow, or rejection by the shutdown drain).
+#    most-recent-first: those that exhausted every retry, plus those recorded with
+#    `attempts: 0` — never attempted (payload over the cap or an
+#    unserializable payload (preflight), inline waiter-queue overflow, or rejection by the
+#    shutdown drain), or, with the queue disabled, stopped by shutdown in a retry backoff that
+#    ended within WEBHOOK_SHUTDOWN_DRAIN_MS, after earlier attempts were sent.
 #    An overflow or shutdown row is replayed by the outbox sweep and removed once it delivers.
 #    The SSRF guard refuses a blocked URL with a 400 when the webhook is registered. A URL that
 #    passed then and is blocked at delivery (its host now resolves to a private address, or the

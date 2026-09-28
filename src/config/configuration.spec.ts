@@ -319,6 +319,27 @@ describe('configuration — webhook payload cap is fail-safe', () => {
   });
 });
 
+describe('configuration: webhook degraded session concurrency', () => {
+  const orig = process.env.WEBHOOK_DEGRADED_SESSION_CONCURRENCY;
+  afterEach(() => {
+    if (orig === undefined) delete process.env.WEBHOOK_DEGRADED_SESSION_CONCURRENCY;
+    else process.env.WEBHOOK_DEGRADED_SESSION_CONCURRENCY = orig;
+  });
+
+  it('is undefined when unset or unusable, so each path derives it from its own pool', () => {
+    for (const value of [undefined, '', 'abc', '0', '-2']) {
+      if (value === undefined) delete process.env.WEBHOOK_DEGRADED_SESSION_CONCURRENCY;
+      else process.env.WEBHOOK_DEGRADED_SESSION_CONCURRENCY = value;
+      expect(configuration().webhook.degradedSessionConcurrency).toBeUndefined();
+    }
+  });
+
+  it('honors a positive override', () => {
+    process.env.WEBHOOK_DEGRADED_SESSION_CONCURRENCY = '3';
+    expect(configuration().webhook.degradedSessionConcurrency).toBe(3);
+  });
+});
+
 describe('configuration — webhook shutdown drain is fail-safe', () => {
   const orig = process.env.WEBHOOK_SHUTDOWN_DRAIN_MS;
   afterEach(() => {

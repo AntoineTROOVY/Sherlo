@@ -898,8 +898,9 @@ curl -X POST http://localhost:2785/api/sessions/{id}/messages/send-image \
 curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions/{sessionId}/webhooks
 
-# Abandoned deliveries, most recent first: those that exhausted every retry, plus those never
-# attempted at all (recorded with `attempts: 0`). Requires an ADMIN key — an OPERATOR key gets
+# Abandoned deliveries, most recent first: those that exhausted every retry, plus those recorded
+# with `attempts: 0`: never attempted, or (queue disabled) stopped by shutdown during a retry
+# backoff after earlier attempts. Requires an ADMIN key — an OPERATOR key gets
 # a 403, which reads like the endpoint does not exist. Rows older than
 # WEBHOOK_FAILURE_RETENTION_DAYS (default 90) are pruned.
 curl -H "X-API-Key: $ADMIN_API_KEY" \

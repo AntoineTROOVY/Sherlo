@@ -551,6 +551,7 @@ describe('validateEnv', () => {
     'S3_REPROBE_INTERVAL_MS',
     'STORAGE_EXPORT_TTL_MS',
     'STORAGE_EXPORT_SWEEP_MAX_AGE_MS',
+    'WEBHOOK_DEGRADED_SESSION_CONCURRENCY',
   ])('rejects a unit-suffixed or non-positive %s and accepts a plain count', key => {
     expect(() => validateEnv({ [key]: '1h' })).toThrow(new RegExp(`${key} must be a positive integer`));
     expect(() => validateEnv({ [key]: '0' })).toThrow(new RegExp(`${key} must be a positive integer`));

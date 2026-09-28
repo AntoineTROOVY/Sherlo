@@ -307,6 +307,7 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     'HEADERS_TIMEOUT_MS',
     'KEEPALIVE_TIMEOUT_MS',
     'WEBHOOK_DISPATCH_CONCURRENCY',
+    'WEBHOOK_DEGRADED_SESSION_CONCURRENCY',
     // 0 would reject every webhook dispatch (a total, silent webhook outage).
     'WEBHOOK_MAX_PAYLOAD_BYTES',
     // 0 would refuse every request carrying a body (a self-DoS), so the budget is positive-only.

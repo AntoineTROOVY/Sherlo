@@ -29,13 +29,14 @@ const DEFAULT_WEBHOOK_WORKER_CONCURRENCY = 10;
  * Webhook Worker concurrency. BullMQ defaults a Worker to 1, which serializes ALL webhook deliveries
  * process-wide: one slow or timing-out receiver head-of-line-blocks every other session's webhooks
  * until it finishes (up to WEBHOOK_TIMEOUT + retries). Running several in parallel lets healthy
- * receivers proceed while a few slots wait on a stuck one, but the pool is shared and not isolated
- * per webhook: each attempt against a dead receiver holds a slot for up to WEBHOOK_TIMEOUT, and its
- * retries re-enter the same pool. Once that receiver's events per second x attempts x
- * WEBHOOK_TIMEOUT (in seconds) reach the concurrency, every slot is busy with it and all other
- * webhooks wait. Size the value above that product. Override via WEBHOOK_WORKER_CONCURRENCY; a
- * non-positive/garbage value falls back to the default. (Read at module import like
- * workerConnectionOptions above.)
+ * receivers proceed while a few slots wait on a stuck one. The pool is shared, and each attempt
+ * against a dead receiver holds a slot for up to WEBHOOK_TIMEOUT, so the processor caps how many
+ * jobs to failing receivers one session starts at once (WEBHOOK_DEGRADED_SESSION_CONCURRENCY,
+ * default a quarter of this value; a job already running when the failure lands is not counted)
+ * and returns the rest to the delayed set. Size this value above that cap times the number of
+ * sessions whose receivers may fail at once, or those sessions fill the pool. Override via
+ * WEBHOOK_WORKER_CONCURRENCY; a non-positive/garbage value falls back to the default. (Read at
+ * module import like workerConnectionOptions above.)
  */
 export function webhookWorkerConcurrency(): number {
   return resolveNonNegativeIntEnv(process.env.WEBHOOK_WORKER_CONCURRENCY, 0) || DEFAULT_WEBHOOK_WORKER_CONCURRENCY;

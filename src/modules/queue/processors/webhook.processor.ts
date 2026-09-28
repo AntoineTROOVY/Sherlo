@@ -1,5 +1,5 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
+import { DelayedError, Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
@@ -54,6 +54,15 @@ interface WebhookDeliveryContext {
 @Processor(QUEUE_NAMES.WEBHOOK, { connection: workerConnectionOptions(), concurrency: webhookWorkerConcurrency() })
 export class WebhookProcessor extends WorkerHost {
   private readonly logger = createLogger('WebhookProcessor');
+  /**
+   * Webhooks whose last attempt on this worker failed, until one succeeds. A job for one of them
+   * takes a per-session slot first, at most `degradedSessionConcurrency` per session; over that it
+   * goes back to the delayed set without spending an attempt. One session's failing receivers then
+   * cannot fill the shared pool, while healthy receivers are never held back.
+   */
+  private readonly failingWebhooks = new Set<string>();
+  private readonly degradedInFlight = new Map<string, number>();
+  private readonly degradedSessionConcurrency: number;
 
   constructor(
     @InjectRepository(Webhook, 'data')
@@ -64,9 +73,40 @@ export class WebhookProcessor extends WorkerHost {
     private readonly configService: ConfigService,
   ) {
     super();
+    // WEBHOOK_DEGRADED_SESSION_CONCURRENCY, else a quarter of the worker pool.
+    this.degradedSessionConcurrency =
+      this.configService.get<number | undefined>('webhook.degradedSessionConcurrency') ??
+      Math.max(1, Math.floor(webhookWorkerConcurrency() / 4));
   }
 
-  async process(job: Job<WebhookJobData>): Promise<WebhookJobResult> {
+  async process(job: Job<WebhookJobData>, token?: string): Promise<WebhookJobResult> {
+    const { webhookId, payload } = job.data;
+    const sessionId = payload.sessionId;
+    const gated = this.failingWebhooks.has(webhookId);
+    if (gated) {
+      const inFlight = this.degradedInFlight.get(sessionId) ?? 0;
+      if (inFlight >= this.degradedSessionConcurrency) {
+        // Before the try below on purpose: this is not an attempt, so it must never be logged as a
+        // failure or file a dead-letter row. moveToDelayed does not spend one of the job's attempts.
+        // At least a second: a job delayed to "now" is promoted straight back and would spin.
+        const delay = Math.max(1000, this.configService.get<number>('webhook.retryDelay', 5000));
+        await job.moveToDelayed(Date.now() + delay + Math.floor(Math.random() * delay), token);
+        throw new DelayedError();
+      }
+      this.degradedInFlight.set(sessionId, inFlight + 1);
+    }
+    try {
+      return await this.deliver(job);
+    } finally {
+      if (gated) {
+        const left = (this.degradedInFlight.get(sessionId) ?? 1) - 1;
+        if (left > 0) this.degradedInFlight.set(sessionId, left);
+        else this.degradedInFlight.delete(sessionId);
+      }
+    }
+  }
+
+  private async deliver(job: Job<WebhookJobData>): Promise<WebhookJobResult> {
     const { webhookId, event, payload, maxRetries } = job.data;
     const startTime = Date.now();
     const sessionId = payload.sessionId;
@@ -109,6 +149,7 @@ export class WebhookProcessor extends WorkerHost {
           idempotencyKey: payload.idempotencyKey,
           action: 'webhook_skipped_stale',
         });
+        this.failingWebhooks.delete(webhookId);
         return { statusCode: 0, success: false, error: 'webhook removed, disabled or unsubscribed', responseTime: 0 };
       }
       ctx.url = current.url;
@@ -123,6 +164,7 @@ export class WebhookProcessor extends WorkerHost {
       );
 
       const { status, responseTime } = await this.postToReceiver(ctx, body, requestHeaders);
+      this.failingWebhooks.delete(webhookId);
       await this.recordSuccessfulDelivery(ctx, status, responseTime);
       return {
         statusCode: status,
@@ -130,6 +172,7 @@ export class WebhookProcessor extends WorkerHost {
         responseTime,
       };
     } catch (error) {
+      this.failingWebhooks.add(webhookId);
       await this.recordDeliveryFailure(ctx, error);
       // Re-throw to trigger BullMQ retry
       throw error;

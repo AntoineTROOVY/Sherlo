@@ -271,6 +271,13 @@ export default () => ({
     // Bound parked inline deliveries as well as active sockets. Queue-full dispatches are recorded in
     // webhook_delivery_failures instead of retaining payload closures without limit.
     dispatchMaxQueued: parseInt(process.env.WEBHOOK_DISPATCH_MAX_QUEUED || '1000', 10),
+    // How many deliveries to failing receivers one session may run at once, per node, in direct and
+    // queued mode alike; healthy receivers are not limited. Unset or garbage leaves it undefined, and
+    // each path then uses a quarter of its own pool (at least 1).
+    degradedSessionConcurrency: (() => {
+      const n = parseInt(process.env.WEBHOOK_DEGRADED_SESSION_CONCURRENCY ?? '', 10);
+      return Number.isInteger(n) && n > 0 ? n : undefined;
+    })(),
     // Upper bound on the serialized webhook body after webhook:before hooks ran; oversize payloads
     // are recorded as undelivered instead of being sent/persisted. Default 1 MiB. Fail-safe like the
     // other byte caps: a non-numeric or non-positive value falls back to the default. 0 is NOT an
