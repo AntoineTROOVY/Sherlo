@@ -250,6 +250,18 @@ test('English unlink success/incomplete copy does not claim handset Linked-Devic
   assert.ok(/incomplete/i.test(incomplete), `incomplete copy lost the "incomplete" framing: "${incomplete}"`);
 });
 
+// The data export drops webhook secrets and headers and strips proxy userinfo, but carries
+// integration instance secrets as-is (src/modules/infra/export-tables.ts). The hint must say which.
+test('English backup hint says which credentials the export leaves out and which it carries', () => {
+  const hint = i18n.t('infrastructure.migration.backupHint', { lng: 'en' });
+  assert.ok(!/contains webhook secrets/i.test(hint), `hint claims webhook secrets are exported: "${hint}"`);
+  assert.ok(/webhook signing secrets[^.]*not included/i.test(hint), `hint lost the webhook omission: "${hint}"`);
+  assert.ok(
+    /integration instance secrets[^.]*included in plaintext/i.test(hint),
+    `hint lost the plaintext note: "${hint}"`,
+  );
+});
+
 test('English start teardown-pending copy is a retryable warning, not an error', () => {
   const title = i18n.t('sessions.start.teardownPendingTitle', { lng: 'en' });
   const body = i18n.t('sessions.start.teardownPending', { lng: 'en' });

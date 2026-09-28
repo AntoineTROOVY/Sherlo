@@ -896,7 +896,7 @@
       "storageWarning": "Mevcut medya dosyaları yeni depolama arka ucuna otomatik olarak taşınmaz; eski konumda kalırlar.",
       "downloadBackup": "Önce yedeği indirin",
       "backupTitle": "Veri yedekleme ve geri yükleme",
-      "backupHint": "Veritabanlarını değiştirmeden önce tüm verileri JSON olarak dışa aktarın, ardından değişiklikten sonra içe aktarın. Yedekleme; webhook gizli anahtarlarını ve proxy kimlik bilgilerini düz metin olarak içerir — güvenli bir şekilde saklayın ve geri yükledikten sonra silin.",
+      "backupHint": "Veritabanlarını değiştirmeden önce tüm verileri JSON olarak dışa aktarın, ardından değişiklikten sonra içe aktarın. Webhook imzalama gizli anahtarları, özel webhook başlıkları ve proxy kimlik bilgileri dahil edilmez; geri yükledikten sonra bunları yeniden girin. Entegrasyon örneklerinin gizli anahtarları ve ayarları düz metin olarak dahil edilir; dosyayı güvenli bir şekilde saklayın ve geri yükledikten sonra silin.",
       "export": "Verileri dışa aktar",
       "import": "Verileri içe aktar",
       "exportFailed": "Veriler dışa aktarılamadı",
