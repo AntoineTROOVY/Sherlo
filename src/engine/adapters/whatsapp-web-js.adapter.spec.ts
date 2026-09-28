@@ -1892,6 +1892,10 @@ describe('WhatsAppWebJsAdapter ready reconciliation (#251/#273)', () => {
 
     return { client, onReady, onStateChanged };
   };
+  // The readiness deadline clears credentials only for a pairing this engine showed a QR for.
+  const markFreshPairing = (adapter: WhatsAppWebJsAdapter): void => {
+    (adapter as unknown as { lifecycle: { qrShown: boolean } }).lifecycle.qrShown = true;
+  };
   const deferredVoid = (): { promise: Promise<void>; resolve: () => void } => {
     let resolve = (): void => undefined;
     const promise = new Promise<void>(res => {
@@ -2338,7 +2342,7 @@ describe('WhatsAppWebJsAdapter ready reconciliation (#251/#273)', () => {
     client.emit('authenticated'); // re-fire 80s in — must not restart the window
     await jest.advanceTimersByTimeAsync(11_000); // 91s total since the FIRST authenticated
 
-    expect(adapter.getStatus()).toBe(EngineStatus.AUTHENTICATING);
+    expect(adapter.getStatus()).toBe(EngineStatus.FAILED); // a restore gives up at the deadline
     expect(jest.getTimerCount()).toBe(0); // gave up at 90s; not reset by the re-fire
   });
 
@@ -2627,6 +2631,7 @@ describe('WhatsAppWebJsAdapter ready reconciliation (#251/#273)', () => {
     });
     const onDisconnected = jest.fn();
     (adapter as unknown as { callbacks: { onDisconnected?: jest.Mock } }).callbacks.onDisconnected = onDisconnected;
+    markFreshPairing(adapter);
 
     client.emit('authenticated');
     await jest.advanceTimersByTimeAsync(50_000);
@@ -2739,6 +2744,7 @@ describe('WhatsAppWebJsAdapter ready reconciliation (#251/#273)', () => {
       getState: jest.fn().mockReturnValue(new Promise<never>(() => {})),
       destroy: jest.fn().mockResolvedValue(undefined),
     });
+    markFreshPairing(adapter);
 
     client.emit('authenticated');
     await jest.advanceTimersByTimeAsync(95_000); // past the 90s give-up deadline
@@ -2748,6 +2754,112 @@ describe('WhatsAppWebJsAdapter ready reconciliation (#251/#273)', () => {
     expect(timeout?.[1]).toMatchObject({ sessionId: 'sess-1' });
 
     warnSpy.mockRestore();
+    rmSpy.mockRestore();
+  });
+
+  // A restore never showed a QR, so nothing says its saved credentials are bad; a stuck restore is
+  // usually an incompatible WhatsApp Web build, which deleting the only copy of the link cannot fix.
+  it('keeps the saved credentials of a restored session stuck past the deadline and marks it failed', async () => {
+    jest.useFakeTimers();
+    const rmSpy = jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
+
+    const adapter = newAdapter();
+    const logger = (adapter as unknown as { logger: { error: jest.Mock } }).logger;
+    const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const { client } = attachFakeClient(adapter, {
+      getState: jest.fn().mockReturnValue(new Promise<never>(() => {})),
+      destroy: jest.fn().mockResolvedValue(undefined),
+    });
+    const onError = jest.fn();
+    const onDisconnected = jest.fn();
+    Object.assign((adapter as unknown as { callbacks: object }).callbacks, { onError, onDisconnected });
+
+    client.emit('authenticated'); // no 'qr' first: a restore of saved credentials
+    await jest.advanceTimersByTimeAsync(95_000);
+
+    expect(rmSpy).not.toHaveBeenCalled();
+    expect(adapter.getStatus()).toBe(EngineStatus.FAILED);
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('credentials were kept'));
+    // A FAILED session has no engine, so a logout answers 400; only a delete clears the credentials.
+    expect(onError).toHaveBeenCalledWith(expect.stringContaining('to pair again, delete it'));
+    expect(onError).not.toHaveBeenCalledWith(expect.stringContaining('log it out'));
+    expect(onDisconnected).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+    const failed = errorSpy.mock.calls.find(
+      ([, , meta]) => (meta as { action?: string })?.action === 'ready_reconcile_timeout_restored',
+    );
+    expect(failed?.[2]).toMatchObject({ sessionId: 'sess-1' });
+
+    errorSpy.mockRestore();
+    rmSpy.mockRestore();
+  });
+
+  it('records a shown QR as a fresh pairing, but not one dropped by a finished adapter', () => {
+    const adapter = newAdapter();
+    const lifecycle = (adapter as unknown as { lifecycle: { qrShown: boolean } }).lifecycle;
+    const { client } = attachFakeClient(adapter);
+
+    client.emit('qr', '2@abc');
+    expect(lifecycle.qrShown).toBe(true);
+
+    const finished = newAdapter();
+    const finishedLifecycle = (finished as unknown as { lifecycle: { qrShown: boolean; disconnectReported: boolean } })
+      .lifecycle;
+    const { client: finishedClient } = attachFakeClient(finished);
+    finishedLifecycle.disconnectReported = true;
+
+    finishedClient.emit('qr', '2@abc');
+    expect(finishedLifecycle.qrShown).toBe(false);
+  });
+
+  it('drops a qr from a client that is no longer the live one', async () => {
+    (qrcode.toDataURL as unknown as jest.Mock).mockClear();
+    const adapter = newAdapter();
+    const lifecycle = (adapter as unknown as { lifecycle: { qrShown: boolean } }).lifecycle;
+    const { client: stale } = attachFakeClient(adapter);
+    const onQRCode = jest.fn();
+    (adapter as unknown as { callbacks: { onQRCode: jest.Mock } }).callbacks.onQRCode = onQRCode;
+    // A replacement client is live while the old one still has its listeners.
+    (adapter as unknown as { client: unknown }).client = new EventEmitter();
+
+    stale.emit('qr', '2@stale');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(qrcode.toDataURL as unknown as jest.Mock).not.toHaveBeenCalled();
+    expect(lifecycle.qrShown).toBe(false);
+    expect(adapter.getStatus()).not.toBe(EngineStatus.QR_READY);
+    expect(onQRCode).not.toHaveBeenCalled();
+  });
+
+  // The wedged Chromium still writes into the profile being removed; killing it first stops that. The
+  // kill fires the browser's 'disconnected', which must not report a second disconnect mid-removal.
+  it('kills the browser before clearing the saved session, and reports the disconnect once', async () => {
+    const rmSpy = jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
+    const adapter = newAdapter();
+    const pupBrowser = new EventEmitter();
+    const kill = jest.fn(() => pupBrowser.emit('disconnected'));
+    Object.assign(pupBrowser, { process: () => ({ kill }) });
+    attachFakeClient(adapter, {
+      pupBrowser,
+      pupPage: Object.assign(new EventEmitter(), { evaluate: jest.fn().mockResolvedValue(true) }),
+      destroy: jest.fn().mockResolvedValue(undefined),
+    } as never);
+    (adapter as unknown as { lifecycle: { status: EngineStatus } }).lifecycle.status = EngineStatus.AUTHENTICATING;
+    (adapter as unknown as { attachPuppeteerLifecycleListeners: () => void }).attachPuppeteerLifecycleListeners();
+    const onDisconnected = jest.fn();
+    Object.assign((adapter as unknown as { callbacks: object }).callbacks, {
+      onDisconnected,
+      claimStuckAuthRecovery: () => true,
+    });
+
+    await (adapter as unknown as { recoverFromStuckAuth: () => Promise<void> }).recoverFromStuckAuth.call(adapter);
+
+    expect(kill).toHaveBeenCalledWith('SIGKILL');
+    expect(kill.mock.invocationCallOrder[0]).toBeLessThan(rmSpy.mock.invocationCallOrder[0]);
+    expect(onDisconnected).toHaveBeenCalledTimes(1);
+    expect(onDisconnected).toHaveBeenCalledWith(expect.stringContaining('cleared for re-pairing'));
+
     rmSpy.mockRestore();
   });
 

@@ -238,6 +238,7 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
       setStatus: status => this.lifecycle.setStatus(status),
       getCallbacks: () => this.callbacks,
       markReadyFromClientInfo: () => this.lifecycle.markReadyFromClientInfo(),
+      wasFreshPairing: () => this.lifecycle.qrShown,
       recoverFromStuckAuth: () => this.recoverFromStuckAuth(),
     });
     this.stuckAuth = new WwebjsStuckAuth({

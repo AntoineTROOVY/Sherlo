@@ -236,6 +236,10 @@ export class WwebjsLifecycle {
    *  re-authenticate, and neither belongs to the session any more (#982). Aliased by the adapter's
    *  `disconnectReported` accessor. */
   disconnectReported = false;
+  /** Set when this engine's page asked for a QR (whatsapp-web.js emits 'qr' only for an UNPAIRED page,
+   *  and a pairing code needs QR_READY), so it tells a fresh pairing from a restore of saved
+   *  credentials. The readiness deadline may clear credentials only for a fresh pairing. */
+  qrShown = false;
   // Navigation re-inject window (#1081): stamped by our framenavigated listener, closed by the
   // library's re-emitted 'ready' and by teardown. Timestamps, never timers — several suites pin
   // exact jest timer counts, and a timer would also outlive the single-use adapter.
@@ -562,14 +566,18 @@ export class WwebjsLifecycle {
       // finished adapter to QR_READY and publish a QR that links a phantom device. Mirrors the
       // 'authenticated' guard below; the normal first QR is unaffected (initialize() moves the status to
       // INITIALIZING before any client exists, so the latch is still clear).
-      if (this.tearingDown || this.disconnectReported || this.status === EngineStatus.FAILED || !this.client) {
+      if (
+        this.client !== source ||
+        this.tearingDown ||
+        this.disconnectReported ||
+        this.status === EngineStatus.FAILED
+      ) {
         return;
       }
-      // Capture the source client so the post-await fence can prove THIS client is still the live one.
+      this.qrShown = true;
       // qrcode.toDataURL() is an awaited macrotask: a 'disconnected' (or a teardown nulling this.client)
       // that lands during the encode leaves the pre-await guard stale. Encode to a LOCAL so the stored
       // qrCode is only touched once the fence re-proves the source client and the finished flags.
-      const sourceClient = this.client;
       try {
         const encodedQr = await qrcode.toDataURL(qr);
         // Post-await fence: the encode resolved, but the source client may have disconnected or been
@@ -579,7 +587,7 @@ export class WwebjsLifecycle {
         // (not `this.status`) so the pre-await guard's narrowing does not elide this comparison:
         // setStatus(FAILED) can run on another tick during the await.
         if (
-          this.client !== sourceClient ||
+          this.client !== source ||
           this.tearingDown ||
           this.disconnectReported ||
           this.getStatus() === EngineStatus.FAILED
@@ -769,7 +777,14 @@ export class WwebjsLifecycle {
    * signal wins, no double-report).
    */
   private handlePuppeteerDeath(reason: string): void {
-    if (this.tearingDown || this.status === EngineStatus.DISCONNECTED || this.status === EngineStatus.FAILED) {
+    // No client means the stuck-auth recovery (or an init retry) already let go of this browser and
+    // killed it on purpose; that recovery reports the disconnect itself once the profile is cleared.
+    if (
+      this.tearingDown ||
+      !this.client ||
+      this.status === EngineStatus.DISCONNECTED ||
+      this.status === EngineStatus.FAILED
+    ) {
       return;
     }
     this.host.clearReadyReconcile();
