@@ -20,6 +20,24 @@ function between(text: string, from: string, to: string): string {
   return text.slice(start, end);
 }
 
+/**
+ * Patch releases from `0.24.0` on whose CHANGELOG section carries a breaking entry or an Upgrade
+ * notes heading. docs/15 section 15.2 reserves both for a MINOR; earlier patches that broke the rule
+ * are listed there and stay out of scope. A breaking entry is matched in every spelling the file has
+ * used: `**Breaking`, `**BREAKING` and an unbolded warning-sign `Breaking:`.
+ */
+function patchesCarryingBreakingChanges(changelog: string): string[] {
+  return changelog.split(/^(?=## \[)/m).flatMap(block => {
+    const version = /^## \[(\d+)\.(\d+)\.(\d+)\]/.exec(block);
+    if (!version) return [];
+    const [major, minor, patch] = version.slice(1).map(Number);
+    const enforced = major > 0 || minor >= 24;
+    return enforced && patch > 0 && /^### Upgrade notes|\*\*breaking|\u26a0\ufe0f?\s*\**\s*breaking/im.test(block)
+      ? [version.slice(1).join('.')]
+      : [];
+  });
+}
+
 type Trigger = { branches?: string[] };
 type Workflow = { on?: { push?: Trigger; pull_request?: Trigger } };
 
@@ -66,6 +84,34 @@ describe('governance docs match the repository', () => {
     expect(applied.length).toBeGreaterThanOrEqual(6);
     expect(documented.size).toBeGreaterThanOrEqual(20);
     expect(applied.filter(label => !documented.has(label))).toEqual([]);
+  });
+
+  it('keeps breaking entries and Upgrade notes out of patch releases', () => {
+    expect(patchesCarryingBreakingChanges(read('CHANGELOG.md'))).toEqual([]);
+  });
+
+  // The operator-facing upgrade matrix restates the section 15.2 rule, so it has to name the same
+  // triggers for a MINOR and admit the earlier patches that did not hold to it.
+  it('states the docs/15 version rule in the docs/14 upgrade matrix', () => {
+    expect(between(read('docs/15-project-roadmap.md'), '### Pre-1.0 policy', '## 15.3')).toMatch(
+      /Upgrade notes \(behavior changes\)/,
+    );
+    const matrix = between(read('docs/14-migration-guide.md'), '### Upgrade Matrix', '\n| From');
+    expect(matrix).toMatch(/breaking change, or anything the CHANGELOG files under \*\*Upgrade notes/);
+    expect(matrix).toMatch(/`0\.24\.0`/);
+  });
+
+  it('flags a patch release that carries either', () => {
+    const sample = [
+      '## [Unreleased]\n### Upgrade notes (behavior changes)\n- pending',
+      '## [0.24.4] - 2026-10-04\n### Changed\n- **BREAKING \u2014 single-port dashboard:** x',
+      '## [0.24.3] - 2026-10-03\n### Removed\n- \u26a0\ufe0f Breaking: bundled extensions removed',
+      '## [0.24.2] - 2026-10-02\n### Fixed\n- \u26a0\ufe0f **Breaking (API).** a route answers 400',
+      '## [0.24.1] - 2026-10-01\n### Upgrade notes (behavior changes)\n- a default changed',
+      '## [0.24.0] - 2026-09-30\n### Upgrade notes (behavior changes)\n- a MINOR may',
+      '## [0.23.7] - 2026-09-25\n### Upgrade notes (behavior changes)\n- before the rule',
+    ].join('\n');
+    expect(patchesCarryingBreakingChanges(sample)).toEqual(['0.24.4', '0.24.3', '0.24.2', '0.24.1']);
   });
 
   it('points the circular-dependency advice at the comment that explains the delegation', () => {
