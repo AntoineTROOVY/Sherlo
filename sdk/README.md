@@ -41,6 +41,15 @@ All five SDKs expose the same fluent resource surface:
 | `media`     | conversionStatus, convertVoice, convertVideo _(OPERATOR)_                                                                                                                                                                                                                                  |
 | `health`    | check, live, ready                                                                                                                                                                                                                                                                         |
 
+The table describes `main`. The 0.5.0 registry builds do not include
+`sessions.getProxy`, `sessions.updateProxy` or `messages.clickButton`
+(`get_proxy`, `update_proxy` and `click_button` in Python; `GetProxy`,
+`UpdateProxy` and `ClickButton` in Go); they ship with the next SDK release.
+Nor is the Java fallback to `UNKNOWN`: 0.5.0 decodes a response enum value it
+does not recognise to `null` (`MessageType` and `ChatKind` included), and
+`SessionStatus`, `DeliveryStatus` and the other response enums that lack an
+`unknown` wire value have no `UNKNOWN` constant there.
+
 > ⚠️ Endpoints requiring an `OPERATOR`-level API key are noted in the inline
 > docs. Deliberately **not** exposed, matching `docs/18-sdk-design.md` exactly:
 > `auth`/api-keys, `audit`, `settings`, `stats`, `automation`, `infra`,
