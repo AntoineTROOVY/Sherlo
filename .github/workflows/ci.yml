@@ -192,13 +192,6 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: '6379'
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
-        if: always()
-        with:
-          files: ./coverage/lcov.info
-          fail_ci_if_error: false
-
   test-postgres:
     name: Test (PostgreSQL migrations)
     runs-on: ubuntu-latest
