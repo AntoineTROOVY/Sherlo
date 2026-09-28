@@ -19,6 +19,10 @@ OpenWA supports two database backends that can be selected at deployment time:
 | **SQLite**     | Development, personal bot, low-resource VPS | 1-5      | ❌                 |
 | **PostgreSQL** | Production, multi-session, high volume      | 5+       | ✅                 |
 
+The PostgreSQL row covers the data database only. The main database (`api_keys`, `audit_logs`) is
+always a SQLite file on each node, and running more than one replica is not supported yet; see
+[13 - Horizontal Scaling Guide](./13-horizontal-scaling.md).
+
 > [!NOTE]
 > **SQLite as a Production Option**
 >
@@ -68,7 +72,10 @@ OpenWA v0.2+ implements a **dual-database architecture** that separates boot con
 
 The main DB is unconditionally SQLite, but its _path_ is not fixed: `MAIN_DATABASE_NAME` overrides the
 `./data/main.sqlite` default, and is honoured by both the runtime connection factory
-(`src/config/configuration.ts`) and the CLI DataSource (`src/database/data-source-main.ts`).
+(`src/config/configuration.ts`) and the CLI DataSource (`src/database/data-source-main.ts`). Each
+process opens its own main DB file and nothing replicates it, so in a multi-node deployment API keys
+and audit logs are per node: a key created, revoked or narrowed on one node is unchanged on the
+others.
 
 > [!IMPORTANT]
 > **Why Dual-Database?**

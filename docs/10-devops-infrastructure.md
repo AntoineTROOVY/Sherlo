@@ -215,15 +215,17 @@ volumes:
 
 > [!IMPORTANT]
 > **Keep `replicas: 1`.** Session ownership gained claim/lease fencing (`nodeId` owner +
-> `leaseExpiresAt`), which bounds any two-engine overlap on one session to roughly one heartbeat
-> interval instead of eliminating it — and docs/13 still says DO NOT run its multi-replica examples
-> yet: WebSocket key eviction on a peer node lags by up to a minute, and WebSocket rate-limit
+> `leaseExpiresAt`), which, while the holder can reach the database, bounds any two-engine overlap on
+> one session to roughly one heartbeat interval instead of eliminating it — and docs/13 still says
+> DO NOT run its multi-replica examples yet: a holder cut off from the database keeps its engines for
+> the length of the outage, API keys and the audit log live in each node's own `main.sqlite` (a key
+> created, revoked or narrowed on one node is unchanged on the others), and WebSocket rate-limit
 > buckets, the unfenced liveness watchdog, bulk-batch state and MCP locality all remain per-process.
 > Follow [13 - Horizontal Scaling Guide](./13-horizontal-scaling.md) for the full list and the design
 > sketch. What multi-node eventually buys is engine capacity, not shared engine state: live engine
 > handles live in exactly one process's `EngineRegistry` (`src/engine/engine-registry.service.ts`),
 > and the hard requirements include a stable `NODE_ID` across restarts, NTP-synced clocks (lease skew
-> beyond the TTL wrongfully transfers a session; the zone each node runs in no longer matters, since
+> beyond the TTL minus one heartbeat, about 40s at defaults, wrongfully transfers a session; the zone each node runs in no longer matters, since
 > the Postgres data connection is pinned to UTC), sticky sessions, `TRUSTED_PROXIES` for forwarded
 > calls, Redis and Postgres.
 
@@ -301,8 +303,8 @@ flowchart TB
 
 > **Design sketch, not a supported topology.** OpenWA is single-process with in-memory engine state,
 > so the multi-`OpenWA` fan-out below would corrupt WhatsApp auth across replicas. It is retained only
-> as the target architecture once the session-claim design in
-> [13 - Horizontal Scaling Guide](./13-horizontal-scaling.md) is implemented. Deploy with `replicas: 1`.
+> as the target architecture once the remaining gaps listed in
+> [13 - Horizontal Scaling Guide](./13-horizontal-scaling.md) are closed. Deploy with `replicas: 1`.
 
 ```mermaid
 flowchart TB
@@ -1166,7 +1168,7 @@ Size up from your own monitoring.
 
 **Not currently supported.** OpenWA is a single-process application with in-memory engine state, so
 multiple replicas against a shared session volume corrupt WhatsApp auth. Run exactly **one** API
-instance per session-data volume (`replicas: 1`). The DB-backed session registry / node-claim design
+instance per session-data volume (`replicas: 1`). Session claims and leases ship; the rest of the design
 that would be required to scale out is documented — as a future design sketch, not a shipped feature —
 in [13 - Horizontal Scaling Guide](./13-horizontal-scaling.md).
 ---

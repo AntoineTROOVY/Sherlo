@@ -1,8 +1,9 @@
 # replicaCount MUST stay 1. A session lease now stops two pods from launching the same
 # session, so the shared-auth corruption this warning used to describe can no longer
-# happen. What is still process-local is the reason: API-key socket eviction, the WS
+# happen. The reasons now: API keys and the audit log live in each pod's own main.sqlite,
+# so a key created, revoked or narrowed on one pod is unchanged on the others, and the WS
 # rate-limit buckets, the liveness watchdog and reconnect timers, and in-flight bulk
-# batches. See docs/13-horizontal-scaling.md.
+# batches are process-local. See docs/13-horizontal-scaling.md.
 # Postgres boot migrations no longer add a cross-replica hazard: replicas serialize them
 # with a session-scoped advisory lock at startup, so simultaneous boots cannot race DDL
 # against the shared migrations ledger. That part is enforced in-process, not by keeping
