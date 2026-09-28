@@ -121,9 +121,16 @@ export function Webhooks() {
     return t(`webhooks.eventDescriptions.${name}`, { defaultValue: name });
   };
 
+  // The gateway requires a URL and at least one event, so the buttons stay disabled until both are set
+  // instead of surfacing the raw validation message in a toast.
+  const canCreate =
+    !createMutation.isPending && !!newWebhook.url.trim() && !!newWebhook.sessionId && newWebhook.events.length > 0;
+  const canSave =
+    !!editWebhook && !updateMutation.isPending && !!editWebhook.url.trim() && editWebhook.events.length > 0;
+
   const handleCreate = async () => {
     // The gateway saves every create it receives, so a double click would register the webhook twice.
-    if (createMutation.isPending || !newWebhook.url || !newWebhook.sessionId) return;
+    if (!canCreate) return;
     try {
       await createMutation.mutateAsync({
         sessionId: newWebhook.sessionId,
@@ -191,7 +198,7 @@ export function Webhooks() {
   };
 
   const handleEdit = async () => {
-    if (!editWebhook) return;
+    if (!editWebhook || !canSave) return;
     try {
       await updateMutation.mutateAsync({
         sessionId: editWebhook.sessionId,
@@ -279,11 +286,7 @@ export function Webhooks() {
               <button className="btn-secondary" onClick={() => setShowCreateModal(false)}>
                 {t('common.cancel')}
               </button>
-              <button
-                className="btn-primary"
-                onClick={handleCreate}
-                disabled={createMutation.isPending || !newWebhook.url || !newWebhook.sessionId}
-              >
+              <button className="btn-primary" onClick={handleCreate} disabled={!canCreate}>
                 {t('common.create')}
               </button>
             </>
@@ -327,6 +330,11 @@ export function Webhooks() {
               );
             })}
           </div>
+          {newWebhook.events.length === 0 && (
+            <span className="hint error" role="status">
+              {t('webhooks.noEvents')}
+            </span>
+          )}
           {supportsFilters(newWebhook.events) && (
             <FilterBuilder
               filters={newWebhook.filters}
@@ -348,7 +356,7 @@ export function Webhooks() {
               <button className="btn-secondary" onClick={() => setShowEditModal(false)}>
                 {t('common.cancel')}
               </button>
-              <button className="btn-primary" onClick={handleEdit}>
+              <button className="btn-primary" onClick={handleEdit} disabled={!canSave}>
                 {t('webhooks.saveChanges')}
               </button>
             </>
@@ -378,6 +386,11 @@ export function Webhooks() {
               );
             })}
           </div>
+          {editWebhook.events.length === 0 && (
+            <span className="hint error" role="status">
+              {t('webhooks.noEvents')}
+            </span>
+          )}
           {supportsFilters(editWebhook.events) && (
             <FilterBuilder
               filters={editWebhook.filters}

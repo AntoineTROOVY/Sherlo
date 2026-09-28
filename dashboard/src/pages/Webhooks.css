@@ -18,6 +18,17 @@
   margin-bottom: 0.75rem;
 }
 
+.webhooks-page .modal-body > .hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: -0.375rem 0 0.75rem;
+}
+
+.webhooks-page .modal-body > .hint.error {
+  color: var(--error-text);
+}
+
 .webhooks-page .modal-body > .event-tags {
   display: flex;
   flex-wrap: wrap;

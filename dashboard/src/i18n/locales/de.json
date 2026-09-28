@@ -446,6 +446,7 @@
     "selectSession": "Sitzung auswählen...",
     "session": "Sitzung",
     "events": "Ereignisse",
+    "noEvents": "Wähle mindestens ein Ereignis aus.",
     "available": "Verfügbare Ereignisse",
     "saveChanges": "Änderungen speichern",
     "filters": {

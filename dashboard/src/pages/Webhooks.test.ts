@@ -11,6 +11,7 @@ let webhooksStatus = 200;
 let webhookList: unknown[] = [];
 let sessionList: unknown[] = [];
 let createCalls = 0;
+let updateCalls = 0;
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -24,6 +25,10 @@ function installFetchStub(): void {
     if (init?.method === 'POST' && path === '/api/sessions/sess-1/webhooks') {
       // Never answers: the create stays in flight, like one held up by the gateway's URL check.
       createCalls++;
+      return new Promise<Response>(() => {});
+    }
+    if (init?.method === 'PUT' && path === '/api/sessions/sess-1/webhooks/w1') {
+      updateCalls++;
       return new Promise<Response>(() => {});
     }
     if (path === '/api/webhooks') {
@@ -63,6 +68,7 @@ afterEach(() => {
   webhookList = [];
   sessionList = [];
   createCalls = 0;
+  updateCalls = 0;
   window.sessionStorage.setItem('openwa_user_role', 'viewer');
 });
 
@@ -186,4 +192,76 @@ test('Create stays disabled until both a session and a URL are filled in', async
 
   fireEvent.change(screen.getByLabelText('URL'), { target: { value: '' } });
   assert.equal(create.disabled, true, 'session without a URL');
+});
+
+test('Create stays disabled with a hint while no event is selected', async () => {
+  const { screen, fireEvent } = rtl;
+  webhooksStatus = 200;
+  sessionList = [{ id: 'sess-1', name: 'Main', status: 'ready', createdAt: '2026-01-01T00:00:00.000Z' }];
+  window.sessionStorage.setItem('openwa_user_role', 'operator');
+  renderWebhooks();
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Add Webhook' }));
+  const sessionSelect = screen.getByLabelText<HTMLSelectElement>('Session');
+  await rtl.findByText(sessionSelect, 'Main');
+  fireEvent.change(sessionSelect, { target: { value: 'sess-1' } });
+  fireEvent.change(screen.getByLabelText('URL'), { target: { value: 'https://example.test/hook' } });
+  const create = screen.getByRole<HTMLButtonElement>('button', { name: 'Create' });
+  assert.equal(create.disabled, false);
+  assert.equal(screen.queryByText('Select at least one event.'), null);
+
+  fireEvent.click(screen.getByRole('button', { name: 'message.received' }));
+  assert.equal(create.disabled, true, 'no event selected');
+  screen.getByText('Select at least one event.');
+  fireEvent.click(create);
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(createCalls, 0);
+
+  fireEvent.click(screen.getByRole('button', { name: 'message.received' }));
+  assert.equal(create.disabled, false);
+});
+
+async function openEditModal(): Promise<HTMLButtonElement> {
+  webhooksStatus = 200;
+  webhookList = [
+    { id: 'w1', sessionId: 'sess-1', url: 'https://example.test/hook', events: ['message.received'], active: true },
+  ];
+  window.sessionStorage.setItem('openwa_user_role', 'operator');
+  renderWebhooks();
+  rtl.fireEvent.click(await rtl.screen.findByTitle('Edit'));
+  return rtl.screen.getByRole<HTMLButtonElement>('button', { name: 'Save Changes' });
+}
+
+test('Save stays disabled with a hint while no event is selected', async () => {
+  const { screen, fireEvent } = rtl;
+  const save = await openEditModal();
+  assert.equal(save.disabled, false);
+
+  fireEvent.click(screen.getByRole('button', { name: 'message.received' }));
+  assert.equal(save.disabled, true, 'no event selected');
+  screen.getByText('Select at least one event.');
+  fireEvent.click(save);
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(updateCalls, 0);
+});
+
+test('Save stays disabled while the URL is empty', async () => {
+  const { screen, fireEvent } = rtl;
+  const save = await openEditModal();
+  fireEvent.change(screen.getByLabelText('URL'), { target: { value: ' ' } });
+  assert.equal(save.disabled, true);
+  fireEvent.click(save);
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(updateCalls, 0);
+});
+
+test('a second click on Save while the first update is in flight sends nothing', async () => {
+  const { fireEvent, waitFor } = rtl;
+  const save = await openEditModal();
+  fireEvent.click(save);
+  await waitFor(() => assert.equal(updateCalls, 1));
+  await new Promise(resolve => setTimeout(resolve, 50));
+  fireEvent.click(save);
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(updateCalls, 1);
 });

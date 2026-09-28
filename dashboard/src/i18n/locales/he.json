@@ -452,6 +452,7 @@
     "selectSession": "בחירת Session...",
     "session": "Session",
     "events": "אירועים",
+    "noEvents": "בחרו לפחות אירוע אחד.",
     "available": "אירועים זמינים",
     "saveChanges": "שמירת שינויים",
     "filters": {

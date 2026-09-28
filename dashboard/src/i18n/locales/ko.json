@@ -446,6 +446,7 @@
     "selectSession": "세션 선택...",
     "session": "세션",
     "events": "이벤트",
+    "noEvents": "이벤트를 하나 이상 선택하세요.",
     "available": "사용 가능한 이벤트",
     "saveChanges": "변경 사항 저장",
     "filters": {

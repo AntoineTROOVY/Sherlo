@@ -451,6 +451,7 @@
     "selectSession": "Selecionar sessão...",
     "session": "Sessão",
     "events": "Eventos",
+    "noEvents": "Selecione pelo menos um evento.",
     "available": "Eventos disponíveis",
     "saveChanges": "Salvar alterações",
     "filters": {

@@ -446,6 +446,7 @@
     "selectSession": "सत्र चुनें...",
     "session": "सत्र",
     "events": "घटनाएँ",
+    "noEvents": "कम से कम एक घटना चुनें।",
     "available": "उपलब्ध घटनाएँ",
     "saveChanges": "परिवर्तन सहेजें",
     "filters": {

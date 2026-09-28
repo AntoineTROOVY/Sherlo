@@ -446,6 +446,7 @@
     "selectSession": "Oturum seçin...",
     "session": "Oturum",
     "events": "Olaylar",
+    "noEvents": "En az bir olay seçin.",
     "available": "Kullanılabilir Olaylar",
     "saveChanges": "Değişiklikleri Kaydet",
     "filters": {

@@ -446,6 +446,7 @@
     "selectSession": "选择会话...",
     "session": "会话",
     "events": "事件",
+    "noEvents": "请至少选择一个事件。",
     "available": "可用事件",
     "saveChanges": "保存更改",
     "filters": {

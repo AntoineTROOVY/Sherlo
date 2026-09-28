@@ -446,6 +446,7 @@
     "selectSession": "Select session...",
     "session": "Session",
     "events": "Events",
+    "noEvents": "Select at least one event.",
     "available": "Available Events",
     "saveChanges": "Save Changes",
     "filters": {

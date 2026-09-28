@@ -467,6 +467,7 @@
     "selectSession": "اختر جلسة...",
     "session": "الجلسة",
     "events": "الأحداث",
+    "noEvents": "اختر حدثًا واحدًا على الأقل.",
     "available": "الأحداث المتاحة",
     "saveChanges": "حفظ التغييرات",
     "filters": {
