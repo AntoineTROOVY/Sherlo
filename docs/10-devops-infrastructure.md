@@ -943,6 +943,10 @@ export class MetricsService {
 | `openwa_process_uptime_seconds`              | gauge     | —                                   | Process uptime                                                                               |
 | `openwa_process_resident_memory_bytes`       | gauge     | —                                   | RSS                                                                                          |
 | `openwa_process_heap_used_bytes`             | gauge     | —                                   | V8 heap used                                                                                 |
+| `openwa_event_loop_delay_p99_seconds`        | gauge     | none                                | p99 event-loop delay since the previous uncached scrape                                      |
+| `openwa_event_loop_delay_max_seconds`        | gauge     | none                                | Maximum event-loop delay since the previous uncached scrape                                  |
+| `openwa_unhandled_rejections_total`          | counter   | `kind`                              | Unhandled promise rejections since process start (`other` or `page_context_lost`)            |
+| `openwa_queue_jobs`                          | gauge     | `queue`, `state`                    | BullMQ jobs per queue in `wait`/`active`/`delayed`/`failed` (cluster-wide, from Redis)       |
 | `openwa_stats_available`                     | gauge     | —                                   | 1 when the last overview read of the database-derived series below succeeded, 0 if it failed |
 | `openwa_sessions_total`                      | gauge     | —                                   | Configured sessions                                                                          |
 | `openwa_sessions_active`                     | gauge     | —                                   | READY (active) sessions                                                                      |
@@ -965,7 +969,15 @@ Not every row appears on every scrape, and the difference matters when you write
 database-derived series (`openwa_sessions*`, `openwa_messages*`) are **omitted entirely** when the
 overview cannot be read — `openwa_stats_available` is what tells the two cases apart, so alert on it
 rather than reading a missing series as zero. `openwa_send_pacing_refusals_total` appears only once
-the governor has refused something. For these, `absent()` is the correct alerting primitive.
+the governor has refused something. `openwa_queue_jobs` appears only with `QUEUE_ENABLED=true`, and a
+queue whose counts cannot be read within 2 s is left out of that scrape. For these, `absent()` is the
+correct alerting primitive.
+
+Two rows need care when aggregating. `openwa_queue_jobs` is read from the shared Redis, so every node
+reports the same cluster-wide value: aggregate it with `max`, not `sum`. The event-loop delay window
+runs from the previous uncached render (renders are cached for 5 s), so with several scrapers it is
+shared between them. `openwa_unhandled_rejections_total{kind="page_context_lost"}` counts the expected
+whatsapp-web.js navigation rejections; alert on `kind="other"`.
 
 `src/common/docs-metrics-list.spec.ts` compares this table against the metric names declared in
 `metrics.service.ts` and `request-metrics.ts`, and checks that every helper `render()` splices in is
