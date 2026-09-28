@@ -6,7 +6,7 @@ OpenWA uses a database to store:
 
 - Session configuration & state
 - Webhook configurations
-- Message history (optional)
+- Message history (with `STORE_EPHEMERAL_MESSAGES=false`, messages received in a disappearing-messages chat and sends made from the linked phone there are not stored; sends made through the API's message send routes still are; a product send is not)
 - API keys & authentication
 - Audit logs
 
@@ -498,7 +498,7 @@ CREATE TABLE automation_rules (
 
 ### 5.3.3 messages
 
-Stores message history (optional, can be disabled). This is a **plain (non-partitioned)** table — the same schema on SQLite and PostgreSQL.
+Stores message history. With `STORE_EPHEMERAL_MESSAGES=false`, a message received in a disappearing-messages chat is neither stored nor dispatched, a history sync skips such messages, and the echo of a send made from the linked phone there is dispatched but not stored. A send made through the API's message send routes into such a chat (single or bulk) is still stored, because those routes write their own row. A product send (`POST .../messages/send-product`) writes none and is dropped like a phone-side send (see [06 - API Specification](./06-api-specification.md)). This is a **plain (non-partitioned)** table — the same schema on SQLite and PostgreSQL.
 
 ```sql
 CREATE TABLE messages (
@@ -620,7 +620,8 @@ any rejection on `/api/health`), session
 lifecycle (`session_created`, `session_started`, `session_stopped`, `session_force_killed`,
 `session_logged_out`, `session_deleted`, `session_qr_generated`, `session_connected`,
 `session_disconnected`, `session_config_updated`), WhatsApp-imposed account restrictions (`session_restricted`,
-`session_restriction_lifted`), messages
+`session_restriction_lifted`), a refused relink of a session to a different WhatsApp number
+(`session_rebind_rejected`, written as a WARN row), messages
 (`message_sent`, `message_failed`), send-pacing enforcement (`send_pacing_blocked`, sampled to at
 most one row per session per minute; `send_breaker_tripped`, never sampled), webhooks (`webhook_created`, `webhook_deleted`,
 `webhook_triggered`, `webhook_failed`), rate-limit enforcement (`rate_limit_exceeded`, sampled to at
@@ -781,21 +782,20 @@ REINDEX TABLE messages;
 ```mermaid
 flowchart TB
     subgraph Inbound["Inbound Message"]
-        E[Engine Event] --> P[Process]
-        P --> S{Store Enabled?}
-        S -->|Yes| DB[(Database)]
-        S -->|No| W[Webhook Only]
-        DB --> W
+        E[Engine Event] --> G{Disappearing chat and STORE_EPHEMERAL_MESSAGES=false?}
+        G -->|Yes| D[Drop: no row, no webhook]
+        G -->|No| P[Hooks / Process]
+        P --> DB[(Insert, UNIQUE sessionId + waMessageId)]
+        DB -->|Duplicate| X[Stop]
+        DB -->|Stored, or a non-duplicate DB error| W[Webhook + WebSocket]
     end
 
-    subgraph Outbound["Outbound Message"]
+    subgraph Outbound["Outbound Message (single send)"]
         A[API Request] --> V[Validate]
-        V --> Q[Queue]
-        Q --> EN[Engine Send]
-        EN --> SR{Store Enabled?}
-        SR -->|Yes| DBO[(Database)]
-        SR -->|No| R[Response]
-        DBO --> R
+        V --> DBP[(Persist PENDING)]
+        DBP --> EN[Engine Send]
+        EN --> DBO[(Update SENT or FAILED)]
+        DBO --> R[Response]
     end
 ```
 
@@ -843,7 +843,7 @@ Migrations are hand-authored and idempotent (`IF NOT EXISTS`) so they are safe t
 ```
 src/database/migrations-main/      # main connection (auth + audit, SQLite)
 ├── 1779900000000-CreateAuthAuditTables.ts   # creates api_keys + audit_logs
-├── 1786600000000-AddApiKeyAllowedChats.ts   # api_keys.allowedChats
+├── 1786600000000-AddApiKeyAllowedChats.ts   # adds api_keys.allowedChats
 └── 1786610000000-DropSynchronizeIndexDuplicates.ts  # drops synchronize-named duplicate indexes
 
 src/database/migrations/           # data connection (pluggable)
@@ -876,14 +876,15 @@ src/database/migrations/           # data connection (pluggable)
 ├── 1785900000000-AddAutomationRules.ts            # 14th migration table; FKs sessions ON DELETE CASCADE
 ├── 1786000000000-AddSessionNodeUrl.ts
 ├── 1786100000000-AddMessageMediaPathIndex.ts   # partial index on messages.mediaPath (orphan sweep)
-├── 1786200000000-AddWebhookOutboxEvents.ts
-├── 1786300000000-AddWebhookDeliveryFailureLookupIndex.ts
-├── 1786400000000-AddChatStates.ts
-├── 1786500000000-ReKeyChatStatesBySessionId.ts
-├── 1786600000000-AddChatStateObserved.ts
-├── 1786600000000-AddSessionDesiredState.ts
+├── 1786200000000-AddWebhookOutboxEvents.ts   # webhook_outbox_events (durable outbound delivery record)
+├── 1786300000000-AddWebhookDeliveryFailureLookupIndex.ts   # (webhookId, idempotencyKey) lookup index
+├── 1786400000000-AddChatStates.ts   # chat_states (persisted mute/archive/pin)
+├── 1786500000000-ReKeyChatStatesBySessionId.ts   # re-keys chat_states from session name to session id
+├── 1786600000000-AddSessionDesiredState.ts   # sessions.desiredState (an operator stop survives a restart)
+├── 1786650000000-AddChatStateObserved.ts   # chat_states.observed (fields a row has seen)
 ├── 1786700000000-AddMessagesSessionChatCreatedAtIndex.ts   # (sessionId, chatId, createdAt): chat thread pages
-└── 1786800000000-AddBaileysStoredMessagesSessionCreatedIdIndex.ts   # (sessionId, createdAt, id) index for the Baileys store cap trim
+├── 1786800000000-AddBaileysStoredMessagesSessionCreatedIdIndex.ts   # (sessionId, createdAt, id) index for the Baileys store cap trim
+└── 1786900000000-ScrubRevokedMessageContent.ts   # clears content kept on rows revoked by earlier releases
 ```
 
 > [!NOTE]
