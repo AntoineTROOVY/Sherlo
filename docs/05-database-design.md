@@ -857,7 +857,8 @@ src/database/migrations/           # data connection (pluggable)
 ├── 1785800000000-AddSessionOwnership.ts
 ├── 1785900000000-AddAutomationRules.ts            # 14th migration table; FKs sessions ON DELETE CASCADE
 ├── 1786000000000-AddSessionNodeUrl.ts
-└── 1786100000000-AddMessageMediaPathIndex.ts   # partial index on messages.mediaPath (orphan sweep)
+├── 1786100000000-AddMessageMediaPathIndex.ts   # partial index on messages.mediaPath (orphan sweep)
+└── 1786800000000-AddBaileysStoredMessagesSessionCreatedIdIndex.ts   # (sessionId, createdAt, id) index for the Baileys store cap trim
 ```
 
 > [!NOTE]
