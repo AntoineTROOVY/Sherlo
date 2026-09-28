@@ -245,13 +245,13 @@ export class WwebjsContacts {
     await withPage(this.host, 'upsertContact', () =>
       this.client().saveOrEditAddressbookContact(userPart(contactId), firstName, lastName),
     );
-    this.host.logger.log(`Saved addressbook contact ${contactId}`);
+    this.host.logger.debug('Saved addressbook contact', { contactId });
   }
 
   async deleteContact(contactId: string): Promise<void> {
     this.host.ensureReady();
     await withPage(this.host, 'deleteContact', () => this.client().deleteAddressbookContact(userPart(contactId)));
-    this.host.logger.log(`Deleted addressbook contact ${contactId}`);
+    this.host.logger.debug('Deleted addressbook contact', { contactId });
   }
 
   async blockContact(contactId: string): Promise<void> {
@@ -260,7 +260,7 @@ export class WwebjsContacts {
       const contact = await this.client().getContactById(contactId);
       await contact.block();
     });
-    this.host.logger.log(`Blocked contact ${contactId}`);
+    this.host.logger.debug('Blocked contact', { contactId });
   }
 
   /**
@@ -280,7 +280,7 @@ export class WwebjsContacts {
       const contact = await this.client().getContactById(contactId);
       await contact.unblock();
     });
-    this.host.logger.log(`Unblocked contact ${contactId}`);
+    this.host.logger.debug('Unblocked contact', { contactId });
   }
 
   async getProfilePicture(contactId: string): Promise<string | null> {

@@ -2131,6 +2131,23 @@ describe('SessionService', () => {
       }
     });
 
+    it('keeps the account number out of the ready line message, in its metadata only', () => {
+      const i = internals();
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      const engine = { getStatus: jest.fn().mockReturnValue(EngineStatus.READY) };
+      i.engines.set('sess-uuid-1', engine);
+      const logger = (lifecycle as unknown as { logger: { log: () => void } }).logger;
+      const log = jest.spyOn(logger, 'log');
+
+      try {
+        i.handleEngineReady('sess-uuid-1', engine, '628123', 'Tester');
+
+        expect(log).toHaveBeenCalledWith('Session ready', expect.objectContaining({ phone: '628123' }));
+      } finally {
+        log.mockRestore();
+      }
+    });
+
     it('resets the attempt budget only after a stable READY, never because time passed between attempts', () => {
       jest.useFakeTimers();
       try {
@@ -7513,6 +7530,22 @@ describe('SessionService', () => {
       } finally {
         log.mockRestore();
         warn.mockRestore();
+      }
+    });
+
+    // The caller is a third party; callId already ties the log line to the call.received event.
+    it("logs the incoming call without the caller's number", async () => {
+      const onCall = await startAndCaptureCallCallback();
+      const logger = (lifecycle as unknown as { logger: { log: () => void } }).logger;
+      const log = jest.spyOn(logger, 'log');
+
+      try {
+        onCall(callEvent({ from: '628111@c.us' }));
+
+        expect(log).toHaveBeenCalledWith('Incoming call', expect.objectContaining({ callId: 'CALL1' }));
+        expect(JSON.stringify(log.mock.calls)).not.toContain('628111');
+      } finally {
+        log.mockRestore();
       }
     });
 

@@ -803,7 +803,7 @@ export class SessionEngineLifecycle {
   /** Engine callback body, lifted out of initializeEngine so the wiring table stays readable. */
   private handleEngineReady(id: string, engine: IWhatsAppEngine, phone: string, pushName: string): void {
     if (!this.isLiveEngine(id, engine)) return;
-    this.logger.log(`Session ready: ${phone}`, {
+    this.logger.log('Session ready', {
       sessionId: id,
       phone,
       pushName,

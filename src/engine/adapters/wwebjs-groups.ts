@@ -344,7 +344,7 @@ export class WwebjsGroups {
     if (!inviteCode) {
       throw new EngineRefusedError(`Failed to get the invite code for group ${groupId} — admin rights required`);
     }
-    this.host.logger.log(`Got invite code for group ${groupId}`);
+    this.host.logger.debug('Got group invite code', { groupId });
     return inviteCode;
   }
 
@@ -354,7 +354,7 @@ export class WwebjsGroups {
     if (!newCode) {
       throw new EngineRefusedError(`Failed to revoke the invite code for group ${groupId} — admin rights required`);
     }
-    this.host.logger.log(`Revoked invite code for group ${groupId}, new code generated`);
+    this.host.logger.debug('Revoked group invite code, new code generated', { groupId });
     return newCode;
   }
 
@@ -450,7 +450,7 @@ export class WwebjsGroups {
     if (!groupId) {
       throw new InvalidInviteCodeError();
     }
-    this.host.logger.log(`Joined group ${groupId} via invite code`);
+    this.host.logger.debug('Joined group via invite code', { groupId });
     return groupId;
   }
 

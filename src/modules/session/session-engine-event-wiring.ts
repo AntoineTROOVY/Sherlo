@@ -282,7 +282,7 @@ export class SessionEngineEventWiring {
       },
       onCall: (event: IncomingCallEvent): void => {
         if (!host.isLiveEngine(id, engine)) return;
-        this.logger.log(`Incoming call from ${event.from}`, {
+        this.logger.log('Incoming call', {
           sessionId: id,
           callId: event.callId,
           isVideo: event.isVideo,

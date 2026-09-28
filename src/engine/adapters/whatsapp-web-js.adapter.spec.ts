@@ -8464,3 +8464,83 @@ describe('WhatsAppWebJsAdapter raw-id extraction hardening', () => {
     expect(info.participantCount).toBe(3);
   });
 });
+
+// A chat, contact or group id belongs to a third party, and a serialized message id embeds the chat JID:
+// the per-action lines keep them out of info-level output and carry them as debug metadata only.
+describe('WhatsAppWebJsAdapter per-action log lines', () => {
+  const CHAT = '628123@c.us';
+  const MESSAGE_ID = `false_${CHAT}_3EB0ABC`;
+  const GROUP = '120363777000@g.us';
+
+  const readyAdapter = (client: unknown): WhatsAppWebJsAdapter => {
+    const adapter = new WhatsAppWebJsAdapter({ sessionId: 's', sessionDataPath: './data/sessions', puppeteer: {} });
+    (adapter as unknown as { status: EngineStatus }).status = EngineStatus.READY;
+    (adapter as unknown as { client: unknown }).client = client;
+    return adapter;
+  };
+
+  it.each<[string, () => unknown, (a: WhatsAppWebJsAdapter) => Promise<unknown>, string, string, object]>([
+    [
+      'deleteContact',
+      () => ({ deleteAddressbookContact: jest.fn().mockResolvedValue(undefined) }),
+      a => a.deleteContact(CHAT),
+      '628123',
+      'Deleted addressbook contact',
+      { contactId: CHAT },
+    ],
+    [
+      'blockContact',
+      () => ({ getContactById: jest.fn().mockResolvedValue({ block: jest.fn().mockResolvedValue(true) }) }),
+      a => a.blockContact(CHAT),
+      '628123',
+      'Blocked contact',
+      { contactId: CHAT },
+    ],
+    [
+      'reactToMessage',
+      () => ({
+        getChatById: jest.fn().mockResolvedValue({
+          fetchMessages: jest
+            .fn()
+            .mockResolvedValue([{ id: { _serialized: MESSAGE_ID }, react: jest.fn().mockResolvedValue(undefined) }]),
+        }),
+      }),
+      a => a.reactToMessage(CHAT, MESSAGE_ID, 'x'),
+      '628123',
+      'Reacted to message',
+      { messageId: MESSAGE_ID },
+    ],
+    [
+      'addLabelToChat',
+      () => ({
+        getChatById: jest.fn().mockResolvedValue({ getLabels: jest.fn().mockResolvedValue([]) }),
+        getLabels: jest.fn().mockResolvedValue([{ id: 'L1', name: 'L1', hexColor: '#fff' }]),
+        addOrRemoveLabels: jest.fn().mockResolvedValue(undefined),
+      }),
+      a => a.addLabelToChat(CHAT, 'L1'),
+      '628123',
+      'Added label to chat',
+      { labelId: 'L1', chatId: CHAT },
+    ],
+    [
+      'getGroupInviteCode',
+      () => ({
+        getChatById: jest.fn().mockResolvedValue({ isGroup: true, getInviteCode: jest.fn().mockResolvedValue('C0DE') }),
+      }),
+      a => a.getGroupInviteCode(GROUP),
+      '120363777000',
+      'Got group invite code',
+      { groupId: GROUP },
+    ],
+  ])('%s logs the id at debug only', async (_name, client, call, id, message, meta) => {
+    const adapter = readyAdapter(client());
+    const logger = (adapter as unknown as { logger: { log: () => void; debug: () => void } }).logger;
+    const log = jest.spyOn(logger, 'log');
+    const debug = jest.spyOn(logger, 'debug').mockImplementation(() => undefined);
+
+    await call(adapter);
+
+    expect(JSON.stringify(log.mock.calls)).not.toContain(id);
+    expect(debug).toHaveBeenCalledWith(message, expect.objectContaining(meta));
+  });
+});
