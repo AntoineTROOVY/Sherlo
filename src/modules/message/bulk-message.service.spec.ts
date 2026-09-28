@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, HttpException, Logger, PayloadTooLargeException } from '@nestjs/common';
+import { BadRequestException, HttpException, PayloadTooLargeException } from '@nestjs/common';
+import { LoggerService } from '../../common/services/logger.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { In, Not } from 'typeorm';
 import {
@@ -124,7 +125,7 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
     repo.update.mockImplementation((where: { id: string }) =>
       Promise.resolve({ affected: where.id === 'b-dead' ? 1 : 0 }),
     );
-    const warn = jest.spyOn((service as unknown as { logger: Logger }).logger, 'warn').mockImplementation();
+    const warn = jest.spyOn((service as unknown as { logger: LoggerService }).logger, 'warn').mockImplementation();
 
     await service.onApplicationBootstrap();
 

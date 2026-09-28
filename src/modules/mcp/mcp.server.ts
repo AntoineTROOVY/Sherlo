@@ -1,4 +1,5 @@
-import { ForbiddenException, HttpException, Logger, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, HttpException, UnauthorizedException } from '@nestjs/common';
+import { createLogger } from '../../common/services/logger.service';
 import type { HttpAdapterHost } from '@nestjs/core';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AnySchema } from '@modelcontextprotocol/sdk/server/zod-compat.js';
@@ -17,7 +18,7 @@ import { limiterKeyForIp, resolveClientIp } from '../../common/utils/ip';
 import { resolveBodyLimit } from '../../config/bootstrap-security';
 import { bearerToken } from '../../common/security/bearer-token';
 
-const logger = new Logger('McpServer');
+const logger = createLogger('McpServer');
 
 type HttpAdapter = NonNullable<HttpAdapterHost['httpAdapter']>;
 type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;

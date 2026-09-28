@@ -1,4 +1,5 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { createLogger } from '../../common/services/logger.service';
 import Docker from 'dockerode';
 import { isEnvPinned, isOsProvidedEnv } from '../../config/env-precedence';
 import { readGeneratedEnv } from '../infra/generated-env';
@@ -28,7 +29,7 @@ interface OrchestrationResult {
 
 @Injectable()
 export class DockerService implements OnModuleInit {
-  private readonly logger = new Logger(DockerService.name);
+  private readonly logger = createLogger(DockerService.name);
   private docker: Docker | null = null;
   private isAvailable = false;
   private reinitInFlight = false;
@@ -93,10 +94,9 @@ export class DockerService implements OnModuleInit {
       this.isAvailable = true;
       this.logger.log('Docker API connected successfully');
     } catch (error) {
-      this.logger.warn(
-        'Docker not available. Container orchestration disabled.',
-        error instanceof Error ? error.message : error,
-      );
+      this.logger.warn('Docker not available. Container orchestration disabled.', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       this.isAvailable = false;
     }
   }
@@ -640,7 +640,7 @@ export async function prestartBuiltinDatabase(
   timeoutMs = 15_000,
 ): Promise<void> {
   if (env.DATABASE_TYPE !== 'postgres' || env.POSTGRES_BUILTIN !== 'true') return;
-  const logger = new Logger('DockerService');
+  const logger = createLogger('DockerService');
   let timer: NodeJS.Timeout | undefined;
   const deadline = new Promise<void>(resolve => {
     timer = setTimeout(() => {

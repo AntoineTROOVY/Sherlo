@@ -1053,6 +1053,10 @@ defaulting to `json` under `NODE_ENV=production` and `pretty` elsewhere. Metadat
 looks like a secret (password, token, api-key, authorization, …) keeps the key and has its **value**
 replaced with `[REDACTED]` before the line is written.
 
+The same logger is installed as Nest's framework logger, so framework lines (route mapping, unhandled
+exception stacks from the exception handler) follow `LOG_LEVEL` and `LOG_FORMAT` and carry the
+request id like every other line; they are tagged `[OpenWA]` in pretty output, not `[Nest]`.
+
 There is no in-app Loki transport: in the stack above, logs reach Loki because **promtail** scrapes
 the container's stdout and stderr from `/var/lib/docker/containers`.
 

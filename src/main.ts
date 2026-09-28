@@ -122,8 +122,10 @@ async function bootstrap() {
   // must be started before it, not from DockerService.onModuleInit (see the helper).
   await prestartBuiltinDatabase();
 
-  // Disable Nest's default body parser so we can set an explicit size cap below.
-  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  // Disable Nest's default body parser so we can set an explicit size cap below. Framework lines
+  // (route mapping, unhandled-exception stacks) go through the app logger so LOG_LEVEL, LOG_FORMAT and
+  // the request id apply to them too.
+  const app = await NestFactory.create(AppModule, { bodyParser: false, logger: createLogger('Nest') });
   appInstance = app;
 
   // Cross-replica WebSocket fan-out: when Redis is enabled, broadcasts reach clients on every

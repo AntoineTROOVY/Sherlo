@@ -1,11 +1,5 @@
-import {
-  Injectable,
-  Logger,
-  BadRequestException,
-  NotFoundException,
-  Optional,
-  OnApplicationBootstrap,
-} from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Optional, OnApplicationBootstrap } from '@nestjs/common';
+import { createLogger } from '../../common/services/logger.service';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Not, QueryDeepPartialEntity, Repository } from 'typeorm';
@@ -103,7 +97,7 @@ interface BatchExecutionState {
 
 @Injectable()
 export class BulkMessageService implements OnApplicationBootstrap {
-  private readonly logger = new Logger(BulkMessageService.name);
+  private readonly logger = createLogger(BulkMessageService.name);
   private readonly processingBatches = new Map<string, boolean>(); // Track active batches for cancellation
   private inFlightBatches = 0; // count of batches currently in processBatch (memory bound, see cap above)
 
