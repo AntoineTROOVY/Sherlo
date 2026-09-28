@@ -185,7 +185,7 @@ Media bodies share the `SendMediaRequest` shape: `{ chatId, url? | base64?, mime
 | ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------ |
 | `list`            | `list(sessionId, query?)`              | List contacts known to the session.                                                  |
 | `get`             | `get(sessionId, contactId)`            | Get details for a single contact by JID.                                             |
-| `check`           | `check(sessionId, number)`             | Check whether a phone number is registered on WhatsApp.                              |
+| `check`           | `check(sessionId, number)`             | Check whether a phone number is registered on WhatsApp. **OPERATOR**                 |
 | `profilePicture`  | `profilePicture(sessionId, contactId)` | Get the contact's profile picture URL (or null).                                     |
 | `profilePictures` | `profilePictures(sessionId, ids)`      | Batch-resolve profile picture URLs for up to 50 contacts in one request.             |
 | `phone`           | `phone(sessionId, contactId)`          | Resolve a contact id (e.g. a `@lid`) to a phone number.                              |
@@ -559,7 +559,7 @@ Resources are accessed as properties on the client (e.g. `client.messages`). All
 | ------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `list`             | `list(session_id, query=None) -> list[ContactRecord]`               | List contacts (`query`: `limit`, `offset`).                                          |
 | `get`              | `get(session_id, contact_id) -> ContactRecord`                      | Get one contact.                                                                     |
-| `check`            | `check(session_id, number) -> CheckNumberResponse`                  | Check whether a number is on WhatsApp.                                               |
+| `check`            | `check(session_id, number) -> CheckNumberResponse`                  | Check whether a number is on WhatsApp. **OPERATOR**                                  |
 | `profile_picture`  | `profile_picture(session_id, contact_id) -> ProfilePictureResponse` | Get a contact's profile picture.                                                     |
 | `profile_pictures` | `profile_pictures(session_id, ids) -> ProfilePicturesResponse`      | Batch-resolve profile picture URLs for up to 50 contacts.                            |
 | `phone`            | `phone(session_id, contact_id) -> ContactPhoneResponse`             | Resolve a contact's phone number.                                                    |
@@ -909,7 +909,7 @@ All payloads are associative arrays; all listed methods are synchronous and retu
 | ----------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
 | `list`            | `list(string $sessionId, array $query = []): array`                | List contacts.                                                                       |
 | `get`             | `get(string $sessionId, string $contactId): array`                 | Get one contact.                                                                     |
-| `check`           | `check(string $sessionId, string $number): array`                  | Check whether a number is on WhatsApp.                                               |
+| `check`           | `check(string $sessionId, string $number): array`                  | Check whether a number is on WhatsApp. **OPERATOR**                                  |
 | `profilePicture`  | `profilePicture(string $sessionId, string $contactId): array`      | Get a contact's profile picture.                                                     |
 | `profilePictures` | `profilePictures(string $sessionId, array $ids): array`            | Batch-resolve profile picture URLs for up to 50 contacts in one request.             |
 | `phone`           | `phone(string $sessionId, string $contactId): array`               | Resolve a contact's phone number.                                                    |

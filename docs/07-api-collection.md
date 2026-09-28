@@ -619,7 +619,7 @@ curl -X GET "$BASE/api/sessions/$SESSION_ID/contacts?limit=100&offset=0" \
 
 #### GET /api/sessions/:sessionId/contacts/check/:number
 
-Check whether a phone number is on WhatsApp.
+Check whether a phone number is on WhatsApp. Requires an `OPERATOR` key.
 
 ```bash
 curl -X GET "$BASE/api/sessions/$SESSION_ID/contacts/check/628123456789" \
