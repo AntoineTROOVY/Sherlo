@@ -550,8 +550,9 @@ Real-time updates use **socket.io** (`socket.io-client`), not a raw browser `Web
 `src/hooks/useWebSocket.ts`. Key facts:
 
 - **Namespace `/events`** (not `/ws`). The client connects to `<origin>/events`, where the origin is
-  `VITE_WS_URL` when set, else the origin of `VITE_API_URL` (so a split-origin build reaches the
-  API), else `window.location.origin`.
+  that of `VITE_WS_URL` when set, else that of `VITE_API_URL` (so a split-origin build reaches the
+  API), else `window.location.origin`. A path or trailing slash on either variable is dropped, and a
+  value with no scheme (`host:port`) is dialled on the page's protocol.
 - **API key via the socket.io `auth` payload (and an `X-API-Key` header for proxies), deliberately
   _not_ in the query string** — a key in the handshake URL would leak into access logs / `Referer`.
 - **Reconnection is socket.io's built-in mechanism** — `reconnectionAttempts: 5`,
@@ -570,7 +571,7 @@ import { io, Socket } from 'socket.io-client';
 import { API_ORIGIN } from '../services/api';
 import { resolveSocketUrl } from '../utils/urlSecurity';
 
-// VITE_WS_URL, else the VITE_API_URL origin, else the page origin.
+// The origin of VITE_WS_URL, else of VITE_API_URL, else the page origin.
 const SOCKET_URL = resolveSocketUrl(import.meta.env.VITE_WS_URL, API_ORIGIN, window.location.origin);
 
 interface ServerEventEnvelope {
