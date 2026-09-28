@@ -709,7 +709,7 @@ test('a refused restart shows the server reason and never polls readiness', { ti
 
 test(
   'a proxy timeout on the restart request reports an unknown outcome, not a failure',
-  { timeout: 10_000 },
+  { timeout: 12_000 },
   async () => {
     const { screen, fireEvent, within } = rtl;
     resetFetchCalls();
@@ -742,8 +742,10 @@ test(
       );
       assert.equal(within(dialog).queryByText('Restart failed'), null);
       assert.equal(within(dialog).queryByText('HTTP 504'), null);
-      // Past the first readiness poll (3s) and the 2s reload a confirmed restart schedules.
-      await new Promise(resolve => setTimeout(resolve, 3500));
+      assert.ok(within(dialog).getByText('Please wait…'), 'the unknown outcome has no neutral title');
+      assert.ok(within(dialog).getByRole('button', { name: 'Reload Page' }), 'no way to reload by hand');
+      // Past the first readiness poll (3s) and the reload a confirmed restart schedules 2s after it.
+      await new Promise(resolve => setTimeout(resolve, 5500));
       assert.equal(findFetchCall('GET', '/api/health/ready'), undefined);
       assert.deepEqual(navigations, [], 'the page reloaded on its own');
     } finally {
@@ -751,6 +753,44 @@ test(
     }
   },
 );
+
+async function clickRestartNow() {
+  const { screen, fireEvent, within } = rtl;
+  renderInfrastructure();
+  await screen.findByText('Database Configuration');
+  fireEvent.click(screen.getByRole('button', { name: 'Save Configuration' }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Restart Now' }));
+  return dialog;
+}
+
+test('a proxy 502 without a gateway code on the restart request reports an unknown outcome', async () => {
+  const { within } = rtl;
+  resetFetchCalls();
+  overrides = {
+    restart: () =>
+      new Response('<html><body>502 Bad Gateway</body></html>', {
+        status: 502,
+        headers: { 'Content-Type': 'text/html' },
+      }),
+  };
+  const dialog = await clickRestartNow();
+
+  await within(dialog).findByText(
+    'The proxy timed out before the server answered. The restart may still be in progress; reload in a minute to check.',
+  );
+  assert.equal(within(dialog).queryByText('Restart failed'), null);
+});
+
+test('a 502 the gateway stamped with a code is a refusal, not an unknown outcome', async () => {
+  const { within } = rtl;
+  resetFetchCalls();
+  overrides = { restart: () => jsonResponse({ message: 'Compose rejected the profile', code: 'SOME_CODE' }, 502) };
+  const dialog = await clickRestartNow();
+
+  await within(dialog).findByText('Restart failed');
+  assert.ok(within(dialog).getByText('Compose rejected the profile'), 'the server reason is not shown');
+});
 
 test(
   'services that failed to start are shown after the restart instead of reloading over them',
