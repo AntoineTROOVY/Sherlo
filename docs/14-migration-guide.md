@@ -873,15 +873,21 @@ echo "🔄 Rolling back to v${TARGET_VERSION}..."
 # 1. Stop current
 docker compose down
 
-# 2. Restore database
+# 2. Restore the databases, both from the same backup. The main DB (API keys, audit log) is always
+#    SQLite, whatever the data store is. Stale journal files go first, as scripts/restore.sh does,
+#    so SQLite cannot replay them into the restored file.
 echo "📥 Restoring database..."
 if [ -f "$BACKUP_DIR/database.sql" ]; then
     # PostgreSQL
     psql -h "$DATABASE_HOST" -U "$DATABASE_USERNAME" -d "$DATABASE_NAME" < "$BACKUP_DIR/database.sql"
 else
     # SQLite
+    rm -f ./data/openwa.sqlite-{wal,shm,journal}
     cp "$BACKUP_DIR/openwa.sqlite" ./data/
 fi
+rm -f ./data/main.sqlite-{wal,shm,journal}
+cp "$BACKUP_DIR/main.sqlite" ./data/
+[ -f "$BACKUP_DIR/.api-key" ] && cp "$BACKUP_DIR/.api-key" ./data/
 
 # 3. Restore auth sessions (SESSION_DATA_PATH + BAILEYS_AUTH_DIR)
 echo "📥 Restoring auth sessions..."
@@ -905,10 +911,15 @@ sleep 10
 curl -f http://localhost:2785/api/health && echo "✅ Rollback successful"
 ```
 
+The main DB and `.api-key` must come from the same backup as the data store. Restoring `main.sqlite`
+returns every API key to its state at backup time: keys created since then are gone, and keys revoked
+since then work again, so revoke those again after the rollback.
+
 > [!TIP]
 > For an archive produced by `scripts/backup.sh`, follow
 > [11 - Runbook: Restore from Backup](./11-operational-runbooks.md#runbook-restore-from-backup)
-> instead. It also restores the Main DB (`main.sqlite`), which the script above does not touch, and
+> instead. It restores the databases, `.api-key`, the auth state, media and plugin state from the
+> archive, but not the host `.env` or compose file, which step 4 above covers, and
 > it runs `scripts/restore.sh` from the image against the production compose named volume
 > (`openwa-data`) or the Helm PVC. A host run of `./scripts/restore.sh`, like the copies into `./data`
 > above, reaches only a bare-metal install or `docker-compose.dev.yml`, which bind-mounts `./data`;
@@ -950,6 +961,24 @@ flowchart TD
 > back.
 > A session first paired on the newer image is not in that backup and must be paired again either way.
 > Baileys sessions are unaffected.
+
+> [!WARNING]
+> A rollback to a release older than 0.23.6 loses API key chat scopes. Those images do not know
+> `allowedChats`, so while one runs, a chat-scoped key reaches every chat of the sessions it is
+> allowed. Restoring `main.sqlite` from a backup taken before the upgrade, as the script above and
+> [11 - Runbook: Version Upgrade](./11-operational-runbooks.md#runbook-version-upgrade) do, avoids the
+> rest of this. Keeping the current `main.sqlite` (changing only the image tag, or `helm rollback`,
+> which keeps the volume) does not: at its first boot the older image's schema sync drops the
+> `allowedChats` column. Upgrading again then stops boot with a `MainSchemaMismatchError` naming
+> `api_keys.allowedChats`, because the migrations ledger that 0.24.0 and later write still records the
+> column's migration. To recover, restore `main.sqlite` from the backup taken before the rollback,
+> which brings the chat scopes back with it, or delete that ledger row as
+> [05 - Database Design, section 5.6](./05-database-design.md#56-migration-strategy) shows, after which
+> the column comes back empty, which means every chat. Before such a rollback, revoke every key that has
+> `allowedChats` (`POST /api/auth/api-keys/:id/revoke`) and issue new ones after upgrading again.
+> Starting the older image with `MAIN_DATABASE_SYNCHRONIZE=false` keeps the column and its values for
+> the next upgrade (the compose file forwards it since 0.14.5), but the older image still does not
+> enforce them.
 
 ## 14.7 Environment Migration
 

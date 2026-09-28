@@ -586,6 +586,17 @@ curl -H "X-API-Key: $API_KEY" http://localhost:2785/api/health
 > start on 0.23.5. Restoring both directories from that backup returns every session to its previous
 > pairing.
 
+> Rolling back past 0.23.6 loses API key chat scopes: an older image does not enforce `allowedChats`.
+> The restore in step 2 returns every key to its state at backup time, so keys revoked since then work
+> again; revoke them again. Changing only the image tag, or `helm rollback`, keeps the current
+> `main.sqlite`, and the older image's schema sync then drops the `allowedChats` column. If 0.24.0 or
+> later last booted that file, the next upgrade refuses to boot, naming `api_keys.allowedChats`, until
+> `main.sqlite` is restored, which brings the scopes back, or the column's ledger row is deleted, after
+> which the column comes back empty (every chat). A file whose ledger lacks that migration (0.23.6 and
+> 0.23.7 on their default `MAIN_DATABASE_SYNCHRONIZE`) is not detected and boots with the column
+> empty. Revoke every chat-scoped key before such a rollback. See the warning in
+> [14 - Migration Guide: Rollback Procedures](./14-migration-guide.md#146-rollback-procedures).
+
 ---
 
 ### Runbook: Database Backup
