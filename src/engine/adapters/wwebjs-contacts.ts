@@ -1,4 +1,5 @@
 import { type Client } from 'whatsapp-web.js';
+import { InternalServerErrorException } from '@nestjs/common';
 import { Contact } from '../interfaces/whatsapp-engine.interface';
 import { EngineTransportError } from '../../common/errors/engine-transport.error';
 import { userPart } from '../identity/wa-id';
@@ -167,10 +168,13 @@ export class WwebjsContacts {
     // contacts: getContactModel skips getAlternateUserWid for a blocked contact, so a blocked row
     // still reads when that call is broken for everyone else.
     if ((unreadable > 0 && !contacts.some(c => !c.isBlocked)) || (contacts.length === 0 && skipped > 0)) {
-      throw new Error(
+      const reason =
         `WhatsApp Web could not read any unblocked contact (${unreadable} failed, ${skipped} without an id, ` +
-          `${contacts.length} blocked read)${firstError ? `: ${firstError}` : ''}`,
-      );
+        `${contacts.length} blocked read)${firstError ? `: ${firstError}` : ''}`;
+      // Nest does not log an HttpException and the contact service logs nothing, so this line is the
+      // only server-side trace of a page-wide failure.
+      this.host.logger.error(reason);
+      throw new InternalServerErrorException(reason);
     }
     if (skipped > 0) {
       this.host.logger.warn(`Skipped ${skipped} contact(s) without a serialized id`);

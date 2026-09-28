@@ -9,6 +9,7 @@ import {
 } from '../interfaces/whatsapp-engine.interface';
 import { EngineNotReadyError } from '../../common/errors/engine-not-ready.error';
 import { EngineTransportError } from '../../common/errors/engine-transport.error';
+import { EnginePageError } from '../../common/errors/engine-page.error';
 import { type createLogger } from '../../common/services/logger.service';
 import { DEFAULT_PUPPETEER_ARGS, MAX_TIMER_MS, withPinnedBrowserLocale } from '../../config/configuration';
 import { resolveWebVersionPin } from '../wa-web-version';
@@ -75,6 +76,37 @@ export function isProtocolTimeout(error: unknown): boolean {
  * and wwebjs-send-page-error.spec.ts pins the two equal.
  */
 export const CAPTURED_PAGE_ERROR_PREFIX = 'page threw ';
+
+/** A summary field the patcher could not read, or read off a value that lacks it. */
+const EMPTY_SUMMARY_FIELD = new Set(['', 'undefined', 'null', '(unreadable)']);
+
+/**
+ * Turn a captured page error into an {@link EnginePageError} that tells the caller what WhatsApp Web
+ * threw; anything else, a summary that does not parse included, comes back unchanged. The thrown
+ * value can be anything, so the name falls back to its constructor and the message to its string.
+ */
+export function toCapturedPageError(error: unknown): unknown {
+  if (!(error instanceof Error) || !error.message.startsWith(CAPTURED_PAGE_ERROR_PREFIX)) return error;
+  let info: Record<string, unknown>;
+  try {
+    info = JSON.parse(error.message.slice(CAPTURED_PAGE_ERROR_PREFIX.length)) as Record<string, unknown>;
+  } catch {
+    return error;
+  }
+  if (!info || typeof info !== 'object') return error;
+  const pick = (...keys: string[]): string => {
+    for (const key of keys) {
+      const value = info[key];
+      if (typeof value === 'string' && !EMPTY_SUMMARY_FIELD.has(value)) return value;
+    }
+    return '';
+  };
+  const build = pick('build');
+  return new EnginePageError(
+    { name: pick('name', 'ctor') || 'Error', message: pick('message', 'str'), ...(build ? { build } : {}) },
+    error,
+  );
+}
 
 /**
  * requestPairingCode retry budget. WhatsApp Web reloads the QR page while UNPAIRED, so a pairing

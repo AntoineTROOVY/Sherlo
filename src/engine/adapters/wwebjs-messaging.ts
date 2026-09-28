@@ -24,6 +24,7 @@ import { buildVCard } from './vcard';
 import { EngineNotSupportedError } from '../../common/errors/engine-not-supported.error';
 import { RecipientUnreachableError } from '../../common/errors/recipient-unreachable.error';
 import { type WwebjsEngineHost, withPage } from './wwebjs-host';
+import { toCapturedPageError } from './wwebjs-lifecycle';
 
 /**
  * Map a whatsapp-web.js MessageAck integer to the neutral DeliveryStatus.
@@ -349,7 +350,7 @@ export class WwebjsMessaging {
         throw new MessageNotFoundError(quotedMessageId);
       }
       if (!chatId.endsWith('@c.us') || !isNoLidForUserError(err)) {
-        throw err;
+        throw toCapturedPageError(err);
       }
       this.resolvedSendIds.delete(chatId);
       const fresh = await this.resolveSendId(chatId);
@@ -378,7 +379,7 @@ export class WwebjsMessaging {
         if (isNoLidForUserError(retryErr)) {
           throw new RecipientUnreachableError(chatId);
         }
-        throw retryErr;
+        throw toCapturedPageError(retryErr);
       }
     }
   }

@@ -6227,10 +6227,17 @@ describe('WhatsAppWebJsAdapter page transport error detection (wedged page fast-
   it('fails the read when WhatsApp Web could not read any contact', async () => {
     const evaluate = jest.fn().mockResolvedValue({ rows: [], failed: 3, firstError: 'x is not a function' });
     const { adapter, onDisconnected } = readyAdapter({ pupPage: { evaluate } });
+    const logger = (adapter as unknown as { logger: { error: (m: string) => void } }).logger;
+    const errorSpy = jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const reason =
+      'WhatsApp Web could not read any unblocked contact (3 failed, 0 without an id, 0 blocked read): x is not a function';
 
-    await expect(adapter.getContacts()).rejects.toThrow(
-      'WhatsApp Web could not read any unblocked contact (3 failed, 0 without an id, 0 blocked read): x is not a function',
-    );
+    const failure = adapter.getContacts();
+    await expect(failure).rejects.toThrow(reason);
+    // The documented 500 carries its reason: a bare Error would answer Nest's context-free one.
+    await expect(failure).rejects.toBeInstanceOf(InternalServerErrorException);
+    // Nest does not log an HttpException, so the page-wide failure needs its own server log line.
+    expect(errorSpy).toHaveBeenCalledWith(reason);
     expect(onDisconnected).not.toHaveBeenCalled();
   });
 

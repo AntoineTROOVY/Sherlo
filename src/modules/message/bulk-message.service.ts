@@ -571,7 +571,15 @@ export class BulkMessageService implements OnApplicationBootstrap {
         );
       }
 
-      this.logger.warn(`Batch ${batch.batchId}: Failed message ${i + 1} to ${msg.chatId}: ${sanitized.message}`);
+      // The log alone carries the cause: an EnginePageError keeps the full in-page summary (stack,
+      // own properties) there, and this batch runs in the background, so no other log sees it.
+      const cause =
+        !(error instanceof SsrfBlockedError) && error instanceof Error && error.cause instanceof Error
+          ? ` (cause: ${error.cause.message})`
+          : '';
+      this.logger.warn(
+        `Batch ${batch.batchId}: Failed message ${i + 1} to ${msg.chatId}: ${sanitized.message}${cause}`,
+      );
 
       if (batch.options.stopOnError) {
         batch.status = BatchStatus.FAILED;
