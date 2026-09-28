@@ -273,7 +273,7 @@ export class SessionEngineControls {
       if (await this.host.isSessionRetired(id)) {
         const resurrected = this.engines.get(id);
         if (resurrected) {
-          await this.fences.teardownEngineSafely(id, resurrected, e => e.destroy(), 'destroy');
+          await this.fences.destroyWithEscalation(id, resurrected);
           this.engines.deleteIfLive(id, resurrected);
         }
         // A delete() that raced this start purged the on-disk auth dirs BEFORE this init re-created
@@ -668,14 +668,15 @@ export class SessionEngineControls {
    * so an engine orphaned by a restore was previously unstoppable until process restart.
    *
    * Each id is handled in isolation and time-bounded: a stuck Chromium/socket on one orphan can
-   * neither stall nor abort the others, and the whole call is bounded by teardownEngineSafely's
-   * per-engine 10s deadline. The mark + reconnect-cancel happen first so an in-flight reconnect
+   * neither stall nor abort the others, and the whole call is bounded by two of teardownEngineSafely's
+   * 10s deadlines per engine (destroy, then the forceDestroy escalation). The mark + reconnect-cancel happen first so an in-flight reconnect
    * cannot resurrect the id while teardown runs. Engines that are mid-initialization (no entry in
    * `engines` yet) are marked but cannot be torn down here — their start() will see the stop mark
    * via its existing guard and self-abort; the caller learns about them in `notRunning`.
    *
-   * Always resolves. Best-effort: a `failed` entry means teardown threw or timed out, and the engine
-   * is removed from the Map regardless so it stops holding a concurrency slot.
+   * Always resolves. Best-effort: a `failed` entry means destroy and the forceDestroy escalation both
+   * threw or timed out, and the engine is removed from the Map regardless so it stops holding a
+   * concurrency slot.
    */
   async stopOrphanEngines(
     sessionIds: string[],
@@ -700,7 +701,7 @@ export class SessionEngineControls {
           return;
         }
         try {
-          const tornDown = await this.fences.destroyEngineSafely(id, engine);
+          const tornDown = await this.fences.destroyWithEscalation(id, engine);
           // The engine leaves the Map regardless of teardown outcome so it stops holding a
           // concurrency slot — but only a completed teardown counts as `stopped`. A throw/timeout
           // means the Chromium/socket may still be alive and writing, so the id lands in `failed`
@@ -713,7 +714,7 @@ export class SessionEngineControls {
             failed.push(id);
           }
         } catch (err) {
-          // destroyEngineSafely never throws today (it isolates via teardownEngineSafely), but defend
+          // destroyWithEscalation never throws today (it isolates via teardownEngineSafely), but defend
           // against a future change so a single orphan cannot abort the batch.
           this.logger.error(`Failed to stop orphan engine for session ${id}`, String(err), {
             sessionId: id,

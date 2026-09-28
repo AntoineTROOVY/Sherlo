@@ -492,9 +492,9 @@ export class InfraDataService {
     }
 
     if (orphanedEngines.length > 0 && data.stopOrphans && this.sessionService) {
-      // Stop the orphans inside this request, BEFORE the transaction opens. destroyEngineSafely's
-      // per-engine 10s deadline bounds the worst case (a stuck Chromium cannot wedge the import); the
-      // engines are reconciled from the Map regardless of teardown outcome.
+      // Stop the orphans inside this request, BEFORE the transaction opens. Two 10s deadlines per
+      // engine (destroy, then forceDestroy), run in parallel, bound the worst case (a stuck Chromium
+      // cannot wedge the import); the engines are reconciled from the Map regardless of teardown outcome.
       const result = await this.sessionService.stopOrphanEngines(orphanedEngines);
       stoppedOrphanEngines = result.stopped;
       failedOrphanEngines = result.failed;

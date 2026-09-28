@@ -715,7 +715,10 @@ describe('SessionService', () => {
       // teardown that threw/timed out must land in `failed` (its Chromium/socket may still be alive),
       // not be misreported as cleanly stopped — the infra import turns `failed` into restartRequired.
       const good = { destroy: jest.fn().mockResolvedValue(undefined) };
-      const bad = { destroy: jest.fn().mockRejectedValue(new Error('stuck chromium')) };
+      const bad = {
+        destroy: jest.fn().mockRejectedValue(new Error('stuck chromium')),
+        forceDestroy: jest.fn().mockRejectedValue(new Error('kill failed')),
+      };
       enginesOf().set('good', good);
       enginesOf().set('bad', bad);
 
@@ -723,12 +726,84 @@ describe('SessionService', () => {
 
       expect(good.destroy).toHaveBeenCalledTimes(1);
       expect(bad.destroy).toHaveBeenCalledTimes(1);
+      expect(bad.forceDestroy).toHaveBeenCalledTimes(1); // escalated before being reported failed
       // Map reconciled for both regardless of teardown outcome — neither holds a concurrency slot.
       expect(enginesOf().has('good')).toBe(false);
       expect(enginesOf().has('bad')).toBe(false);
       expect(result.stopped).toEqual(['good']);
       expect(result.failed).toEqual(['bad']);
       expect(result.notRunning).toEqual([]);
+    });
+
+    it('escalates a failing destroy() to forceDestroy() and reports the orphan stopped when the kill succeeds', async () => {
+      const g1 = {
+        destroy: jest.fn().mockRejectedValue(new Error('stuck chromium')),
+        forceDestroy: jest.fn().mockResolvedValue(undefined),
+      };
+      enginesOf().set('g1', g1);
+
+      const result = await service.stopOrphanEngines(['g1']);
+
+      expect(g1.forceDestroy).toHaveBeenCalledTimes(1);
+      expect(g1.destroy.mock.invocationCallOrder[0]).toBeLessThan(g1.forceDestroy.mock.invocationCallOrder[0]);
+      expect(result.stopped).toEqual(['g1']);
+      expect(result.failed).toEqual([]);
+      expect(enginesOf().has('g1')).toBe(false);
+    });
+
+    it('escalates a hung destroy() after its deadline and reports failed only when the kill hangs too', async () => {
+      jest.useFakeTimers();
+      try {
+        const g1 = {
+          destroy: jest.fn(() => new Promise<void>(() => undefined)),
+          forceDestroy: jest.fn(() => new Promise<void>(() => undefined)),
+        };
+        enginesOf().set('g1', g1);
+
+        const pending = service.stopOrphanEngines(['g1']);
+        await jest.advanceTimersByTimeAsync(10_000);
+        expect(g1.forceDestroy).toHaveBeenCalledTimes(1);
+        await jest.advanceTimersByTimeAsync(10_000);
+        const result = await pending;
+
+        expect(result.failed).toEqual(['g1']);
+        expect(enginesOf().has('g1')).toBe(false);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('logs the ids a lease-loss teardown could not stop, and stays quiet when it stops them', async () => {
+      let onLost!: (ids: string[]) => Promise<void>;
+      const ownership = {
+        onLeaseLoss: jest.fn((fn: (ids: string[]) => Promise<void>) => (onLost = fn)),
+        setEngineLiveness: jest.fn(),
+        startHeartbeat: jest.fn(),
+      };
+      Object.assign(service as unknown as Record<string, unknown>, { ownership });
+      const watchdog = (service as unknown as { watchdog: { start: () => void } }).watchdog;
+      jest.spyOn(watchdog, 'start').mockImplementation(() => undefined);
+      (configService.get as jest.Mock).mockImplementation(
+        <T>(key: string, def?: T): T => (key === 'features' ? { autoStartSessions: false } : def) as T,
+      );
+      const logger = (service as unknown as { logger: { error: (...a: unknown[]) => void } }).logger;
+      const error = jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+      service.onApplicationBootstrap();
+
+      enginesOf().set('ok', { destroy: jest.fn().mockResolvedValue(undefined) });
+      await onLost(['ok']);
+      expect(error).not.toHaveBeenCalled();
+
+      enginesOf().set('g1', {
+        destroy: jest.fn().mockRejectedValue(new Error('stuck')),
+        forceDestroy: jest.fn().mockRejectedValue(new Error('kill failed')),
+      });
+      error.mockClear();
+      await onLost(['g1']);
+      const leaseLoss = error.mock.calls.find(
+        c => (c[2] as { action?: string } | undefined)?.action === 'lease_loss_teardown_failed',
+      );
+      expect(leaseLoss?.[2]).toEqual({ sessionIds: ['g1'], action: 'lease_loss_teardown_failed' });
     });
 
     it('is a bounded no-op for an empty id list', async () => {
@@ -2678,6 +2753,20 @@ describe('SessionService', () => {
       expect(mockEngine.forceDestroy).not.toHaveBeenCalled();
       expect(mockEngine.destroy).not.toHaveBeenCalled();
       expect(i.engines.has('sess-uuid-1')).toBe(true);
+    });
+
+    it('escalates to forceDestroy() when an engine retired during re-init fails its graceful destroy()', async () => {
+      const i = internals();
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      jest
+        .spyOn(lifecycle as unknown as { isSessionRetired: () => Promise<boolean> }, 'isSessionRetired')
+        .mockResolvedValue(true);
+      mockEngine.destroy.mockRejectedValueOnce(new Error('stuck chromium'));
+
+      await i.executeReconnect('sess-uuid-1', createMockSession(), reconnectState);
+
+      expect(mockEngine.forceDestroy).toHaveBeenCalledTimes(1);
+      expect(i.engines.has('sess-uuid-1')).toBe(false);
     });
 
     it('does not stack reconnect timers when scheduled twice back-to-back', () => {
@@ -6841,6 +6930,21 @@ describe('SessionService', () => {
       expect(service.getEngine('sess-uuid-1')).toBeUndefined();
       // A stop() retirement must NOT purge: the row (and its credentials) is meant to survive.
       expect(engineFactory.purgeSessionData).not.toHaveBeenCalled();
+    });
+
+    it('escalates to forceDestroy() when the retired engine fails its graceful destroy()', async () => {
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      mockEngine.destroy.mockRejectedValueOnce(new Error('stuck chromium'));
+      mockEngine.initialize.mockImplementationOnce(() => {
+        (lifecycle as unknown as { stoppingSessions: Set<string> }).stoppingSessions.add('sess-uuid-1');
+        return Promise.resolve();
+      });
+
+      await service.start('sess-uuid-1');
+
+      expect(mockEngine.forceDestroy).toHaveBeenCalledTimes(1);
+      expect(service.getEngine('sess-uuid-1')).toBeUndefined();
     });
 
     it('tears down the just-initialized engine if the session is deleted during start() (row gone, mark cleared)', async () => {

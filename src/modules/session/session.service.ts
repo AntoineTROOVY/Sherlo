@@ -185,9 +185,19 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     // Leaving ours running would put two engines on one WhatsApp account — the thing the claim
     // exists to prevent — so the engine goes down. stopOrphanEngines is the right verb: it tears
     // down locally and leaves the row alone, because the row is no longer ours to write.
-    // The teardown report is not consulted here: losing a claim is not a request anyone is waiting
-    // on, and stopOrphanEngines already logs what it could not stop.
-    this.ownership?.onLeaseLoss(async ids => void (await this.engineLifecycle.stopOrphanEngines(ids)));
+    // Nobody is waiting on this teardown, so an engine that could not be stopped (destroy and its
+    // forceDestroy escalation both failed) is reported here at error level: it is out of the Map, so
+    // force-kill cannot reach it, and a peer may run a second engine on the account until restart.
+    this.ownership?.onLeaseLoss(async ids => {
+      const { failed } = await this.engineLifecycle.stopOrphanEngines(ids);
+      if (failed.length > 0) {
+        this.logger.error(
+          'Engine teardown failed after lease loss; a peer may run a second engine on the same account until this process restarts',
+          undefined,
+          { sessionIds: failed, action: 'lease_loss_teardown_failed' },
+        );
+      }
+    });
     // Claims are only renewed while something still runs for them here, so a claim left behind by
     // an untracked teardown path lapses instead of pinning the session to this node forever.
     this.ownership?.setEngineLiveness(id => this.engineLifecycle.isEngineActive(id));

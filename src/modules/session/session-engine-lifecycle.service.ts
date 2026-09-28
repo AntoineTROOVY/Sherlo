@@ -1203,14 +1203,11 @@ export class SessionEngineLifecycle {
       // (after 10s on a hang), so reconnection proceeds either way.
       const oldEngine = this.engines.get(id);
       if (oldEngine) {
-        const destroyed = await this.teardownEngineSafely(id, oldEngine, e => e.destroy(), 'destroy');
-        if (!destroyed) {
-          // A timed-out destroy() leaves the wedged Chromium process alive (the raced promise never
-          // kills it — see start()'s catch), and this path relaunches on the SAME profile dir in the
-          // same tick. Escalate to a SIGKILL so the replacement browser can't collide with the
-          // orphan (#1081); bounded again by teardownEngineSafely, so it can't wedge a second time.
-          await this.teardownEngineSafely(id, oldEngine, e => e.forceDestroy(), 'force-destroy');
-        }
+        // A timed-out destroy() leaves the wedged Chromium process alive (the raced promise never
+        // kills it; see start()'s catch), and this path relaunches on the SAME profile dir in the
+        // same tick. destroyWithEscalation escalates to a SIGKILL so the replacement browser can't
+        // collide with the orphan (#1081); each step is bounded, so it can't wedge a second time.
+        await this.fences.destroyWithEscalation(id, oldEngine);
         this.engines.deleteIfLive(id, oldEngine);
       }
 
@@ -1252,7 +1249,7 @@ export class SessionEngineLifecycle {
       if (retired) {
         const resurrected = this.engines.get(id);
         if (resurrected) {
-          await this.teardownEngineSafely(id, resurrected, e => e.destroy(), 'destroy');
+          await this.fences.destroyWithEscalation(id, resurrected);
           this.engines.deleteIfLive(id, resurrected);
         }
         // Same start/delete window as start()'s post-init guard: this re-init re-created auth dirs
