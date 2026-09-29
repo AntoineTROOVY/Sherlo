@@ -345,4 +345,16 @@ describe('deployment docs describe what the entrypoint, probes and backup script
       expect(text).toMatch(/the chart's startupProbe budget/);
     }
   });
+
+  // The note is written for any archive holding engine state, including one taken with sessions stopped.
+  it('words the ENGINE-STATE-NOTE as a possibility in the restore.sh header', () => {
+    const phrase = 'ENGINE-STATE-NOTE (engine auth state that may have been copied while the app ran)';
+    const header = read('scripts/restore.sh')
+      .split('\n')
+      .filter(line => line.startsWith('#'))
+      .map(line => line.replace(/^#\s*/, ''))
+      .join(' ');
+    expect(header).toContain(phrase);
+    expect(read('docs/11-operational-runbooks.md')).toContain(phrase);
+  });
 });

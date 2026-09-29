@@ -357,7 +357,8 @@ docker stats --no-stream
 
 # 3. Create a backup in the running container, where the data is mounted, and copy it off the
 #    volume (see Runbook: Database Backup). A host run of ./scripts/backup.sh archives ./data in the
-#    checkout, which only a bare-metal install or docker-compose.dev.yml reads
+#    checkout, which only a bare-metal install or docker-compose.dev.yml reads. Engine auth state is
+#    copied live; stop the sessions first if a restore must not need re-pairing
 docker exec -e BACKUP_DIR=/app/data/backups -e TMPDIR=/app/data/backups openwa-api ./scripts/backup.sh
 docker cp openwa-api:/app/data/backups/. ./backups/
 
@@ -436,7 +437,8 @@ curl -H "X-API-Key: $API_KEY" \
 #    files name the container openwa-api. Running ./scripts/backup.sh on the host instead archives
 #    ./data in the checkout, which the production compose never reads (see Runbook: Database Backup).
 #    An image older than 0.19.0 has no scripts/backup.sh, and on PostgreSQL one older than 0.22.0 has
-#    no pg_dump: see 14 - Known Upgrade Hazards
+#    no pg_dump: see 14 - Known Upgrade Hazards. Engine auth state is copied live; stop the sessions
+#    first if a rollback must not need re-pairing
 export BACKUP_DIR="/backups/openwa"
 mkdir -p "$BACKUP_DIR"
 docker exec -e BACKUP_DIR=/app/data/backups -e TMPDIR=/app/data/backups openwa-api ./scripts/backup.sh
@@ -590,7 +592,10 @@ curl -H "X-API-Key: $API_KEY" http://localhost:2785/api/health
 
 **Trigger:** Daily schedule, before maintenance, before upgrade
 
-**Impact:** None (online backup)
+**Impact:** None for the databases, which are snapshotted consistently online (`sqlite3 .backup`,
+`pg_dump`). Engine authentication state (`sessions/`, `baileys/`) is copied while the engines write
+it, so a restored session can need re-pairing; for a copy that is consistent by construction, stop
+the sessions first (`POST /api/sessions/:id/stop`), or stop the container and archive the volume.
 
 **Prerequisites:**
 
@@ -626,7 +631,9 @@ User-managed files outside that list (for example the project-level `.env`) must
 # are NOT derived from OPENWA_DATA_DIR. A missing source database fails the run (no silent empty
 # backup), the finished archive is checked to contain every configured database, and with the sqlite3
 # CLI present the databases are snapshotted online via .backup (otherwise plain-copied with a
-# CONSISTENCY-WARNING marker inside the archive).
+# CONSISTENCY-WARNING marker inside the archive). sessions/ and baileys/ are plain copies: when a
+# whatsapp-web.js profile is open or Baileys state is present, the archive carries an
+# ENGINE-STATE-NOTE naming them, which restore.sh prints and never refuses.
 
 # Run from the repo root (database defaults are ./data/...; state dirs follow OPENWA_DATA_DIR):
 ./scripts/backup.sh
@@ -713,7 +720,8 @@ docker compose down
 #    (databases land on MAIN_DATABASE_NAME / DATABASE_NAME, default ./data/... — the same paths
 #    the app reads, as the environment, ./.env or the archive's .env.generated set them; non-DB
 #    state follows OPENWA_DATA_DIR. Pass --strict to refuse an archive
-#    whose CONSISTENCY-WARNING marker reports plain-copied, possibly-torn database snapshots.
+#    whose CONSISTENCY-WARNING marker reports plain-copied, possibly-torn database snapshots;
+#    an ENGINE-STATE-NOTE (engine auth state that may have been copied while the app ran) is only printed.
 #    Restoring over an existing install's live databases requires --force; without it the script
 #    refuses to overwrite them)
 ./scripts/restore.sh ./backups/openwa-backup-<timestamp>.tar.gz
