@@ -574,7 +574,7 @@ CREATE TABLE api_keys (
     "updatedAt" DATETIME NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE UNIQUE INDEX "IDX_df3b25181df0b4b59bd93f16e1" ON api_keys("keyHash");
+CREATE UNIQUE INDEX "IDX_api_keys_keyHash" ON api_keys("keyHash");
 ```
 
 > [!NOTE]
@@ -605,12 +605,18 @@ CREATE TABLE audit_logs (
     "createdAt" DATETIME NOT NULL DEFAULT (datetime('now'))
 );
 
--- Indexes (declared on the entity; TypeORM-derived hash names)
-CREATE INDEX "IDX_cee5459245f652b75eb2759b4c" ON audit_logs(action);
-CREATE INDEX "IDX_741fa976d1e04e695f3aa23cb8" ON audit_logs("apiKeyId");
-CREATE INDEX "IDX_dd2b6e43c767b6b5b2bb227ace" ON audit_logs("sessionId");
-CREATE INDEX "IDX_c69efb19bf127c97e6740ad530" ON audit_logs("createdAt");
+-- Indexes (created by migrations-main/)
+CREATE INDEX "IDX_audit_logs_action" ON audit_logs(action);
+CREATE INDEX "IDX_audit_logs_apiKeyId" ON audit_logs("apiKeyId");
+CREATE INDEX "IDX_audit_logs_sessionId" ON audit_logs("sessionId");
+CREATE INDEX "IDX_audit_logs_createdAt" ON audit_logs("createdAt");
 ```
+
+These are the index names on a default install. With `MAIN_DATABASE_SYNCHRONIZE=true`, the
+synchronize pass after the chain replaces them with the TypeORM-derived hash names the entities'
+`@Index()` declarations generate (`IDX_df3b25181df0b4b59bd93f16e1` on `api_keys` and
+`IDX_cee5459245f652b75eb2759b4c`, `IDX_741fa976d1e04e695f3aa23cb8`, `IDX_dd2b6e43c767b6b5b2bb227ace`,
+`IDX_c69efb19bf127c97e6740ad530` on `audit_logs`).
 
 **Audit actions** are an enum (`AuditAction`) spanning API-key lifecycle (`api_key_created`,
 `api_key_updated`, `api_key_used`, `api_key_revoked`, `api_key_deleted`, `api_key_auth_failed`, capped
@@ -738,8 +744,8 @@ CREATE INDEX "IDX_webhooks_sessionId" ON webhooks("sessionId");
 CREATE UNIQUE INDEX "UQ_message_batches_session_id_batch_id" ON message_batches(session_id, batch_id);
 
 -- audit_logs (main DB): filter by action / key / session, ordered by time
-CREATE INDEX "IDX_cee5459245f652b75eb2759b4c" ON audit_logs(action);
-CREATE INDEX "IDX_c69efb19bf127c97e6740ad530" ON audit_logs("createdAt");
+CREATE INDEX "IDX_audit_logs_action" ON audit_logs(action);
+CREATE INDEX "IDX_audit_logs_createdAt" ON audit_logs("createdAt");
 ```
 
 > [!NOTE]
