@@ -8527,8 +8527,9 @@ describe('SessionService', () => {
 
     // Nest binds the HTTP listener only after every bootstrap hook settles, and a launch is a
     // Chromium start bounded by resolveEngineInitTimeoutMs (>= 60s) with a 2s throttle between
-    // sessions. Awaiting the loop here kept the port CLOSED for that whole time, so every liveness
-    // probe in the window was a connection refusal — the chart's budget is ~50s.
+    // sessions. Awaiting the loop here kept the port CLOSED for that whole time, so every probe in
+    // the window was a connection refusal, and the chart's startupProbe budget
+    // (charts/openwa/templates/statefulset.yaml) is a fixed number of seconds.
     it('returns without waiting for a launch that has not finished', async () => {
       process.env.AUTO_START_SESSIONS = 'true';
       (repository.find as jest.Mock).mockResolvedValue([{ id: 'a', name: 'A' }]);

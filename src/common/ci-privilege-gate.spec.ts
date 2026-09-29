@@ -257,3 +257,35 @@ describe('a job that can mint a publish credential pins global npm installs and 
     expect(pythonInstallsInOidcJobs(file)).toEqual([]);
   });
 });
+
+/**
+ * The operator-facing text around the entrypoint, the probes and the backup scripts states what they
+ * do. Each of these was once true of an earlier version and outlived the change that made it false.
+ */
+describe('deployment docs describe what the entrypoint, probes and backup scripts do', () => {
+  const root = path.join(__dirname, '..', '..');
+  const read = (file: string): string => fs.readFileSync(path.join(root, file), 'utf8');
+
+  // Session auto-start is detached: boot does not wait for it, so no probe covers it.
+  it('does not claim the startupProbe covers session restore', () => {
+    expect(read('docs/13-horizontal-scaling.md')).not.toMatch(/off during boot \([^)]*session/);
+    expect(read('scripts/check-chart-behaviour.mjs')).not.toMatch(/sessions to restore/);
+  });
+
+  // The chart's liveness budget lives in statefulset.yaml; a copied figure goes stale.
+  it('does not restate the chart liveness budget in session comments', () => {
+    for (const file of ['src/modules/session/session.service.ts', 'src/modules/session/session.service.spec.ts']) {
+      expect(read(file)).not.toMatch(/the chart's (?:budget )?is ~\d+s/);
+    }
+  });
+
+  // The startupProbe suspends liveness until it first succeeds, so a closed port at boot meets it, not liveness.
+  it('names the startupProbe as the budget a closed port at boot runs against', () => {
+    for (const file of ['src/modules/session/session.service.ts', 'src/modules/session/session.service.spec.ts']) {
+      const text = read(file).replace(/\n\s*\/\/ ?/g, ' ');
+      expect(text).not.toMatch(/every liveness\s+probe/i);
+      expect(text).not.toMatch(/the chart's liveness budget/);
+      expect(text).toMatch(/the chart's startupProbe budget/);
+    }
+  });
+});

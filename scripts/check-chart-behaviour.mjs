@@ -21,6 +21,7 @@
  * Run locally: `npm run check:chart`. Runs in CI (Helm chart and workflows job). Needs Docker.
  */
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // Pinned in step with the `helm lint` / `helm template` steps of .github/workflows/ci.yml. A version
@@ -132,9 +133,10 @@ const check = (id, ok, detail) => results.push({ id, ok, detail });
   );
 }
 
-// Boot is long and varies with the number of sessions to restore. That belongs to a startupProbe: it
-// suspends the liveness probe until it succeeds, so the boot window and the running-health window can
-// be set independently. Without one, the liveness budget alone decides how long boot may take.
+// Boot is long (migrations, the database connect retry, plugin load, backfills). That belongs to a
+// startupProbe: it suspends the liveness probe until it succeeds, so the boot window and the
+// running-health window can be set independently. Without one, the liveness budget alone
+// decides how long boot may take.
 {
   const sts = byKind(render(), 'StatefulSet')[0] ?? '';
   const startup = mapAt(sts, ['startupProbe']);
@@ -147,6 +149,31 @@ const check = (id, ok, detail) => results.push({ id, ok, detail });
     !startup
       ? `${nameOf(sts) ?? 'StatefulSet'}: no startupProbe, so boot must finish inside the ${livenessBudget}s liveness budget or the kubelet restarts the pod mid-boot`
       : `startupProbe allows ${startupBudget}s, liveness allows ${livenessBudget}s`,
+  );
+}
+
+// A probe that times out counts as a failure. The kubelet default is 1s, which /ready misses by
+// design (it bounds each database probe at READINESS_PROBE_TIMEOUT_MS so it can answer its own 503)
+// and which a CPU-throttled pod can miss even on the static /live route. The constant is read from
+// the controller so the two cannot drift; a rename fails here rather than skipping the check.
+{
+  const source = readFileSync(new URL('../src/modules/health/health.controller.ts', import.meta.url), 'utf8');
+  const match = /READINESS_PROBE_TIMEOUT_MS\s*=\s*([\d_]+)/.exec(source);
+  const handlerMs = match ? Number(match[1].replace(/_/g, '')) : NaN;
+  const sts = byKind(render(), 'StatefulSet')[0] ?? '';
+  const timeout = name => Number(mapAt(sts, [name])?.timeoutSeconds ?? 1);
+  const readiness = timeout('readinessProbe');
+  const short = ['livenessProbe', 'startupProbe'].filter(name => timeout(name) < 2);
+  check(
+    'probe-timeouts-cover-handlers',
+    Number.isFinite(handlerMs) && readiness * 1000 > handlerMs && short.length === 0,
+    !Number.isFinite(handlerMs)
+      ? 'READINESS_PROBE_TIMEOUT_MS not found in src/modules/health/health.controller.ts'
+      : readiness * 1000 <= handlerMs
+        ? `readinessProbe times out at ${readiness}s, not above the ${handlerMs}ms the handler may take`
+        : short.length
+          ? `${short.join(' and ')} time out below 2s`
+          : `readiness ${readiness}s exceeds the ${handlerMs}ms handler bound; liveness and startup allow ${timeout('livenessProbe')}s and ${timeout('startupProbe')}s`,
   );
 }
 

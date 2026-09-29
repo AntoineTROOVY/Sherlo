@@ -214,9 +214,10 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     // hook has settled, and this loop's duration is unbounded: one engine initialization is at least
     // 60s (resolveEngineInitTimeoutMs) and there is a 2s throttle between sessions, so a host with
     // ten authenticated sessions kept the port CLOSED — not unhealthy, closed — for ten minutes.
-    // Every liveness probe in that window is a connection refusal, and no probe budget can cover a
-    // bound that scales with the session count: the chart's is ~50s and the Dockerfile HEALTHCHECK
-    // encodes the same expectation. Awaited on shutdown so a launch in flight is accounted for.
+    // Every probe in that window is a connection refusal, and no probe budget can cover a bound that
+    // scales with the session count: the chart's startupProbe budget (statefulset.yaml), which governs
+    // boot, is a fixed number of seconds, and the Dockerfile HEALTHCHECK encodes the same expectation.
+    // Awaited on shutdown so a launch in flight is accounted for.
     this.autoStartRun = this.autoStartSessions().catch((error: unknown) => {
       // Previously this rejected out of the hook and aborted boot, so a transient database error
       // during the session scan took the whole gateway down rather than the auto-start.

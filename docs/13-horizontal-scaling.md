@@ -452,18 +452,31 @@ spec:
               mountPath: /app/data
             - name: tmp
               mountPath: /tmp
+          # Same probes as charts/openwa/templates/statefulset.yaml. The startupProbe holds liveness
+          # off during boot (migrations, connect retry, plugin load, backfills), and every timeoutSeconds is
+          # explicit because the 1s kubelet default is shorter than /ready's 3s database bound.
+          startupProbe:
+            httpGet:
+              path: /api/health/live
+              port: 2785
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 60
           livenessProbe:
             httpGet:
-              path: /api/health
+              path: /api/health/live
               port: 2785
             initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
           readinessProbe:
             httpGet:
               path: /api/health/ready
               port: 2785
             initialDelaySeconds: 10
             periodSeconds: 5
+            timeoutSeconds: 5
       volumes:
         - name: tmp
           emptyDir: {}
