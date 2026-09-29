@@ -81,6 +81,29 @@ describe('the non-root drop is enforced, not merely documented', () => {
     expect(entrypoint).toMatch(/exec\s+gosu\s+openwa/);
   });
 
+  // A start as any other uid (runAsUser, `--user`) holds no CAP_CHOWN or CAP_SETUID, so it must leave
+  // before the first chown and the gosu drop: under `set -e` either one exits, and the container
+  // restarts in a loop. It must also refuse a data volume it cannot write, naming the cause.
+  it('lets a non-root start skip every chown and the gosu drop', () => {
+    const entrypoint = fs.readFileSync(path.join(__dirname, '..', '..', 'docker-entrypoint.sh'), 'utf8');
+    const exit = entrypoint.search(/^if \[ "\$\(id -u\)" != 0 \]; then\n\s+exec "\$@"\nfi$/m);
+    const firstChown = entrypoint.search(/^\s*(?:chown|find\b.*-exec chown)\b/m);
+    expect(exit).toBeGreaterThan(-1);
+    expect(firstChown).toBeGreaterThan(exit);
+    expect(entrypoint.search(/^exec gosu openwa/m)).toBeGreaterThan(exit);
+    expect(entrypoint).toMatch(/FATAL: \$dir is not writable by uid/);
+  });
+
+  // runAsUser, fsGroup and `--user` name a number, so the image has to guarantee it rather than take
+  // whatever `useradd -r` finds free after the apt layers.
+  it('pins the openwa uid and gid that the chart and docs name', () => {
+    const dockerfile = fs.readFileSync(path.join(__dirname, '..', '..', 'Dockerfile'), 'utf8');
+    const values = fs.readFileSync(path.join(__dirname, '..', '..', 'charts', 'openwa', 'values.yaml'), 'utf8');
+    expect(dockerfile).toMatch(/^RUN groupadd -r -g 997 openwa && useradd -r -u 997 -g openwa openwa$/m);
+    expect(values).toMatch(/runAsUser: 997/);
+    expect(values).toMatch(/fsGroup: 997/);
+  });
+
   // The Dockerfile explains the missing USER directive by pointing at the entrypoint. A line number
   // goes stale on the next entrypoint edit and sends the reader to the wrong statement.
   it('does not cite entrypoint line numbers from the Dockerfile', () => {
@@ -270,6 +293,35 @@ describe('a job that can mint a publish credential pins global npm installs and 
 describe('deployment docs describe what the entrypoint, probes and backup scripts do', () => {
   const root = path.join(__dirname, '..', '..');
   const read = (file: string): string => fs.readFileSync(path.join(root, file), 'utf8');
+
+  // A non-root start leaves before the re-own, so there a host chown is the fix, not a no-op.
+  it('scopes "a host chown is not a fix" to the root start', () => {
+    const bullet = read('docs/12-troubleshooting-faq.md')
+      .split('\n')
+      .find(line => line.includes('of the host directory is not a fix'));
+    expect(bullet).toMatch(/root start/);
+  });
+
+  // A non-root start never re-owns what the restore writes, and a root helper pod is refused in a
+  // namespace enforcing Pod Security "restricted". The helper runs as the app user, so both hold.
+  it('runs the Helm restore helper as the app user, and scopes the compose re-own to the root start', () => {
+    const doc = read('docs/11-operational-runbooks.md');
+    const helper = doc.slice(
+      doc.indexOf('  name: openwa-restore'),
+      doc.indexOf('> EOF', doc.indexOf('  name: openwa-restore')),
+    );
+    expect(helper).toMatch(/runAsNonRoot: true/);
+    expect(helper).toMatch(/runAsUser: 997/);
+    expect(helper).toMatch(/fsGroup: 997/);
+    expect(helper).toMatch(/seccompProfile: \{ type: RuntimeDefault \}/);
+    expect(helper).toMatch(/allowPrivilegeEscalation: false/);
+    expect(helper).toMatch(/capabilities: \{ drop: \[ALL\] \}/);
+    const handBack = doc
+      .replace(/\n> # /g, ' ')
+      .split(/[.;] /)
+      .find(sentence => sentence.includes('hands the restored files back'));
+    expect(handBack).toMatch(/root start/);
+  });
 
   // Session auto-start is detached: boot does not wait for it, so no probe covers it.
   it('does not claim the startupProbe covers session restore', () => {

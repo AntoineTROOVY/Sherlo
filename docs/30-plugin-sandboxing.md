@@ -79,9 +79,10 @@ The bundled compose stack adds **OS-level containment** as defence in depth. It 
 process can do to the host; it does not confine a plugin away from anything that process can reach:
 
 - **Run OpenWA in a container.** The image's entrypoint already drops to the non-root `openwa` user
-  (via `gosu`, after fixing volume ownership). The rest of the confinement comes from the bundled
-  `docker-compose.yml`, not from the image: `read_only: true` rootfs with a tmpfs `/tmp`,
-  `no-new-privileges`, and `cap_drop: ALL` with a minimal re-add
+  (via `gosu`, after fixing volume ownership), or can be started as that user (uid/gid 997) from the
+  first instruction, with no capabilities added (the chart's `podSecurityContext`). The rest of the
+  confinement comes from the bundled `docker-compose.yml`, not from the image: `read_only: true`
+  rootfs with a tmpfs `/tmp`, `no-new-privileges`, and `cap_drop: ALL` with a minimal re-add
   (`CHOWN`/`DAC_OVERRIDE`/`FOWNER`/`SETGID`/`SETUID`) that only the root entrypoint uses — once `gosu`
   setuids, the Node process keeps no effective capabilities. A plain `docker run` of the image gets
   none of the compose-level settings, so replicate them yourself if you deploy that way.

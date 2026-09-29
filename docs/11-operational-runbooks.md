@@ -758,7 +758,9 @@ curl -s -X POST -H "X-API-Key: <an-existing-key>" http://localhost:2785/api/auth
 >
 > ```bash
 > # Compose: the entrypoint override runs the script as root, which can read the archive and write
-> # the volume; the next start hands the restored files back to the app user. The image sets
+> # the volume; on the default root start, the next start hands the restored files back to the app
+> # user. A service with `user:` set runs the script as that uid instead, which then needs to read
+> # the archive and write ./backups, and owns what it restores. The image sets
 > # HOME=/app/data, and the script refuses a data dir that is the home directory, so HOME is moved
 > # off it here for a compose file that does not already set it.
 > docker compose run --rm --no-deps --entrypoint /app/scripts/restore.sh \
@@ -776,10 +778,19 @@ curl -s -X POST -H "X-API-Key: <an-existing-key>" http://localhost:2785/api/auth
 >   name: openwa-restore
 > spec:
 >   restartPolicy: Never
+>   securityContext:
+>     runAsNonRoot: true
+>     runAsUser: 997
+>     runAsGroup: 997
+>     fsGroup: 997
+>     seccompProfile: { type: RuntimeDefault }
 >   containers:
 >     - name: restore
 >       image: ghcr.io/rmyndharis/openwa:<version>
 >       command: ['sleep', 'infinity']
+>       securityContext:
+>         allowPrivilegeEscalation: false
+>         capabilities: { drop: [ALL] }
 >       envFrom:
 >         - configMapRef:
 >             name: openwa
@@ -798,6 +809,8 @@ curl -s -X POST -H "X-API-Key: <an-existing-key>" http://localhost:2785/api/auth
 > # HOME is moved off the data dir here too, as in the compose command.
 > kubectl exec openwa-restore -- env HOME=/tmp OPENWA_RESTORE_SNAPSHOT_DIR=/restore TMPDIR=/restore \
 >   ./scripts/restore.sh /restore/backup.tar.gz --force
+> # The helper runs as the app user (uid 997), so what the script restores is already owned by it,
+> # and the pod meets Pod Security "restricted" for a release that runs non-root.
 > # The emptyDir goes away with the pod: copy off every snapshot the script named first.
 > kubectl cp openwa-restore:/restore/data.pre-restore-<ts> ./backups/data.pre-restore-<ts>
 > kubectl delete pod openwa-restore

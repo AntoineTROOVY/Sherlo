@@ -1149,14 +1149,18 @@ npm run migration:run:main
 
 **Solutions:**
 
-The entrypoint starts as root, re-owns `/app/data` to the `openwa` user on every start, and then
-drops privileges with `gosu`. Keep that path intact:
+By default the entrypoint starts as root, re-owns `/app/data` to the `openwa` user (uid/gid 997) on
+every start, and then drops privileges with `gosu`. Keep that path intact:
 
-- Do not set `user:` on `openwa-api` (or `--user` on `docker run`). The entrypoint then cannot
-  `chown` or drop privileges, exits, and the container restarts in a loop.
 - Keep the `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID` and `SETUID` entries under `cap_add` in
   `docker-compose.yml`; the `chown` and the `gosu` drop need them.
-- A `chown` of the host directory is not a fix: the entrypoint re-owns `/app/data` at the next start.
+- Setting `user:` on `openwa-api` (or `--user` on `docker run`) starts the entrypoint as that uid
+  instead. It then skips the `chown` and the drop, so `/app/data` must already be writable by that
+  uid: `user: "997:997"` works on a volume a root start has already re-owned, and the `cap_add` list
+  can then be removed. Any other uid needs the volume chowned to it first. When the volume is not
+  writable the container stops with `FATAL: /app/data is not writable by uid ...`.
+- On the default root start, a `chown` of the host directory is not a fix: the entrypoint re-owns
+  `/app/data` at the next start. A non-root start (above) is the case that needs one.
 - If the error persists on a bind mount, the host filesystem is refusing the `chown` (NFS with
   `root_squash`, some rootless or SMB setups) or SELinux is denying access (add `:z` to the mount).
   Use the named volume from the shipped `docker-compose.yml` instead.

@@ -28,6 +28,10 @@ spec:
       serviceAccountName: {{ include "openwa.serviceAccountName" . }}
       # The app never calls the Kubernetes API — don't mount a token it can't use.
       automountServiceAccountToken: false
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

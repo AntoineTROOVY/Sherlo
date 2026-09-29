@@ -405,10 +405,15 @@ spec:
       # grants by default, so a plugin that abuses Node built-ins (fs, net) can read host files / open raw
       # sockets outside the capability model. The shipped compose file runs the image read-only +
       # cap_drop:ALL, and the node process runs as the non-root openwa user; the manifest below mirrors
-      # that so a k8s deploy is not silently weaker. Do NOT add runAsNonRoot: the entrypoint starts as
-      # root to chown /app/data, then drops to openwa via gosu (same as charts/openwa/values.yaml).
+      # that so a k8s deploy is not silently weaker. By default the entrypoint starts as root to chown
+      # /app/data, then drops to openwa (uid/gid 997) via gosu. To run non-root from the start instead,
+      # add runAsNonRoot: true, runAsUser: 997 and runAsGroup: 997 here and remove the capabilities `add`
+      # list below; the entrypoint then skips the chown and the drop (see podSecurityContext in
+      # charts/openwa/values.yaml). fsGroup makes the volume writable by openwa in either mode;
+      # OnRootMismatch re-owns it only when its root is wrong, not every file on every mount.
       securityContext:
-        fsGroup: 1000
+        fsGroup: 997
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: openwa
           image: ghcr.io/rmyndharis/openwa:latest

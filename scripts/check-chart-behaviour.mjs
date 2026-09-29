@@ -177,6 +177,37 @@ const check = (id, ok, detail) => results.push({ id, ok, detail });
   );
 }
 
+// The image also starts as a non-root uid, which is the only way to meet Pod Security "restricted".
+// That needs a pod-level securityContext (fsGroup is what makes a fresh volume writable by the uid)
+// and a way to drop the capability list the root entrypoint needs, while the default stays as it is.
+// The profile rendered is the one values.yaml documents, so the comment cannot drift from what works.
+{
+  const podContext = out => {
+    const sts = byKind(out, 'StatefulSet')[0] ?? '';
+    return /^ {6}securityContext:\n((?: {8}.*\n)+)/m.exec(sts)?.[1] ?? '';
+  };
+  const addsCaps = out => /^ {14}add:/m.test(byKind(out, 'StatefulSet')[0] ?? '');
+  const byDefault = render();
+  const values = readFileSync(`${CHARTS}/openwa/values.yaml`, 'utf8');
+  const profile = /^# {3}podSecurityContext:\n(?:# {3}.*\n)+/m.exec(values)?.[0] ?? '';
+  const nonRoot = renderValues(profile.replace(/^# {3}/gm, ''));
+  const pod = podContext(nonRoot);
+  const problems = [
+    podContext(byDefault) && 'the default render sets a pod securityContext',
+    !addsCaps(byDefault) && 'the default render lost the capabilities the root entrypoint needs',
+    !/runAsNonRoot: true/.test(pod) && 'podSecurityContext.runAsNonRoot does not reach the pod spec',
+    !/fsGroup: 997/.test(pod) && 'podSecurityContext.fsGroup does not reach the pod spec',
+    // Without it the kubelet re-owns every file on the volume on every mount before the pod starts.
+    !/fsGroupChangePolicy: OnRootMismatch/.test(pod) && 'podSecurityContext.fsGroupChangePolicy is not OnRootMismatch',
+    addsCaps(nonRoot) && 'containerSecurityContext.capabilities.add: null still renders an add list',
+  ].filter(Boolean);
+  check(
+    'non-root-profile-renders',
+    problems.length === 0,
+    problems.length ? problems.join('; ') : 'the default is unchanged, and podSecurityContext plus add: null render a non-root pod',
+  );
+}
+
 // One scrape target per pod per endpoint. Prometheus Operator yields a target for every address of
 // every Service matching the selector and de-duplicates nothing by pod, so a selector matching N
 // Services produces N series sets separated only by the `service` label.

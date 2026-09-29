@@ -108,8 +108,9 @@ COPY --from=builder /app/dist ./dist
 # every production dependency (issue #1045: ~35 minutes on a small VPS), and the container itself
 # is the Chromium confinement boundary (cap_drop ALL, read_only rootfs). Instead the image starts
 # as root, the entrypoint chowns ONLY the writable ./data volume and then drops privileges via
-# `exec gosu openwa node dist/main.js` (no-new-privileges blocks any setuid path back up).
-RUN groupadd -r openwa && useradd -r -g openwa openwa
+# `exec gosu openwa node dist/main.js` (no-new-privileges blocks any setuid path back up). The ids
+# are pinned so the image can also be started as openwa directly (`--user 997:997`, runAsUser 997).
+RUN groupadd -r -g 997 openwa && useradd -r -u 997 -g openwa openwa
 
 # Expose port
 EXPOSE 2785

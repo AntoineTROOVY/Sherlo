@@ -170,8 +170,10 @@ http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.l
 # Set Puppeteer to skip automatic download during npm install (we download it explicitly below)
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
-# Create app user for security
-RUN groupadd -r openwa && useradd -r -g openwa openwa
+# Create app user for security. The ids are pinned (997 is what `-r` assigned on both arches) so a
+# Kubernetes runAsUser/fsGroup or a `docker run --user` can name the runtime user; the root start
+# re-owns /app/data by name either way.
+RUN groupadd -r -g 997 openwa && useradd -r -u 997 -g openwa openwa
 
 WORKDIR /app
 
@@ -306,6 +308,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # `exec gosu openwa "$@"`, after it chowns /app/data and the Chromium XDG
 # dirs. Adding `USER openwa` here would run the entrypoint as openwa and break
 # the chown-before-drop pattern that makes named-volume mounts work on first
-# boot (#254, #259).
+# boot (#254, #259). Starting it as a non-root uid on purpose (`--user 997:997`,
+# a Kubernetes runAsUser) is supported: the entrypoint skips the chown and the
+# drop, and needs /app/data to be writable by that uid.
 ENTRYPOINT ["dumb-init", "--", "/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "dist/main"]

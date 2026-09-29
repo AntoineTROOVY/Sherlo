@@ -251,6 +251,8 @@ dumb-init (PID 1)
 
 Named volumes (e.g. `openwa-data`) get their ownership corrected automatically on every start, so no manual `chown` step is needed after volume creation.
 
+The image can also start as the `openwa` user directly (uid/gid 997: `--user 997:997`, or the Helm chart's `podSecurityContext`). The entrypoint then skips the `chown` and the `gosu` drop and needs no added capabilities, provided `/app/data` is writable by that uid.
+
 ---
 
 ## 🏭 Production Deployment
