@@ -327,7 +327,11 @@ environments and no auto-deploy on merge.
 gates with a weekly run (Wednesdays 03:00 UTC, plus `workflow_dispatch`): it re-runs the exact
 `audit` job against the current dependency trees and the release workflow's `image-scan` against
 the published `latest` image on both architectures. A newly published advisory therefore turns
-something red within days instead of waiting for the next push or release.
+something red within days instead of waiting for the next push or release. A third job,
+`base-image-drift`, fails when the two `node:22-slim` FROM lines in the `Dockerfile` pin different
+digests, or when the pin differs from what the tag serves today and either the tag has served that
+image for 7 or more days, or for 3 or more days with the pin last changed 28 or more days ago; merge
+the pending Dependabot digest refresh, or refresh both FROM lines by hand.
 
 ## 10.4 Deployment Architecture
 
