@@ -1,7 +1,14 @@
+import { spawn, type ChildProcess } from 'node:child_process';
 import { chmod, mkdtemp, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { FfmpegConversionError, probeFfmpeg, runFfmpeg } from './ffmpeg';
+
+// The real spawn, wrapped so a test can reach the child process it created.
+jest.mock('node:child_process', () => {
+  const actual = jest.requireActual<typeof import('node:child_process')>('node:child_process');
+  return { ...actual, spawn: jest.fn(actual.spawn) };
+});
 
 /**
  * Exercises the process wrapper itself — the timeout, the output ceiling, and the temp-directory
@@ -38,7 +45,7 @@ for a in "$@"; do
 done
 case "$mode" in
   fail)  echo "Invalid data found when processing input" >&2; exit 1 ;;
-  hang)  sleep 30 ;;
+  hang)  sleep 10 ;;
   empty) : > "$out" ;;
   big)   head -c 4096 /dev/zero > "$out" ;;
   argv)  printf '%s ' "$@" > "$out" ;;
@@ -102,8 +109,22 @@ esac
       runFfmpeg(Buffer.from('input'), 'bin', 'ogg', mode('hang'), options({ timeoutMs: 200 })),
     ).rejects.toThrow(/timed out after 200ms/);
 
-    // Comfortably below the stub's 30s sleep: proves it was killed, not awaited.
-    expect(Date.now() - startedAt).toBeLessThan(10_000);
+    // Below the stub's 10s sleep: proves it was killed, not awaited.
+    expect(Date.now() - startedAt).toBeLessThan(8_000);
+  }, 15_000);
+
+  // The stub's `sleep` is a child of the killed shell and inherits its stderr, as a process under a
+  // wrapper script would. Unless the parent lets go of the pipe, it stays open until that child exits
+  // and keeps the process from exiting.
+  it('releases the stderr pipe when a timed-out process leaves a descendant holding it', async () => {
+    const spawned = jest.mocked(spawn);
+    spawned.mockClear();
+    await expect(
+      runFfmpeg(Buffer.from('input'), 'bin', 'ogg', mode('hang'), options({ timeoutMs: 200 })),
+    ).rejects.toThrow(/timed out after 200ms/);
+
+    const child = spawned.mock.results[0].value as ChildProcess;
+    expect(child.stderr?.destroyed).toBe(true);
   }, 15_000);
 
   // Transcoding can inflate as well as shrink, so the output needs a ceiling of its own.

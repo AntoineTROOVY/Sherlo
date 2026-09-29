@@ -206,6 +206,10 @@ function execute(args: string[], options: FfmpegRunOptions): Promise<void> {
       // SIGKILL rather than SIGTERM: the case being defended against is a codec stuck in a loop,
       // which is exactly the case that would ignore a polite signal.
       child.kill('SIGKILL');
+      // Let go of our end of the stderr pipe too. A descendant of the killed process (ffmpeg under a
+      // wrapper script) can still hold the inherited stderr, and the open pipe would keep this
+      // process alive until that descendant exits.
+      child.stderr.destroy();
       // Reject as soon as the signal is sent rather than waiting for `close`. `close` fires when the
       // stdio pipes close, not when the process dies, so anything still holding the inherited stderr
       // keeps it pending — which would leave the timeout bounding nothing at all.
