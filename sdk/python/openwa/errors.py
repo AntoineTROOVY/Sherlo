@@ -82,7 +82,7 @@ class OpenWAAuthError(OpenWAApiError):
 
 
 class OpenWAForbiddenError(OpenWAApiError):
-    """403 Forbidden — insufficient role."""
+    """403 Forbidden: the API key's role or scope (session, IP or chat allow-list) refuses the call."""
 
 
 class OpenWANotFoundError(OpenWAApiError):

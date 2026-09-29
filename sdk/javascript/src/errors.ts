@@ -83,7 +83,7 @@ export class OpenWAApiError extends OpenWAError {
 
 /** 401 Unauthorized — missing or invalid API key. */
 export class OpenWAAuthError extends OpenWAApiError {}
-/** 403 Forbidden — the API key's role is insufficient for this endpoint. */
+/** 403 Forbidden: the API key's role or scope (session, IP or chat allow-list) refuses the call. */
 export class OpenWAForbiddenError extends OpenWAApiError {}
 /** 404 Not Found. */
 export class OpenWANotFoundError extends OpenWAApiError {}

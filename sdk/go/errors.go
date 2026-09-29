@@ -23,7 +23,8 @@ var (
 	ErrBadRequest = errors.New("openwa: bad request")
 	// ErrUnauthorized is returned for a 401 (missing or invalid API key).
 	ErrUnauthorized = errors.New("openwa: unauthorized")
-	// ErrForbidden is returned for a 403 (insufficient role).
+	// ErrForbidden is returned for a 403: the API key's role or scope (session,
+	// IP or chat allow-list) refuses the call.
 	ErrForbidden = errors.New("openwa: forbidden")
 	// ErrNotFound is returned for a 404.
 	ErrNotFound = errors.New("openwa: not found")

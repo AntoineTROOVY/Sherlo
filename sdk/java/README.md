@@ -110,7 +110,7 @@ try {
 | Class                           | HTTP | Meaning                                 |
 | ------------------------------- | ---- | --------------------------------------- |
 | `OpenWAAuthError`               | 401  | Missing or invalid API key              |
-| `OpenWAForbiddenError`          | 403  | API key role insufficient               |
+| `OpenWAForbiddenError`          | 403  | API key role or scope refuses the call  |
 | `OpenWANotFoundError`           | 404  | Resource not found                      |
 | `OpenWAConflictError`           | 409  | Engine not ready                        |
 | `OpenWARateLimitError`          | 429  | Rate limited                            |
