@@ -5624,7 +5624,7 @@ Request a graceful server restart, optionally orchestrating Docker profiles (add
 
 #### GET /api/infra/export-data
 
-Export every row of the 16 migration tables from the Data DB as JSON. Read-only, but runs raw `SELECT *` on the `data` DataSource.
+Export every row of the 16 migration tables from the Data DB as JSON. Read-only, but runs raw SQL on the `data` DataSource: `SELECT *` for most tables, while `messages` and `message_batches` are read as ids first and then as full rows in chunks, newest-first, of at most 200 rows and max(`EXPORT_INLINE_MEDIA_BUDGET_BYTES`, 1 MiB) of stored payload each (a larger single row is read on its own). Each chunk's payloads are dropped against the budget below before the next is read, so the export holds the rows it returns, one chunk and the budget's worth of media, never every inline payload in the database at once. Rows keep the order the database returns them in.
 
 **Auth:** API key (ADMIN)
 

@@ -17,7 +17,7 @@ import { Session as SessionEntity, SessionStatus } from '../session/entities/ses
 import { In } from 'typeorm';
 import { DateUtils } from 'typeorm/util/DateUtils';
 import type { MigrationTables, TableCounts } from './migration-tables.types';
-import { EXPORT_TABLES, EXPORT_TABLE_EXCLUSIONS } from './export-tables';
+import { EXPORT_TABLES, EXPORT_TABLE_EXCLUSIONS, type AnyExportTable } from './export-tables';
 import { TABLE_IMPORTERS } from './table-importers';
 
 /**
@@ -189,6 +189,14 @@ function newestFirst<T>(rows: readonly T[], at: (row: T) => number): T[] {
 }
 
 /**
+ * A chunk of full-row reads from an inline-media table holds at most max(budget, 1 MiB) of stored
+ * payload (and always at least one row), as the message list does. The row cap keeps a chunk of
+ * small rows well inside every driver's bound-parameter limit.
+ */
+const EXPORT_READ_CHUNK_MIN_BYTES = 1024 * 1024;
+const EXPORT_READ_CHUNK_MAX_ROWS = 200;
+
+/**
  * Spends the shared budget, and remembers what it refused.
  *
  * `exceeds` returns true when this payload does not fit and must be dropped. The tally matters as
@@ -196,11 +204,19 @@ function newestFirst<T>(rows: readonly T[], at: (row: T) => number): T[] {
  * is deliberately the same shape a payload skipped on the way in gets — so without a count, a
  * truncated backup is indistinguishable from a complete one, both on inspection and on restore.
  */
-function createInlineMediaBudget(): { exceeds: (encodedBytes: number) => boolean; droppedPayloads: () => number } {
+interface InlineMediaBudget {
+  /** The configured budget, which also sizes the export's chunked reads. */
+  bytes: number;
+  exceeds: (encodedBytes: number) => boolean;
+  droppedPayloads: () => number;
+}
+
+function createInlineMediaBudget(): InlineMediaBudget {
   const budget = exportInlineMediaBudgetBytes();
   let spent = 0;
   let dropped = 0;
   return {
+    bytes: budget,
     exceeds: (encodedBytes: number): boolean => {
       if (spent + encodedBytes > budget) {
         dropped += 1;
@@ -346,13 +362,13 @@ export class InfraDataService {
     // A skipped table is surfaced in `skippedTables` (and logged as a warning) so an operator can tell
     // "not migrated yet" apart from "exported empty".
     const skippedTables: string[] = [];
-    const queryOptionalTable = async (table: string): Promise<unknown[]> => {
+    const readTable = async (entry: AnyExportTable, sql: string): Promise<unknown[]> => {
       try {
-        return await this.dataDataSource.query(`SELECT * FROM ${table}`);
+        return await this.dataDataSource.query(sql);
       } catch (error) {
-        if (!isMissingTableError(error)) throw error;
-        skippedTables.push(table);
-        this.logger.warn('Optional table does not exist in this DB; exporting without it', { table });
+        if (!entry.optional || !isMissingTableError(error)) throw error;
+        skippedTables.push(entry.table);
+        this.logger.warn('Optional table does not exist in this DB; exporting without it', { table: entry.table });
         return [];
       }
     };
@@ -360,7 +376,7 @@ export class InfraDataService {
     // One budget shared by the tables that carry a full inline payload (messages and
     // message_batches today), so the total is what is bounded rather than each table separately.
     const inlineMediaBudget = createInlineMediaBudget();
-    // The per-bucket drop counts are measured as the delta around each budgeted table's loop, which
+    // The per-bucket drop counts are measured as the delta around each budgeted table's read, which
     // attributes every refusal to the table that spent it and keeps the snapshot semantics the
     // response documents: messages are served first, batches spend what is left.
     const droppedByBucket: Record<'messages' | 'messageBatches', number> = { messages: 0, messageBatches: 0 };
@@ -368,18 +384,15 @@ export class InfraDataService {
     const counts = {} as TableCounts;
 
     for (const entry of EXPORT_TABLES) {
-      const rows: unknown[] = entry.optional
-        ? await queryOptionalTable(entry.table)
-        : await this.dataDataSource.query(`SELECT * FROM ${entry.table}`);
+      const droppedBefore = inlineMediaBudget.droppedPayloads();
+      const rows: unknown[] = entry.inlineMedia
+        ? await this.readInlineMediaTable(entry, entry.inlineMedia, sql => readTable(entry, sql), inlineMediaBudget)
+        : await readTable(entry, `SELECT * FROM ${entry.table}`);
       // `rows` was read for exactly this entry's table, so it holds the row type the entry's hooks
       // declare. That correlation is what the erased entry type cannot carry, and this loop is the
       // one place it is known — so the casts live here rather than at each hook.
       entry.afterRead?.(rows as never[]);
       if (entry.inlineMedia) {
-        const droppedBefore = inlineMediaBudget.droppedPayloads();
-        for (const row of newestFirst(rows, entry.inlineMedia.newestFirst as (row: unknown) => number)) {
-          entry.inlineMedia.strip(row as never, inlineMediaBudget.exceeds);
-        }
         droppedByBucket[entry.inlineMedia.bucket] = inlineMediaBudget.droppedPayloads() - droppedBefore;
       }
       tables[entry.key] = rows as never;
@@ -399,6 +412,64 @@ export class InfraDataService {
       skippedTables,
       omittedInlineMedia: droppedByBucket,
     };
+  }
+
+  /**
+   * Read a table whose rows carry inline media without ever holding all of its payloads at once.
+   *
+   * A `SELECT *` put every payload on the heap before the budget could drop one, so a media-heavy
+   * database could exhaust memory for a response that only ever carries the budget's worth. Instead
+   * every row is read as `id`, its recency key and its payload's stored size; the full rows follow
+   * newest-first in chunks, and each chunk is stripped against the budget before the next is read.
+   * Peak memory is the stripped rows, one chunk and the budget.
+   *
+   * The budget sees the rows in exactly the order `newestFirst` gave it over a `SELECT *`, and the
+   * result keeps the key read's row order, which is the order `SELECT *` returned; the caller applies
+   * `afterRead` to it as to any other table. A row deleted between the key read and its chunk is left
+   * out; one inserted after the key read is not exported.
+   */
+  private async readInlineMediaTable(
+    entry: AnyExportTable,
+    media: NonNullable<AnyExportTable['inlineMedia']>,
+    readKeys: (sql: string) => Promise<unknown[]>,
+    budget: InlineMediaBudget,
+  ): Promise<unknown[]> {
+    const keys = (await readKeys(
+      `SELECT id, "${media.recencyColumn}", OCTET_LENGTH("${media.payloadColumn}") AS "payloadBytes" FROM ${entry.table}`,
+    )) as Array<{ id: unknown; payloadBytes: number | string | null }>;
+    const chunkLimit = Math.max(budget.bytes, EXPORT_READ_CHUNK_MIN_BYTES);
+    const stripped = new Map<unknown, unknown>();
+    let chunk: unknown[] = [];
+    let chunkBytes = 0;
+
+    const flush = async (): Promise<void> => {
+      const isPostgres = this.dataDataSource.options.type === 'postgres';
+      const placeholders = chunk.map((_, i) => (isPostgres ? `$${i + 1}` : '?')).join(', ');
+      const rows = await this.dataDataSource.query<Array<{ id: unknown }>>(
+        `SELECT * FROM ${entry.table} WHERE id IN (${placeholders})`,
+        chunk,
+      );
+      // IN returns the rows in no particular order; the budget is spent in the chunk's own order.
+      const byId = new Map(rows.map(row => [row.id, row]));
+      for (const id of chunk) {
+        const row = byId.get(id);
+        if (!row) continue;
+        media.strip(row as never, budget.exceeds);
+        stripped.set(id, row);
+      }
+      chunk = [];
+      chunkBytes = 0;
+    };
+
+    for (const key of newestFirst(keys, media.newestFirst as (row: unknown) => number)) {
+      const bytes = Number(key.payloadBytes) || 0;
+      const full = chunk.length === EXPORT_READ_CHUNK_MAX_ROWS || chunkBytes + bytes > chunkLimit;
+      if (chunk.length > 0 && full) await flush();
+      chunk.push(key.id);
+      chunkBytes += bytes;
+    }
+    if (chunk.length > 0) await flush();
+    return keys.filter(key => stripped.has(key.id)).map(key => stripped.get(key.id));
   }
 
   async importData(data: {
