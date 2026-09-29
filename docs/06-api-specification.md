@@ -1507,6 +1507,9 @@ The inline fallback also keeps an inbound message's media downloadable after
 `CHAT_MEDIA_ARCHIVE_TTL_DAYS` retention purges the archived file, since retention leaves the inline
 copy in place.
 
+A revoked message (deleted for everyone, or through `POST /messages/delete`) has no media: its row is
+cleared on revoke, and this route answers `404` for it.
+
 **Auth:** API key
 
 **Path parameters**
@@ -2192,7 +2195,7 @@ The controller hardcodes the result after the engine call. Note the `200` status
 
 #### POST /api/sessions/:sessionId/messages/delete
 
-Delete a message (for everyone by default); also flags the stored record as `revoked`.
+Delete a message (for everyone by default); also clears the stored record and flags it `revoked`.
 
 **Auth:** API key (OPERATOR)
 
@@ -2216,7 +2219,7 @@ Delete a message (for everyone by default); also flags the stored record as `rev
 
 **Response** `200`
 
-After the engine delete, the stored message body is cleared and its `type` set to `revoked`. Note the `200` status (via `@HttpCode`).
+After the engine delete, the stored message's body and `metadata` (inline media, quote, reactions) are cleared, its archived-media pointer is removed, and its `type` is set to `revoked`, the same as when the engine reports a revoke (`message.revoked`). The archived file itself is deleted later by the chat-media orphan sweep, once it has stayed unreferenced for the sweep's grace window. Note the `200` status (via `@HttpCode`).
 
 ```json
 { "success": true }

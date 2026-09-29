@@ -3,7 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { MessageProjector, PERSIST_RETRY_DELAY_MS } from './message-projector.service';
 import { EngineRegistry } from '../../engine/engine-registry.service';
-import type { Repository } from 'typeorm';
+import { Not, type Repository } from 'typeorm';
 import { Message, MessageDirection, MessageStatus } from '../message/entities/message.entity';
 import { Session } from './entities/session.entity';
 import { EventsGateway } from '../events/events.gateway';
@@ -551,6 +551,17 @@ describe('MessageProjector (inbound projection)', () => {
       expect(projector.inFlightInbound('other-session', 'wamid.1')).toBeUndefined();
     });
 
+    it('lends no text to a quote once the message is revoked before its row is written', () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      hookManager.execute.mockImplementationOnce(() => new Promise(() => undefined));
+
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming());
+      projector.handleMessageRevoked(SESSION_ID, engine, { id: 'wamid.1' } as never);
+
+      expect(projector.inFlightInbound(SESSION_ID, 'wamid.1')).toEqual({ chatId: '15550001111@c.us', body: '' });
+    });
+
     // The row is inserted only after the message:received chain, so a revoke or edit landing while
     // it runs updates nothing, and the insert would then write the content the sender took back.
     describe('a revoke or edit that lands while message:received is still running', () => {
@@ -575,6 +586,7 @@ describe('MessageProjector (inbound projection)', () => {
         );
       };
       const where = { sessionId: SESSION_ID, waMessageId: 'wamid.1' };
+      const revokedPatch = { body: '', type: 'revoked', metadata: null, mediaPath: null, mediaMimetype: null };
 
       beforeEach(() => {
         Object.assign(eventsGateway, { emitMessageEdited: jest.fn() });
@@ -586,13 +598,14 @@ describe('MessageProjector (inbound projection)', () => {
         await received(engine);
 
         projector.handleMessageRevoked(SESSION_ID, engine, { id: 'wamid.1', body: '', type: 'revoked' } as never);
-        expect(messageRepository.update).toHaveBeenCalledWith(where, { body: '', type: 'revoked' });
+        await drain();
+        expect(messageRepository.update).toHaveBeenCalledWith(where, revokedPatch);
         expect(webhookService.dispatch).toHaveBeenCalledWith(SESSION_ID, 'message.revoked', expect.anything());
         releaseHook();
         await drain();
 
         expect(messageRepository.insert).toHaveBeenCalledTimes(1);
-        expect(updatesAfterInsert()).toEqual([[where, { body: '', type: 'revoked' }]]);
+        expect(updatesAfterInsert()).toEqual([[where, revokedPatch]]);
       });
 
       it('writes the latest edit onto the row once it is written', async () => {
@@ -621,7 +634,7 @@ describe('MessageProjector (inbound projection)', () => {
         releaseHook();
         await drain();
 
-        expect(updatesAfterInsert()).toEqual([[where, { body: '', type: 'revoked' }]]);
+        expect(updatesAfterInsert()).toEqual([[where, revokedPatch]]);
       });
 
       it('changes nothing after the insert when no revoke or edit arrived', async () => {
@@ -716,6 +729,82 @@ describe('MessageProjector (inbound projection)', () => {
         expect(webhookService.dispatch).toHaveBeenCalledWith(SESSION_ID, 'message.received', expect.anything());
         expect(eventsGateway.emitMessage).toHaveBeenCalledWith(SESSION_ID, expect.anything());
       });
+    });
+  });
+
+  describe('a revoked message', () => {
+    const where = { sessionId: SESSION_ID, waMessageId: 'wamid.1' };
+    const revokedPatch = { body: '', type: 'revoked', metadata: null, mediaPath: null, mediaMimetype: null };
+    const flush = async (): Promise<void> => {
+      for (let i = 0; i < 5; i++) await new Promise(resolve => setImmediate(resolve));
+    };
+
+    beforeEach(() => {
+      Object.assign(eventsGateway, { emitMessageReaction: jest.fn(), emitMessageEdited: jest.fn() });
+    });
+
+    it('keeps nothing of the content and hands the cleared row to message:persisted', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      const cleared = { id: 7, ...where, ...revokedPatch };
+      messageRepository.update.mockResolvedValueOnce({ affected: 1 });
+      messageRepository.findOne.mockResolvedValueOnce(cleared);
+
+      projector.handleMessageRevoked(SESSION_ID, engine, { id: 'NOTIF', revokedId: 'wamid.1' } as never);
+      await flush();
+
+      expect(messageRepository.update).toHaveBeenCalledWith(where, revokedPatch);
+      expect(hookManager.execute).toHaveBeenCalledWith(
+        'message:persisted',
+        { sessionId: SESSION_ID, message: cleared },
+        expect.anything(),
+      );
+      expect(webhookService.dispatch).toHaveBeenCalledWith(SESSION_ID, 'message.revoked', expect.anything());
+    });
+
+    it('does not announce a row that was never stored', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      messageRepository.update.mockResolvedValueOnce({ affected: 0 });
+
+      projector.handleMessageRevoked(SESSION_ID, engine, { id: 'wamid.1' } as never);
+      await flush();
+
+      expect(hookManager.execute).not.toHaveBeenCalledWith('message:persisted', expect.anything(), expect.anything());
+    });
+
+    it('lands after a reaction queued before it, so the reaction cannot write content back', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      messageRepository.findOne.mockResolvedValue({ ...where, metadata: { media: { data: 'AAAA' } } });
+
+      projector.applyReactionQueued(SESSION_ID, { messageId: 'wamid.1', senderId: 'x@c.us', reaction: 'ok' } as never);
+      projector.handleMessageRevoked(SESSION_ID, engine, { id: 'wamid.1' } as never);
+      await flush();
+
+      expect(messageRepository.update.mock.calls.at(-1)).toEqual([where, revokedPatch]);
+    });
+
+    it('never takes an edit, inbound or outbound', async () => {
+      projector.applyMessageEditQueued(SESSION_ID, { messageId: 'wamid.1', body: 'late' } as never);
+      await projector.recordOutboundMessageEdit(SESSION_ID, 'wamid.1', 'later');
+      await flush();
+
+      const guarded = { ...where, type: Not('revoked') };
+      expect(messageRepository.update).toHaveBeenCalledWith(guarded, { body: 'late' });
+      expect(messageRepository.update).toHaveBeenCalledWith(guarded, { body: 'later' });
+    });
+
+    it('clears nothing when the engine gives no message id', async () => {
+      await projector.recordRevoke(SESSION_ID, '');
+
+      expect(messageRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('resolves the REST revoke even when the write fails', async () => {
+      messageRepository.update.mockRejectedValueOnce(new Error('db down'));
+
+      await expect(projector.recordRevoke(SESSION_ID, 'wamid.1')).resolves.toBeUndefined();
     });
   });
 
@@ -900,6 +989,24 @@ describe('MessageProjector (inbound projection)', () => {
         await flush();
 
         expect(updatesAfterS()).toEqual([[expect.objectContaining(whereS), { status: MessageStatus.READ }]]);
+      });
+
+      it('empties the echo row when the REST delete lands before it is written', async () => {
+        const { releaseA } = await echoWaitingBehindA();
+        void projector.recordRevoke(SESSION_ID, 'S');
+        releaseA();
+        await flush();
+
+        expect(updatesAfterS()).toEqual([[whereS, expect.objectContaining({ body: '', type: 'revoked' })]]);
+      });
+
+      it('writes a REST edit onto the echo row once it is written', async () => {
+        const { releaseA } = await echoWaitingBehindA();
+        void projector.recordOutboundMessageEdit(SESSION_ID, 'S', 'fixed');
+        releaseA();
+        await flush();
+
+        expect(updatesAfterS()).toEqual([[whereS, { body: 'fixed' }]]);
       });
 
       it('stores reactions that arrived before the row, without announcing them again', async () => {

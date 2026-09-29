@@ -180,6 +180,19 @@ describe('ChatMediaArchiveService', () => {
       expect((await repository.findOneByOrFail({ id: row.id })).mediaPath).toBeNull();
       update.mockRestore();
     });
+
+    it('does not point a row revoked while its file was written back at the media', async () => {
+      const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64') });
+      // The archive works from the in-memory row the projector inserted; the revoke lands meanwhile.
+      await repository.update({ id: row.id }, { type: 'revoked', body: '' });
+
+      await expect(enabled().archive(row)).resolves.toBeNull();
+
+      expect((await repository.findOneByOrFail({ id: row.id })).mediaPath).toBeNull();
+      const files = [];
+      for await (const f of storageService.iterateFiles(CHAT_MEDIA_PREFIX)) files.push(f);
+      expect(files).toEqual([]);
+    });
   });
 
   describe('getMedia', () => {
@@ -191,6 +204,14 @@ describe('ChatMediaArchiveService', () => {
         path: key,
         mimetype: 'image/png',
       });
+    });
+
+    it('returns null for a revoked message that still points at a file', async () => {
+      const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64') });
+      await enabled().archive(row);
+      await repository.update({ id: row.id }, { type: 'revoked' });
+
+      expect(await enabled().getMedia('sess-1', [row.chatId], row.waMessageId)).toBeNull();
     });
 
     it('returns null for a message with nothing archived', async () => {

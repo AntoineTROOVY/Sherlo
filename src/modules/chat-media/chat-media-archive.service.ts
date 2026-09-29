@@ -158,7 +158,16 @@ export class ChatMediaArchiveService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      await this.repository.update({ id: row.id }, { mediaPath: key, mediaMimetype: media.mimetype });
+      // Conditional on the row not being revoked: a revoke that landed while the file was written
+      // cleared the row, and pointing it at the file would bring the deleted media back.
+      const result = await this.repository.update(
+        { id: row.id, type: Not('revoked') },
+        { mediaPath: key, mediaMimetype: media.mimetype },
+      );
+      if (result.affected === 0) {
+        await this.storageService.deleteFile(key).catch(() => undefined); // else the orphan sweep reaps it
+        return null;
+      }
     } catch (error) {
       // The file exists but no row references it — an orphan the sweep reaps after its grace
       // window. The row itself stays consistent (mediaPath still null), so nothing else to undo.
@@ -183,7 +192,8 @@ export class ChatMediaArchiveService implements OnModuleInit, OnModuleDestroy {
     // engine-neutral form depending on which writer won the persist race. The caller owns the
     // dialect resolution (it holds the lid table), so this only has to match any of them.
     const row = await this.repository.findOne({ where: { sessionId, chatId: In(chatIds), waMessageId } });
-    if (!row?.mediaPath || !row.mediaMimetype) return null;
+    // A revoked row serves nothing, whatever pointer it still holds.
+    if (!row?.mediaPath || !row.mediaMimetype || row.type === 'revoked') return null;
     return { path: row.mediaPath, mimetype: row.mediaMimetype };
   }
 

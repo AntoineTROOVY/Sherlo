@@ -88,8 +88,9 @@ text (escape-then-highlight), never as HTML. Do not inject HTML.
 
 ## 27.3 Indexing via the `message:persisted` hook
 
-The core fires `message:persisted` for every live message (outbound on send, inbound on receive) — never
-for history backfill. Register a handler to keep your index in sync:
+The core fires `message:persisted` for every live message (outbound on send, inbound on receive, and again
+when a stored message is revoked) — never for history backfill. Register a handler to keep your index in
+sync:
 
 ```ts
 ctx.registerHook('message:persisted', async hookCtx => {
@@ -103,6 +104,12 @@ ctx.registerHook('message:persisted', async hookCtx => {
 as `PENDING` (usually with `waMessageId` still null), then emits it **again** with the same `id` once it
 reaches its terminal state (`SENT` with the engine id, or `FAILED`). Key your documents by the row `id`
 and treat every emission as an upsert, and your index always converges to the finalized state.
+
+**A revoke re-emits the row too.** When a message of either direction is revoked (an engine
+`message.revoked`, or `POST /messages/delete`, whether or not `forEveryone` is set), the core clears the
+stored row and emits `message:persisted` again with the same `id`, an empty `body`, `type: 'revoked'` and
+null `metadata`. An upsert keyed by `id` therefore drops the deleted content from your index; do not count
+the emission as a new message.
 
 One race remains visible by design: when the engine's own-send echo wins, the redundant PENDING row is
 merged into the echo's row and then dropped. The core emits `message:persisted` for the surviving row

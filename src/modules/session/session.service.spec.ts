@@ -5970,7 +5970,7 @@ describe('SessionService', () => {
 
       expect(messageRepository.update as jest.Mock).toHaveBeenCalledWith(
         { sessionId: 'sess-uuid-1', waMessageId: 'ORIGINAL_MSG' },
-        { body: '', type: 'revoked' },
+        { body: '', type: 'revoked', metadata: null, mediaPath: null, mediaMimetype: null },
       );
 
       // The DB flag is an internal side effect; the delivered payload is the public contract
@@ -6001,7 +6001,7 @@ describe('SessionService', () => {
 
       expect(messageRepository.update as jest.Mock).toHaveBeenCalledWith(
         { sessionId: 'sess-uuid-1', waMessageId: 'ORIGINAL_MSG' },
-        { body: '', type: 'revoked' },
+        { body: '', type: 'revoked', metadata: null, mediaPath: null, mediaMimetype: null },
       );
     });
 
@@ -7477,14 +7477,13 @@ describe('SessionService', () => {
       };
 
       callbacks.onMessageRevoked(revoked);
-      // Allow the queued microtask (repository.update().then()) to resolve.
-      await Promise.resolve();
-      await Promise.resolve();
+      // Allow the queued revoke on the message's mutation chain to run.
+      await new Promise(resolve => setImmediate(resolve));
 
       // The stored update must carry an EMPTY body and the 'revoked' type — no display string.
       expect(messageRepository.update).toHaveBeenCalledWith(
         { sessionId: 'sess-uuid-1', waMessageId: 'WA_MSG_1' },
-        { body: '', type: 'revoked' },
+        { body: '', type: 'revoked', metadata: null, mediaPath: null, mediaMimetype: null },
       );
 
       // The structured payload emitted to clients must not contain any localized text.
@@ -7543,7 +7542,7 @@ describe('SessionService', () => {
       await new Promise(resolve => setImmediate(resolve));
 
       expect(messageRepository.update).toHaveBeenCalledWith(
-        { sessionId: 'sess-uuid-1', waMessageId: 'WA_MSG_EDIT_1' },
+        { sessionId: 'sess-uuid-1', waMessageId: 'WA_MSG_EDIT_1', type: Not('revoked') },
         { body: 'New edited text' },
       );
       expect(eventsGateway.emitMessageEdited).not.toHaveBeenCalled();

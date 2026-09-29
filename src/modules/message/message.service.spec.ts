@@ -67,7 +67,7 @@ describe('MessageService', () => {
   let service: MessageService;
   let repository: jest.Mocked<Partial<Repository<Message>>>;
   let engines: EngineRegistry;
-  let messageProjector: { recordOutboundMessageEdit: jest.Mock };
+  let messageProjector: { recordOutboundMessageEdit: jest.Mock; recordRevoke: jest.Mock };
   let hookManager: jest.Mocked<Partial<HookManager>>;
   let lidMappingStore: { findLidsForPhone: jest.Mock; findPhoneForLid: jest.Mock };
   let mockEngine: ReturnType<typeof createMockEngine>;
@@ -84,7 +84,10 @@ describe('MessageService', () => {
 
     mockEngine = createMockEngine();
 
-    messageProjector = { recordOutboundMessageEdit: jest.fn().mockResolvedValue(undefined) };
+    messageProjector = {
+      recordOutboundMessageEdit: jest.fn().mockResolvedValue(undefined),
+      recordRevoke: jest.fn().mockResolvedValue(undefined),
+    };
 
     engines = new EngineRegistry();
     engines.set('sess-1', mockEngine as unknown as IWhatsAppEngine);
@@ -809,6 +812,16 @@ describe('MessageService', () => {
 
       expect(mockEngine.deleteMessage).toHaveBeenCalledWith('test@c.us', 'wa-msg-1', false);
     });
+
+    it('clears the stored row through the same revoke as an engine revoke, after the engine delete', async () => {
+      await service.deleteMessage('sess-1', { chatId: 'test@c.us', messageId: 'wa-msg-1' });
+
+      expect(messageProjector.recordRevoke).toHaveBeenCalledWith('sess-1', 'wa-msg-1');
+      expect(mockEngine.deleteMessage.mock.invocationCallOrder[0]).toBeLessThan(
+        messageProjector.recordRevoke.mock.invocationCallOrder[0],
+      );
+      expect(repository.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('editMessage', () => {
@@ -1045,6 +1058,15 @@ describe('MessageService', () => {
       });
     });
 
+    it('404s for a revoked row that still carries an inline copy', async () => {
+      (repository.findOne as jest.Mock).mockResolvedValue({
+        ...inlineRow({ mimetype: 'image/jpeg', data: Buffer.from('GONE').toString('base64') }),
+        type: 'revoked',
+      });
+      const svc = build(noArchive(), storage());
+      await expect(svc.getChatMedia('sess-1', 'c@c.us', 'wa-1')).rejects.toThrow(NotFoundException);
+    });
+
     it('prefers the archived file over the inline copy when both exist', async () => {
       (repository.findOne as jest.Mock).mockResolvedValue(
         inlineRow({ mimetype: 'image/png', data: Buffer.from('INLINE').toString('base64') }),
@@ -1269,5 +1291,18 @@ describe('spendInlineMediaBudget', () => {
 
     expect(mediaOf(rows[0]).data).toBeUndefined();
     expect(mediaOf(rows[0]).omitted).toBe(true);
+  });
+  // A revoked message has no media. A row restored from an older backup, or merged onto after its
+  // revoke was cleared, can still carry a payload; the list must not return it, and it must not
+  // spend the newest-payload allowance the next real media is owed.
+  it('drops the media of a revoked row and still inlines the media after it', () => {
+    const revoked = row('revoked', 5000);
+    revoked.type = 'revoked';
+    const rows = [revoked, row('image', 3000)];
+    spendInlineMediaBudget(rows, 1000);
+
+    expect(rows[0].metadata.media).toBeUndefined();
+    expect(mediaOf(rows[1]).data).toHaveLength(3000);
+    expect(mediaOf(rows[1]).omitted).toBeUndefined();
   });
 });

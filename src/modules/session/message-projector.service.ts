@@ -59,6 +59,20 @@ import { isMessagePayload } from '../../core/hooks/hook-results';
 export const ACK_RECONCILE_DELAY_MS = 750;
 
 /**
+ * What a revoke leaves of a stored message: the placeholder WhatsApp itself shows. Body, archived-media
+ * pointers and metadata (inline media, quote, reactions, buttons) are all cleared, so the row carries
+ * nothing of what the sender took back. The archived file, now unreferenced, is reaped by the chat-media
+ * orphan sweep.
+ */
+const REVOKED_ROW_PATCH = {
+  body: '',
+  type: 'revoked',
+  metadata: null,
+  mediaPath: null,
+  mediaMimetype: null,
+} as unknown as QueryDeepPartialEntity<Message>;
+
+/**
  * Delay before the single retry of a message insert that failed transiently (lock contention, a
  * dropped connection, a pool timeout). The engine delivers each message once, so without the retry
  * one busy moment loses the row for good.
@@ -242,7 +256,9 @@ export class MessageProjector {
    * table.
    */
   inFlightInbound(sessionId: string, waMessageId: string): Pick<IncomingMessage, 'chatId' | 'body'> | undefined {
-    return waMessageId ? this.inboundInFlight.get(`${sessionId}:${waMessageId}`)?.message : undefined;
+    const entry = waMessageId ? this.inboundInFlight.get(`${sessionId}:${waMessageId}`) : undefined;
+    // A revoked message lends no text, as its cleared row would not; the chatId still scopes the quote.
+    return entry && (entry.revoked ? { chatId: entry.message.chatId, body: '' } : entry.message);
   }
 
   /**
@@ -483,11 +499,8 @@ export class MessageProjector {
     }
     if (!pending?.revoked && pending?.editedBody === undefined && !pending?.reactions) return;
     this.enqueueMessageMutation(id, waMessageId, async () => {
+      if (pending.revoked) return this.revokeRow(id, waMessageId);
       try {
-        if (pending.revoked) {
-          await this.messageRepository.update({ sessionId: id, waMessageId }, { body: '', type: 'revoked' });
-          return;
-        }
         if (pending.editedBody !== undefined) {
           await this.messageRepository.update({ sessionId: id, waMessageId }, { body: pending.editedBody });
         }
@@ -510,6 +523,43 @@ export class MessageProjector {
     }
     // Only the metadata column, so a concurrent ack UPDATE is not overwritten.
     await this.messageRepository.update({ sessionId: id, waMessageId }, { metadata: { ...metadata, reactions } });
+  }
+
+  /**
+   * Clear a revoked message's stored row, on the message's mutation chain so a reaction or edit queued
+   * before it cannot write content back afterwards. Used by the engine's revoke event and by the REST
+   * delete. Best-effort like every stored-message mutation: never rejects, and resolves once the write
+   * has run.
+   */
+  recordRevoke(sessionId: string, waMessageId: string): Promise<void> {
+    // A message not written yet takes the revoke once its row lands; the UPDATE below matches nothing.
+    const inFlight = this.inboundInFlight.get(`${sessionId}:${waMessageId}`);
+    if (inFlight) inFlight.revoked = true;
+    return new Promise(resolve =>
+      this.enqueueMessageMutation(sessionId, waMessageId, () =>
+        this.revokeRow(sessionId, waMessageId).finally(resolve),
+      ),
+    );
+  }
+
+  /**
+   * Apply {@link REVOKED_ROW_PATCH}, then hand the cleared row to `message:persisted` so a plugin index
+   * keyed by row id drops the content too. Must run on the message's mutation chain.
+   */
+  private async revokeRow(sessionId: string, waMessageId: string): Promise<void> {
+    // An undefined condition is DROPPED from the where-clause, which would clear every row of the session.
+    if (!waMessageId) return;
+    try {
+      const result = await this.messageRepository.update({ sessionId, waMessageId }, REVOKED_ROW_PATCH);
+      if (!result?.affected) return;
+      const row = await this.messageRepository.findOne({ where: { sessionId, waMessageId } });
+      if (!row) return;
+      void this.hookManager
+        .execute('message:persisted', { sessionId, message: row }, { sessionId, source: 'SessionService' })
+        .catch(() => undefined);
+    } catch (err) {
+      this.logger.error(`Failed to clear revoked message ${waMessageId}`, String(err));
+    }
   }
 
   /** Fan an accepted inbound message out: `message:persisted` plugin hook, webhook, websocket emit. */
@@ -793,21 +843,15 @@ export class MessageProjector {
       action: 'message_revoked',
     });
 
-    // Flag the stored message as revoked (best-effort; the message may not be in the
-    // DB). The dashboard renders the localized "message deleted" text, so no display
-    // string is persisted here.
+    // Clear the stored message (best-effort; the message may not be in the DB). The
+    // dashboard renders the localized "message deleted" text, so no display string is
+    // persisted here.
     //
     // Match on `revokedId` (the ORIGINAL deleted message's id) when present: on wwebjs
     // `message.id` is the revocation notification, which never matches a stored row.
     // `revokedId` falls back to `id` (Baileys, where the two are the same).
     const revokedWaMessageId = message.revokedId ?? message.id;
-    const inFlight = this.inboundInFlight.get(`${id}:${revokedWaMessageId}`);
-    if (inFlight) inFlight.revoked = true;
-    void this.messageRepository
-      .update({ sessionId: id, waMessageId: revokedWaMessageId }, { body: '', type: 'revoked' })
-      .catch(err => {
-        this.logger.error(`Failed to update revoked message: ${revokedWaMessageId}`, String(err));
-      });
+    void this.recordRevoke(id, revokedWaMessageId);
 
     // Notify consumers regardless of whether the row existed: webhook (message.revoked
     // is a declared event) + the real-time dashboard stream.
@@ -845,6 +889,8 @@ export class MessageProjector {
 
   /** Stored-row update for a REST outbound edit, on the same mutation chain — see MessageMutationProjector. */
   recordOutboundMessageEdit(sessionId: string, messageId: string, body: string): Promise<void> {
+    const inFlight = this.inboundInFlight.get(`${sessionId}:${messageId}`);
+    if (inFlight) inFlight.editedBody = body;
     return this.mutationProjector.recordOutboundMessageEdit(sessionId, messageId, body);
   }
 

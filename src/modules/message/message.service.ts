@@ -95,6 +95,11 @@ export function createInlineMediaSpender(budgetBytes: number): (message: Message
   return message => {
     const metadata = message.metadata as Record<string, unknown> | null | undefined;
     if (!metadata || typeof metadata !== 'object') return;
+    // A revoked message has no media, even on a row restored or merged after its revoke was cleared.
+    if (message.type === 'revoked') {
+      delete metadata.media;
+      return;
+    }
     const media = metadata.media as { data?: unknown; sizeBytes?: number } | null | undefined;
     if (!media || typeof media.data !== 'string' || MEDIA_URL_POINTER.test(media.data)) return;
 
@@ -546,6 +551,8 @@ export class MessageService implements PluginMessagePort {
     });
     const inline = (row?.metadata as { media?: { data?: unknown; mimetype?: unknown; omitted?: unknown } })?.media;
     if (
+      // A revoked message's media is gone, even on a row cleared before revokes dropped it.
+      row?.type === 'revoked' ||
       !inline ||
       inline.omitted ||
       typeof inline.data !== 'string' ||
@@ -648,13 +655,10 @@ export class MessageService implements PluginMessagePort {
     const engine = this.getEngine(sessionId);
     await engine.deleteMessage(dto.chatId, dto.messageId, dto.forEveryone ?? true);
 
-    // Flag the stored message as revoked. No localized display string is persisted here;
-    // the dashboard renders the localized "message deleted" text.
-    try {
-      await this.messageRepository.update({ sessionId, waMessageId: dto.messageId }, { body: '', type: 'revoked' });
-    } catch (err) {
-      this.logger.warn(`Failed to flag deleted message ${dto.messageId} as revoked`, { error: String(err) });
-    }
+    // Clear the stored message the same way an engine revoke does (body, media and metadata), on
+    // its mutation chain. Best-effort: never rejects. No localized display string is persisted
+    // here; the dashboard renders the localized "message deleted" text.
+    await this.messageProjector.recordRevoke(sessionId, dto.messageId);
   }
 
   // ========== Edit Message ==========
