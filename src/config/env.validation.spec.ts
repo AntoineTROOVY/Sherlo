@@ -208,6 +208,15 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ AUDIT_RETENTION_DAYS: '90' })).not.toThrow();
   });
 
+  it('rejects a non-integer message retention and accepts 0 and negatives as "keep forever"', () => {
+    expect(() => validateEnv({ MESSAGE_RETENTION_DAYS: '30d' })).toThrow(/MESSAGE_RETENTION_DAYS/);
+    expect(() => validateEnv({ MESSAGE_RETENTION_DAYS: '0' })).not.toThrow();
+    expect(() => validateEnv({ MESSAGE_RETENTION_DAYS: '-1' })).not.toThrow();
+    expect(() => validateEnv({ MESSAGE_RETENTION_DAYS: '30' })).not.toThrow();
+    expect(() => validateEnv({ MESSAGE_RETENTION_DAYS: '36500' })).not.toThrow();
+    expect(() => validateEnv({ MESSAGE_RETENTION_DAYS: '36501' })).toThrow(/MESSAGE_RETENTION_DAYS.*36500/);
+  });
+
   it('rejects a non-positive / non-integer WEBHOOK_MAX_PAYLOAD_BYTES (0 would reject every dispatch)', () => {
     expect(() => validateEnv({ WEBHOOK_MAX_PAYLOAD_BYTES: '0' })).toThrow(/WEBHOOK_MAX_PAYLOAD_BYTES/);
     expect(() => validateEnv({ WEBHOOK_MAX_PAYLOAD_BYTES: 'abc' })).toThrow(/WEBHOOK_MAX_PAYLOAD_BYTES/);

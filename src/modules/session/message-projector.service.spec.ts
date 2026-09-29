@@ -280,6 +280,25 @@ describe('MessageProjector', () => {
 
       expect(dedupIds(messageRepository.find)).toEqual(['DUP']);
     });
+
+    it('skips history older than the MESSAGE_RETENTION_DAYS window', async () => {
+      const prev = process.env.MESSAGE_RETENTION_DAYS;
+      process.env.MESSAGE_RETENTION_DAYS = '30';
+      try {
+        messageRepository.find.mockResolvedValue([{ waMessageId: 'NEW' }]);
+        const nowSec = Math.floor(Date.now() / 1000);
+
+        await projector.persistHistoryMessages('s1', engine, [
+          historyMessage({ id: 'OLD', timestamp: nowSec - 31 * 86_400 }),
+          historyMessage({ id: 'NEW', timestamp: nowSec - 29 * 86_400 }),
+        ]);
+
+        expect(dedupIds(messageRepository.find)).toEqual(['NEW']);
+      } finally {
+        if (prev === undefined) delete process.env.MESSAGE_RETENTION_DAYS;
+        else process.env.MESSAGE_RETENTION_DAYS = prev;
+      }
+    });
   });
 });
 

@@ -246,8 +246,15 @@ export function validateEnv(config: EnvConfig): EnvConfig {
   // into a bare checkInt('AUDIT_RETENTION_DAYS') call would silently drop the knob out of that gate.
   for (const key of [
     'AUDIT_RETENTION_DAYS', // <= 0 disables retention
+    'MESSAGE_RETENTION_DAYS', // unset or <= 0 keeps messages forever
   ]) {
     checkInt(key);
+  }
+  // A window past about a century gives a cutoff SQLite compares as a later date, deleting every
+  // message. Keep in step with MAX_MESSAGE_RETENTION_DAYS in message-retention.service.ts.
+  const messageRetentionDays = str('MESSAGE_RETENTION_DAYS');
+  if (messageRetentionDays !== undefined && Number(messageRetentionDays) > 36500) {
+    errors.push(`MESSAGE_RETENTION_DAYS must be at most 36500 (got "${messageRetentionDays}")`);
   }
 
   // BAILEYS_WA_VERSION: optional version pin for the Baileys engine (e.g. 2.3000.1045340097 or 2,3000,1045340097)
