@@ -56,7 +56,9 @@ export async function readLeanContacts(): Promise<LeanContactRead> {
       };
     };
   };
-  const models = w.require('WAWebCollections').Contact.getModelsArray();
+  // A copy: getModelsArray() is the collection's live array, which grows when a new contact writes,
+  // so indexing it across the yields below would read one contact twice and skip another.
+  const models = w.require('WAWebCollections').Contact.getModelsArray().slice();
   const rows: LeanContact[] = [];
   let failed = 0;
   let firstError: string | undefined;
