@@ -6602,6 +6602,7 @@ file arrives.
 **Size note.** Both endpoints return the converted media inline, so the response is bounded by the
 same `MEDIA_CONVERSION_MAX_OUTPUT_BYTES` cap (default 50 MiB) — and a client posting it onward is
 still bound by `BODY_SIZE_LIMIT` (default 25 MiB) on that next request.
+ffmpeg stops writing once its output passes that cap, and such a conversion fails with `400`.
 
 ### 6.4.16 Automation rules (autoreply)
 

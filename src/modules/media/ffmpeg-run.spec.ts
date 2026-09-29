@@ -41,6 +41,8 @@ case "$mode" in
   hang)  sleep 30 ;;
   empty) : > "$out" ;;
   big)   head -c 4096 /dev/zero > "$out" ;;
+  argv)  printf '%s ' "$@" > "$out" ;;
+  capped) head -c 1025 /dev/zero > "$out" ;;
   *)     printf 'converted-output' > "$out" ;;
 esac
 `,
@@ -109,6 +111,20 @@ esac
     await expect(
       runFfmpeg(Buffer.from('input'), 'bin', 'ogg', mode('big'), options({ maxOutputBytes: 1000 })),
     ).rejects.toThrow(/4096 bytes, above the 1000 byte limit/);
+  });
+
+  // The cap has to reach the process, or the output grows unbounded until ffmpeg exits.
+  it('hands ffmpeg the size cap', async () => {
+    const argv = (await runFfmpeg(Buffer.from('input'), 'bin', 'ogg', mode('argv'), options())).toString();
+
+    expect(argv).toContain('-fs 1025 ');
+  });
+
+  // Where ffmpeg stops at -fs it exits 0 with a cut-off file, which must never be returned as a result.
+  it('refuses the cut-off file ffmpeg leaves when it stops at the cap', async () => {
+    await expect(
+      runFfmpeg(Buffer.from('input'), 'bin', 'ogg', mode('capped'), options({ maxOutputBytes: 1024 })),
+    ).rejects.toThrow(/1025 bytes, above the 1024 byte limit/);
   });
 
   // An empty file is a silent failure: it would otherwise be returned as a valid zero-byte result.

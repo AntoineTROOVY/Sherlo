@@ -89,8 +89,18 @@ const BASE_ARGS = [
  * shape — restricted protocols, no stdin, and the fact that the only paths present are ones this
  * process chose — can be asserted without running a process.
  */
-export function buildFfmpegArgs(inputPath: string, outputPath: string, encodeArgs: string[]): string[] {
-  return [...BASE_ARGS, '-i', inputPath, ...encodeArgs, outputPath];
+export function buildFfmpegArgs(
+  inputPath: string,
+  outputPath: string,
+  encodeArgs: string[],
+  maxOutputBytes: number,
+): string[] {
+  // `-fs` makes ffmpeg stop writing once the output reaches the limit, so a conversion cannot fill
+  // the temp directory (a RAM-backed tmpfs in the compose files) before the size check after exit.
+  // It is an output option, so it sits right before the output path. The limit is one byte above
+  // the cap: a cut-off file is then always over the cap and rejected, and a complete one at the cap
+  // still passes.
+  return [...BASE_ARGS, '-i', inputPath, ...encodeArgs, '-fs', String(maxOutputBytes + 1), outputPath];
 }
 
 /**
@@ -157,10 +167,11 @@ export async function runFfmpeg(
   const outputPath = join(dir, `out.${outputExtension}`);
   try {
     await writeFile(inputPath, input);
-    await execute(buildFfmpegArgs(inputPath, outputPath, encodeArgs), options);
+    await execute(buildFfmpegArgs(inputPath, outputPath, encodeArgs, options.maxOutputBytes), options);
 
     // Check the size on disk before reading, so an unexpectedly large result is refused instead of
-    // being pulled into memory first.
+    // being pulled into memory first. `-fs` stops ffmpeg at one byte over the cap and ffmpeg then
+    // exits 0, so this check is also what rejects that cut-off file.
     const { size } = await stat(outputPath);
     if (size > options.maxOutputBytes) {
       throw new FfmpegConversionError(
