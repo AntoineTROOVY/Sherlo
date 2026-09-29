@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { MessageProjector, PERSIST_RETRY_DELAY_MS } from './message-projector.service';
 import { EngineRegistry } from '../../engine/engine-registry.service';
 import type { Repository } from 'typeorm';
-import { Message, MessageDirection } from '../message/entities/message.entity';
+import { Message, MessageDirection, MessageStatus } from '../message/entities/message.entity';
 import { Session } from './entities/session.entity';
 import { EventsGateway } from '../events/events.gateway';
 import { WebhookService } from '../webhook/webhook.service';
@@ -719,6 +719,206 @@ describe('MessageProjector (inbound projection)', () => {
     });
   });
 
+  // Hook chains for different messages finish in any order. A slow chain for one message must not let
+  // a later message of the same chat be stored and announced first.
+  describe('commit order within a chat', () => {
+    const flush = async (): Promise<void> => {
+      for (let i = 0; i < 10; i++) await new Promise(resolve => setImmediate(resolve));
+    };
+    /** Holds each message's message:received / message:sent chain until the test releases it by id. */
+    const holdHooks = (): Map<string, (fail?: boolean) => void> => {
+      const release = new Map<string, (fail?: boolean) => void>();
+      hookManager.execute.mockImplementation((event: string, data: IncomingMessage) => {
+        if (event !== 'message:received' && event !== 'message:sent') return Promise.resolve({ continue: true, data });
+        return new Promise((resolve, reject) =>
+          release.set(data.id, fail => (fail ? reject(new Error('hook blew up')) : resolve({ continue: true, data }))),
+        );
+      });
+      return release;
+    };
+    const inserted = (): unknown[] =>
+      messageRepository.insert.mock.calls.map(([row]) => (row as { waMessageId: string }).waMessageId);
+    const dispatched = (): unknown[] =>
+      webhookService.dispatch.mock.calls.map(([, event, payload]) => `${event}:${(payload as { id: string }).id}`);
+    const chatA = '15550001111@c.us';
+
+    it('stores and dispatches in arrival order when a later hook finishes first', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      const release = holdHooks();
+
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming({ id: 'A', chatId: chatA }));
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming({ id: 'B', chatId: chatA }));
+      // Both chains started: hooks still run concurrently.
+      expect(hookManager.execute).toHaveBeenCalledTimes(2);
+
+      release.get('B')!();
+      await flush();
+      expect(inserted()).toEqual([]);
+
+      release.get('A')!();
+      await flush();
+      expect(inserted()).toEqual(['A', 'B']);
+      expect(dispatched()).toEqual(['message.received:A', 'message.received:B']);
+      expect(eventsGateway.emitMessage.mock.calls.map(([, m]) => (m as { id: string }).id)).toEqual(['A', 'B']);
+    });
+
+    it('does not hold back another chat', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      const release = holdHooks();
+
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming({ id: 'A', chatId: chatA }));
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming({ id: 'C', chatId: '15550002222@c.us' }));
+      release.get('C')!();
+      await flush();
+
+      expect(inserted()).toEqual(['C']);
+    });
+
+    it('still commits a later message when an earlier hook chain fails', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      const release = holdHooks();
+
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming({ id: 'A', chatId: chatA }));
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming({ id: 'B', chatId: chatA }));
+      release.get('A')!(true);
+      release.get('B')!();
+      await flush();
+
+      expect(inserted()).toEqual(['B']);
+      expect(dispatched()).toEqual(['message.received:B']);
+    });
+
+    it('drops queued messages once the engine is retired', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      const release = holdHooks();
+
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming({ id: 'A', chatId: chatA }));
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming({ id: 'B', chatId: chatA }));
+      release.get('B')!();
+      await flush();
+      engines.set(SESSION_ID, makeEngine());
+      release.get('A')!();
+      await flush();
+
+      expect(inserted()).toEqual([]);
+      expect(dispatched()).toEqual([]);
+    });
+
+    it('applies a revoke that lands while a message waits for its turn', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      const release = holdHooks();
+
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming({ id: 'A', chatId: chatA }));
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming({ id: 'B', chatId: chatA }));
+      release.get('B')!();
+      await flush();
+      projector.handleMessageRevoked(SESSION_ID, engine, { id: 'B' } as never);
+      release.get('A')!();
+      await flush();
+
+      const insertedB = messageRepository.insert.mock.invocationCallOrder[1];
+      const afterB = messageRepository.update.mock.calls.filter(
+        (_call, i) => messageRepository.update.mock.invocationCallOrder[i] > insertedB,
+      );
+      expect(afterB).toEqual([
+        [{ sessionId: SESSION_ID, waMessageId: 'B' }, expect.objectContaining({ type: 'revoked' })],
+      ]);
+    });
+
+    it('orders an own-send echo after an earlier inbound message of the same chat', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      const release = holdHooks();
+
+      projector.handleInboundMessage(SESSION_ID, engine, makeIncoming({ id: 'A', chatId: chatA }));
+      projector.handleOwnSendEcho(SESSION_ID, engine, makeIncoming({ id: 'S', chatId: chatA, fromMe: true }));
+      release.get('S')!();
+      await flush();
+      expect(inserted()).toEqual([]);
+
+      release.get('A')!();
+      await flush();
+      expect(inserted()).toEqual(['A', 'S']);
+      expect(dispatched()).toEqual(['message.received:A', 'message.sent:S']);
+    });
+
+    describe('a change to an own-send echo that waits behind an earlier message', () => {
+      /** Echo S is ready but queued behind inbound A; `change` runs while S has no row yet. */
+      const echoWaitingBehindA = async (): Promise<{ engine: IWhatsAppEngine; releaseA: () => void }> => {
+        const engine = makeEngine();
+        engines.set(SESSION_ID, engine);
+        const release = holdHooks();
+        projector.handleInboundMessage(SESSION_ID, engine, makeIncoming({ id: 'A', chatId: chatA }));
+        projector.handleOwnSendEcho(SESSION_ID, engine, makeIncoming({ id: 'S', chatId: chatA, fromMe: true }));
+        release.get('S')!();
+        await flush();
+        return { engine, releaseA: () => release.get('A')!() };
+      };
+      /** The update calls issued after S was inserted, as [where, change]. */
+      const updatesAfterS = (): unknown[] => {
+        const insertedS = messageRepository.insert.mock.invocationCallOrder[inserted().indexOf('S')];
+        return messageRepository.update.mock.calls.filter(
+          (_call, i) => messageRepository.update.mock.invocationCallOrder[i] > insertedS,
+        );
+      };
+      const whereS = { sessionId: SESSION_ID, waMessageId: 'S' };
+
+      beforeEach(() => {
+        Object.assign(eventsGateway, { emitMessageEdited: jest.fn() });
+        messageRepository.update.mockResolvedValue({ affected: 0 });
+      });
+
+      it('empties the echo row once it is written', async () => {
+        const { engine, releaseA } = await echoWaitingBehindA();
+        projector.handleMessageRevoked(SESSION_ID, engine, { id: 'S' } as never);
+        releaseA();
+        await flush();
+
+        expect(inserted()).toEqual(['A', 'S']);
+        expect(updatesAfterS()).toEqual([[whereS, expect.objectContaining({ body: '', type: 'revoked' })]]);
+      });
+
+      it('writes an edit onto the echo row once it is written', async () => {
+        const { releaseA } = await echoWaitingBehindA();
+        projector.applyMessageEditQueued(SESSION_ID, { messageId: 'S', body: 'fixed' } as never);
+        releaseA();
+        await flush();
+
+        expect(updatesAfterS()).toEqual([[whereS, { body: 'fixed' }]]);
+      });
+
+      it('advances the echo row to the furthest ack that arrived before it was written', async () => {
+        const { engine, releaseA } = await echoWaitingBehindA();
+        projector.handleMessageAck(SESSION_ID, engine, 'S', 'read');
+        projector.handleMessageAck(SESSION_ID, engine, 'S', 'delivered');
+        releaseA();
+        await flush();
+
+        expect(updatesAfterS()).toEqual([[expect.objectContaining(whereS), { status: MessageStatus.READ }]]);
+      });
+
+      it('stores reactions that arrived before the row, without announcing them again', async () => {
+        const emitMessageReaction = jest.fn();
+        Object.assign(eventsGateway, { emitMessageReaction });
+        const stored = { metadata: { keep: 1, reactions: { 'y@c.us': 'hi' } } };
+        messageRepository.findOne.mockImplementation(() => Promise.resolve(inserted().includes('S') ? stored : null));
+        const { releaseA } = await echoWaitingBehindA();
+        projector.applyReactionQueued(SESSION_ID, { messageId: 'S', senderId: 'x@c.us', reaction: 'ok' } as never);
+        projector.applyReactionQueued(SESSION_ID, { messageId: 'S', senderId: 'y@c.us', reaction: '' } as never);
+        releaseA();
+        await flush();
+
+        expect(updatesAfterS()).toEqual([[whereS, { metadata: { keep: 1, reactions: { 'x@c.us': 'ok' } } }]]);
+        expect(emitMessageReaction).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
   // One transient insert failure (lock contention, a dropped connection, a pool timeout) used to lose
   // the row for good: the engine delivers each message once, and nothing retried the insert.
   describe('a transient insert failure', () => {
@@ -807,6 +1007,33 @@ describe('MessageProjector (inbound projection)', () => {
       });
 
       await receive(engine);
+      projector.handleMessageRevoked(SESSION_ID, engine, { id: 'wamid.1' } as never);
+      releaseHook();
+      await flush();
+      await jest.advanceTimersByTimeAsync(PERSIST_RETRY_DELAY_MS);
+      await flush();
+
+      const retriedAt = messageRepository.insert.mock.invocationCallOrder[1];
+      const afterRetry = messageRepository.update.mock.calls.filter(
+        (_call, i) => messageRepository.update.mock.invocationCallOrder[i] > retriedAt,
+      );
+      expect(afterRetry).toEqual([
+        [{ sessionId: SESSION_ID, waMessageId: 'wamid.1' }, expect.objectContaining({ body: '', type: 'revoked' })],
+      ]);
+    });
+
+    it('clears an own-send echo row the same way', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      messageRepository.insert.mockRejectedValueOnce(busy()).mockRejectedValueOnce(dup());
+      let releaseHook!: () => void;
+      hookManager.execute.mockImplementationOnce(async (_event: string, data: unknown) => {
+        await new Promise<void>(resolve => (releaseHook = resolve));
+        return { continue: true, data };
+      });
+
+      projector.handleOwnSendEcho(SESSION_ID, engine, makeIncoming({ fromMe: true }));
+      await flush();
       projector.handleMessageRevoked(SESSION_ID, engine, { id: 'wamid.1' } as never);
       releaseHook();
       await flush();
