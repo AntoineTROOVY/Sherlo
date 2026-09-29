@@ -1045,8 +1045,9 @@ curl -H "X-API-Key: $API_KEY" \
 
 ```sql
 -- Indexes ship with the schema (migrations) — there is nothing to add by hand. `messages`
--- carries ("sessionId", "createdAt"), ("chatId"), ("status"), ("createdAt") and a unique
--- ("sessionId", "waMessageId").
+-- carries ("sessionId", "createdAt"), ("sessionId", "chatId", "createdAt"), ("chatId"),
+-- ("status"), ("createdAt"), a partial ("mediaPath") where it is not null, a unique
+-- ("sessionId", "waMessageId"), and on PostgreSQL a GIN index on the full-text "body_ts" column.
 
 -- PostgreSQL: refresh planner statistics on the hot tables
 ANALYZE sessions;

@@ -277,6 +277,36 @@ describe('MessageService', () => {
       delete (repository as unknown as { manager?: unknown }).manager;
     });
 
+    /**
+     * The unary `+` sort key is SQLite-only. PostgreSQL has no unary `+` for timestamps, and TypeORM
+     * leaves the bare `message.createdAt` after it unquoted, so a chat page there would 500.
+     */
+    it('keeps the plain createdAt key for a multi-candidate chat on postgres', async () => {
+      const qb = makeCursorQb([{ id: 'm-2' } as Message]);
+      (repository.createQueryBuilder as jest.Mock).mockReturnValue(qb);
+      (repository as unknown as { manager: unknown }).manager = {
+        connection: { options: { type: 'postgres' } },
+      };
+
+      await service.getMessages('sess-1', { chatId: '628123@c.us' });
+
+      expect(qb.orderBy).toHaveBeenCalledWith('message.createdAt', 'DESC');
+      expect(qb.orderBy).not.toHaveBeenCalledWith('+message.createdAt', 'DESC');
+
+      delete (repository as unknown as { manager?: unknown }).manager;
+    });
+
+    it('takes createdAt out of index order for a multi-candidate chat on sqlite only', async () => {
+      const qb = makeCursorQb([{ id: 'm-2' } as Message]);
+      (repository.createQueryBuilder as jest.Mock).mockReturnValue(qb);
+
+      await service.getMessages('sess-1', { chatId: '628123@c.us' });
+      expect(qb.orderBy).toHaveBeenLastCalledWith('+message.createdAt', 'DESC');
+
+      await service.getMessages('sess-1', { chatId: '120363@g.us' });
+      expect(qb.orderBy).toHaveBeenLastCalledWith('message.createdAt', 'DESC');
+    });
+
     it('orders by rowid on sqlite, which is the arrival order and needs no sort', async () => {
       const qb = makeCursorQb([{ id: 'm-2' } as Message]);
       (repository.createQueryBuilder as jest.Mock).mockReturnValue(qb);

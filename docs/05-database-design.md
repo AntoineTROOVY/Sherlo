@@ -520,6 +520,7 @@ CREATE TABLE messages (
 -- "sessionId", so it already serves session-only lookups (see DropRedundantMessagesSessionIdIndex).
 CREATE INDEX "IDX_399833392126349ef0b04b9bed" ON messages("sessionId", "createdAt");
 CREATE INDEX "IDX_36bc604c820bb9adc4c75cd411" ON messages("chatId");
+CREATE INDEX "IDX_messages_sessionId_chatId_createdAt" ON messages("sessionId", "chatId", "createdAt");
 CREATE INDEX "IDX_befd307485dbf0559d17e4a4d2" ON messages(status);
 CREATE INDEX "IDX_messages_createdAt" ON messages("createdAt");   -- createdAt-only stats aggregates
 
@@ -703,7 +704,9 @@ These indexes are the ones declared on the entities (see §5.3); the rows below 
 | Get session by ID                | `sessions.id` (PK)                                          | Very High |
 | Get session by name              | `sessions.name` (UNIQUE)                                    | High      |
 | List messages by session (paged) | `("sessionId", "createdAt")` composite                      | Very High |
-| Look up message by chat          | `"chatId"`                                                  | High      |
+| List a chat's messages (paged)   | `IDX_messages_sessionId_chatId_createdAt`                   | Very High |
+| Send-pacing chat history probes  | `IDX_messages_sessionId_chatId_createdAt`                   | Very High |
+| Search / stats by chat           | `"chatId"`                                                  | Medium    |
 | Ack/dedup a message              | `UQ_messages_sessionId_waMessageId` (UNIQUE)                | Very High |
 | Message stats over a date range  | `IDX_messages_createdAt`                                    | Medium    |
 | Find a session's webhooks        | `IDX_webhooks_sessionId`                                    | Very High |
@@ -715,6 +718,7 @@ These indexes are the ones declared on the entities (see §5.3); the rows below 
 ```sql
 -- messages: paged listing per session + ack-driven status update / inbound dedup
 CREATE INDEX        "IDX_399833392126349ef0b04b9bed"      ON messages("sessionId", "createdAt");
+CREATE INDEX        "IDX_messages_sessionId_chatId_createdAt" ON messages("sessionId", "chatId", "createdAt");
 CREATE UNIQUE INDEX "UQ_messages_sessionId_waMessageId"   ON messages("sessionId", "waMessageId");
 CREATE INDEX        "IDX_messages_createdAt"              ON messages("createdAt");
 
@@ -865,6 +869,13 @@ src/database/migrations/           # data connection (pluggable)
 ├── 1785900000000-AddAutomationRules.ts            # 14th migration table; FKs sessions ON DELETE CASCADE
 ├── 1786000000000-AddSessionNodeUrl.ts
 ├── 1786100000000-AddMessageMediaPathIndex.ts   # partial index on messages.mediaPath (orphan sweep)
+├── 1786200000000-AddWebhookOutboxEvents.ts
+├── 1786300000000-AddWebhookDeliveryFailureLookupIndex.ts
+├── 1786400000000-AddChatStates.ts
+├── 1786500000000-ReKeyChatStatesBySessionId.ts
+├── 1786600000000-AddChatStateObserved.ts
+├── 1786600000000-AddSessionDesiredState.ts
+├── 1786700000000-AddMessagesSessionChatCreatedAtIndex.ts   # (sessionId, chatId, createdAt): chat thread pages
 └── 1786800000000-AddBaileysStoredMessagesSessionCreatedIdIndex.ts   # (sessionId, createdAt, id) index for the Baileys store cap trim
 ```
 

@@ -298,11 +298,23 @@ export class MessageService implements PluginMessagePort {
     const offset = typeof rawOffset === 'number' && Number.isFinite(rawOffset) ? Math.max(Math.trunc(rawOffset), 0) : 0;
 
     const tiebreak = this.orderTiebreak;
+    // Match across dialects: a stored chatId may be `@s.whatsapp.net` (e.g. an outbound send addressed
+    // by a raw engine id) while the caller filters by the neutral `@c.us` from the chat list - same
+    // chat, different dialect. Resolving both sides through the table keeps them equal.
+    const chatIds = chatId ? await this.resolveJidCandidates(chatId) : undefined;
+    // SQLite has no planner statistics here (nothing runs ANALYZE), so with several chatId candidates
+    // it prefers the (sessionId, createdAt) index because it already yields the order, and walks the
+    // whole session filtering chatId row by row. The unary `+` takes createdAt out of index-order
+    // consideration, so it seeks (sessionId, chatId, createdAt) and sorts only that chat's rows, the
+    // plan ANALYZE would pick. A single candidate already uses that index in order, and PostgreSQL
+    // (no unary `+` on timestamps) has statistics, so both keep the plain key.
+    const createdAtKey =
+      tiebreak === 'rowid' && chatIds !== undefined && chatIds.length > 1 ? '+message.createdAt' : 'message.createdAt';
 
     const query = this.messageRepository
       .createQueryBuilder('message')
       .where('message.sessionId = :sessionId', { sessionId })
-      .orderBy('message.createdAt', 'DESC')
+      .orderBy(createdAtKey, 'DESC')
       // `createdAt` is not unique: SQLite stores whole seconds, Postgres NOW() is transaction-scoped
       // so a bulk write ties every row, and a history backfill stamps WhatsApp's own second-resolution
       // timestamp. Without a tiebreaker the tie group's order is whatever the plan produces, and
@@ -318,11 +330,8 @@ export class MessageService implements PluginMessagePort {
       query.skip(offset);
     }
 
-    if (chatId) {
-      // Match across dialects: a stored chatId may be `@s.whatsapp.net` (e.g. an outbound send addressed
-      // by a raw engine id) while the caller filters by the neutral `@c.us` from the chat list - same
-      // chat, different dialect. Resolving both sides through the table keeps them equal.
-      query.andWhere('message.chatId IN (:...chatIds)', { chatIds: await this.resolveJidCandidates(chatId) });
+    if (chatIds) {
+      query.andWhere('message.chatId IN (:...chatIds)', { chatIds });
     }
 
     if (from) {

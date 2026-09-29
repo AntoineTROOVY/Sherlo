@@ -121,6 +121,26 @@ const POSTGRES_ENABLED = process.env.DATABASE_TYPE === 'postgres';
   });
 
   /**
+   * A chat filter on a user id expands to several dialect candidates, which picks a SQLite-only sort
+   * key there. PostgreSQL must keep the plain one, so the chat-filtered walk runs on the real server.
+   */
+  it('walks one chat by its several dialect candidates in the same total order', async () => {
+    const served: string[] = [];
+    for (let offset = 0; offset < ROWS; offset += PAGE * 10) {
+      const { messages } = await service.getMessages(SESSION_ID, { chatId: 'peer@c.us', limit: PAGE, offset });
+      served.push(...messages.map(m => m.id));
+    }
+    const unfiltered: string[] = [];
+    for (let offset = 0; offset < ROWS; offset += PAGE * 10) {
+      const { messages } = await service.getMessages(SESSION_ID, { limit: PAGE, offset });
+      unfiltered.push(...messages.map(m => m.id));
+    }
+
+    expect(served).toHaveLength(ROWS / 10);
+    expect(served).toEqual(unfiltered);
+  });
+
+  /**
    * The tiebreaker gives the list a total order; it does not stop the WINDOW drifting, because
    * `offset` addresses a position by count. A message arriving mid-walk pushes every older row down
    * one, so the next offset re-reads a row the previous page already served. `after` anchors on the
