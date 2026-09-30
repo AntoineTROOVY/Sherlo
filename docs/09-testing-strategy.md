@@ -61,9 +61,6 @@ npm --prefix dashboard run test:unit
 | `cd sdk/php && ./vendor/bin/phpunit`                             | Run the PHP SDK tests                                                    |
 | `cd sdk/java && mvn -B verify`                                   | Run the Java SDK tests                                                   |
 | `cd sdk/go && gofmt -l . && go vet ./... && go test -race ./...` | List unformatted files, vet, and race-test the Go SDK                    |
-| `npm run test:scripts`                                           | Run the install-script tests (`node --test scripts/postinstall.spec.js`) |
-| `npm run check:dockerignore`                                     | Verify `.dockerignore` still excludes what the image must not carry      |
-| `npm run check:versions`                                         | Verify docs and Swagger track the `package.json` version                 |
 
 ## 9.3 Backend Unit Tests
 
@@ -154,22 +151,13 @@ E2E smoke tests live in `test/` and use `test/jest-e2e.json`.
 ```text
 test/
 ├── __mocks__/
+├── engine-real/
 ├── fixtures/
-├── app.e2e-spec.ts
-├── baileys-engine.e2e-spec.ts
-├── chat-scope.e2e-spec.ts
-├── ingress-instance-throttle.e2e-spec.ts
-├── integration-fabric.e2e-spec.ts
-├── integration-instance.e2e-spec.ts
-├── mcp-auth.e2e-spec.ts
-├── queue-on.e2e-spec.ts
-├── search.e2e-spec.ts
-├── serve-static.e2e-spec.ts
-├── session-scope.e2e-spec.ts
-├── setup-e2e-env.e2e-spec.ts
-├── webhooks.e2e-spec.ts
+├── helpers/
+├── *.e2e-spec.ts        (one suite per surface)
 ├── jest-e2e.json
-└── setup-e2e.ts
+├── setup-e2e.ts
+└── teardown-e2e.ts
 ```
 
 `test/setup-e2e.ts` configures the app for local test boot before `AppModule` is imported:
