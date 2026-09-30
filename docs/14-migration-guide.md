@@ -813,7 +813,8 @@ docker compose down
 #    The repo's compose file BUILDS the API image from source:
 git pull && docker compose up -d --build
 #    Deployments pinned to a published image instead (ghcr.io/rmyndharis/openwa:<version>)
-#    bump the tag in their compose file, then: docker compose pull openwa-api && docker compose up -d --no-build
+#    bump the tag and bring the compose file up to the release (git pull for the repo checkout),
+#    then: docker compose pull openwa-api && docker compose up -d --no-build
 
 # 4. Wait for health — every route lives under the /api prefix
 for i in {1..30}; do
