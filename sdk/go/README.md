@@ -185,6 +185,36 @@ var out map[string]any
 err := client.Do(ctx, "GET", "/api/some/new/path", nil, nil, &out)
 ```
 
+## Receiving webhooks
+
+A webhook configured with a secret signs each delivery in its
+`X-OpenWA-Signature` header. Check it with `VerifyWebhookSignature` against the
+raw request body, exactly as received, and decode the JSON only after the check
+passes: a re-serialized body can differ byte for byte and will not verify. The
+helper returns `false` for a missing, malformed or non-matching signature.
+`WebhookDelivery` types the decoded body.
+
+```go
+http.HandleFunc("/openwa/webhook", func(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if !openwa.VerifyWebhookSignature(body, r.Header.Get("X-OpenWA-Signature"), secret) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	var delivery openwa.WebhookDelivery
+	if err := json.Unmarshal(body, &delivery); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	// Process delivery.Event and delivery.Data here.
+	w.WriteHeader(http.StatusOK)
+})
+```
+
 ## Security & reliability
 
 - **Use HTTPS in production.** The API key is sent as `X-API-Key` on every
