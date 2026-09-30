@@ -14,8 +14,9 @@ let createCalls = 0;
 let updateCalls = 0;
 let createBody: Record<string, unknown> | undefined;
 let updateBody: Record<string, unknown> | undefined;
-// Test deliveries, recorded by path; each answers only once `releaseRequests` runs.
+// Test deliveries and deletes, recorded by path; each answers only once `releaseRequests` runs.
 let testCalls: string[] = [];
+let deleteCalls: string[] = [];
 let heldRequests: Promise<void> = Promise.resolve();
 let releaseRequests: () => void = () => {};
 function holdRequests(): void {
@@ -45,6 +46,14 @@ function installFetchStub(): void {
     if (init?.method === 'POST' && /^\/api\/sessions\/sess-1\/webhooks\/[^/]+\/test$/.test(path)) {
       testCalls.push(path);
       return heldRequests.then(() => jsonResponse({ success: true, statusCode: 200 }));
+    }
+    if (init?.method === 'DELETE' && /^\/api\/sessions\/sess-1\/webhooks\/[^/]+$/.test(path)) {
+      deleteCalls.push(path);
+      // A repeat delete finds the row gone, as the gateway's does.
+      const repeat = deleteCalls.filter(p => p === path).length > 1;
+      return heldRequests.then(() =>
+        repeat ? jsonResponse({ message: 'Webhook not found' }, 404) : new Response(null, { status: 204 }),
+      );
     }
     if (path === '/api/webhooks') {
       if (webhooksStatus === 403) {
@@ -87,6 +96,7 @@ afterEach(() => {
   createBody = undefined;
   updateBody = undefined;
   testCalls = [];
+  deleteCalls = [];
   releaseRequests();
   heldRequests = Promise.resolve();
   window.sessionStorage.setItem('openwa_user_role', 'viewer');
@@ -498,4 +508,25 @@ test('a test in flight on one webhook is not ended by a test on another', async 
   releaseRequests();
   await waitFor(() => assert.equal(first.disabled, false));
   assert.equal(second.disabled, false);
+});
+
+test('a second click on the delete confirm while the first delete is in flight sends nothing', async () => {
+  const { screen, fireEvent, waitFor, within } = rtl;
+  webhooksStatus = 200;
+  webhookList = [{ id: 'w1', sessionId: 'sess-1', url: 'https://example.test/hook', events: [], active: true }];
+  window.sessionStorage.setItem('openwa_user_role', 'operator');
+  holdRequests();
+  renderWebhooks();
+  fireEvent.click(await screen.findByTitle('Delete'));
+
+  const confirm = within(screen.getByRole('dialog')).getByRole<HTMLButtonElement>('button', { name: 'Delete' });
+  fireEvent.click(confirm);
+  await waitFor(() => assert.equal(deleteCalls.length, 1));
+  await new Promise(resolve => setTimeout(resolve, 50));
+  fireEvent.click(confirm);
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(deleteCalls.length, 1);
+  releaseRequests();
+  await screen.findByText('Webhook deleted successfully');
+  assert.equal(screen.queryByRole('alert'), null);
 });

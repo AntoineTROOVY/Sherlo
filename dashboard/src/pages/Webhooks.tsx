@@ -290,7 +290,8 @@ export function Webhooks() {
   };
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    // A second click would send a second DELETE, which finds the row gone and reports a failure.
+    if (!deleteTarget || deleteMutation.isPending) return;
     try {
       await deleteMutation.mutateAsync({ sessionId: deleteTarget.sessionId, id: deleteTarget.id });
       setShowDeleteModal(false);
@@ -647,7 +648,7 @@ export function Webhooks() {
               <button className="btn-secondary" onClick={() => setShowDeleteModal(false)}>
                 {t('common.cancel')}
               </button>
-              <button className="btn-danger" onClick={handleDelete}>
+              <button className="btn-danger" onClick={handleDelete} disabled={deleteMutation.isPending}>
                 {t('common.delete')}
               </button>
             </>
