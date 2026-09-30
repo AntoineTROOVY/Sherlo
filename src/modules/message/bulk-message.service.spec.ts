@@ -381,7 +381,10 @@ describe('BulkMessageService.processBatch', () => {
       repo.findOne.mockResolvedValue(null); // batchId not taken
       (service as unknown as { inFlightBatches: number }).inFlightBatches = 2; // at cap
       const dto = { messages: [{ chatId: 'c@c.us', type: 'text', content: { text: 'hi' } }] };
-      await expect(service.createBatch('s1', dto as never)).rejects.toThrow(/too many bulk batches/i);
+      const create = service.createBatch('s1', dto as never);
+      await expect(create).rejects.toThrow(/too many bulk batches/i);
+      // A capacity refusal, not a malformed request: 429 is what clients retry on.
+      await expect(create).rejects.toMatchObject({ status: 429 });
       expect(repo.save).not.toHaveBeenCalled(); // rejected before a PENDING row is written
     } finally {
       if (prev === undefined) delete process.env.BULK_MAX_CONCURRENT_BATCHES;

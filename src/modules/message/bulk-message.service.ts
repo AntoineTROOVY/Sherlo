@@ -1,4 +1,12 @@
-import { Injectable, BadRequestException, NotFoundException, Optional, OnApplicationBootstrap } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+  Optional,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
 import { createLogger } from '../../common/services/logger.service';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -247,7 +255,10 @@ export class BulkMessageService implements OnApplicationBootstrap {
     // hold an unbounded number of full message sets (base64 media included) in memory at once.
     const maxConcurrentBatches = resolveMaxConcurrentBatches();
     if (maxConcurrentBatches > 0 && this.inFlightBatches >= maxConcurrentBatches) {
-      throw new BadRequestException(`Too many bulk batches in progress (max ${maxConcurrentBatches}); retry shortly`);
+      throw new HttpException(
+        `Too many bulk batches in progress (max ${maxConcurrentBatches}); retry shortly`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
     const options = {
       delayBetweenMessages: dto.options?.delayBetweenMessages ?? 3000,
