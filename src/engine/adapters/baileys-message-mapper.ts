@@ -4,8 +4,8 @@ import { chatKind } from '../identity/wa-id';
 /**
  * Content types that change or annotate another message and carry nothing of their own: a poll vote,
  * an in-chat pin, a keep-in-chat toggle, an album header (its photos arrive as their own messages), an
- * encrypted reaction and an event RSVP. Mapped, they would surface as a bodyless `unknown` message, so
- * the live and history paths drop them instead.
+ * encrypted reaction, an event RSVP, an encrypted edit (an event edit) and an encrypted comment. Mapped,
+ * they would surface as a bodyless `unknown` message, so the live and history paths drop them instead.
  */
 export const BAILEYS_NON_CONTENT_TYPES: ReadonlySet<string> = new Set([
   'pollUpdateMessage',
@@ -14,6 +14,8 @@ export const BAILEYS_NON_CONTENT_TYPES: ReadonlySet<string> = new Set([
   'albumMessage',
   'encReactionMessage',
   'encEventResponseMessage',
+  'secretEncryptedMessage',
+  'encCommentMessage',
 ]);
 
 /**

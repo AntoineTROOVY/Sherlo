@@ -2245,6 +2245,8 @@ describe('BaileysAdapter inbound fan-out', () => {
       ['ALBUM', { albumMessage: { expectedImageCount: 2 } }],
       ['ENC_REACTION', { encReactionMessage: { targetMessageKey: { id: 'M1' } } }],
       ['EVENT_RSVP', { encEventResponseMessage: { eventCreationMessageKey: { id: 'EV1' } } }],
+      ['EVENT_EDIT', { secretEncryptedMessage: { targetMessageKey: { id: 'EV1' }, secretEncType: 1 } }],
+      ['ENC_COMMENT', { encCommentMessage: { targetMessageKey: { id: 'M1' } } }],
     ];
     const batch = (fromMe: boolean) => [
       ...nonContent.map(([id, message]) => ({
