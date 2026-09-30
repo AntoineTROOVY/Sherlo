@@ -785,6 +785,19 @@ describe('MessageProjector (inbound projection)', () => {
       expect(messageRepository.update.mock.calls.at(-1)).toEqual([where, revokedPatch]);
     });
 
+    it('takes no reaction that arrives after the revoke, and announces it without a snapshot', async () => {
+      const revoked = { ...where, ...revokedPatch };
+      messageRepository.findOne.mockImplementation(({ where: w }: { where: { type?: unknown } }) =>
+        Promise.resolve(w.type ? null : revoked),
+      );
+
+      projector.applyReactionQueued(SESSION_ID, { messageId: 'wamid.1', senderId: 'x@c.us', reaction: 'ok' } as never);
+      await flush();
+
+      expect(messageRepository.update).not.toHaveBeenCalled();
+      expect(dispatchPayload(webhookService.dispatch)).not.toHaveProperty('reactions');
+    });
+
     it('never takes an edit, inbound or outbound', async () => {
       projector.applyMessageEditQueued(SESSION_ID, { messageId: 'wamid.1', body: 'late' } as never);
       await projector.recordOutboundMessageEdit(SESSION_ID, 'wamid.1', 'later');
