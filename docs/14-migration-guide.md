@@ -129,18 +129,23 @@ curl -X POST 'http://localhost:2785/api/infra/import-data' \
 > **The import is one request, bounded by the target's `BODY_SIZE_LIMIT`** (default `25mb`); a larger
 > file is refused with `413`, or with `503` and `Retry-After` once it is also above half the in-flight
 > body budget (twice `BODY_SIZE_LIMIT` at the default budget). Retrying does not help either way; raise
-> the limit as below, which clears both because the default budget scales with it. Compare `ls -l data-backup.json` with that limit before Step 4. If the
-> file is bigger, set `BODY_SIZE_LIMIT` on the target to at least its size (for example `50mb`) and
-> restart, since the value is read at boot; put it back afterwards, because it applies to every route.
+> the limit as below, which clears both because the default budget scales with it. Compare
+> `ls -l data-backup.json` with that limit before Step 4. If the file is bigger, set `BODY_SIZE_LIMIT`
+> on the target to at least its size (for example `50mb`) and restart, since the value is read at
+> boot; put it back afterwards, because it applies to every route.
 > An explicit `INFLIGHT_BODY_BUDGET_BYTES` must stay at least twice the file size, because one caller
 > may hold only half of it; a body above that share is refused with `503`. `EXPORT_INLINE_MEDIA_BUDGET_BYTES`
 > bounds inline media only, so a long text history can still pass the limit and needs the memory to
 > parse it on both ends.
 >
-> **Credentials do not travel.** Webhooks are restored without their `secret` and custom `headers`, so
-> deliveries go unsigned until you set them again with `PUT /api/sessions/:sessionId/webhooks/:id`. A
-> session `proxyUrl` keeps its host but loses its `user:pass`, so a proxy that needs authentication
-> fails the session's next start until you re-enter it with `PATCH /api/sessions/:sessionId/proxy`.
+> **Webhook and proxy credentials do not travel.** Webhooks are restored without their `secret` and
+> custom `headers`, so deliveries go unsigned until you set them again with
+> `PUT /api/sessions/:sessionId/webhooks/:id`. A session `proxyUrl` keeps its host but loses its
+> `user:pass`, so a proxy that needs authentication fails the session's next start until you re-enter
+> it with `PATCH /api/sessions/:sessionId/proxy`.
+> Plugin instances are the exception: their ingress `secret`, `verifyToken` and `config` (API tokens
+> included) are exported and restored in plaintext, so treat `data-backup.json` as a secret and delete
+> it after the import.
 
 > [!NOTE]
 > **Session statuses in the backup describe the source host.** An active status (`ready`,
