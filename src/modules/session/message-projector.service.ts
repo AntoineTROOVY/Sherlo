@@ -628,20 +628,25 @@ export class MessageProjector {
       this.logger.error(`onMessageCreate handler failed for ${id}`, String(err));
       return null;
     };
+    // The commit may wait behind a slow earlier message of the chat; a revoke, edit or ack of this
+    // send landing meanwhile is recorded here and applied once the row is written. Like the inbound
+    // path, the entry follows the chain's rewrites, so a quote carries what the row will hold.
+    const inFlightKey = `${id}:${message.id}`;
+    const inFlight = this.trackInFlight(inFlightKey, messageData);
     // Execute hook for message sent - plugins can modify or stop processing. Like the inbound path,
     // the hook chain runs concurrently and the commit waits its turn on the chat's queue.
     const prepared = this.hookManager
       .execute('message:sent', messageData, {
         sessionId: id,
         source: 'Engine',
-        accept: isMessagePayload,
+        accept: data => {
+          if (!isMessagePayload(data)) return false;
+          inFlight.message = data;
+          return true;
+        },
       })
       .then(({ data }) => this.messageOrEngineCopy(id, 'message:sent', data, message))
       .catch(onFailure);
-    // The commit may wait behind a slow earlier message of the chat; a revoke, edit or ack of this
-    // send landing meanwhile is recorded here and applied once the row is written.
-    const inFlightKey = `${id}:${message.id}`;
-    const inFlight = this.trackInFlight(inFlightKey, messageData);
     this.chatCommits.enqueue(this.chatCommitKey(id, message), async () => {
       try {
         const finalMessage = await prepared;

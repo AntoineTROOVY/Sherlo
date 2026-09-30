@@ -1200,6 +1200,24 @@ describe('MessageProjector (inbound projection)', () => {
   });
 
   describe('handleOwnSendEcho', () => {
+    it('lends a quote the body its message:sent chain rewrote, until the row is written', async () => {
+      const engine = makeEngine();
+      engines.set(SESSION_ID, engine);
+      hookManager.execute.mockImplementationOnce(
+        (_event: string, data: IncomingMessage, options: { accept: (d: unknown) => boolean }) => {
+          const rewritten = { ...data, body: '[redacted]' };
+          options.accept(rewritten);
+          return Promise.resolve({ continue: true, data: rewritten });
+        },
+      );
+      messageRepository.insert.mockImplementationOnce(() => new Promise(() => undefined));
+
+      projector.handleOwnSendEcho(SESSION_ID, engine, makeIncoming({ fromMe: true }));
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(projector.inFlightInbound(SESSION_ID, 'wamid.1')).toMatchObject({ body: '[redacted]' });
+    });
+
     it('still persists and dispatches the send when a message:sent hook returns null', async () => {
       const engine = makeEngine();
       engines.set(SESSION_ID, engine);
