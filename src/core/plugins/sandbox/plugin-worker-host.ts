@@ -37,9 +37,8 @@ const PROGRESS_KINDS: ReadonlySet<WorkerToHostMessage['kind']> = new Set([
  * Host-side driver for a single untrusted plugin running in a worker. Owns the request/response
  * correlation over a {@link PluginWorkerChannel}: it posts `load`/`lifecycle` messages and resolves
  * the matching promise when the worker replies, and fails every outstanding call if the worker dies.
- *
- * Phase B1 covers lifecycle only. The capability bridge (B2) and hook bridge (B3) extend this with
- * their own correlated message kinds, all over the same channel.
+ * Capability, hook, webhook, search and health traffic use their own correlated message kinds over
+ * the same channel.
  */
 export class PluginWorkerHost {
   private nextId = 1;
@@ -213,9 +212,9 @@ export class PluginWorkerHost {
 
   /**
    * Dispatch a verified inbound webhook to the worker and await its handler result. Cloned from
-   * dispatchHook: bounded by `timeoutMs`, and fail-open — a slow or wedged worker resolves a default
-   * 504 (the provider was already ack'd in async mode) rather than hanging the HTTP request. A
-   * mid-request worker crash is drained to 502 in handleExit, so the request never hangs forever.
+   * dispatchHook and bounded by `timeoutMs`: a slow or wedged worker resolves ok:false with 504, and a
+   * mid-dispatch worker crash is drained to 502 in handleExit. The ingress job throws on either, so the
+   * queued delivery is retried or dead-lettered rather than waiting forever.
    */
   dispatchWebhook(options: {
     instanceId: string;
@@ -241,7 +240,7 @@ export class PluginWorkerHost {
         this.webhookPending.delete(id);
         options.onTimeout?.();
         this.probeLiveness();
-        resolve({ ok: false, status: 504 }); // fail-open: provider already ack'd in async mode
+        resolve({ ok: false, status: 504 }); // the ingress job retries or dead-letters the delivery
       }, options.timeoutMs);
       this.webhookPending.set(id, { resolve, timer });
       this.channel.postMessage({
@@ -621,8 +620,8 @@ export class PluginWorkerHost {
       resolve({ continue: true });
     });
     this.hookPending.clear();
-    // Drain in-flight webhooks: a mid-request worker crash must return 502, never hang the HTTP
-    // request. (The per-request timeout would eventually fail-open to 504, but the request should not
+    // Drain in-flight webhooks: a mid-dispatch worker crash returns 502 so the ingress job fails the
+    // delivery now. (The per-dispatch timeout would eventually resolve 504, but the job should not
     // wait the full window when the worker is already known dead.)
     this.webhookPending.forEach(({ resolve, timer }) => {
       clearTimeout(timer);
