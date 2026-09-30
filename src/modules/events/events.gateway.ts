@@ -314,7 +314,17 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     }
   }
 
-  async handleConnection(client: Socket) {
+  handleConnection(client: Socket): Promise<void> {
+    // socket.io sends CONNECT to the client before Nest calls this, and Nest binds the frame handlers
+    // without waiting for it, so a client that subscribes from its 'connect' handler can send a frame
+    // while the key below is still being validated. handleMessage waits on this promise; it is stored
+    // synchronously, before any frame can be dispatched.
+    const ready = this.authenticate(client);
+    (client.data as { authReady?: Promise<void> }).authReady = ready;
+    return ready;
+  }
+
+  private async authenticate(client: Socket): Promise<void> {
     // Resolve the client IP once here so the handshake throttle, the validation, and the
     // audit trail all use the same trusted-proxy-aware value (parity with the REST guard / MCP mount).
     const clientIp = this.resolveClientIp(client);
@@ -472,6 +482,14 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
         ipAddress: this.resolveClientIp(client),
       });
       return this.reply(client, this.createError('RATE_LIMITED', 'Frame rate limit exceeded, slow down', requestId));
+    }
+
+    // A frame sent during the handshake waits for it. Without this a subscribe found no key on the socket
+    // and was refused as 'API key is no longer valid', a server-side close the client does not retry.
+    // A socket the handshake refused has already been answered and closed, so its frame is dropped.
+    await (client.data as { authReady?: Promise<void> }).authReady;
+    if (client.disconnected) {
+      return undefined;
     }
 
     switch (message?.type) {
