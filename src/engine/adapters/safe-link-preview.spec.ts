@@ -178,6 +178,15 @@ describe('generateSafeLinkPreview', () => {
         description: 'Size 42 > 41',
       });
     });
+
+    it('keeps a quote of the other kind inside a value', async () => {
+      respondWith(`<meta property="og:title" content="Don't Panic"><meta name='description' content='say "hi"'>`);
+
+      await expect(generateSafeLinkPreview('https://example.com')).resolves.toMatchObject({
+        title: "Don't Panic",
+        description: 'say "hi"',
+      });
+    });
   });
 
   // The scan runs on the event loop, where the fetch timeout cannot interrupt it. A page of unclosed
