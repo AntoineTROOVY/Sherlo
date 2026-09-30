@@ -311,6 +311,12 @@ REDIS_PASSWORD=optional
 > whose configuration lives in `.env` — but if you manage datastores from the dashboard, leave the
 > key unset (as the shipped templates do) and set only the connection details above. The same holds
 > for `POSTGRES_BUILTIN` and `MINIO_BUILTIN`.
+>
+> This applies to a bare-metal install that reads the project `.env`. Compose does not forward
+> `REDIS_BUILTIN` (nor `POSTGRES_BUILTIN` or `MINIO_BUILTIN`), so on compose clear "Use Built-in Redis
+> Container" in Dashboard > Infrastructure (or set `REDIS_BUILTIN=false` in `data/.env.generated`), and
+> put only the forwarded `REDIS_ENABLED`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME` and
+> `REDIS_PASSWORD` in the `.env` next to `docker-compose.yml`.
 
 | Scenario                  | Support | Notes                                      |
 | ------------------------- | ------- | ------------------------------------------ |
