@@ -242,7 +242,10 @@ MCP_IP_RATE_LIMIT_WINDOW_MS=60000     # per-IP window in ms (default 60000 = 1 m
 ```
 
 Point an MCP client at `POST /mcp`. For Claude Code, a `.mcp.json` at your project root
-(gitignored — replace the key with a real one from `data/.api-key`):
+(gitignored; replace `YOUR_API_KEY` with a dedicated key scoped to the sessions the agent
+needs, `VIEWER` for a read-only agent and `OPERATOR` at most, as
+[24.5](#245-authentication--security) describes, never the bootstrap admin key in
+`data/.api-key`):
 
 ```json
 {
