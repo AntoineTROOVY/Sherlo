@@ -528,10 +528,6 @@ export interface MessageRecord {
 }
 
 /**
- * A message read live from WhatsApp by `messages.history()`. This is the engine
- * payload (richer and differently shaped than the persisted {@link MessageRecord}).
- */
-/**
  * The engine-normalized message kinds — persisted rows, `message.received`/`message.sent`
  * payloads and the websocket all use these values (raw engine tokens are normalized at the
  * adapter boundary).
@@ -554,6 +550,10 @@ export type MessageType =
   | 'masked'
   | 'unknown';
 
+/**
+ * A message read live from WhatsApp by `messages.history()`. This is the engine
+ * payload (richer and differently shaped than the persisted {@link MessageRecord}).
+ */
 export interface ChatHistoryMessage {
   id: string;
   from: Jid;
