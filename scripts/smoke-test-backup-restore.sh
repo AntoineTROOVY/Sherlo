@@ -41,6 +41,7 @@
 #       both scripts whatever the uid
 #   (aa) engine auth state copied from a running app (an open whatsapp-web.js profile, Baileys state)
 #       is noted in the archive and printed by restore, which does not refuse it even with --strict
+#   (ab) a blank ./.env line keeps data/.env.generated from supplying the key, so the default applies
 #
 # Usage: ./scripts/smoke-test-backup-restore.sh
 # Requires: bash, tar, node (restore.sh path resolution). sqlite3 is optional (see (c) and (k)).
@@ -1227,6 +1228,25 @@ if tar -tzf "$(ls "$AA"/quiet-out/openwa-backup-*.tar.gz)" | grep -q 'ENGINE-STA
   fail "(aa) an archive with no open profile and no Baileys state carries the engine note"
 fi
 pass "(aa) live engine auth state is noted in the archive and printed, never refused"
+
+echo ""
+echo "==> (ab) a blank line in ./.env hides the key from data/.env.generated, as it does in the app"
+# dotenv sets a blank ./.env line to '' and never overwrites a key that is already set, so the app
+# reads its built-in default and never sees .env.generated's value. Falling through to that value
+# archived a database the app does not use, and the run exited 0.
+AB="$WORK/ab"
+mkdir -p "$AB/data" "$AB/elsewhere" "$AB/extract"
+make_fixture "$AB/data/main.sqlite" "bravo2-main"
+make_fixture "$AB/data/openwa.sqlite" "bravo2-default"
+make_fixture "$AB/elsewhere/openwa.sqlite" "WRONG-data"
+printf 'DATABASE_NAME=\n' >"$AB/.env"
+printf 'DATABASE_NAME=%s\n' "$AB/elsewhere/openwa.sqlite" >"$AB/data/.env.generated"
+(cd "$AB" && BACKUP_DIR="$AB/out" "$BACKUP" >/dev/null 2>&1)
+tar -xzf "$(ls "$AB"/out/openwa-backup-*.tar.gz)" -C "$AB/extract"
+if [ "$(db_fingerprint "$AB/extract/openwa.sqlite")" != "bravo2-default" ]; then
+  fail "(ab) a blank DATABASE_NAME in ./.env fell through to data/.env.generated"
+fi
+pass "(ab) a blank ./.env line stops the lookup and the built-in default applies"
 
 echo ""
 echo "All smoke tests passed!"
