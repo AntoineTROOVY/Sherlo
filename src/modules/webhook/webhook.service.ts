@@ -221,7 +221,10 @@ export class WebhookService implements OnModuleInit, OnModuleDestroy {
   async update(sessionId: string, id: string, dto: UpdateWebhookDto): Promise<Webhook> {
     const webhook = await this.findOne(sessionId, id);
 
-    if (dto.url !== undefined) {
+    // An unchanged URL is not re-validated: every edit re-sends it, so a webhook whose host stopped
+    // resolving or became SSRF-blocked could not otherwise be deactivated or re-filtered. Delivery
+    // still checks the URL on every send.
+    if (dto.url !== undefined && dto.url !== webhook.url) {
       await this.validateWebhookUrl(dto.url);
       webhook.url = dto.url;
     }
