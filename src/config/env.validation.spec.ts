@@ -658,8 +658,40 @@ describe('validateEnv', () => {
     'MESSAGE_REAPER_INTERVAL_MS',
     'WEBHOOK_RECONCILE_INTERVAL_MS',
     'INGRESS_RECONCILE_INTERVAL_MS',
+    'SESSION_TAKEOVER_SWEEP_MS',
+    'SESSION_PROXY_TIMEOUT_MS',
+    'MEDIA_DOWNLOAD_TIMEOUT_MS',
+    'WEBHOOK_TIMEOUT',
+    'RATE_LIMIT_SHORT_TTL',
+    'RATE_LIMIT_MEDIUM_TTL',
+    'RATE_LIMIT_LONG_TTL',
+    'INGRESS_INSTANCE_TTL',
   ])('rejects a %s above the Node timer ceiling', key => {
     expect(() => validateEnv({ [key]: '2147483648' })).toThrow(new RegExp(`${key} must not exceed 2147483647 ms`));
     expect(() => validateEnv({ [key]: '2147483647' })).not.toThrow();
+  });
+
+  it('rejects a SESSION_LEASE_HEARTBEAT_MS above the Node timer ceiling even inside a longer lease', () => {
+    const lease = { SESSION_LEASE_TTL_MS: '5000000000' };
+    expect(() => validateEnv({ ...lease, SESSION_LEASE_HEARTBEAT_MS: '2147483648' })).toThrow(
+      /SESSION_LEASE_HEARTBEAT_MS must not exceed 2147483647 ms/,
+    );
+    expect(() => validateEnv({ ...lease, SESSION_LEASE_HEARTBEAT_MS: '2147483647' })).not.toThrow();
+  });
+
+  // Send verbs arm four times this budget, so its ceiling is a quarter of the timer ceiling.
+  it('rejects a PLUGIN_CAP_TIMEOUT_MS whose send-verb budget overflows the Node timer ceiling', () => {
+    expect(() => validateEnv({ PLUGIN_CAP_TIMEOUT_MS: '536870912' })).toThrow(
+      /PLUGIN_CAP_TIMEOUT_MS must not exceed 536870911 ms/,
+    );
+    expect(() => validateEnv({ PLUGIN_CAP_TIMEOUT_MS: '536870911' })).not.toThrow();
+  });
+
+  // A direct (queue-off) delivery doubles the delay on each retry, up to 2^3 for the maximum retryCount of 5.
+  it('rejects a WEBHOOK_RETRY_DELAY whose last direct-delivery backoff overflows the Node timer ceiling', () => {
+    expect(() => validateEnv({ WEBHOOK_RETRY_DELAY: '268435456' })).toThrow(
+      /WEBHOOK_RETRY_DELAY must not exceed 268435455 ms/,
+    );
+    expect(() => validateEnv({ WEBHOOK_RETRY_DELAY: '268435455' })).not.toThrow();
   });
 });

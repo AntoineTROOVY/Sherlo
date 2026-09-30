@@ -409,6 +409,15 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     ['STATUS_ORPHAN_SWEEP_INTERVAL_MS', 'the orphan sweep reruns every millisecond'],
     ['S3_REPROBE_INTERVAL_MS', 'S3 is re-probed every millisecond while it is down'],
     ['STORAGE_EXPORT_TTL_MS', 'the export archive is deleted about 1 ms after it is written'],
+    ['SESSION_TAKEOVER_SWEEP_MS', 'the takeover sweep reruns every millisecond'],
+    ['SESSION_LEASE_HEARTBEAT_MS', 'the lease heartbeat renews every millisecond'],
+    ['SESSION_PROXY_TIMEOUT_MS', 'every proxied request times out after 1 ms'],
+    ['MEDIA_DOWNLOAD_TIMEOUT_MS', 'every media download fails'],
+    ['WEBHOOK_TIMEOUT', 'every webhook delivery fails'],
+    ['RATE_LIMIT_SHORT_TTL', 'each hit expires after 1 ms and that rate-limit tier never blocks'],
+    ['RATE_LIMIT_MEDIUM_TTL', 'each hit expires after 1 ms and that rate-limit tier never blocks'],
+    ['RATE_LIMIT_LONG_TTL', 'each hit expires after 1 ms and that rate-limit tier never blocks'],
+    ['INGRESS_INSTANCE_TTL', 'each hit expires after 1 ms and the ingress rate limits never block'],
     // 0 still disables these three, so they carry only the ceiling, not the positive-only check.
     ['MESSAGE_REAPER_INTERVAL_MS', 'the pending message reaper reruns every millisecond'],
     ['WEBHOOK_RECONCILE_INTERVAL_MS', 'the webhook reconciler reruns every millisecond'],
@@ -420,6 +429,28 @@ export function validateEnv(config: EnvConfig): EnvConfig {
       errors.push(
         `${key} must not exceed ${MAX_TIMER_MS} ms (got "${raw}"): Node's ` +
           `timers overflow above that and fire after 1 ms, so ${consequence}`,
+      );
+    }
+  }
+  // Knobs armed at a multiple of their value get that fraction of the timer's ceiling. Send verbs arm
+  // four times PLUGIN_CAP_TIMEOUT_MS (SEND_CAP_TIMEOUT_FACTOR in plugin-worker-host.ts); a direct
+  // (queue-off) webhook delivery doubles WEBHOOK_RETRY_DELAY on each retry, up to 2^3 for the maximum
+  // retryCount of 5.
+  for (const [key, factor, multiple, consequence] of [
+    ['PLUGIN_CAP_TIMEOUT_MS', 4, 'send verbs wait four times this long', 'every plugin send times out'],
+    [
+      'WEBHOOK_RETRY_DELAY',
+      8,
+      'the last direct-delivery retry waits eight times this long',
+      'webhook retries fire back to back',
+    ],
+  ] as const) {
+    const raw = str(key);
+    const max = Math.floor(MAX_TIMER_MS / factor);
+    if (raw !== undefined && DECIMAL_INTEGER.test(raw) && Number(raw) > max) {
+      errors.push(
+        `${key} must not exceed ${max} ms (got "${raw}"): ${multiple}, ` +
+          `and Node's timers overflow above that and fire after 1 ms, so ${consequence}`,
       );
     }
   }
