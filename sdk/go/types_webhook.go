@@ -47,9 +47,10 @@ type GroupEventChanges struct {
 }
 
 // GroupEventPayload is the payload of the group.join / group.leave /
-// group.update events (webhook and socket alike). ParticipantIDs carries the
-// affected users for join/leave and is empty for metadata updates; Changes is
-// the metadata delta, present on group.update. Timestamp is unix seconds.
+// group.update / group.join_request events (webhook and socket alike).
+// ParticipantIDs carries the affected users for join/leave, the users asking
+// to join for join_request, and is empty for metadata updates; Changes is the
+// metadata delta, present on group.update. Timestamp is unix seconds.
 type GroupEventPayload struct {
 	GroupID        string             `json:"groupId"`
 	ActorID        *string            `json:"actorId,omitempty"`
