@@ -12,6 +12,9 @@ let templatesStatus = 200;
 let sessionsStatus = 200;
 // When set, GET /api/sessions answers only once this settles, holding the page on its first load.
 let sessionsGate: Promise<void> | null = null;
+// Sessions listed after the default one, which is dropped while `firstSessionGone` is set.
+let extraSessions: Array<{ id: string; name: string }> = [];
+let firstSessionGone = false;
 let templates: Array<{ id: string; name: string; body: string }> = [];
 const deleted: string[] = [];
 
@@ -26,17 +29,22 @@ function installFetchStub(): void {
     if (path === '/api/sessions') {
       if (sessionsGate) return sessionsGate.then(() => jsonResponse([]));
       if (sessionsStatus !== 200) return Promise.resolve(jsonResponse({ message: 'gateway restarting' }, 502));
+      const rows = [{ id: 'sess-1', name: 'billing-bot' }, ...extraSessions].filter(
+        row => !firstSessionGone || row.id !== 'sess-1',
+      );
       return Promise.resolve(
-        jsonResponse([
-          {
-            id: 'sess-1',
-            name: 'billing-bot',
+        jsonResponse(
+          rows.map(row => ({
+            ...row,
             status: 'ready',
             createdAt: '2026-01-01T00:00:00.000Z',
             updatedAt: '2026-01-01T00:00:00.000Z',
-          },
-        ]),
+          })),
+        ),
       );
+    }
+    if (path === '/api/sessions/sess-2/templates') {
+      return Promise.resolve(jsonResponse([{ id: 'tpl-2', name: 'support-greeting', body: 'Hello' }]));
     }
     if (path === '/api/sessions/sess-1/templates') {
       if (templatesStatus === 403) {
@@ -80,6 +88,8 @@ afterEach(() => {
   queryClient?.clear();
   queryClient = undefined;
   sessionsStatus = 200;
+  extraSessions = [];
+  firstSessionGone = false;
 });
 
 function renderTemplates(): void {
@@ -178,4 +188,28 @@ test('the first-load spinner is centered in a 400px block', async () => {
     sessionsGate = null;
     style.remove();
   }
+});
+
+// A session deleted elsewhere drops out of the list on the next read. Kept selected, it matches no
+// option, so the select shows another session while the list and every write still target the gone one.
+test('a selected session that disappears from the list is replaced by the first remaining one', async () => {
+  const { screen, act } = rtl;
+  templatesStatus = 200;
+  templates = [{ id: 'tpl-1', name: 'invoice-reminder', body: 'Hi {{name}}' }];
+  extraSessions = [{ id: 'sess-2', name: 'support-bot' }];
+  window.sessionStorage.setItem('openwa_user_role', 'operator');
+  renderTemplates();
+
+  await screen.findByText('invoice-reminder');
+  const select = screen.getByLabelText<HTMLSelectElement>('Session');
+  assert.equal(select.value, 'sess-1');
+
+  firstSessionGone = true;
+  await act(() => queryClient!.refetchQueries({ queryKey: ['sessions'], exact: true }));
+
+  await screen.findByText('support-greeting');
+  assert.equal(select.value, 'sess-2');
+  assert.equal(screen.queryByText('invoice-reminder'), null);
+  screen.getByText('Saved under support-bot');
+  window.sessionStorage.setItem('openwa_user_role', 'viewer');
 });
