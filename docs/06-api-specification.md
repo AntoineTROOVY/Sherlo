@@ -99,6 +99,7 @@ A few refusals add a stable machine-readable `code`, so a client can branch with
 | `SESSION_NAME_TEARDOWN_PENDING` | `409`  | The previous session's credential teardown under that name is still in flight; retry once it settles                                          |
 | `SESSION_STOP_INCOMPLETE`       | `502`  | The engine did not confirm the stop; retryable                                                                                                |
 | `SESSION_LOGOUT_INCOMPLETE`     | `502`  | The engine did not confirm the logout; retryable                                                                                              |
+| `SESSION_FORCE_KILL_INCOMPLETE` | `502`  | The engine did not confirm the force-kill; its process may still be running                                                                   |
 | `SEND_PACING_LIMITED`           | `429`  | Send pacing refused the send; the body also carries `retryAfterSeconds`                                                                       |
 | `ENGINE_PAGE_ERROR`             | `500`  | whatsapp-web.js: WhatsApp Web rejected the operation in the page; the body also carries `pageError` and, when the page could read it, `build` |
 | `IMPORT_ALREADY_RUNNING`        | `409`  | Another data import is in progress                                                                                                            |
@@ -804,7 +805,7 @@ Returned via `transformSession`.
 
 Like `stop`, a force-killed session stays down across restarts and takeover until an explicit `POST /start`; a `400` refusal records nothing.
 
-**Errors:** `400` session is not started (no live engine to kill) · `401` · `403` · `404` not found
+**Errors:** `400` session is not started (no live engine to kill) · `401` · `403` · `404` not found · `502` `SESSION_FORCE_KILL_INCOMPLETE`: session stopped locally but the engine force-kill did not complete (status `disconnected`, no success audit; a retry answers `400` because the engine is no longer registered, so restart the node to reap a leaked process)
 
 #### POST /api/sessions/:sessionId/pairing-code
 
