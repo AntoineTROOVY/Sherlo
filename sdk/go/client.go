@@ -191,7 +191,8 @@ func warnIfInsecure(cfg *config) {
 
 // Do issues a raw request against the API and decodes the JSON response into
 // out (pass nil to ignore the body). It is the escape hatch for endpoints the
-// typed services do not cover. path must begin with "/".
+// typed services do not cover. path must begin with "/"; any other path returns
+// an error and nothing is sent.
 //
 // A 2xx body is assigned verbatim when out is a *[]byte, and a non-JSON 2xx
 // body falls back to the raw text when out is a *string — mirroring the
@@ -318,9 +319,14 @@ var jidRestorer = strings.NewReplacer("%40", "@", "%3A", ":", "%2B", "+")
 
 var dotFolder = strings.NewReplacer("%2e", ".", "%2E", ".")
 
-// checkPathSegments refuses a "." or ".." segment (also written %2e), and an
-// empty one unless allowEmpty. The query and fragment are not path segments.
+// checkPathSegments refuses a path that does not begin with "/" (appended to the
+// base URL, "@host/x" would move the request and its API key to another host), a
+// "." or ".." segment (also written %2e), and an empty one unless allowEmpty. The
+// query and fragment are not path segments.
 func checkPathSegments(path string, allowEmpty bool) error {
+	if !strings.HasPrefix(path, "/") {
+		return fmt.Errorf("openwa: path must begin with \"/\": %q", path)
+	}
 	p := path
 	if i := strings.IndexAny(p, "?#"); i >= 0 {
 		p = p[:i]

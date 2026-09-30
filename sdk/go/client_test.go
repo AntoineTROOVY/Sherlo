@@ -1625,3 +1625,18 @@ func TestRequestEnumWireValues(t *testing.T) {
 		t.Errorf("durationSeconds did not marshal as a bare number: %s", pin)
 	}
 }
+
+// A Do path that does not begin with "/" would be appended to the base URL's
+// authority, so "@evil.example/x" sends the API key to evil.example.
+func TestDoPathWithoutLeadingSlashRefused(t *testing.T) {
+	rt := &recordTransport{status: 200, body: `{}`}
+	c := newTestClient(t, rt)
+	for _, path := range []string{"@evil.example/api/x", ".evil.example/api/x", "api/x", ""} {
+		if err := c.Do(context.Background(), "GET", path, nil, nil, nil); err == nil {
+			t.Errorf("Do %q: want an error", path)
+		}
+	}
+	if rt.lastReq != nil {
+		t.Fatalf("request sent to %s, want none", rt.lastReq.URL.Host)
+	}
+}
