@@ -684,8 +684,8 @@ export function useTheme() {
 }
 ```
 
-The actual colors live in the global CSS as variables keyed off `[data-theme]` —
-e.g. `:root { --color-accent: #25d366; } [data-theme='dark'] { --color-accent: #25d366; }` — so
+The actual colors live in `src/App.css` as variables keyed off `[data-theme]` —
+e.g. `:root { --bg-light: #f8fafc; } [data-theme='dark'] { --bg-light: #0f172a; }` — so
 switching mode is a single attribute write with no re-render of the tree.
 
 ## 17.8 Build & Deployment
