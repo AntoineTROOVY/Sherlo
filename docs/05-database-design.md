@@ -120,7 +120,8 @@ POSTGRES_SCHEMA=public   # Default behavior (historical)
 **Requirements:**
 
 - The schema must already exist before migration time
-- Built-in PostgreSQL container automatically creates the schema via init script
+- The compose `postgres` service creates the schema via `scripts/postgres-init-schema.sh`, but only when its volume is first initialized; on an existing volume, run `CREATE SCHEMA <name>;` once
+- The dashboard built-in database (`POSTGRES_BUILTIN=true`) always uses `public`
 - External/managed PostgreSQL: run `CREATE SCHEMA <name>;` once before first startup
 - SQLite ignores this setting
 
