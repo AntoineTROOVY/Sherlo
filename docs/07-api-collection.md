@@ -1651,25 +1651,28 @@ curl -X DELETE "$BASE/api/plugins/chat-flow" \
 
 #### POST /mcp
 
-MCP JSON-RPC 2.0 transport (no `/api` prefix; gated by `MCP_ENABLED=true`). The API key goes via `X-Api-Key` or `Authorization: Bearer` on every request, `initialize` and `tools/list` included (a missing or invalid key answers `401`, a key carrying `allowedIps` `403`); role and session scope are checked per tool call. The server is **read-only by default** — write tools such as `MessageSendText` are only mounted when `MCP_READONLY=false`. See doc 24 for the tool catalog.
+MCP JSON-RPC 2.0 transport (no `/api` prefix; gated by `MCP_ENABLED=true`). The API key goes via `X-Api-Key` or `Authorization: Bearer` on every request, `initialize` and `tools/list` included (a missing or invalid key answers `401`, a key carrying `allowedIps` `403`); role and session scope are checked per tool call. The server is **read-only by default** — write tools such as `MessageSendText` are only mounted when `MCP_READONLY=false`. Every `POST` must send `Accept: application/json, text/event-stream` (otherwise `406`), and the reply arrives as an SSE frame: an `event: message` line, then a `data:` line holding the JSON-RPC response. See doc 24 for the tool catalog.
 
 ```bash
 # Initialize handshake
 curl -X POST "$BASE/mcp" \
   -H "X-Api-Key: $API_KEY" \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -d '{ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": { "name": "openwa-collection", "version": "1.0.0" } } }'
 
 # List available tools
 curl -X POST "$BASE/mcp" \
   -H "X-Api-Key: $API_KEY" \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -d '{ "jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {} }'
 
 # Call a tool (arguments must match the tool's zod inputSchema; requires MCP_READONLY=false)
 curl -X POST "$BASE/mcp" \
   -H "X-Api-Key: $API_KEY" \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -d '{ "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "MessageSendText", "arguments": { "sessionId": "'"$SESSION_ID"'", "chatId": "6281234567890@c.us", "text": "Hello from MCP" } } }'
 ```
 
