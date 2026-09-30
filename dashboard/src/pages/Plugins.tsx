@@ -410,7 +410,8 @@ function SessionsTab({ plugin }: { plugin: Plugin }) {
   };
 
   // ── Per-session config override ───────────────────────────────────────────
-  const hasSchema = !!plugin.configSchema && Object.keys(plugin.configSchema.properties).length > 0;
+  // `properties` is optional in practice: the gateway does not validate a manifest's configSchema.
+  const hasSchema = Object.keys(plugin.configSchema?.properties ?? {}).length > 0;
   const hasUi = !!plugin.configUi;
   const lzProps = localizePlugin(plugin, i18n.language).configSchema?.properties;
   const [selSession, setSelSession] = useState<string>('');
@@ -554,10 +555,10 @@ function SessionsTab({ plugin }: { plugin: Plugin }) {
           </select>
           {selSession && hasUi ? (
             <PluginConfigUi key={selSession} plugin={plugin} sessionId={selSession} />
-          ) : selSession && plugin.configSchema ? (
+          ) : selSession && hasSchema ? (
             <>
               <form ref={overrideFormRef} className="config-form" onSubmit={e => e.preventDefault()}>
-                {Object.entries(lzProps ?? plugin.configSchema.properties).map(([key, field]) => (
+                {Object.entries(lzProps ?? plugin.configSchema?.properties ?? {}).map(([key, field]) => (
                   <ConfigField
                     key={key}
                     field={field}
@@ -1295,8 +1296,7 @@ export default function Plugins() {
                       only. A plugin with its own editor saves through that editor, so the footer Save is
                       omitted rather than left to save a form the operator cannot see. */}
                   {(showTabs && (configTab === 'sessions' || configTab === 'instances')) ||
-                  configPlugin.configUi ? null : lz.configSchema &&
-                    Object.keys(lz.configSchema.properties).length > 0 ? (
+                  configPlugin.configUi ? null : Object.keys(lz.configSchema?.properties ?? {}).length > 0 ? (
                     <button className="btn-primary" onClick={handleSaveSchemaConfig} disabled={savingConfig}>
                       {savingConfig ? <Loader2 size={16} className="animate-spin" /> : t('plugins.config.save')}
                     </button>
@@ -1313,7 +1313,7 @@ export default function Plugins() {
                      button with different semantics, which is what the Chat Flow modal looked like. */
               configPlugin.configUi ? (
                 <PluginConfigUi plugin={configPlugin} />
-              ) : lz.configSchema && Object.keys(lz.configSchema.properties).length > 0 ? (
+              ) : lz.configSchema && Object.keys(lz.configSchema.properties ?? {}).length > 0 ? (
                 <form ref={schemaFormRef} className="config-form" onSubmit={e => e.preventDefault()}>
                   {Object.entries(lz.configSchema.properties).map(([key, field]) => (
                     <ConfigField

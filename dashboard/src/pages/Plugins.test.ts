@@ -220,3 +220,15 @@ test('uninstalling a plugin reloads the catalog, whose installed flags it change
     window.confirm = realConfirm;
   }
 });
+
+test('a config schema without properties opens the config modal and the Sessions tab', async () => {
+  const { screen, fireEvent } = rtl;
+  pluginOverride = { configSchema: { type: 'object' } };
+  renderPlugins();
+  fireEvent.click(await screen.findByTitle('Configure'));
+  assert.equal(screen.queryByRole('button', { name: 'Save Configuration' }), null);
+  fireEvent.click(await screen.findByRole('button', { name: 'Sessions' }));
+  // No declared field means nothing to override per session.
+  await screen.findByText('Run for');
+  assert.equal(screen.queryByRole('combobox', { name: 'Select a session…' }), null);
+});
