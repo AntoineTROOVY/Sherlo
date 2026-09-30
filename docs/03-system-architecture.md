@@ -923,9 +923,15 @@ export interface EngineEventCallbacks {
   onCall?: (event: IncomingCallEvent) => void; // incoming call ringing; Baileys can rejectCall() while it rings
   onHistoryMessages?: (messages: IncomingMessage[]) => void; // bulk initial sync; persist, don't dispatch
   onDisconnected?: (reason: string) => void; // recoverable -> reconnect
+  onReconnecting?: (attempt: number, nextDelayMs: number) => void; // engines that retry internally (Baileys)
   onStateChanged?: (state: EngineStatus) => void;
   onActionRequired?: (reason: string) => void; // engine alive, but an operator must act
+  onAccountRestriction?: (restriction: AccountRestriction | null) => void; // null = restriction lifted
+  onPresenceUpdate?: (event: PresenceUpdateEvent) => void; // chats this session subscribed to
+  onCallOutcome?: (event: CallOutcomeEvent) => void; // a ringing call was answered, declined or missed
   onError?: (reason: string) => void; // terminal init/auth failure
+  onCredentialTeardownStarted?: (operation: Promise<void>) => void; // auth-dir removal began; host fences on it
+  claimStuckAuthRecovery?: () => boolean; // one credential reset per reconnect episode
 }
 
 export interface IWhatsAppEngine {
@@ -1384,7 +1390,7 @@ Database wiring lives inline in `AppModule` (`src/app.module.ts`) as two named
 // shape of the 'data' connection useFactory in src/app.module.ts
 const dbType = configService.get<'sqlite' | 'postgres'>('dataDatabase.type', 'sqlite');
 const baseConfig = {
-  entities: [/* session, webhook, message, template, engine, integration, status-store globs */],
+  entities: [/* session, webhook, message, template, engine, integration, status-store, automation globs */],
   migrations: [__dirname + '/database/migrations/*{.ts,.js}'],
   logging: configService.get<boolean>('dataDatabase.logging', false),
 };
