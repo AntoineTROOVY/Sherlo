@@ -246,7 +246,8 @@ bounded redrive path instead of an infinite replay loop; a successful replay lik
 row's payload with the `dispatched` mark and retires any live-path dead-letter row for the same
 delivery so a later redrive never double-delivers. A `pending` row found without a payload (only
 possible for imported/corrupt history — payloads are retired only with a recorded outcome) is
-skipped loudly, never replayed empty.
+excluded from the sweep and never replayed empty; nothing logs it, and it stays `pending` until
+`INGRESS_DEDUP_RETENTION_DAYS` prunes it.
 
 Table growth is bounded by construction rather than by operator hygiene: the per-instance ingress
 throttle caps the row-creation rate, dispatched rows slim to a marker + hash, and the two retention
