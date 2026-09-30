@@ -967,7 +967,7 @@
       "checking": "Comprobando estado del servidor...",
       "dontClose": "Por favor, no cierres esta ventana",
       "successMsg": "¡El servidor volvió a estar en línea! La página se recargará automáticamente.",
-      "errorMsg": "El servidor no respondió tras 30 segundos. Revisa los logs de Docker y reinicia manualmente.",
+      "errorMsg": "El servidor no respondió. Revisa los logs de Docker y reinicia manualmente.",
       "outcomeUnknown": "El proxy devolvió un error antes de que el servidor respondiera, así que no se sabe si el reinicio está en curso. Recarga la página en un minuto para comprobarlo.",
       "reload": "Recargar página"
     },

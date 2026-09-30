@@ -981,7 +981,7 @@
       "checking": "Serverstatus wird geprüft...",
       "dontClose": "Bitte schließe dieses Fenster nicht",
       "successMsg": "Der Server ist wieder online! Die Seite wird automatisch neu geladen.",
-      "errorMsg": "Der Server hat nach 30 Sekunden nicht geantwortet. Prüfe die Docker-Protokolle und starte ihn manuell neu.",
+      "errorMsg": "Der Server hat nicht geantwortet. Prüfe die Docker-Protokolle und starte ihn manuell neu.",
       "outcomeUnknown": "Der Proxy hat einen Fehler zurückgegeben, bevor der Server geantwortet hat. Ob der Neustart läuft, ist daher unklar; lade die Seite in einer Minute neu, um es zu prüfen.",
       "reload": "Seite neu laden"
     },

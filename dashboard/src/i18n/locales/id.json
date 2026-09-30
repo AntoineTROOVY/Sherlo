@@ -981,7 +981,7 @@
       "checking": "Memeriksa status server...",
       "dontClose": "Mohon jangan tutup jendela ini",
       "successMsg": "Server kembali online! Halaman akan dimuat ulang otomatis.",
-      "errorMsg": "Server tidak merespons setelah 30 detik. Periksa log Docker dan restart secara manual.",
+      "errorMsg": "Server tidak merespons. Periksa log Docker dan restart secara manual.",
       "outcomeUnknown": "Proxy mengembalikan kesalahan sebelum server menjawab, sehingga tidak diketahui apakah restart sedang berlangsung. Muat ulang dalam satu menit untuk memeriksa.",
       "reload": "Muat Ulang Halaman"
     },

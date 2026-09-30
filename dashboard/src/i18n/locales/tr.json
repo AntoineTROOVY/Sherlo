@@ -981,7 +981,7 @@
       "checking": "Sunucu durumu kontrol ediliyor...",
       "dontClose": "Lütfen bu pencereyi kapatmayın",
       "successMsg": "Sunucu tekrar çevrimiçi! Sayfa otomatik olarak yeniden yüklenecektir.",
-      "errorMsg": "Sunucu 30 saniye sonra yanıt vermedi. Lütfen Docker kayıtlarını kontrol edin ve manuel olarak yeniden başlatın.",
+      "errorMsg": "Sunucu yanıt vermedi. Lütfen Docker kayıtlarını kontrol edin ve manuel olarak yeniden başlatın.",
       "outcomeUnknown": "Sunucu yanıt vermeden önce proxy bir hata döndürdü, bu nedenle yeniden başlatmanın sürüp sürmediği bilinmiyor. Kontrol etmek için bir dakika sonra sayfayı yeniden yükleyin.",
       "reload": "Sayfayı Yeniden Yükle"
     },
