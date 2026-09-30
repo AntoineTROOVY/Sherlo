@@ -128,9 +128,9 @@ export class BulkMessageService implements OnApplicationBootstrap {
   ) {}
 
   /**
-   * Transition orphaned batches on startup. A batch still in PROCESSING belongs to a
+   * Transition orphaned batches on startup. A batch still in PENDING or PROCESSING belongs to a
    * previous (crashed/restarted) process — this fresh process is not driving it, so it would
-   * otherwise be stuck in PROCESSING forever. Mark it FAILED. Auto-resume is intentionally NOT
+   * otherwise be stuck there forever. Mark it FAILED. Auto-resume is intentionally NOT
    * done here: resuming risks re-sending messages already delivered before the crash.
    *
    * "A previous process" is not the same as "any process". A batch is only ever driven by whichever
@@ -141,33 +141,39 @@ export class BulkMessageService implements OnApplicationBootstrap {
    * because the two cannot diverge: only the engine holder can send.
    */
   async onApplicationBootstrap(): Promise<void> {
-    const processing = await this.batchRepository.find({ where: { status: BatchStatus.PROCESSING } });
-    const orphaned = await this.ownedByThisNode(processing);
+    const unfinished = await this.batchRepository.find({
+      where: { status: In([BatchStatus.PENDING, BatchStatus.PROCESSING]) },
+    });
+    const orphaned = await this.ownedByThisNode(unfinished);
     let failed = 0;
     for (const batch of orphaned) {
       if (await this.failOrphanedBatch(batch)) failed++;
     }
     if (failed > 0) {
-      this.logger.warn(`Marked ${failed} orphaned PROCESSING batch(es) FAILED on startup (interrupted by a restart)`);
+      this.logger.warn(`Marked ${failed} orphaned unfinished batch(es) FAILED on startup (interrupted by a restart)`);
     }
-    const skipped = processing.length - orphaned.length;
+    const skipped = unfinished.length - orphaned.length;
     if (skipped > 0) {
-      this.logger.log(`Left ${skipped} PROCESSING batch(es) alone: their sessions are held by another node`);
+      this.logger.log(`Left ${skipped} unfinished batch(es) alone: their sessions are held by another node`);
     }
   }
 
   /**
-   * Guarded on PROCESSING in the UPDATE itself: the row was read before this write, and a batch that
-   * finalized in between must keep its real status, progress and results. Returns whether the row
-   * was still PROCESSING and is now FAILED.
+   * Guarded on the unfinished statuses in the UPDATE itself: the row was read before this write, and
+   * a batch that finalized in between must keep its real status, progress and results. Returns
+   * whether the row was still unfinished and is now FAILED. Without `messages` (the run failed
+   * before it could read the row) the stored payloads are left as they are.
    */
-  private async failOrphanedBatch(batch: MessageBatch): Promise<boolean> {
-    this.stripBatchMediaPayloads(batch.messages);
-    const failed = await this.batchRepository.update({ id: batch.id, status: BatchStatus.PROCESSING }, {
-      status: BatchStatus.FAILED,
-      completedAt: new Date(),
-      messages: batch.messages,
-    } as QueryDeepPartialEntity<MessageBatch>);
+  private async failOrphanedBatch(batch: Pick<MessageBatch, 'id'> & Partial<MessageBatch>): Promise<boolean> {
+    const set: QueryDeepPartialEntity<MessageBatch> = { status: BatchStatus.FAILED, completedAt: new Date() };
+    if (batch.messages) {
+      this.stripBatchMediaPayloads(batch.messages);
+      set.messages = batch.messages as QueryDeepPartialEntity<MessageBatch>['messages'];
+    }
+    const failed = await this.batchRepository.update(
+      { id: batch.id, status: In([BatchStatus.PENDING, BatchStatus.PROCESSING]) },
+      set,
+    );
     return Boolean(failed.affected);
   }
 
@@ -392,6 +398,15 @@ export class BulkMessageService implements OnApplicationBootstrap {
       }
       this.processingBatches.set(batch.id, true);
       await this.executeBatch(batch);
+    } catch (error) {
+      // A throw here (a DB error on the pickup read, the start transition or a progress write) would
+      // leave the row PENDING or PROCESSING, and nothing else moves it on while this process lives:
+      // the reapers run only at boot and on a session takeover. Best effort, since the database that
+      // just failed may fail again.
+      await this.failOrphanedBatch(batch ?? { id: batchDbId }).catch((failError: unknown) => {
+        this.logger.error(`Could not mark batch ${batchDbId} FAILED after its run threw: ${String(failError)}`);
+      });
+      throw error;
     } finally {
       if (reserved) this.inFlightBatches--;
       if (batch) this.processingBatches.delete(batch.id);

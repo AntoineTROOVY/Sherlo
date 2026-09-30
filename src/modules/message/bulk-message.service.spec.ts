@@ -63,7 +63,7 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
   let service: BulkMessageService;
   let repo: { find: jest.Mock; save: jest.Mock; update: jest.Mock };
   const failedWrite = (id: string): [object, unknown] => [
-    { id, status: BatchStatus.PROCESSING },
+    { id, status: In([BatchStatus.PENDING, BatchStatus.PROCESSING]) },
     expect.objectContaining({ status: BatchStatus.FAILED }) as unknown,
   ];
 
@@ -108,9 +108,21 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
 
     await service.onApplicationBootstrap();
 
-    expect(repo.find).toHaveBeenCalledWith({ where: { status: BatchStatus.PROCESSING } });
+    expect(repo.find).toHaveBeenCalledWith({
+      where: { status: In([BatchStatus.PENDING, BatchStatus.PROCESSING]) },
+    });
     expect(repo.update).toHaveBeenCalledWith(...failedWrite('b1'));
     expect(repo.save).not.toHaveBeenCalled();
+  });
+
+  // The process died between persisting the batch and its start transition. No run exists at boot,
+  // so the row would otherwise stay PENDING forever: no reaper or retention sweep ever selects it.
+  it('marks a PENDING batch a previous process never started FAILED on startup', async () => {
+    repo.find.mockResolvedValue([{ id: 'b-new', status: BatchStatus.PENDING, messages: [] }]);
+
+    await service.onApplicationBootstrap();
+
+    expect(repo.update).toHaveBeenCalledWith(...failedWrite('b-new'));
   });
 
   // FAILED is terminal, and the status route documents completedAt as null only while a batch runs.
@@ -142,7 +154,7 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
 
     expect(repo.update).toHaveBeenCalledTimes(2);
     expect(warn).toHaveBeenCalledWith(
-      'Marked 1 orphaned PROCESSING batch(es) FAILED on startup (interrupted by a restart)',
+      'Marked 1 orphaned unfinished batch(es) FAILED on startup (interrupted by a restart)',
     );
   });
 
@@ -373,6 +385,36 @@ describe('BulkMessageService.processBatch', () => {
 
   const inFlightMarkers = (): Map<string, boolean> =>
     (service as unknown as { processingBatches: Map<string, boolean> }).processingBatches;
+
+  // A run that throws would otherwise leave the row PENDING or PROCESSING with nothing left to move
+  // it on while this process lives: the reapers only run at boot and on a session takeover.
+  it.each([
+    ['the pickup read', () => repo.findOne.mockRejectedValueOnce(new Error('database unavailable'))],
+    [
+      'the start transition',
+      () => {
+        repo.findOne.mockResolvedValue(makeBatch(1));
+        repo.update.mockRejectedValueOnce(new Error('database unavailable'));
+      },
+    ],
+  ])('fails the batch when %s throws, and rethrows', async (_label, arrange) => {
+    arrange();
+
+    await expect(runProcessBatch()).rejects.toThrow('database unavailable');
+
+    expect(repo.update).toHaveBeenLastCalledWith(
+      { id: 'b1', status: In([BatchStatus.PENDING, BatchStatus.PROCESSING]) },
+      expect.objectContaining({ status: BatchStatus.FAILED, completedAt: expect.any(Date) as unknown }),
+    );
+    expect(inFlightMarkers().has('b1')).toBe(false);
+  });
+
+  it('still rethrows the run error when failing the batch throws too', async () => {
+    repo.findOne.mockRejectedValueOnce(new Error('database unavailable'));
+    repo.update.mockRejectedValueOnce(new Error('still unavailable'));
+
+    await expect(runProcessBatch()).rejects.toThrow('database unavailable');
+  });
 
   it('rejects a new batch (before persisting) when the concurrent in-flight cap is reached', async () => {
     const prev = process.env.BULK_MAX_CONCURRENT_BATCHES;
