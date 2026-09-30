@@ -982,7 +982,7 @@ class ChatSummary(TypedDict):
     unreadCount: int
     # Server returns a plain preview string, not a message object.
     lastMessage: NotRequired[str]
-    timestamp: str | int
+    timestamp: int
     kind: ChatKind
     archived: bool
     pinned: bool
