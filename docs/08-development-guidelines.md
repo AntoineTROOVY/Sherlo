@@ -40,6 +40,7 @@ openwa/
   "compilerOptions": {
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    "esModuleInterop": true,
     "target": "ES2023",
     "rootDir": ".",
     "outDir": "./dist",
@@ -47,13 +48,8 @@ openwa/
     "declaration": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "strictNullChecks": true,
-    "noImplicitAny": true,
-    "strictBindCallApply": true,
-    "noFallthroughCasesInSwitch": true,
-    "strictPropertyInitialization": false,
-    "strictFunctionTypes": false,
-    "useUnknownInCatchVariables": false
+    "strict": true,
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["src", "test"],
   "exclude": ["node_modules", "dist", "dashboard"]
@@ -61,9 +57,9 @@ openwa/
 ```
 
 There are **no path aliases** — no `baseUrl`, no `paths`. Import with relative paths
-(`../common/services/logger.service`), not `@/…`. Under TypeScript 6 the strict family defaults on,
-so the three `false` entries above are deliberate opt-outs pending their own migrations
-(`strictPropertyInitialization` alone flags around 260 TypeORM entity properties). `types` must be
+(`../common/services/logger.service`), not `@/…`. The whole strict family is on, with no opt-outs,
+so entity and DTO properties the framework populates carry a definite-assignment `!`
+(`name!: string;`), since no constructor assigns them. `types` must be
 listed explicitly because TypeScript 6 no longer auto-includes every `@types` package.
 
 ### ESLint Configuration
@@ -114,11 +110,11 @@ let messageCount = 0;
 const MAX_RETRY_COUNT = 3;
 const DEFAULT_TIMEOUT = 30000;
 
-// Enums: PascalCase with PascalCase values
+// Enums: PascalCase name with UPPER_SNAKE_CASE values
 enum SessionStatus {
-  Created = 'created',
-  Ready = 'ready',
-  Disconnected = 'disconnected',
+  CREATED = 'created',
+  READY = 'ready',
+  DISCONNECTED = 'disconnected',
 }
 ```
 
@@ -259,7 +255,7 @@ export class CreateExampleDto {
   @ApiProperty({ description: 'Example name', example: 'My Example' })
   @IsString()
   @MaxLength(100)
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional({ description: 'Optional description' })
   @IsOptional()
