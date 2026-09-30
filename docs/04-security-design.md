@@ -470,11 +470,13 @@ app.use(helmet({
 ### What Gets Logged
 
 > **Reality check:** persisted audit coverage currently includes API-key create/update/revoke/delete
-> (updates carry before/after authorization state), rejected authentication, session lifecycle,
-> integration-instance creation, secret rotation, deletion, and scope-binding bridge failures, the
+> (updates carry before/after authorization state), rejected authentication, session lifecycle
+> (including disconnects caused by WhatsApp unlinking the device, account restrictions and their
+> lifting, and refused rebinds), integration-instance creation, update, secret rotation, deletion,
+> redrive, and scope-binding bridge failures, send-pacing refusals (sampled) and breaker trips, the
 > infra operations (config save, restart request, data export/import, storage export/import),
 > WebSocket rate-limit violations (sampled — see §4.6), and Bull Board queue mutations. Enum
-> members for API-key use, connection transitions, message sends, and webhook lifecycle are explicitly
+> members for API-key use, session connected, message sends, and webhook lifecycle are explicitly
 > registered as intentionally unemitted; application logs cover those operational events until dedicated
 > audit callsites are added. There is no global audit interceptor.
 
