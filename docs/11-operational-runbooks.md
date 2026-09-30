@@ -364,7 +364,8 @@ docker stats --no-stream
 # 3. Create a backup in the running container, where the data is mounted, and copy it off the
 #    volume (see Runbook: Database Backup). A host run of ./scripts/backup.sh archives ./data in the
 #    checkout, which only a bare-metal install or docker-compose.dev.yml reads. Engine auth state is
-#    copied live; stop the sessions first if a restore must not need re-pairing
+#    copied live; stop the sessions first if a restore must not need re-pairing, and start them
+#    again in step 10
 docker exec -e BACKUP_DIR=/app/data/backups -e TMPDIR=/app/data/backups openwa-api ./scripts/backup.sh
 docker cp openwa-api:/app/data/backups/. ./backups/
 
@@ -396,7 +397,8 @@ curl http://localhost:2785/api/health
 
 # 10. Verify all sessions reconnected
 #     (on their own only with AUTO_START_SESSIONS=true; otherwise POST
-#     /api/sessions/{sessionId}/start each one first)
+#     /api/sessions/{sessionId}/start each one first). A session stopped in step 3 stays down,
+#     even with AUTO_START_SESSIONS=true, until that explicit start
 curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions | jq '.[].status'
 
@@ -446,7 +448,7 @@ curl -H "X-API-Key: $API_KEY" \
 #    ./data in the checkout, which the production compose never reads (see Runbook: Database Backup).
 #    An image older than 0.19.0 has no scripts/backup.sh, and on PostgreSQL one older than 0.22.0 has
 #    no pg_dump: see 14 - Known Upgrade Hazards. Engine auth state is copied live; stop the sessions
-#    first if a rollback must not need re-pairing
+#    first if a rollback must not need re-pairing, and start them again in step 11
 export BACKUP_DIR="/backups/openwa"
 mkdir -p "$BACKUP_DIR"
 docker exec -e BACKUP_DIR=/app/data/backups -e TMPDIR=/app/data/backups openwa-api ./scripts/backup.sh
@@ -489,7 +491,8 @@ curl -H "X-API-Key: $API_KEY" http://localhost:2785/api/health | jq '.version'
 
 # 11. Verify all sessions
 #     (they reconnect on their own only with AUTO_START_SESSIONS=true; otherwise POST
-#     /api/sessions/{sessionId}/start each one first)
+#     /api/sessions/{sessionId}/start each one first). A session stopped in step 2 stays down,
+#     even with AUTO_START_SESSIONS=true, until that explicit start
 curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions
 
@@ -620,6 +623,9 @@ curl -H "X-API-Key: $API_KEY" http://localhost:2785/api/health
 `pg_dump`). Engine authentication state (`sessions/`, `baileys/`) is copied while the engines write
 it, so a restored session can need re-pairing; for a copy that is consistent by construction, stop
 the sessions first (`POST /api/sessions/:id/stop`), or stop the container and archive the volume.
+A stopped session stays down across restarts, even with `AUTO_START_SESSIONS=true`, so start each
+one again with `POST /api/sessions/:id/start` once the backup is copied. The stop is recorded in the
+backed-up database, so a restore of that archive keeps the session stopped too.
 
 **Prerequisites:**
 
