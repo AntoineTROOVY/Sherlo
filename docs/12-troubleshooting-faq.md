@@ -167,7 +167,7 @@ docker compose up -d --build   # `docker compose pull` never updates it
 **Symptoms:**
 
 - The API is healthy (`curl http://<host>:2785/api/health` returns `200`) but the dashboard is blank
-- The startup log says `🖥️ Dashboard: serving bundled UI at …` — the UI _is_ being served
+- The startup log says `Dashboard: serving bundled UI at …` — the UI _is_ being served
 - The browser console shows script-loading errors; DevTools → Network shows the `/assets/*.js`
   requests going to `https://` even though you opened the page over `http://`
 - You reach the instance directly over plain HTTP (a host:port allocation, a private network, a
@@ -247,7 +247,7 @@ docker compose restart openwa-api
 > this document assume a source install (`npm run start:dev`) or that dev bind mount.
 
 Proxy egress (if WhatsApp is blocked on your network) is configured **per session** via the
-`proxyUrl`/`proxyType` fields on `POST /api/sessions` — it is **not** an environment variable, and an
+`proxyUrl` field on `POST /api/sessions` — it is **not** an environment variable, and an
 unreachable proxy silently blocks the WhatsApp WebSocket (see the _No QR code appears, or `/start`
 returns `504`_ entry below).
 
@@ -310,7 +310,7 @@ curl -X POST "$BASE/api/sessions" -H "X-API-Key: $API_KEY" -H "Content-Type: app
 ```
 
 > ℹ️ Proxy egress for the `whatsapp-web.js` engine is configured **per session** via the
-> `proxyUrl`/`proxyType` fields on `POST /api/sessions` — not via environment variables.
+> `proxyUrl` field on `POST /api/sessions` — not via environment variables.
 
 > ℹ️ A `504` whose body starts with `Engine initialization timed out after ...` is a **different**
 > failure with a different fix: initialization never finished at all. That happens when WhatsApp Web,
