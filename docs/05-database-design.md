@@ -163,18 +163,28 @@ curl -X POST 'http://localhost:2785/api/infra/import-data' \
 
 #### Cross-Database Date Portability
 
-To ensure date/time values work across both SQLite and PostgreSQL, OpenWA uses a `DateTransformer` that stores dates as ISO 8601 text strings:
+To ensure date/time values work across both SQLite and PostgreSQL, OpenWA uses a `DateTransformer` together with `dateColumnType()`. On SQLite the column is `text` and dates are stored as ISO 8601 strings; on PostgreSQL the column is a native `timestamp` and the `Date` passes through to the driver:
 
 ```typescript
 // src/common/transformers/date.transformer.ts
 export const DateTransformer: ValueTransformer = {
-  from: (value: string | null) => value ? new Date(value) : null,
-  to: (value: Date | null) => value ? value.toISOString() : null,
+  from: (value: string | Date | null): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    return new Date(value);
+  },
+  to: (value: Date | null): string | Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) {
+      return process.env.DATABASE_TYPE === 'postgres' ? value : value.toISOString();
+    }
+    return value;
+  },
 };
 
-// Usage in entities (Data DB only)
-@Column({ type: 'text', nullable: true, transformer: DateTransformer })
-connectedAt: Date | null;
+// Usage in entities (Data DB only); dateColumnType() is 'timestamp' on PostgreSQL, 'text' on SQLite
+@Column({ type: dateColumnType(), nullable: true, transformer: DateTransformer })
+connectedAt!: Date | null;
 ```
 
 > [!NOTE]
