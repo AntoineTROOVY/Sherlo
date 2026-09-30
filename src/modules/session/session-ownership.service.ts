@@ -41,6 +41,8 @@ export class SessionOwnershipService {
   private heartbeat?: ReturnType<typeof setInterval>;
   /** Sessions this process believes it owns, so the heartbeat knows what to renew. */
   private readonly owned = new Set<string>();
+  /** Bumped on every claim and release, so renew() can tell a claim it read from one replaced since. */
+  private readonly claimGen = new Map<string, number>();
   /** Notified when a renewal proves this process no longer holds sessions it thought it did. */
   private onLeaseLost?: (sessionIds: string[]) => Promise<void> | void;
 
@@ -146,6 +148,7 @@ export class SessionOwnershipService {
     const claimed = (result.affected ?? 0) > 0;
     if (claimed) {
       this.owned.add(sessionId);
+      this.bumpClaimGen(sessionId);
       this.lastSeenLease.set(sessionId, leaseExpiresAt.getTime());
     } else this.logger.warn('Session is held by another node', { sessionId, nodeId: this.nodeId });
     return claimed;
@@ -163,6 +166,7 @@ export class SessionOwnershipService {
   async release(sessionId: string): Promise<void> {
     const now = new Date();
     this.owned.delete(sessionId);
+    this.bumpClaimGen(sessionId);
     await this.sessions
       .createQueryBuilder()
       .update(Session)
@@ -170,6 +174,10 @@ export class SessionOwnershipService {
       .where('id = :id', { id: sessionId })
       .andWhere('("nodeId" = :me OR "leaseExpiresAt" < :now)', { me: this.nodeId, now: leaseParam(now) })
       .execute();
+  }
+
+  private bumpClaimGen(sessionId: string): void {
+    this.claimGen.set(sessionId, (this.claimGen.get(sessionId) ?? 0) + 1);
   }
 
   /** Release everything this process holds, on the way down. */
@@ -253,6 +261,7 @@ export class SessionOwnershipService {
    */
   async renew(): Promise<void> {
     const held = [...this.owned];
+    const heldGen = new Map(held.map(id => [id, this.claimGen.get(id)]));
 
     // Only claims that still cover something alive on this process are pushed out. A claim whose
     // engine is gone (a failed start, an exhausted reconnect) must be allowed to lapse — renewing
@@ -301,7 +310,10 @@ export class SessionOwnershipService {
     // entry-only check would let it through. Renewing was harmless; concluding loss is not.
     if (this.lossDetectionSuspended > 0) return;
 
-    const lost = held.filter(id => !kept.has(id));
+    // Only a claim this tick actually read can be lost. One released during the queries (a stop) is
+    // gone on purpose, and one released and claimed again (a stop, then a start) may have been read
+    // in between: neither was taken by a peer.
+    const lost = held.filter(id => !kept.has(id) && this.owned.has(id) && this.claimGen.get(id) === heldGen.get(id));
     if (lost.length === 0) return;
     for (const id of lost) this.owned.delete(id);
     this.logger.warn(`Lost the claim on ${lost.length} session(s); another node now holds them`, {

@@ -428,6 +428,49 @@ describe('SessionOwnershipService', () => {
       await expect(nodeA.renew()).resolves.toBeUndefined();
       expect(nodeA.ownedIds()).toEqual([]);
     });
+
+    // A stop releases the claim while a tick is in flight: the row no longer names this node, but
+    // nothing was lost to a peer, and the lease-loss teardown would leave a stale stop mark.
+    it('does not report a session this process released during the tick', async () => {
+      const session = await seed();
+      const nodeA = service('node-a');
+      await nodeA.claim(session.id);
+      const lost: string[][] = [];
+      nodeA.onLeaseLoss(ids => void lost.push(ids));
+      const realFind = sessions.find.bind(sessions);
+      jest.spyOn(sessions, 'find').mockImplementation(async (...args: Parameters<typeof realFind>) => {
+        await nodeA.release(session.id);
+        return realFind(...args);
+      });
+
+      await nodeA.renew();
+      jest.restoreAllMocks();
+
+      expect(lost).toEqual([]);
+    });
+
+    // A stop then a start: the tick read the row between the release and the re-claim. Reporting it
+    // lost would drop the fresh claim from `owned` and tear down the engine the start is launching.
+    it('does not report a session released and re-claimed during the tick', async () => {
+      const session = await seed();
+      const nodeA = service('node-a');
+      await nodeA.claim(session.id);
+      const lost: string[][] = [];
+      nodeA.onLeaseLoss(ids => void lost.push(ids));
+      const realFind = sessions.find.bind(sessions);
+      jest.spyOn(sessions, 'find').mockImplementation(async (...args: Parameters<typeof realFind>) => {
+        await nodeA.release(session.id);
+        const rows = await realFind(...args);
+        await nodeA.claim(session.id);
+        return rows;
+      });
+
+      await nodeA.renew();
+      jest.restoreAllMocks();
+
+      expect(lost).toEqual([]);
+      expect(nodeA.ownedIds()).toEqual([session.id]);
+    });
   });
 
   describe('what a booting process may reset', () => {
