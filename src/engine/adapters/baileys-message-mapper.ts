@@ -862,9 +862,16 @@ export function extractBaileysContext(content: BaileysContextContent): BaileysMe
   // surface it so the store/viewer can render the story the way it was posted.
   const extText = content.extendedTextMessage;
   const contextInfo = subForContext?.contextInfo;
+  // WhatsApp stamps the timer on every message in a disappearing chat, a product, poll, contact card, live
+  // location, order or event included, so any content node answers when the carriers above have none.
+  const expiration =
+    contextInfo?.expiration ??
+    Object.values(content)
+      .map(node => (node as BaileysContextCarrier | null | undefined)?.contextInfo?.expiration)
+      .find((e): e is number => typeof e === 'number' && e > 0);
 
   const context: BaileysMessageContext = {
-    ephemeralDuration: contextInfo?.expiration ?? undefined,
+    ephemeralDuration: expiration ?? undefined,
     mentionedJids: contextInfo?.mentionedJid ?? undefined,
     backgroundArgb: typeof extText?.backgroundArgb === 'number' ? extText.backgroundArgb : undefined,
     font: typeof extText?.font === 'number' ? extText.font : undefined,
