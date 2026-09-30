@@ -656,14 +656,21 @@ describe('SessionService', () => {
       expect(result).toBeDefined();
     });
 
-    it('forceKill() completes even when forceDestroy() rejects (best-effort recovery)', async () => {
+    it('forceKill() surfaces a 502 when forceDestroy() fails, after settling local state', async () => {
       (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
       (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
       const engine = { forceDestroy: jest.fn().mockRejectedValue(new Error('still wedged')) };
       enginesOf().set('sess-uuid-1', engine);
 
-      await expect(service.forceKill('sess-uuid-1')).resolves.toBeDefined();
+      const thrown = await service.forceKill('sess-uuid-1').catch((e: unknown) => e);
+
+      // Not reported as a clean kill (the controller audits only a resolved one): the process may live.
+      expect(thrown).toBeInstanceOf(BadGatewayException);
+      expect(((thrown as BadGatewayException).getResponse() as { code?: string }).code).toBe(
+        'SESSION_FORCE_KILL_INCOMPLETE',
+      );
       expect(enginesOf().has('sess-uuid-1')).toBe(false); // map reconciled despite the failure
+      expect(repository.update).toHaveBeenCalledWith('sess-uuid-1', { status: SessionStatus.DISCONNECTED });
     });
 
     it('forceKill() throws NotFoundException for an unknown session', async () => {
