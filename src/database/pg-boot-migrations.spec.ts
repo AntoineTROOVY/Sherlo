@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import { DataSource, DataSourceOptions } from 'typeorm';
 // Default import (not `import * as`) on purpose: it binds straight to pg's module.exports, so the
 // constructor spy below reaches the same object pg-boot-migrations reads `Client` from at call time.
@@ -350,11 +351,11 @@ describe('createBootDataSource (postgres boot migrations)', () => {
     // The production path. Only the spots that would touch the outside world are stubbed — the
     // DataSource lifecycle methods (initialize would open a pool) and the pg Client constructor
     // (connect would open a socket) — so both default factories run as shipped.
-    const lockClient: AdvisoryLockClient = {
+    const lockClient: AdvisoryLockClient = Object.assign(new EventEmitter(), {
       connect: jest.fn(() => Promise.resolve()),
       query: jest.fn(() => Promise.resolve()),
       end: jest.fn(() => Promise.resolve()),
-    };
+    });
     const clientCtor = jest.spyOn(pg, 'Client').mockImplementation(() => lockClient as unknown as PgClient);
     const initialize = jest.spyOn(DataSource.prototype, 'initialize').mockImplementation(function (this: DataSource) {
       return Promise.resolve(this);
@@ -395,6 +396,28 @@ describe('createBootDataSource (postgres boot migrations)', () => {
       query.mockRestore();
       runMigrations.mockRestore();
       destroy.mockRestore();
+    }
+  });
+
+  // pg emits 'error' on the client when its socket drops outside the client's own end() (failover,
+  // pg_terminate_backend, an idle-timeout on the silent wait inside pg_advisory_lock). With no
+  // listener that emit throws from the socket handler and kills the process before the failed lock
+  // query can reject into the factory's cleanup and Nest's retry loop.
+  it('listens for lock-client errors so a dropped connection cannot crash the process', async () => {
+    const lockClient = Object.assign(new EventEmitter(), {
+      connect: jest.fn(() => Promise.resolve()),
+      query: jest.fn(() => Promise.resolve()),
+      end: jest.fn(() => Promise.resolve()),
+    });
+    const clientCtor = jest.spyOn(pg, 'Client').mockImplementation(() => lockClient as unknown as PgClient);
+    const { deps } = makeFakes();
+    try {
+      await createBootDataSource(PG_OPTIONS, { createDataSource: deps.createDataSource });
+
+      expect(lockClient.listenerCount('error')).toBeGreaterThan(0);
+      expect(() => lockClient.emit('error', new Error('Connection terminated unexpectedly'))).not.toThrow();
+    } finally {
+      clientCtor.mockRestore();
     }
   });
 

@@ -1,6 +1,9 @@
 import { Client, ClientConfig } from 'pg';
 import { DataSource, DataSourceOptions } from 'typeorm';
+import { createLogger } from '../common/services/logger.service';
 import { assertDataConnectionUtc, postgresUtcExtra } from './postgres-utc';
+
+const logger = createLogger('PgBootMigrations');
 
 // The postgres data connection runs its boot migrations while holding a session-scoped Postgres
 // advisory lock, so replicas that boot at the same time serialize instead of racing DDL against
@@ -46,7 +49,7 @@ export async function createBootDataSource(
   deps: BootDataSourceDeps = {},
 ): Promise<DataSource> {
   const createDataSource = deps.createDataSource ?? (opts => new DataSource(opts));
-  const createLockClient = deps.createLockClient ?? (config => new Client(config));
+  const createLockClient = deps.createLockClient ?? createPgLockClient;
 
   if (options?.type !== 'postgres') {
     // useFactory always resolves a full options object; the optional parameter is the library's
@@ -107,6 +110,19 @@ export async function createBootDataSource(
     throw error;
   }
   return dataSource;
+}
+
+// pg emits 'error' on the client when its socket drops while the client is not ending (a failover,
+// pg_terminate_backend, an idle-timeout on the silent wait inside pg_advisory_lock). Unheard, that
+// emit throws from the socket handler and exits the process. The in-flight query rejects on its own,
+// so the factory's cleanup and Nest's retry loop take it from there; a holder that loses the socket
+// has lost the lock with it, which is worth a warning.
+function createPgLockClient(config: ClientConfig): AdvisoryLockClient {
+  const client = new Client(config);
+  client.on('error', (error: Error) => {
+    logger.warn(`Boot migration lock connection lost: ${error.message}`);
+  });
+  return client;
 }
 
 function lockClientConfig(options: PostgresOptions): ClientConfig {
