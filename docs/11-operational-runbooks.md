@@ -113,7 +113,7 @@ curl -X POST http://localhost:2785/api/sessions/{sessionId}/messages/send-text \
 
 **Prerequisites:**
 
-- API Key
+- An OPERATOR (or ADMIN) API key
 - Physical access to phone (if QR needed)
 
 **Steps:**
