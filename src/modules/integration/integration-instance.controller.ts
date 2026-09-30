@@ -48,7 +48,7 @@ export class IntegrationInstanceController {
     type: InstanceView,
   })
   @ApiResponse({ status: 400, description: 'Validation failed, or the plugin is not ingress-capable.' })
-  @ApiResponse({ status: 403, description: "Key role below ADMIN, or sessionScope outside the key's allowedSessions." })
+  @ApiResponse({ status: 403, description: "sessionScope is outside the key's allowedSessions." })
   @ApiResponse({ status: 404, description: 'Plugin not found.' })
   @ApiResponse({ status: 409, description: 'An instance with that id already exists for the plugin' })
   async create(
@@ -123,10 +123,7 @@ export class IntegrationInstanceController {
   @Patch(':instanceId')
   @ApiResponse({ status: 200, description: 'Instance updated (secret masked).', type: InstanceView })
   @ApiResponse({ status: 400, description: 'Validation failed, or the masked config could not be restored.' })
-  @ApiResponse({
-    status: 403,
-    description: "Key role below ADMIN, or the new sessionScope outside the key's allowedSessions.",
-  })
+  @ApiResponse({ status: 403, description: "The new sessionScope is outside the key's allowedSessions." })
   @ApiResponse({ status: 404, description: "Unknown instance, or one outside the key's allowedSessions." })
   async patch(
     @Param('pluginId') pluginId: string,
