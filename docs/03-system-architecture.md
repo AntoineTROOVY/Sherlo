@@ -1464,8 +1464,9 @@ There is **no** cache-manager / `CacheModuleOptions` / `redisStore` setup and **
 `REDIS_ENABLED` (falling back to the `cache.enabled` config flag). When caching is disabled — or Redis
 is unreachable — the service **fails open**: every read returns `null` and every write is a silent
 no-op, so the app keeps serving from its source of truth. In other words, "no cache configured" means
-**no cache** (recompute), not an in-process LRU. Cache is therefore a pure optimization layer (session
-status/info/QR/list/stats, each with its own short TTL); it is never the source of truth.
+**no cache** (recompute), not an in-process LRU. Cache is never the source of truth, and today no
+request path reads from it: the only consumers are the infra status probe (`isAvailable`) and a
+sessions-stats snapshot that `StatsService` writes and nothing reads back.
 
 ```typescript
 // src/common/cache/cache.service.ts
