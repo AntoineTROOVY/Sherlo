@@ -329,11 +329,14 @@ services:
     image: ghcr.io/rmyndharis/openwa:latest
 ```
 
-Run `docker compose pull openwa-api && docker compose up -d --no-build`, and use the same command to
-upgrade. Pin a release by replacing `latest` with its version number. Once the image is pulled, Compose
-runs it and builds nothing. The service keeps its `build:` section, so if the pull fails (a mistyped tag,
-no registry access) Compose falls back to building from source and tags that build with the published
-name; `--no-build` makes that case fail instead. For the same reason, do not use `--build` or
+Run `docker compose pull openwa-api && docker compose up -d --no-build`. To upgrade, update the checkout
+first (`git pull`, or `git checkout v<version>` when pinning), then run the same command: the override
+replaces only the image, and `docker-compose.yml` forwards an explicit variable list with no `env_file`,
+so an outdated copy drops the variables a newer release adds and keeps the old service definitions. Pin a
+release by replacing `latest` with its version number. Once the image is pulled, Compose runs it and
+builds nothing. The service keeps its `build:` section, so if the pull fails (a mistyped tag, no registry
+access) Compose falls back to building from source and tags that build with the published name;
+`--no-build` makes that case fail instead. For the same reason, do not use `--build` or
 `docker compose build` with this override.
 
 ## 🔌 Ports
