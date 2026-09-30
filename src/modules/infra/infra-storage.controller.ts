@@ -234,6 +234,12 @@ export class InfraStorageController implements OnApplicationBootstrap {
   // string while the handler takes an object.
   @ApiBody({ type: ImportStorageDto, description: 'Path to tar.gz file to import' })
   @ApiResponse({ status: 200, description: 'Import result', type: StorageImportResponseDto })
+  @ApiResponse({
+    status: 400,
+    description:
+      '`filePath` is outside the data directory or does not exist, or the archive could not be read or ' +
+      'broke a resource cap. Entries written before an abort are kept.',
+  })
   @ApiResponse({ status: 503, description: S3_UNAVAILABLE_DESCRIPTION })
   async importStorage(
     @Body() body: ImportStorageDto,
