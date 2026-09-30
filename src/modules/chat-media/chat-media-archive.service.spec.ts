@@ -181,6 +181,20 @@ describe('ChatMediaArchiveService', () => {
       update.mockRestore();
     });
 
+    it('still returns null when the unreferenced file cannot be removed after a skipped update', async () => {
+      const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64') });
+      const update = jest
+        .spyOn(repository, 'update')
+        .mockResolvedValueOnce({ affected: 0, raw: [], generatedMaps: [] });
+      const del = jest.spyOn(storageService, 'deleteFile').mockRejectedValueOnce(new Error('s3 down'));
+
+      await expect(enabled().archive(row)).resolves.toBeNull();
+
+      expect(del).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^${CHAT_MEDIA_PREFIX}sess-1/`)));
+      update.mockRestore();
+      del.mockRestore();
+    });
+
     it('does not point a row revoked while its file was written back at the media', async () => {
       const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64') });
       // The archive works from the in-memory row the projector inserted; the revoke lands meanwhile.
@@ -422,6 +436,20 @@ describe('ChatMediaArchiveService', () => {
       const files = [];
       for await (const f of storageService.iterateFiles(CHAT_MEDIA_PREFIX)) files.push(f);
       expect(files).toEqual([]);
+    });
+
+    it('warns and keeps the file when deleting an orphan past its grace window fails', async () => {
+      const key = `${CHAT_MEDIA_PREFIX}sess-1/orphan.png`;
+      await storageService.putFile(key, PNG);
+      const svc = enabled({ 'chatMedia.orphanGraceMs': 0 });
+      const warn = jest.spyOn((svc as unknown as { logger: { warn: () => void } }).logger, 'warn');
+      const del = jest.spyOn(storageService, 'deleteFile').mockRejectedValueOnce(new Error('s3 down'));
+
+      expect(await svc.sweepOrphanedMedia(Date.now())).toBe(0);
+
+      expect(warn).toHaveBeenCalledWith(`Failed to delete orphaned chat media ${key}`, { error: 'Error: s3 down' });
+      expect(await storageService.getFile(key)).toEqual(PNG);
+      del.mockRestore();
     });
 
     it('never reaps a file a row still references, however long it sits there', async () => {
