@@ -7,7 +7,7 @@ import './GlobalSearch.css';
 interface GlobalSearchProps {
   /** Called when the user clicks a result — the parent navigates to that chat/message. */
   onHit: (hit: SearchHit) => void;
-  /** When set, the scope toggle defaults to this session (optional). */
+  /** When set, offers a toggle that limits the search to this session (off by default). */
   currentSessionId?: string;
 }
 
