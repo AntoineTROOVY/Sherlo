@@ -987,7 +987,7 @@ export interface WebhookTestResult {
   error?: string;
 }
 
-/** A webhook delivery abandoned after every retry, as listed by the delivery-failure log. */
+/** A webhook delivery the gateway gave up on or could not dispatch, as listed by the delivery-failure log. */
 export interface WebhookDeliveryFailure {
   id: string;
   webhookId: string;
@@ -997,12 +997,12 @@ export interface WebhookDeliveryFailure {
   /** The idempotency key the receiver would have deduped on. */
   idempotencyKey?: string | null;
   deliveryId?: string | null;
-  /** Total attempts made before giving up. */
+  /** Attempts made before giving up; 0 when the delivery was not given up after retries (see `deliveryFailures`). */
   attempts: number;
   /** Last HTTP status when the failure was a non-2xx response; null for a network or timeout error. */
   lastStatusCode?: number | null;
   lastError: string;
-  /** ISO timestamp of when the delivery was finally abandoned. */
+  /** ISO timestamp of when the row was recorded. */
   createdAt: string;
 }
 
