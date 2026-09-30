@@ -436,6 +436,9 @@ test('replacing headers sends the whole map, and no rows sends an empty map', as
   assert.deepEqual(updateBody!.headers, {});
 });
 
+const FILTERS_HINT =
+  'Give every filter condition a value, and use at most 20 conditions, 100 values per condition and 1000 characters of text.';
+
 // FilterBuilder starts a condition as "sender is" with no contact, and the gateway refuses an empty
 // value list and more than 20 conditions. Either would come back as raw English in a toast.
 test('an incomplete filter condition keeps Create disabled and says why', async () => {
@@ -445,7 +448,7 @@ test('an incomplete filter condition keeps Create disabled and says why', async 
 
   fireEvent.click(screen.getByRole('button', { name: 'Add condition' }));
   assert.equal(create.disabled, true);
-  screen.getByText('Give every filter condition a value, and use at most 20 conditions.');
+  screen.getByText(FILTERS_HINT);
   fireEvent.click(create);
   await new Promise(resolve => setTimeout(resolve, 50));
   assert.equal(createCalls, 0);
@@ -454,8 +457,7 @@ test('an incomplete filter condition keeps Create disabled and says why', async 
   assert.equal(create.disabled, false);
 });
 
-test('more than 20 filter conditions keep Save disabled', async () => {
-  const { screen, fireEvent } = rtl;
+function editWebhookWith(conditions: unknown[]): void {
   webhooksStatus = 200;
   webhookList = [
     {
@@ -464,21 +466,41 @@ test('more than 20 filter conditions keep Save disabled', async () => {
       url: 'https://example.test/hook',
       events: ['message.received'],
       active: true,
-      filters: { conditions: Array.from({ length: 20 }, () => ({ field: 'fromMe', operator: 'is', value: true })) },
+      filters: { conditions },
     },
   ];
   window.sessionStorage.setItem('openwa_user_role', 'operator');
   renderWebhooks();
-  fireEvent.click(await screen.findByTitle('Edit'));
-  const save = screen.getByRole<HTMLButtonElement>('button', { name: 'Save Changes' });
-  assert.equal(save.disabled, false);
+}
 
-  // A 21st condition that is complete on its own: only the count is wrong.
-  fireEvent.click(screen.getByRole('button', { name: 'Add condition' }));
-  const fields = screen.getAllByLabelText('Filter field');
-  fireEvent.change(fields[fields.length - 1], { target: { value: 'fromMe' } });
+async function openEdit(): Promise<HTMLButtonElement> {
+  const { screen, fireEvent } = rtl;
+  fireEvent.click(await screen.findByTitle('Edit'));
+  return screen.getByRole<HTMLButtonElement>('button', { name: 'Save Changes' });
+}
+
+test('more than 20 filter conditions keep Save disabled', async () => {
+  const { screen, fireEvent } = rtl;
+  // Stored before the limit: the builder no longer adds a 21st row, but it can still load one.
+  editWebhookWith(Array.from({ length: 21 }, () => ({ field: 'fromMe', operator: 'is', value: true })));
+  const save = await openEdit();
   assert.equal(save.disabled, true);
-  screen.getByText('Give every filter condition a value, and use at most 20 conditions.');
+  screen.getByText(FILTERS_HINT);
+
+  fireEvent.click(screen.getAllByRole('button', { name: 'Remove condition' })[0]);
+  assert.equal(save.disabled, false);
+});
+
+test('a condition with more than 100 values keeps Save disabled', async () => {
+  const { screen, fireEvent } = rtl;
+  const values = Array.from({ length: 101 }, (_, i) => `${i}@c.us`);
+  editWebhookWith([{ field: 'sender', operator: 'is', value: values }]);
+  const save = await openEdit();
+  assert.equal(save.disabled, true);
+  screen.getByText(FILTERS_HINT);
+  fireEvent.click(save);
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(updateCalls, 0);
 });
 
 test('a test in flight on one webhook is not ended by a test on another', async () => {

@@ -19,6 +19,7 @@ import { availableEventNames } from '../utils/webhookEvents';
 import { filterValueLabel } from '../utils/enumLabels';
 import { buildHeaderMap, generateSecret, secretError, type HeaderRow } from '../utils/webhookAuth';
 import { copyToClipboard } from '../utils/clipboard';
+import { filtersIncomplete } from '../utils/webhookFilters';
 import { useRole } from '../hooks/useRole';
 import { useToast } from '../hooks/useToast';
 import {
@@ -37,14 +38,10 @@ import './Webhooks.css';
 // Filters only apply to message.* events (the wildcard subscribes to them too).
 const supportsFilters = (events: string[]) => events.some(e => e === '*' || e.startsWith('message.'));
 
-// The gateway refuses more than 20 conditions and an id or enum condition with no values, and a new
+// The gateway refuses filters past its limits and an id or enum condition with no values, and a new
 // condition starts as "sender is" with none, so an untouched one would come back as a raw error.
-const MAX_FILTER_CONDITIONS = 20;
 const filtersInvalid = (events: string[], filters: WebhookFilters | null | undefined) =>
-  supportsFilters(events) &&
-  !!filters &&
-  (filters.conditions.length > MAX_FILTER_CONDITIONS ||
-    filters.conditions.some(c => Array.isArray(c.value) && c.value.length === 0));
+  supportsFilters(events) && filtersIncomplete(filters);
 
 type TFn = ReturnType<typeof useTranslation>['t'];
 
@@ -488,7 +485,10 @@ export function Webhooks() {
           )}
           {filtersInvalid(newWebhook.events, newWebhook.filters) && (
             <span className="hint error" role="status">
-              {t('webhooks.filters.incomplete', 'Give every filter condition a value, and use at most 20 conditions.')}
+              {t(
+                'webhooks.filters.incomplete',
+                'Give every filter condition a value, and use at most 20 conditions, 100 values per condition and 1000 characters of text.',
+              )}
             </span>
           )}
           <div className="filter-builder webhook-auth">
@@ -569,7 +569,10 @@ export function Webhooks() {
           )}
           {filtersInvalid(editWebhook.events, editWebhook.filters) && (
             <span className="hint error" role="status">
-              {t('webhooks.filters.incomplete', 'Give every filter condition a value, and use at most 20 conditions.')}
+              {t(
+                'webhooks.filters.incomplete',
+                'Give every filter condition a value, and use at most 20 conditions, 100 values per condition and 1000 characters of text.',
+              )}
             </span>
           )}
           <div className="filter-builder webhook-auth">
