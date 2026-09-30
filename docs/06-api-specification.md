@@ -4827,7 +4827,7 @@ Bare JSON array (no envelope), ordered by `createdAt` DESC. Null array/date fiel
   {
     "id": "3f2a1c9e-1b2d-4a5f-9c8e-aa11bb22cc33",
     "name": "Production Bot",
-    "keyPrefix": "owa_k1_a1b2",
+    "keyPrefix": "owa_k1_a1b2c",
     "role": "operator",
     "allowedIps": ["192.168.1.1", "10.0.0.0/8"],
     "allowedSessions": ["session-uuid-1"],
@@ -4860,7 +4860,7 @@ Get a single API key's details by id. No plaintext key.
 {
   "id": "3f2a1c9e-1b2d-4a5f-9c8e-aa11bb22cc33",
   "name": "Production Bot",
-  "keyPrefix": "owa_k1_a1b2",
+  "keyPrefix": "owa_k1_a1b2c",
   "role": "operator",
   "allowedIps": ["192.168.1.1", "10.0.0.0/8"],
   "allowedSessions": ["session-uuid-1"],
@@ -4887,7 +4887,7 @@ Create a new API key; returns the full plaintext key exactly once.
 | `name`            | string                                 | yes      | length 3–100                                                                                             | Friendly name for the key.                                                        |
 | `role`            | enum `admin` \| `operator` \| `viewer` | no       | `@IsEnum`                                                                                                | Defaults to `operator` when omitted.                                              |
 | `allowedIps`      | string[]                               | no       | each entry a valid **IPv4** address or IPv4 CIDR `/0-32`; IPv6 rejected                                  | IP whitelist (IPv4-only by design).                                               |
-| `allowedSessions` | string[]                               | no       | each `@IsString`                                                                                         | Session IDs this key may access.                                                  |
+| `allowedSessions` | string[]                               | no       | each `@IsString`, `@ArrayUnique`; each entry non-empty, no surrounding whitespace, no comma              | Session IDs this key may access.                                                  |
 | `allowedChats`    | string[]                               | no       | unique entries, each a group `<id>@g.us`, a contact `<phone>@c.us` / `<lid>@lid`, or a bare phone number | Chat IDs this key may reach (see [Roles & Authorization](#roles--authorization)). |
 | `expiresAt`       | string (ISO 8601 date)                 | no       | `@IsDateString`                                                                                          | Stored as a `Date`.                                                               |
 
@@ -4909,7 +4909,7 @@ Same shape as the read DTO **plus** an `apiKey` field carrying the full plaintex
 {
   "id": "3f2a1c9e-1b2d-4a5f-9c8e-aa11bb22cc33",
   "name": "Production Bot",
-  "keyPrefix": "owa_k1_a1b2",
+  "keyPrefix": "owa_k1_a1b2c",
   "role": "operator",
   "allowedIps": ["192.168.1.1", "10.0.0.0/8"],
   "allowedSessions": ["session-uuid-1"],
@@ -4937,14 +4937,14 @@ Update mutable fields of an API key. `isActive` is **not** updatable here — us
 
 **Request body** — `UpdateApiKeyDto`
 
-| Field             | Type                                   | Required | Constraints              | Description                                                                                              |
-| ----------------- | -------------------------------------- | -------- | ------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `name`            | string                                 | no       | length 3–100             | Applied only if truthy.                                                                                  |
-| `role`            | enum `admin` \| `operator` \| `viewer` | no       | `@IsEnum`                | Applied only if truthy.                                                                                  |
-| `allowedIps`      | string[]                               | no       | IPv4 address / CIDR only | Applied if not `undefined` (can be set to `[]` to clear).                                                |
-| `allowedSessions` | string[]                               | no       | each `@IsString`         | Applied if not `undefined`.                                                                              |
-| `allowedChats`    | string[]                               | no       | same as create           | Applied if not `undefined` (`[]` clears it, making the key unrestricted).                                |
-| `expiresAt`       | string (ISO 8601 date) \| null         | no       | `@IsDateString`          | Applied if not `undefined`; `null` clears the expiry (an empty string fails `@IsDateString` with `400`). |
+| Field             | Type                                   | Required | Constraints                                                                                 | Description                                                                                              |
+| ----------------- | -------------------------------------- | -------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `name`            | string                                 | no       | length 3–100                                                                                | Applied only if truthy.                                                                                  |
+| `role`            | enum `admin` \| `operator` \| `viewer` | no       | `@IsEnum`                                                                                   | Applied only if truthy.                                                                                  |
+| `allowedIps`      | string[]                               | no       | IPv4 address / CIDR only                                                                    | Applied if not `undefined` (can be set to `[]` to clear).                                                |
+| `allowedSessions` | string[]                               | no       | each `@IsString`, `@ArrayUnique`; each entry non-empty, no surrounding whitespace, no comma | Applied if not `undefined`.                                                                              |
+| `allowedChats`    | string[]                               | no       | same as create                                                                              | Applied if not `undefined` (`[]` clears it, making the key unrestricted).                                |
+| `expiresAt`       | string (ISO 8601 date) \| null         | no       | `@IsDateString`                                                                             | Applied if not `undefined`; `null` clears the expiry (an empty string fails `@IsDateString` with `400`). |
 
 ```json
 {
@@ -4963,7 +4963,7 @@ Returns the updated key (no plaintext).
 {
   "id": "3f2a1c9e-1b2d-4a5f-9c8e-aa11bb22cc33",
   "name": "Renamed Bot",
-  "keyPrefix": "owa_k1_a1b2",
+  "keyPrefix": "owa_k1_a1b2c",
   "role": "viewer",
   "allowedIps": ["203.0.113.5"],
   "isActive": true,
@@ -4995,7 +4995,7 @@ Sets `isActive` to `false` and returns the key with explicit HTTP `200`. After r
 {
   "id": "3f2a1c9e-1b2d-4a5f-9c8e-aa11bb22cc33",
   "name": "Production Bot",
-  "keyPrefix": "owa_k1_a1b2",
+  "keyPrefix": "owa_k1_a1b2c",
   "role": "operator",
   "isActive": false,
   "usageCount": 42,
