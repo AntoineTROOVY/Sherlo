@@ -3329,9 +3329,9 @@ the contact themselves. On whatsapp-web.js the engine pauses 250–500ms between
 
 **Request body** — `MembershipRequestActionDto`
 
-| Field        | Type     | Required | Constraints                                                                       | Description                                                   |
-| ------------ | -------- | -------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| participants | string[] | No       | `@IsOptional`, `@IsArray`, `@ArrayNotEmpty`, `@IsString({each:true})`, 1..256 ids | Requester WhatsApp IDs. Omit to act on every pending request. |
+| Field        | Type     | Required | Constraints                                                                                                | Description                                                   |
+| ------------ | -------- | -------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| participants | string[] | No       | omit to skip (explicit `null` → `400`), `@IsArray`, `@ArrayNotEmpty`, `@IsString({each:true})`, 1..256 ids | Requester WhatsApp IDs. Omit to act on every pending request. |
 
 ```json
 { "participants": ["628123456789@c.us"] }
@@ -4724,15 +4724,15 @@ Update a webhook. Partial — only fields present in the body are changed.
 
 **Request body** — `UpdateWebhookDto` (all fields optional; only fields where the value is not `undefined` are applied)
 
-| Field      | Type                   | Required | Constraints                                                                                               | Description                                                                   |
-| ---------- | ---------------------- | -------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| url        | string                 | no       | `@IsOptional`, `@IsUrl({ require_tld: false })`; re-runs the SSRF guard when provided → `400` if blocked. | New URL.                                                                      |
-| events     | string[]               | no       | `@IsOptional`, `@IsArray`, `@ArrayMinSize(1)`, `@IsIn([...WEBHOOK_EVENTS, '*'], { each: true })`          | Same allowed set as create (incl. `*`).                                       |
-| secret     | string                 | no       | `@IsOptional`, `@IsString`, `@MinLength(16)` (skipped for `""`, which clears it), `@MaxLength(255)`       | **Write-only.** An empty string is normalized to `null`, which disables HMAC. |
-| headers    | Record<string,string>  | no       | `@IsOptional`, `@IsHeaderMap()` (same constraints as create)                                              | **Write-only.** Replaces existing headers wholesale when provided.            |
-| filters    | WebhookFilters \| null | no       | `@IsOptional`, `@IsValidWebhookFilters()`                                                                 | Set to `null` or `{ conditions: [] }` to clear filters.                       |
-| active     | boolean                | no       | `@IsOptional`, `@IsBoolean`                                                                               | Enable/disable the webhook. (Present only on update, not create.)             |
-| retryCount | number (int)           | no       | `@IsOptional`, `@IsInt`, `@Min(0)`, `@Max(5)`                                                             | Total delivery attempts per event, including the first.                       |
+| Field      | Type                   | Required | Constraints                                                                                                                        | Description                                                                   |
+| ---------- | ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| url        | string                 | no       | omit to skip (explicit `null` → `400`), `@IsUrl({ require_tld: false })`; re-runs the SSRF guard when provided → `400` if blocked. | New URL.                                                                      |
+| events     | string[]               | no       | omit to skip (explicit `null` → `400`), `@IsArray`, `@ArrayMinSize(1)`, `@IsIn([...WEBHOOK_EVENTS, '*'], { each: true })`          | Same allowed set as create (incl. `*`).                                       |
+| secret     | string                 | no       | `@IsOptional`, `@IsString`, `@MinLength(16)` (skipped for `""`, which clears it), `@MaxLength(255)`                                | **Write-only.** An empty string is normalized to `null`, which disables HMAC. |
+| headers    | Record<string,string>  | no       | omit to skip (explicit `null` → `400`), `@IsHeaderMap()` (same constraints as create)                                              | **Write-only.** Replaces existing headers wholesale when provided.            |
+| filters    | WebhookFilters \| null | no       | `@IsOptional`, `@IsValidWebhookFilters()`                                                                                          | Set to `null` or `{ conditions: [] }` to clear filters.                       |
+| active     | boolean                | no       | omit to skip (explicit `null` → `400`), `@IsBoolean`                                                                               | Enable/disable the webhook. (Present only on update, not create.)             |
+| retryCount | number (int)           | no       | omit to skip (explicit `null` → `400`), `@IsInt`, `@Min(0)`, `@Max(5)`                                                             | Total delivery attempts per event, including the first.                       |
 
 ```json
 {
