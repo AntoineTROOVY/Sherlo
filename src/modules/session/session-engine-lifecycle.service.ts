@@ -493,7 +493,7 @@ export class SessionEngineLifecycle {
    * Set the tearing-down mark synchronously, before any awaited work a retiring control performs.
    *
    * The pre-initialize retirement race turns on this mark being visible to initializeEngine's
-   * post-INITIALIZING check (line ~507) by the time that awaited DB write settles. stop()/delete()
+   * post-INITIALIZING stop-mark check by the time that awaited DB write settles. stop()/delete()
    * both add the mark internally, but only AFTER their own first await (requireSession /
    * awaitPendingTeardown), and the ownership fence added another await ahead of them — so the mark
    * could land after the window it guards. Exposing it lets SessionService set it at true entry,
