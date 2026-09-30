@@ -199,14 +199,15 @@ export function Logs() {
           ) : filteredLogs.length === 0 ? (
             <div className="empty-table-state">
               <FileText size={48} strokeWidth={1} />
-              {hasSeverityFilter || hasSearch ? (
+              {hasSeverityFilter && !hasSearch ? (
+                <>
+                  <h3>{t('logs.empty.title')}</h3>
+                  <p>{t('logs.empty.filteredServerDescription')}</p>
+                </>
+              ) : hasSearch ? (
                 <>
                   <h3>{t('logs.empty.filteredTitle')}</h3>
-                  <p>
-                    {hasSeverityFilter && !hasSearch
-                      ? t('logs.empty.filteredServerDescription')
-                      : t('logs.empty.filteredDescription')}
-                  </p>
+                  <p>{t('logs.empty.filteredDescription')}</p>
                 </>
               ) : (
                 <>

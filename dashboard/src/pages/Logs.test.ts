@@ -92,6 +92,10 @@ function installFetchStub(): void {
       const shifted = [exportRow(-1), ...[...Array(300).keys()].map(exportRow)];
       return Promise.resolve(jsonResponse({ data: shifted.slice(offset), total: 301 }));
     }
+    // The gateway holds no error rows, so the server-side severity filter matches nothing.
+    if (new URL(url, 'http://localhost').searchParams.get('severity') === 'error') {
+      return Promise.resolve(jsonResponse({ data: [], total: 0 }));
+    }
     const reply = jsonResponse({ data: LOGS, total: listTotal ?? LOGS.length });
     return firstPageGate && offset === 0 ? firstPageGate.then(() => reply) : Promise.resolve(reply);
   }) as typeof fetch;
@@ -299,4 +303,14 @@ test('typing a search on a later page keeps the search box mounted while page on
     listTotal = null;
     firstPageGate = null;
   }
+});
+
+test('a severity filter that matches nothing says no logs exist, not that this page has none', async () => {
+  const { screen, fireEvent } = rtl;
+  renderLogs();
+  await screen.findByText('infra.restart');
+  fireEvent.click(screen.getByRole('button', { name: 'All Severities' }));
+  fireEvent.click(screen.getByRole('option', { name: 'Error' }));
+  await screen.findByText('No logs match these filters. Adjust the severity filter to widen the search.');
+  assert.ok(screen.getByRole('heading', { name: 'No logs found' }));
 });
