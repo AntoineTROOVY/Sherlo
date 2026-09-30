@@ -39,6 +39,10 @@ let putReply: { success: boolean; message?: string } = { success: false, message
 let putBodies: unknown[] = [];
 // When set, a PUT waits for it before answering, so a test can act while the request is in flight.
 let putGate: Promise<void> | undefined;
+// Fields that replace the installed plugin's, and what the catalog route answers (and how often it was read).
+let pluginOverride: Record<string, unknown> = {};
+let catalogReply: () => Promise<Response> = () => Promise.resolve(jsonResponse([]));
+let catalogReads = 0;
 
 function installFetchStub(): void {
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -46,7 +50,14 @@ function installFetchStub(): void {
     const path = url.replace(/^https?:\/\/[^/]+/, '');
     const method = init?.method ?? 'GET';
     if (method === 'GET' && path === '/api/plugins') {
-      return Promise.resolve(jsonResponse([{ ...PLUGIN, sessionConfig }]));
+      return Promise.resolve(jsonResponse([{ ...PLUGIN, sessionConfig, ...pluginOverride }]));
+    }
+    if (method === 'GET' && path === '/api/plugins/catalog') {
+      catalogReads++;
+      return catalogReply();
+    }
+    if (method === 'DELETE' && path === `/api/plugins/${PLUGIN.id}`) {
+      return Promise.resolve(jsonResponse({ success: true, message: 'Uninstalled' }));
     }
     if (method === 'GET' && path === '/api/sessions') return Promise.resolve(jsonResponse([SESSION, SESSION_2]));
     const put = method === 'PUT' ? path.match(new RegExp(`^/api/plugins/${PLUGIN.id}/config/([^/]+)$`)) : null;
@@ -99,13 +110,15 @@ afterEach(() => {
   putReply = { success: false, message: REJECTION };
   putBodies = [];
   putGate = undefined;
+  pluginOverride = {};
+  catalogReply = () => Promise.resolve(jsonResponse([]));
+  catalogReads = 0;
   rtl.cleanup();
   queryClient?.clear();
   queryClient = undefined;
 });
 
-async function openSessionOverride(sessionLabel: string): Promise<void> {
-  const { screen, fireEvent, findByText } = rtl;
+function renderPlugins(): void {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 1_000 } } });
   rtl.render(
     createElement(
@@ -114,6 +127,11 @@ async function openSessionOverride(sessionLabel: string): Promise<void> {
       createElement(ToastProvider, null, createElement(Plugins)),
     ),
   );
+}
+
+async function openSessionOverride(sessionLabel: string): Promise<void> {
+  const { screen, fireEvent, findByText } = rtl;
+  renderPlugins();
 
   fireEvent.click(await screen.findByTitle('Configure'));
   fireEvent.click(await screen.findByRole('button', { name: 'Sessions' }));
@@ -169,4 +187,21 @@ test('a clear that answers after the operator switched sessions leaves the new s
   releasePut();
   await screen.findByText('Configuration Saved');
   assert.equal(screen.getByLabelText<HTMLInputElement>('Greeting').value, 'hey');
+});
+
+test('a catalog prefetch that fails after the Catalog tab opened shows the error with a retry', async () => {
+  const { screen, fireEvent } = rtl;
+  let failCatalog!: () => void;
+  catalogReply = () =>
+    new Promise(resolve => (failCatalog = () => resolve(jsonResponse({ message: 'catalog unreachable' }, 502))));
+  renderPlugins();
+  await screen.findByTitle('Configure');
+  fireEvent.click(screen.getByRole('button', { name: 'Install plugin' }));
+  fireEvent.click(document.querySelectorAll<HTMLButtonElement>('.install-tab')[1]);
+  await screen.findByText(/Install directly from the OpenWA plugin catalog/);
+
+  failCatalog();
+  const message = await screen.findByText(/catalog unreachable/);
+  assert.ok(rtl.within(message).getByRole('button', { name: 'Refresh' }));
+  assert.equal(screen.queryByText('No plugins in the catalog.'), null);
 });

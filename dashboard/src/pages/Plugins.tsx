@@ -735,34 +735,35 @@ export default function Plugins() {
     }
   };
 
-  const loadCatalog = async (silent = false) => {
+  const loadCatalog = async () => {
     setCatalogLoading(true);
     setCatalogError(null);
     try {
       setCatalog(await pluginsApi.catalog());
     } catch (err) {
-      // Silent mode is the page-mount prefetch that powers the update chips: a catalog that
-      // cannot be reached just means no chips, so the failure is not surfaced here — the
-      // drawer's own lazy-load effect (which skips while an error is set) retries loudly
-      // when the user actually opens the Catalog tab.
-      if (!silent) setCatalogError(err instanceof Error ? err.message : String(err));
+      // The error renders only inside the Catalog tab, next to a Refresh button, so a failed
+      // page-mount prefetch stays quiet on the page itself (it just means no update chips). It
+      // must still be recorded: a tab opened while that prefetch was in flight would otherwise
+      // settle on "No plugins in the catalog." with no way to retry.
+      setCatalogError(err instanceof Error ? err.message : String(err));
     } finally {
       setCatalogLoading(false);
     }
   };
 
-  // Lazy-load the catalog the first time the Catalog tab is opened.
+  // Load the catalog when the Catalog tab opens with nothing to show: the first time, or again
+  // after an earlier load failed.
   useEffect(() => {
-    if (showInstallModal && installMode === 'catalog' && catalog.length === 0 && !catalogLoading && !catalogError) {
+    if (showInstallModal && installMode === 'catalog' && catalog.length === 0 && !catalogLoading) {
       void loadCatalog();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showInstallModal, installMode]);
 
   // Prefetch once on mount so installed-plugin cards can flag newer catalog versions without the
-  // user having to open the Install drawer first. Silent: an unreachable catalog hides the chips.
+  // user having to open the Install drawer first. An unreachable catalog just hides the chips.
   useEffect(() => {
-    void loadCatalog(true);
+    void loadCatalog();
   }, []);
 
   // Catalog entries with a strictly newer version than the installed one, keyed by plugin id —
