@@ -75,7 +75,6 @@ type UpsertLabelRequest struct {
 	Color *int `json:"color,omitempty"`
 }
 
-// ParticipantPresence is one participant's presence within a chat.
 // SessionStatus is the session lifecycle state reported by the gateway.
 type SessionStatus string
 
@@ -110,6 +109,7 @@ const (
 	PresencePaused      PresenceState = "paused"
 )
 
+// ParticipantPresence is one participant's presence within a chat.
 type ParticipantPresence struct {
 	ID string `json:"id"`
 	// State is one of: available, unavailable, composing, recording, paused. "composing" and
