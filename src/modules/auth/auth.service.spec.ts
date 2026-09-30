@@ -4,7 +4,7 @@ jest.mock('fs', () => ({ __esModule: true, ...jest.requireActual<typeof import('
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, type QueryDeepPartialEntity } from 'typeorm';
 import { UnauthorizedException, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { createHash, createHmac } from 'crypto';
 import * as fs from 'fs';
@@ -772,7 +772,10 @@ describe('AuthService', () => {
 
       // Scoped to the usage columns: persisting the whole entity here would write back the
       // authorisation state this request loaded, reverting any concurrent administrator change.
-      const [criteria, patch] = (repository.update as jest.Mock).mock.calls[0] as [{ id: string }, Partial<ApiKey>];
+      const [criteria, patch] = (repository.update as jest.Mock).mock.calls[0] as [
+        { id: string },
+        QueryDeepPartialEntity<ApiKey>,
+      ];
       expect(criteria).toEqual({ id: key.id });
       expect(Object.keys(patch).sort()).toEqual(['lastUsedAt', 'usageCount']);
       // An increment by this request's delta, not the loaded value plus it.
@@ -924,7 +927,7 @@ describe('AuthService', () => {
       // Still due on the next request (DB lastUsedAt was never written) → the retry persists the
       // failed delta plus this request's increment — nothing is lost.
       await service.validateApiKey(rawKey);
-      const writes = (repository.update as jest.Mock).mock.calls as Array<[unknown, Partial<ApiKey>]>;
+      const writes = (repository.update as jest.Mock).mock.calls as Array<[unknown, QueryDeepPartialEntity<ApiKey>]>;
       expect((writes[1][1].usageCount as () => string)()).toBe('"usageCount" + 2'); // failed delta 1 + this request 1
 
       // The successful retry drained the accumulator — nothing left for the shutdown flush.
