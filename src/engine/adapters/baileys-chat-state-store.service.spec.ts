@@ -603,6 +603,23 @@ describe('ChatStateStoreService', () => {
       expect(repo.rows.get(KEY('s', PHONE))).toMatchObject({ pinned: true, muteEndTime: -1, archived: true });
     });
 
+    it('queries a twin with no row once, not on every fold', async () => {
+      const repo = makeRepo();
+      const svc = svcWith(repo);
+      for (let i = 0; i < 3; i++) await svc.fold('s', PHONE, [LID], { archived: false }, false);
+      expect(repo.findOne).toHaveBeenCalledWith({ where: { sessionId: 's', chatId: LID } });
+      expect(repo.findOne.mock.calls.filter(([o]) => o.where.chatId === LID)).toHaveLength(1);
+    });
+
+    it('does not query a twin again once its row was folded away', async () => {
+      const repo = makeRepo([{ sessionId: 's', chatId: LID, pinned: true, updatedAt: new Date(1000) }]);
+      const svc = svcWith(repo);
+      await svc.fold('s', PHONE, [LID], { archived: false }, false);
+      expect([...repo.rows.keys()]).toEqual([KEY('s', PHONE)]);
+      await svc.fold('s', PHONE, [LID], { archived: false }, false);
+      expect(repo.findOne.mock.calls.filter(([o]) => o.where.chatId === LID)).toHaveLength(1);
+    });
+
     it('applies only the patch and keeps the twin when a row cannot be read', async () => {
       const repo = coldNewerPhone();
       const svc = svcWith(repo);

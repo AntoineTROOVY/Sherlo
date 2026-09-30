@@ -276,6 +276,8 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
     const cached = this.states.get(k);
     if (cached || this.completeSessions.has(sessionId) || this.absent.has(k)) return cached;
     const row = await this.repo.findOne({ where: { sessionId, chatId } });
+    // Recorded like a listing's miss, or every fold of a lid-addressed chat queries its twin again.
+    if (!row && !this.states.has(k)) this.markAbsent(k);
     return row ? fromRow(row) : undefined;
   }
 
@@ -409,6 +411,7 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
           this.writes.enqueue(k, async () => {
             try {
               await this.repo.delete({ sessionId, chatId });
+              this.markAbsent(k);
             } catch (err) {
               this.logger.warn(
                 `Failed to forget chat state for ${chatId}: ${err instanceof Error ? err.message : String(err)}`,
