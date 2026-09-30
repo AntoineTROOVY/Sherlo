@@ -53,6 +53,7 @@ export class AuthController {
     description: 'API key created',
     type: ApiKeyCreatedResponseDto,
   })
+  @ApiResponse({ status: 400, description: 'Validation failed, or the body carries a field the DTO does not declare.' })
   async create(
     @Body() dto: CreateApiKeyDto,
     @Req() req: Request,
@@ -119,6 +120,7 @@ export class AuthController {
     description: 'The API key (plaintext never returned; only the keyPrefix).',
     type: ApiKeyResponseDto,
   })
+  @ApiResponse({ status: 404, description: 'No API key with this id.' })
   async findOne(@Param('id') id: string): Promise<ApiKeyResponseDto> {
     const k = await this.authService.findOne(id);
     return {
@@ -141,6 +143,8 @@ export class AuthController {
   @RequireRole(ApiKeyRole.ADMIN)
   @ApiOperation({ summary: 'Update API key (admin only)' })
   @ApiResponse({ status: 200, description: 'The updated API key.', type: ApiKeyResponseDto })
+  @ApiResponse({ status: 400, description: 'Validation failed, or the body carries a field the DTO does not declare.' })
+  @ApiResponse({ status: 404, description: 'No API key with this id.' })
   @ApiResponse({
     status: 409,
     description: 'The change would remove the last usable admin key: no other usable admin key lasts at least as long.',
@@ -183,6 +187,7 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete API key (admin only)' })
   @ApiResponse({ status: 204, description: 'API key deleted' })
+  @ApiResponse({ status: 404, description: 'No API key with this id.' })
   @ApiResponse({
     status: 409,
     description: 'The key is the last usable admin key: no other usable admin key lasts at least as long.',
@@ -201,6 +206,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Revoke API key (admin only)' })
   @ApiResponse({ status: 200, description: 'The revoked API key (isActive now false).', type: ApiKeyResponseDto })
+  @ApiResponse({ status: 404, description: 'No API key with this id.' })
   @ApiResponse({
     status: 409,
     description: 'The key is the last usable admin key: no other usable admin key lasts at least as long.',
