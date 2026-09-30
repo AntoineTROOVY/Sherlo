@@ -131,7 +131,7 @@
     "send": "Kirim",
     "placeholderTitle": "Mulai berkirim pesan",
     "placeholderDesc": "Pilih percakapan untuk membaca dan membalas.",
-    "scrollToBottom": "Gulir ke terbaru",
+    "scrollToBottom": "Gulir ke pesan terbaru",
     "groupSubtitle": "Grup",
     "privateContactSubtitle": "Kontak pribadi",
     "deleteConfirm": "Hapus pesan ini untuk semua orang?",
@@ -239,8 +239,8 @@
     },
     "noSessions": "Tidak ada sesi ditemukan. Buat sesi untuk memulai.",
     "view": "Lihat",
-    "disconnect": "Putuskan",
-    "disconnectFailed": "Gagal memutuskan sesi",
+    "disconnect": "Putuskan Koneksi",
+    "disconnectFailed": "Gagal memutuskan koneksi sesi",
     "errorPrefix": "Kesalahan: {{message}}",
     "loadError": "Gagal memuat data",
     "charts": {
@@ -352,7 +352,7 @@
       "configured": "{{host}} ({{type}})",
       "noProxy": "Tidak ada proxy dikonfigurasi",
       "hasCredentials": "Kredensial tersimpan tetapi tidak ditampilkan. Masukkan URL lengkap untuk mengubahnya.",
-      "hint": "Perubahan berlaku saat sesi dimulai berikutnya, bukan pada koneksi yang sedang berjalan. Proxy harus nyata dan dapat dijangkau — nilai yang tidak dapat dijangkau akan memblokir pengiriman QR dan start mengembalikan 504.",
+      "hint": "Perubahan berlaku saat sesi dimulai berikutnya, bukan pada koneksi yang sedang berjalan. Proxy harus nyata dan dapat dijangkau: nilai yang tidak dapat dijangkau akan memblokir pengiriman QR, dan permintaan mulai sesi mengembalikan 504.",
       "createHint": "Hanya diperlukan jika jaringan Anda tidak dapat menjangkau WhatsApp secara langsung. Harus berupa proxy yang nyata dan dapat dijangkau.",
       "invalidUrl": "Masukkan URL proxy yang valid: http, https, socks4, atau socks5.",
       "saveSuccessTitle": "Proxy Disimpan",
@@ -402,7 +402,7 @@
       "message": "Putuskan tautan sesi <strong>\"{{name}}\"</strong> dari akun WhatsApp?",
       "warning": "WhatsApp akan menghapus perangkat ini dari Perangkat Tertaut dan sesi berhenti. Menghubungkan kembali memerlukan pindaian QR atau kode pairing baru. Untuk juga menghapus semua data lokal, hapus sesi setelahnya.",
       "confirm": "Putuskan Tautan",
-      "successTitle": "Perangkat Diputuskan",
+      "successTitle": "Tautan Perangkat Diputuskan",
       "success": "Putus tautan selesai: perangkat telah logout dan kredensial sesi lokal dibersihkan. Menghubungkan kembali memerlukan pindaian QR atau kode pairing baru.",
       "incompleteTitle": "Putus Tautan Tidak Lengkap",
       "incomplete": "Sesi berhenti secara lokal, tetapi operasi logout belum lengkap — perangkat mungkin masih tertaut. Mulai sesi dan coba logout lagi.",
@@ -446,6 +446,7 @@
     "selectSession": "Pilih sesi...",
     "session": "Sesi",
     "events": "Kejadian",
+    "noEvents": "Pilih minimal satu kejadian.",
     "available": "Kejadian Tersedia",
     "saveChanges": "Simpan Perubahan",
     "filters": {
@@ -471,7 +472,7 @@
         "kind": "Jenis obrolan",
         "fromMe": "Dikirim oleh saya",
         "hasMedia": "Memiliki media",
-        "mentions": "Menyebut"
+        "mentions": "Sebutan"
       },
       "operators": {
         "is": "adalah",
@@ -516,18 +517,18 @@
     "eventDescriptions": {
       "message.received": "Saat pesan diterima",
       "message.sent": "Saat pesan dikirim",
-      "message.ack": "Saat status pengiriman atau dibaca pesan berubah",
+      "message.ack": "Saat status pengiriman atau status baca pesan berubah",
       "message.failed": "Saat pesan keluar gagal terkirim",
       "message.revoked": "Saat pesan dihapus untuk semua orang",
       "message.reaction": "Saat reaksi ditambahkan, diubah atau dihapus",
       "message.edited": "Saat pesan diedit",
       "session.status": "Saat status sesi berubah",
       "session.qr": "Saat kode QR dibuat",
-      "session.authenticated": "Saat sesi dipasangkan dan siap",
+      "session.authenticated": "Saat sesi tertaut dan siap",
       "session.disconnected": "Saat sesi terputus",
       "session.reconnect_loop": "Saat sesi terus gagal terhubung kembali",
       "session.restriction": "Saat WhatsApp membatasi akun atau mencabut pembatasan",
-      "presence.update": "Saat obrolan yang dilanggan online, mengetik atau offline",
+      "presence.update": "Saat obrolan yang dilanggani online, mengetik atau offline",
       "group.join": "Saat peserta bergabung atau ditambahkan ke grup",
       "group.leave": "Saat peserta keluar atau dikeluarkan dari grup",
       "group.update": "Saat nama, deskripsi atau pengaturan grup berubah",
@@ -538,6 +539,33 @@
       "call.missed": "Saat panggilan tidak terjawab",
       "status.received": "Saat kontak memposting status",
       "all": "Semua kejadian"
+    },
+    "auth": {
+      "title": "Autentikasi pengiriman",
+      "hint": "Opsional. Nilai yang tersimpan tidak akan ditampilkan lagi setelah disimpan.",
+      "editHint": "Secret dan header yang tersimpan tidak pernah ditampilkan. Biarkan bagian ini apa adanya untuk mempertahankannya.",
+      "secret": "Secret penandatanganan",
+      "secretHint": "16 hingga 255 karakter. Setiap pengiriman membawa tanda tangan HMAC-SHA256 di header X-OpenWA-Signature.",
+      "secretKeepPlaceholder": "Kosongkan untuk mempertahankan secret saat ini",
+      "generateSecret": "Buat",
+      "copySecret": "Salin",
+      "secretCopied": "Secret penandatanganan disalin",
+      "removeSecret": "Hentikan penandatanganan pengiriman (hapus secret)",
+      "headers": "Header kustom",
+      "headerName": "Nama header",
+      "headerValue": "Nilai header",
+      "addHeader": "Tambah header",
+      "removeHeader": "Hapus header",
+      "replaceHeaders": "Ganti header kustom",
+      "replaceHint": "Baris-baris ini menggantikan semua header yang tersimpan. Jika tidak ada baris, header yang tersimpan akan dihapus.",
+      "errors": {
+        "headerName": "Nama header hanya boleh berisi huruf, angka, dan tanda hubung.",
+        "headerValue": "Nilai header maksimal 1024 karakter, tanpa karakter kontrol atau karakter di luar Latin-1.",
+        "headerReserved": "Content-Type, User-Agent, X-OpenWA-*, dan header koneksi diatur oleh gateway sehingga tidak dapat digunakan.",
+        "headerDuplicate": "Setiap nama header hanya dapat digunakan sekali.",
+        "tooMany": "Header kustom maksimal 50.",
+        "secretLength": "Secret penandatanganan harus terdiri dari 16 hingga 255 karakter."
+      }
     }
   },
   "templates": {
@@ -597,6 +625,7 @@
     "createdTitle": "Kunci API Dibuat",
     "createdHint": "Salin kunci ini sekarang. Anda tidak akan dapat melihatnya lagi.",
     "namePlaceholder": "mis. Production Key",
+    "nameTooShort": "Gunakan minimal 3 karakter.",
     "rolesTitle": "Referensi Peran",
     "roles": {
       "admin": "Admin",
@@ -615,11 +644,13 @@
       "status": "Status",
       "lastUsed": "Terakhir Digunakan",
       "actions": "Aksi",
-      "sessions": "Sesi"
+      "sessions": "Sesi",
+      "restrictions": "Pembatasan"
     },
     "statuses": {
       "active": "Aktif",
-      "revoked": "Dicabut"
+      "revoked": "Dicabut",
+      "expired": "Kedaluwarsa"
     },
     "empty": {
       "title": "Belum ada kunci API dibuat",
@@ -640,7 +671,7 @@
       "copy": "Salin",
       "revoke": "Cabut",
       "delete": "Hapus",
-      "editSessions": "Edit sesi"
+      "edit": "Edit akses"
     },
     "sessions": {
       "label": "Akses sesi",
@@ -648,10 +679,36 @@
       "all": "Semua sesi",
       "empty": "Belum ada sesi. Kunci ini akan dapat mengakses setiap sesi setelah ada.",
       "restricted": "{{count}} dipilih",
-      "editTitle": "Edit akses sesi",
       "save": "Simpan",
       "choose": "Pilih sesi",
       "leaveAll": "Biarkan untuk semua sesi"
+    },
+    "edit": {
+      "title": "Edit akses kunci",
+      "signedIn": "Anda masuk ke dasbor ini menggunakan kunci ini. Mengubah peran, alamat IP, obrolan, atau tanggal kedaluwarsanya dapat membuat Anda keluar."
+    },
+    "restrictions": {
+      "none": "Tidak ada",
+      "ips": "IP: {{count}}",
+      "chats": "Obrolan: {{count}}",
+      "expires": "Berlaku hingga {{date}}",
+      "expired": "Kedaluwarsa {{date}}"
+    },
+    "ips": {
+      "label": "Alamat IP yang diizinkan (opsional)",
+      "hint": "Satu alamat IP atau rentang CIDR per baris. Kosongkan untuk menerima alamat apa pun.",
+      "invalid": "Bukan alamat IPv4 atau rentang CIDR: {{value}}"
+    },
+    "chats": {
+      "label": "Akses obrolan (opsional)",
+      "hint": "Satu obrolan per baris: ID grup yang diakhiri @g.us, ID kontak yang diakhiri @c.us atau @lid, atau nomor telepon. Kosongkan untuk semua obrolan. Kunci yang dibatasi obrolan hanya dapat menggunakan rute yang terbuka untuk kunci dengan cakupan obrolan; WebSocket kejadian dan MCP menolaknya.",
+      "invalid": "Bukan ID obrolan atau nomor telepon: {{value}}"
+    },
+    "expiry": {
+      "label": "Kedaluwarsa pada (opsional)",
+      "hint": "Menggunakan zona waktu browser ini. Kosongkan untuk kunci yang tidak pernah kedaluwarsa.",
+      "clear": "Hapus tanggal kedaluwarsa",
+      "invalid": "Masukkan tanggal dan waktu yang lengkap, paling lambat tahun 9999, atau kosongkan kolom ini untuk kunci yang tidak pernah kedaluwarsa."
     }
   },
   "logs": {
@@ -677,7 +734,7 @@
       "title": "Tidak ada log ditemukan",
       "description": "Log audit akan muncul di sini saat aksi dilakukan",
       "filteredTitle": "Tidak ada yang cocok di halaman ini",
-      "filteredDescription": "Pencarian memfilter halaman saat ini saja. Hapus filter, buka halaman lain, atau gunakan filter tingkat keparahan untuk mempersempit di sisi server.",
+      "filteredDescription": "Pencarian memfilter halaman saat ini saja. Kosongkan pencarian, buka halaman lain, atau gunakan filter tingkat keparahan untuk mempersempit di sisi server.",
       "filteredServerDescription": "Tidak ada log yang cocok dengan filter ini. Sesuaikan filter tingkat keparahan untuk memperluas pencarian."
     },
     "exportFailed": "Gagal mengekspor log audit",
@@ -693,7 +750,7 @@
     "responseTitle": "Respons API",
     "session": "Sesi",
     "noReadySessions": "Tidak ada sesi siap",
-    "sessionOptionPhoneNone": "Tanpa telepon",
+    "sessionOptionPhoneNone": "Tanpa nomor",
     "recipientType": "Tipe Penerima",
     "personal": "Pribadi",
     "group": "Grup",
@@ -707,7 +764,7 @@
     "clearGroupSelection": "Hapus",
     "groupsSelectedCount": "Dipilih: {{count}}/{{max}}",
     "noGroupsMatch": "Tidak ada grup yang cocok dengan pencarian Anda",
-    "forwardUsesFirstGroup": "Teruskan hanya menggunakan grup pertama yang dipilih, sebagai obrolan asal.",
+    "forwardUsesFirstGroup": "Jenis Teruskan hanya menggunakan grup pertama yang dipilih sebagai obrolan asal.",
     "phoneHint": "Gunakan format internasional tanpa spasi",
     "messageType": "Tipe Pesan",
     "types": {
@@ -769,7 +826,7 @@
     "bulkMediaHint": "Dengan lampiran, pesan menjadi keterangannya. Berkas yang dipilih dikirim di dalam permintaan, jadi berkas besar untuk banyak penerima memerlukan URL media publik.",
     "bulkMediaTooLarge": "Berkas ini terlalu besar untuk dikirim inline ke {{count}} penerima: pada jumlah tersebut tiap berkas maksimal {{size}}. Gunakan URL media publik, atau kirim ke lebih sedikit penerima.",
     "bulkMediaUrlInvalid": "Gunakan alamat http:// atau https:// lengkap, seperti https://example.com/file.pdf.",
-    "bulkCaptionTooLong": "Dengan lampiran pesan dikirim sebagai keterangannya, yang terbatas {{max}} karakter (saat ini {{count}}).",
+    "bulkCaptionTooLong": "Dengan lampiran, pesan dikirim sebagai keterangannya, yang dibatasi {{max}} karakter (saat ini {{count}}).",
     "bulkAudioNoCaption": "Audio dikirim tanpa keterangan, jadi teks ini tidak akan terkirim. Hapus pesan atau pilih jenis lain.",
     "send": "Kirim Pesan",
     "sending": "Mengirim...",
@@ -842,7 +899,7 @@
       "webVersionNative": "otomatis (default whatsapp-web.js)",
       "webVersionSource": {
         "pinned": "disematkan via WWEBJS_WEB_VERSION",
-        "auto": "terpecahkan otomatis, build known-good saat ini",
+        "auto": "ditentukan otomatis, build known-good saat ini",
         "native": "pemilihan otomatis native whatsapp-web.js"
       }
     },
@@ -896,7 +953,7 @@
       "storageWarning": "Berkas media yang ada tidak dipindahkan ke backend penyimpanan baru secara otomatis; berkas akan tetap di lokasi lama.",
       "downloadBackup": "Unduh cadangan terlebih dahulu",
       "backupTitle": "Cadangan & pemulihan data",
-      "backupHint": "Ekspor semua data sebagai JSON sebelum mengganti database, lalu impor setelah pergantian. Cadangan berisi rahasia webhook dan kredensial proxy dalam plaintext — simpan dengan aman dan hapus setelah dipulihkan.",
+      "backupHint": "Ekspor semua data sebagai JSON sebelum mengganti database, lalu impor setelah pergantian. Secret penandatanganan webhook, header webhook kustom, dan kredensial proxy tidak disertakan; masukkan kembali setelah pemulihan. Secret dan pengaturan instance integrasi disertakan dalam plaintext, jadi simpan berkas dengan aman dan hapus setelah dipulihkan.",
       "export": "Ekspor data",
       "import": "Impor data",
       "exportFailed": "Gagal mengekspor data",
@@ -922,7 +979,7 @@
       "dontClose": "Mohon jangan tutup jendela ini",
       "successMsg": "Server kembali online! Halaman akan dimuat ulang otomatis.",
       "errorMsg": "Server tidak merespons setelah 30 detik. Periksa log Docker dan restart secara manual.",
-      "outcomeUnknown": "Proxy timeout sebelum server menjawab. Restart mungkin masih berlangsung; muat ulang dalam satu menit untuk memeriksa.",
+      "outcomeUnknown": "Proxy mengembalikan kesalahan sebelum server menjawab, sehingga tidak diketahui apakah restart sedang berlangsung. Muat ulang dalam satu menit untuk memeriksa.",
       "reload": "Muat Ulang Halaman"
     },
     "toasts": {
@@ -978,7 +1035,7 @@
     },
     "installModal": {
       "title": "Instal plugin",
-      "hint": "Unggah plugin yang dikemas sebagai .zip (dengan manifest.json). Plugin berjalan sandbox setelah diaktifkan.",
+      "hint": "Unggah plugin yang dikemas sebagai .zip (dengan manifest.json). Plugin berjalan dalam sandbox setelah diaktifkan.",
       "trustWarning": "Plugin berjalan dengan hak penuh proses gateway — sandbox menampung crash, bukan kode berbahaya. Instal hanya plugin yang Anda percayai.",
       "choose": "Pilih berkas .zip…",
       "tooLarge": "Berkas melebihi batas 5 MB.",
@@ -990,7 +1047,7 @@
     },
     "toasts": {
       "errorTitle": "Kesalahan Plugin",
-      "errorDefault": "Gagal mengganti plugin",
+      "errorDefault": "Gagal mengubah status plugin",
       "healthOk": "Cek Kesehatan Lulus",
       "healthFail": "Cek Kesehatan Gagal",
       "healthError": "Kesalahan Cek Kesehatan",
@@ -1009,7 +1066,7 @@
     },
     "sessions": {
       "activationTitle": "Jalankan untuk",
-      "activationDesc": "Pilih sesi mana plugin ini dijalankan.",
+      "activationDesc": "Pilih sesi tempat plugin ini dijalankan.",
       "allSessions": "Semua sesi",
       "specificSessions": "Sesi tertentu",
       "noSessions": "Belum ada sesi.",
@@ -1022,7 +1079,7 @@
     },
     "instances": {
       "title": "Instance",
-      "description": "Sediakan instance per-akun untuk integrasi ini. Setiap instance memiliki rahasia penandatanganan dan URL ingress sendiri.",
+      "description": "Sediakan instance per-akun untuk integrasi ini. Setiap instance memiliki secret penandatanganan dan URL ingress sendiri.",
       "create": "Buat instance",
       "empty": "Belum ada instance. Buat satu untuk mendapatkan URL ingress dan secret.",
       "loadError": "Gagal memuat instance.",
@@ -1040,7 +1097,7 @@
         "secret": "Secret ingress (opsional)",
         "secretPlaceholder": "Secret webhook provider (mis. Chatwoot)",
         "secretHint": "Kosongkan untuk dibuat otomatis (ditampilkan sekali). Jika provider menetapkan secret webhook sendiri, tempel di sini — secret yang dibuat otomatis tidak akan cocok.",
-        "config": "Config (JSON opsional)",
+        "config": "Konfigurasi (JSON opsional)",
         "configPlaceholder": "{ }"
       },
       "created": {
@@ -1074,7 +1131,7 @@
       },
       "errors": {
         "invalidId": "ID instance harus huruf, angka, tanda hubung atau garis bawah (maks 64).",
-        "invalidJson": "Config harus JSON yang valid.",
+        "invalidJson": "Konfigurasi harus berupa JSON yang valid.",
         "invalidSecret": "Secret minimal 16 karakter, atau kosongkan untuk dibuat otomatis.",
         "duplicateId": "Instance dengan ID tersebut sudah ada."
       },
