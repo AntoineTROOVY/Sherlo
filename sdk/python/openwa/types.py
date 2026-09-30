@@ -953,7 +953,7 @@ class WebhookDelivery(TypedDict):
 
 
 class WebhookDeliveryFailure(TypedDict):
-    """A webhook delivery abandoned after every retry, as listed by the delivery-failure log."""
+    """A webhook delivery that exhausted its retries or was never sent, as listed by the delivery-failure log."""
 
     id: str
     webhookId: str
@@ -963,12 +963,12 @@ class WebhookDeliveryFailure(TypedDict):
     # The idempotency key the receiver would have deduped on.
     idempotencyKey: NotRequired[str | None]
     deliveryId: NotRequired[str | None]
-    # Total attempts made before giving up.
+    # Attempts recorded; 0 when the delivery was shed, refused or failed before sending.
     attempts: int
     # Last HTTP status when the failure was a non-2xx response; None for a network or timeout error.
     lastStatusCode: NotRequired[int | None]
     lastError: str
-    # ISO timestamp of when the delivery was finally abandoned.
+    # ISO timestamp of when the failure was first recorded.
     createdAt: str
 
 
