@@ -226,6 +226,17 @@ export async function importFromStream(
         fail(new Error(`Import aborted: archive exceeds the ${maxEntries}-entry limit`));
         return;
       }
+      // Only regular files are media. A directory or link entry carries no content, and writing it
+      // through putFile would store an empty file over any existing object with that key.
+      if (header.type !== 'file' && header.type !== 'contiguous-file') {
+        logger.debug(`Skipped ${header.type ?? 'unknown'} entry: ${header.name}`);
+        stream.on('end', () => next());
+        stream.resume();
+        return;
+      }
+      // An archive packed with `tar -C dir .` names every entry `./…`; the export's keys have no such
+      // segment, and on S3 it would become part of the object key.
+      const key = header.name.replace(/^(?:\.\/)+/, '');
 
       const chunks: Buffer[] = [];
       let entryBytes = 0;
@@ -237,7 +248,7 @@ export async function importFromStream(
         if (entryBytes > maxEntryBytes) {
           entryAborted = true;
           stream.resume(); // drain the remainder so the source can end
-          fail(new Error(`Import aborted: entry "${header.name}" exceeds the ${maxEntryBytes}-byte per-entry cap`));
+          fail(new Error(`Import aborted: entry "${key}" exceeds the ${maxEntryBytes}-byte per-entry cap`));
         } else {
           chunks.push(chunk);
         }
@@ -246,15 +257,15 @@ export async function importFromStream(
       stream.on('end', () => {
         if (entryAborted || settled) return;
         const data = Buffer.concat(chunks);
-        putFile(header.name, data)
+        putFile(key, data)
           .then(() => {
             importedCount++;
-            logger.debug(`Imported file: ${header.name}`);
+            logger.debug(`Imported file: ${key}`);
             next();
           })
           .catch((error: unknown) => {
             failedCount++;
-            logger.error(`Failed to import file: ${header.name}`, String(error));
+            logger.error(`Failed to import file: ${key}`, String(error));
             next();
           });
       });

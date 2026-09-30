@@ -1,5 +1,7 @@
 import { randomBytes } from 'crypto';
 import { PassThrough, Readable } from 'stream';
+import * as tar from 'tar-stream';
+import { createGzip } from 'zlib';
 
 // archiver v8 is ESM-only and ts-jest cannot load it here. This stand-in keeps the parts of its
 // TarArchive contract the export relies on: a stream entry with a known size is piped straight into
@@ -192,5 +194,31 @@ describe('importFromStream reports refused writes', () => {
     );
 
     expect(result).toEqual({ imported: 0, failed: names.length });
+  });
+});
+
+describe('importFromStream writes regular files only', () => {
+  it('skips directory and link entries and drops a leading ./ from the key', async () => {
+    const pack = tar.pack();
+    pack.entry({ name: './', type: 'directory' });
+    pack.entry({ name: './status/', type: 'directory' });
+    pack.entry({ name: './status/link.jpg', type: 'symlink', linkname: 'a.jpg' });
+    pack.entry({ name: './status/hard.jpg', type: 'link', linkname: './status/a.jpg' });
+    pack.entry({ name: './status/a.jpg' }, Buffer.from('jpeg!!'));
+    pack.finalize();
+    const written = new Map<string, Buffer>();
+
+    const result = await importFromStream(
+      pack.pipe(createGzip()),
+      (name, data) => {
+        written.set(name, data);
+        return Promise.resolve();
+      },
+      makeLogger() as never,
+    );
+
+    expect([...written.keys()]).toEqual(['status/a.jpg']);
+    expect(written.get('status/a.jpg')?.toString()).toBe('jpeg!!');
+    expect(result).toEqual({ imported: 1, failed: 0 });
   });
 });
