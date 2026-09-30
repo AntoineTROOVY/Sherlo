@@ -499,6 +499,24 @@ describe('ChatMediaArchiveService', () => {
       setInterval.mockRestore();
     });
 
+    it('logs a failed purge or orphan sweep instead of leaving the rejection unhandled', async () => {
+      const svc = build();
+      jest.spyOn(svc, 'purgeExpired').mockRejectedValue(new Error('db gone'));
+      jest.spyOn(svc, 'sweepOrphanedMedia').mockRejectedValue(new Error('bucket gone'));
+      const logError = jest
+        .spyOn((svc as unknown as { logger: { error: (...args: unknown[]) => void } }).logger, 'error')
+        .mockImplementation(() => undefined);
+      try {
+        svc.onModuleInit();
+        await new Promise(resolve => setImmediate(resolve));
+
+        expect(logError).toHaveBeenCalledWith('Chat media purge failed', expect.stringContaining('db gone'));
+        expect(logError).toHaveBeenCalledWith('Chat media orphan sweep failed', expect.stringContaining('bucket gone'));
+      } finally {
+        svc.onModuleDestroy();
+      }
+    });
+
     it('still expires an archived file past its TTL while archiving is off', async () => {
       const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64') });
       const key = await enabled().archive(row);
