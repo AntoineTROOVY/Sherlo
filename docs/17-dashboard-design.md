@@ -61,7 +61,7 @@ backed by `localStorage` — there is no Zustand store.
    originals, which are 6:1 or better on the dark surfaces, and lightens error to `#f15e5e` because
    the original measures 4.06:1 there.
    Known gap: the exclusive button groups report `aria-pressed` without arrow-key roving focus. Every
-   page except Login has a render test, but only Infrastructure's resolves the caption references
+   page has a render test, but only Infrastructure's resolves the caption references
    against a real DOM; elsewhere they are checked structurally. Treat the claim as directional, not
    certified.
 5. **Dark mode** - Support for light/dark themes
@@ -390,22 +390,22 @@ no DOM. Nothing under `chats/` ships its own stylesheet either: those components
 from `pages/Chats.css`, and `MediaLightbox` adds the `yet-another-react-lightbox` vendor CSS. There
 is no design-system package to pull from.
 
-| Component                    | File                                | Responsibility                                                                                                        |
-| ---------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `Layout`                     | `components/Layout.tsx`             | App shell: collapsible sidebar nav, mobile drawer, language menu, light/dark theme toggle, logout, live version badge |
-| `ToastProvider` / `useToast` | `components/Toast.tsx`              | Context-based toast notifications (success/error/warning/info) with de-dup keys                                       |
-| `PageHeader`                 | `components/PageHeader.tsx`         | Shared page title / subtitle / badge / actions header                                                                 |
-| `Modal`                      | `components/Modal.tsx`              | Accessible dialog (`role="dialog"`, Escape/overlay close, focus trap + restore); uses the global `.modal-*` styles    |
-| `CustomSelect`               | `components/CustomSelect.tsx`       | Keyboard-navigable select replacement (type-ahead, arrow keys) used by Sessions / Logs / Login                        |
-| `DashboardCharts`            | `components/DashboardCharts.tsx`    | `recharts`-based message-volume / activity charts on the Dashboard                                                    |
-| `FilterBuilder`              | `components/FilterBuilder.tsx`      | Visual condition builder for webhook event filters                                                                    |
-| `GlobalSearch`               | `components/GlobalSearch.tsx`       | Debounced message-search box in the Chats header, with all-sessions / current-session scope                           |
-| `PluginInstances`            | `components/PluginInstances.tsx`    | Per-plugin instance list: create / edit / delete and secret regeneration                                              |
-| `ErrorBoundary`              | `components/ErrorBoundary.tsx`      | Top-level React error boundary wrapping the whole app                                                                 |
-| `GithubIcon`                 | `components/GithubIcon.tsx`         | Inline brand SVG                                                                                                      |
-| `GroupPicker`                | `components/GroupPicker.tsx`        | Searchable multi-select of a session's groups, used by the Message Tester's multi-group send                          |
-| `SessionScopePicker`         | `components/SessionScopePicker.tsx` | Per-key session scope checklist on the API Keys page                                                                  |
-| `RoleProvider`               | `components/RoleProvider.tsx`       | Context holding the logged-in key's role, read with `useRole` (`canWrite` gates write actions)                        |
+| Component                    | File                                | Responsibility                                                                                                               |
+| ---------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `Layout`                     | `components/Layout.tsx`             | App shell: collapsible sidebar nav, mobile drawer, language menu, light/dark/system theme toggle, logout, live version badge |
+| `ToastProvider` / `useToast` | `components/Toast.tsx`              | Context-based toast notifications (success/error/warning/info) with de-dup keys                                              |
+| `PageHeader`                 | `components/PageHeader.tsx`         | Shared page title / subtitle / badge / actions header                                                                        |
+| `Modal`                      | `components/Modal.tsx`              | Accessible dialog (`role="dialog"`, Escape/overlay close, focus trap + restore); uses the global `.modal-*` styles           |
+| `CustomSelect`               | `components/CustomSelect.tsx`       | Keyboard-navigable select replacement (type-ahead, arrow keys) used by Sessions / Logs / Login                               |
+| `DashboardCharts`            | `components/DashboardCharts.tsx`    | `recharts`-based message-volume / activity charts on the Dashboard                                                           |
+| `FilterBuilder`              | `components/FilterBuilder.tsx`      | Visual condition builder for webhook event filters                                                                           |
+| `GlobalSearch`               | `components/GlobalSearch.tsx`       | Debounced message-search box in the Chats header, with all-sessions / current-session scope                                  |
+| `PluginInstances`            | `components/PluginInstances.tsx`    | Per-plugin instance list: create / edit / delete and secret regeneration                                                     |
+| `ErrorBoundary`              | `components/ErrorBoundary.tsx`      | Top-level React error boundary wrapping the whole app                                                                        |
+| `GithubIcon`                 | `components/GithubIcon.tsx`         | Inline brand SVG                                                                                                             |
+| `GroupPicker`                | `components/GroupPicker.tsx`        | Searchable multi-select of a session's groups, used by the Message Tester's multi-group send                                 |
+| `SessionScopePicker`         | `components/SessionScopePicker.tsx` | Per-key session scope checklist on the API Keys page                                                                         |
+| `RoleProvider`               | `components/RoleProvider.tsx`       | Context holding the logged-in key's role, read with `useRole` (`canWrite` gates write actions)                               |
 
 Chat-specific pieces live one level down in `components/chats/`: `MessageBody` (WhatsApp text
 formatting + link detection), `ChatThread` (bubble list, including inbound Baileys prompt buttons
@@ -661,7 +661,8 @@ that toggles one attribute on `<html>` and lets the CSS do the rest. The value i
 - **Mode** — `light | dark | system`. `system` removes `data-theme` so a `prefers-color-scheme`
   media query in the global CSS takes over; otherwise `data-theme="light|dark"` is set explicitly.
 
-The sidebar footer button toggles light ↔ dark directly (resolving `system` first); there is no
+The sidebar footer button cycles light → dark → system, its label naming the mode a click
+selects; there is no
 picker popover and no `ThemeProvider` context wrapper — it's a hook consumed directly where needed.
 An earlier accent-palette picker (seven palettes via `data-palette`) was removed for
 maintainability; the legacy `openwa_palette` storage key and the attribute are cleaned up on load.

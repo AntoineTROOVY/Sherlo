@@ -860,7 +860,8 @@ BODY_SIZE_LIMIT=25mb
 
 # Note: one active API key may hold at most half the aggregate in-flight budget, wherever its
 # requests come from, and is refused with 503 + Retry-After past that even while the gateway as a
-# whole has room. Requests without a recognised key (ingress deliveries included) share a pool of a
+# whole has room. A single declared body larger than that share gets 413 instead, since a retry
+# cannot help. Requests without a recognised key (ingress deliveries included) share a pool of a
 # quarter of the budget or twice BODY_SIZE_LIMIT, whichever is larger, and each client IP gets at
 # most half of that pool (never less than one full-size body). Behind a reverse proxy, set
 # TRUSTED_PROXIES: without it every unkeyed caller resolves to the proxy's own address and shares
