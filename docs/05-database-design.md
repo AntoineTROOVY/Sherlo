@@ -755,7 +755,9 @@ CREATE INDEX "IDX_webhooks_sessionId" ON webhooks("sessionId");
 
 -- message_batches: batch ids are unique per session, not globally.
 -- Note the snake_case: this table really is named that way — see the naming note in §5.3.
-CREATE UNIQUE INDEX "UQ_message_batches_session_id_batch_id" ON message_batches(session_id, batch_id);
+-- This is a UNIQUE constraint, not a standalone index: on PostgreSQL drop it with ALTER TABLE ... DROP CONSTRAINT;
+-- SQLite cannot drop a constraint in place and needs a table rebuild.
+ALTER TABLE message_batches ADD CONSTRAINT "UQ_message_batches_session_id_batch_id" UNIQUE (session_id, batch_id);
 
 -- audit_logs (main DB): filter by action / key / session, ordered by time
 CREATE INDEX "IDX_audit_logs_action" ON audit_logs(action);
