@@ -6,6 +6,7 @@ import {
   NotFoundException,
   Optional,
   OnApplicationBootstrap,
+  OnModuleInit,
 } from '@nestjs/common';
 import { createLogger } from '../../common/services/logger.service';
 import { ConfigService } from '@nestjs/config';
@@ -104,7 +105,7 @@ interface BatchExecutionState {
 }
 
 @Injectable()
-export class BulkMessageService implements OnApplicationBootstrap {
+export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap {
   private readonly logger = createLogger(BulkMessageService.name);
   private readonly processingBatches = new Map<string, boolean>(); // Track active batches for cancellation
   private inFlightBatches = 0; // count of batches currently in processBatch (memory bound, see cap above)
@@ -126,6 +127,15 @@ export class BulkMessageService implements OnApplicationBootstrap {
     @Optional()
     private readonly configService?: ConfigService,
   ) {}
+
+  /**
+   * A session this process takes over from a node whose lease lapsed leaves that node's unfinished
+   * batches behind, whichever path took it: an explicit start or stop as much as the takeover sweep.
+   * Registered here, before any bootstrap hook can start a session.
+   */
+  onModuleInit(): void {
+    this.ownership?.onAdoption(sessionId => this.reapProcessingBatches(sessionId, 'session taken from a lapsed node'));
+  }
 
   /**
    * Transition orphaned batches on startup. A batch still in PENDING or PROCESSING belongs to a
@@ -178,25 +188,29 @@ export class BulkMessageService implements OnApplicationBootstrap {
   }
 
   /**
-   * Fail a session's stuck PROCESSING batches after the session was adopted from a lapsed node.
-   * Same policy as the boot reaper and for the same reason: the dead node's already-sent messages
-   * are unknowable, so resuming risks double-sends — FAILED with the payloads stripped is the
+   * Fail a session's unfinished (PENDING or PROCESSING) batches after the session was taken over from a
+   * node whose lease lapsed: a batch that node saved but never picked up is as orphaned as one it was
+   * running. Same policy as the boot reaper and for the same reason: the dead node's already-sent
+   * messages are unknowable, so resuming risks double-sends: FAILED with the payloads stripped is the
    * honest terminal state, and the caller can re-issue the batch knowingly.
    *
-   * A batch this process is running itself is not orphaned: the adoption claims the session before
-   * its engine finishes initializing, so a bulk request routed here in that window starts a batch
-   * that is already PROCESSING by the time the caller reaps. Only the dead holder's batches go.
+   * Runs after this process claims the session from, or releases the claim of, such a node (see
+   * onModuleInit). A batch this process created or is still running is not orphaned, as when it held
+   * the session before or still runs a stale engine for it: createBatch registers every batch before
+   * its row is written, so only the lapsed node's batches go.
    */
   async reapProcessingBatches(sessionId: string, reason: string): Promise<number> {
-    const processing = (
-      await this.batchRepository.find({ where: { status: BatchStatus.PROCESSING, sessionId } })
+    const unfinished = (
+      await this.batchRepository.find({
+        where: { status: In([BatchStatus.PENDING, BatchStatus.PROCESSING]), sessionId },
+      })
     ).filter(batch => !this.processingBatches.has(batch.id));
     let failed = 0;
-    for (const batch of processing) {
+    for (const batch of unfinished) {
       if (await this.failOrphanedBatch(batch)) failed++;
     }
     if (failed > 0) {
-      this.logger.warn(`Marked ${failed} PROCESSING batch(es) FAILED for session ${sessionId} (${reason})`);
+      this.logger.warn(`Marked ${failed} unfinished batch(es) FAILED for session ${sessionId} (${reason})`);
     }
     return failed;
   }
@@ -281,6 +295,9 @@ export class BulkMessageService implements OnApplicationBootstrap {
     };
 
     const batch = this.batchRepository.create({
+      // Assigned here rather than by the database, so the batch is registered below before its row
+      // exists anywhere.
+      id: randomUUID(),
       batchId,
       sessionId,
       status: BatchStatus.PENDING,
@@ -291,6 +308,10 @@ export class BulkMessageService implements OnApplicationBootstrap {
       currentIndex: 0,
     });
 
+    // Registered before the row exists, so a reap for this session (a claim that took the session
+    // from another holder) can never read this process's own batch unregistered. A cancel can only
+    // find the row once it is committed, and the false it sets then stands for the pickup check.
+    this.processingBatches.set(batch.id, true);
     // Reserve synchronously in the same turn as the cap check. There is deliberately no await between
     // them, so a burst cannot all observe the same stale count and overshoot the ceiling.
     this.inFlightBatches++;
@@ -298,6 +319,7 @@ export class BulkMessageService implements OnApplicationBootstrap {
       await this.batchRepository.save(batch);
     } catch (error) {
       this.inFlightBatches--;
+      this.processingBatches.delete(batch.id);
       // Two concurrent creates with the same caller-supplied batchId both pass the read above; the
       // unique index decides, and the loser gets the same 400 as the sequential case.
       if (isUniqueViolation(error)) {
@@ -409,7 +431,7 @@ export class BulkMessageService implements OnApplicationBootstrap {
       throw error;
     } finally {
       if (reserved) this.inFlightBatches--;
-      if (batch) this.processingBatches.delete(batch.id);
+      this.processingBatches.delete(batchDbId);
     }
   }
 
@@ -427,19 +449,20 @@ export class BulkMessageService implements OnApplicationBootstrap {
     await this.finalizeBatch(batch, state);
   }
 
-  /** Returns false when a committed cancel won the guarded start UPDATE — send nothing. */
+  /** Returns false when the batch left PENDING before this start UPDATE, so nothing is sent. */
   private async markBatchProcessing(batch: MessageBatch): Promise<boolean> {
-    // Transition to PROCESSING with the guard IN the UPDATE: it only lands while the stored status
-    // is not CANCELLED, so a cancel that already committed (any process) can never be overwritten
-    // back to PROCESSING. Zero affected rows = cancel-before-start won; send nothing.
+    // Transition to PROCESSING with the guard IN the UPDATE: it only lands while the stored status is
+    // still PENDING, the one status a run starts from. A cancel that already committed (any process)
+    // or a reap that failed the batch after another node adopted its session can never be overwritten
+    // back to PROCESSING. Zero affected rows means send nothing.
     batch.status = BatchStatus.PROCESSING;
     batch.startedAt = new Date();
     const started = await this.batchRepository.update(
-      { id: batch.id, status: Not(BatchStatus.CANCELLED) },
+      { id: batch.id, status: BatchStatus.PENDING },
       { status: BatchStatus.PROCESSING, startedAt: batch.startedAt },
     );
     if (!started.affected) {
-      this.logger.log(`Batch ${batch.batchId} was cancelled before processing started; nothing was sent`);
+      this.logger.log(`Batch ${batch.batchId} was cancelled or failed before processing started; nothing was sent`);
       return false;
     }
     return true;

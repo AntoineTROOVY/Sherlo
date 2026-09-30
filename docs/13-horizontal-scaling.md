@@ -39,7 +39,8 @@
 > sessions in a running-or-should-be state are adopted; mid-pairing and operator-`failed`
 > ones are left alone, and a cleanly stopped session releases its claim so it is never
 > "lapsed". Adopting a session fails its stuck in-flight batches (no auto-resume — the dead
-> node's already-sent messages are unknowable). Adopting is gated by the same
+> node's already-sent messages are unknowable), and so does an explicit `POST /start` or `POST /stop`
+> of a session whose holder's lease lapsed. The sweep's adoption is gated by the same
 > `AUTO_START_SESSIONS` flag as boot auto-start; the sweep itself is not, and runs on every node,
 > because it also has a job that starts nothing: a row a vanished node left `ready`, `initializing`,
 > `authenticating` or `action_required` is marked disconnected once its lease expired more than two

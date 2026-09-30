@@ -45,6 +45,8 @@ export class SessionOwnershipService {
   private readonly claimGen = new Map<string, number>();
   /** Notified when a renewal proves this process no longer holds sessions it thought it did. */
   private onLeaseLost?: (sessionIds: string[]) => Promise<void> | void;
+  /** Notified when this process takes a session over from a node whose lease lapsed. See onAdoption. */
+  private onAdopted?: (sessionId: string) => Promise<unknown>;
 
   /**
    * How many callers are currently telling renew() that an empty/blank result is NOT evidence of
@@ -127,6 +129,14 @@ export class SessionOwnershipService {
   async claim(sessionId: string): Promise<boolean> {
     const now = new Date();
     const leaseExpiresAt = new Date(now.getTime() + this.leaseTtlMs);
+    // Who held it, read only when an adoption handler is registered. The UPDATE below still decides
+    // the claim; this read only tells whether it took a lapsed lease over from another node.
+    const previous = this.onAdopted
+      ? await this.sessions.findOne({
+          where: { id: sessionId },
+          select: { id: true, nodeId: true, leaseExpiresAt: true },
+        })
+      : null;
     const result = await this.sessions
       .createQueryBuilder()
       .update(Session)
@@ -150,6 +160,14 @@ export class SessionOwnershipService {
       this.owned.add(sessionId);
       this.bumpClaimGen(sessionId);
       this.lastSeenLease.set(sessionId, leaseExpiresAt.getTime());
+      // A released row (nodeId NULL) is not an adoption: its holder may still be finishing its own
+      // batches, and failing them under it would leave two writers on one batch row.
+      const adopted =
+        previous?.nodeId != null &&
+        previous.nodeId !== this.nodeId &&
+        previous.leaseExpiresAt != null &&
+        previous.leaseExpiresAt < now;
+      if (adopted) this.followAdoption(sessionId);
     } else this.logger.warn('Session is held by another node', { sessionId, nodeId: this.nodeId });
     return claimed;
   }
@@ -167,13 +185,29 @@ export class SessionOwnershipService {
     const now = new Date();
     this.owned.delete(sessionId);
     this.bumpClaimGen(sessionId);
-    await this.sessions
+    const cleared = { nodeId: null, claimedAt: null, leaseExpiresAt: null, nodeUrl: null };
+    // Its own claim first, in one statement as before. Only when that matched nothing is a lapsed
+    // claim of another node cleared, and that is a takeover like a claim: the dead holder's
+    // unfinished work is failed too (see onAdoption).
+    const own = await this.sessions
       .createQueryBuilder()
       .update(Session)
-      .set({ nodeId: null, claimedAt: null, leaseExpiresAt: null, nodeUrl: null })
+      .set(cleared)
       .where('id = :id', { id: sessionId })
-      .andWhere('("nodeId" = :me OR "leaseExpiresAt" < :now)', { me: this.nodeId, now: leaseParam(now) })
+      .andWhere('"nodeId" = :me', { me: this.nodeId })
       .execute();
+    if ((own.affected ?? 0) > 0) return;
+    const lapsed = await this.sessions
+      .createQueryBuilder()
+      .update(Session)
+      .set(cleared)
+      .where('id = :id', { id: sessionId })
+      .andWhere('"nodeId" IS NOT NULL AND "nodeId" <> :me AND "leaseExpiresAt" < :now', {
+        me: this.nodeId,
+        now: leaseParam(now),
+      })
+      .execute();
+    if ((lapsed.affected ?? 0) > 0) this.followAdoption(sessionId);
   }
 
   private bumpClaimGen(sessionId: string): void {
@@ -219,6 +253,36 @@ export class SessionOwnershipService {
    */
   onLeaseLoss(handler: (sessionIds: string[]) => Promise<void> | void): void {
     this.onLeaseLost = handler;
+  }
+
+  /**
+   * Register what to do when this process takes a session over from a node whose lease lapsed, by
+   * claiming it (an explicit start, boot auto-start, the takeover sweep) or by releasing that node's
+   * claim (a stop of such a session). Whatever that node left unfinished for the
+   * session can no longer finish there. A session its holder released is not taken over: that holder
+   * may still be finishing its own work.
+   */
+  onAdoption(handler: (sessionId: string) => Promise<unknown>): void {
+    this.onAdopted = handler;
+  }
+
+  /**
+   * Run the adoption handler off the caller's path. Awaiting it inside claim() would hold the start
+   * between its claim and the moment it counts as starting, and a stop landing in that window would
+   * release the claim and let the engine launch on a row nobody holds. A failure is logged; the claim
+   * or release stands either way.
+   */
+  private followAdoption(sessionId: string): void {
+    const handler = this.onAdopted;
+    if (!handler) return;
+    void Promise.resolve()
+      .then(() => handler(sessionId))
+      .catch((error: unknown) =>
+        this.logger.warn('Session adoption follow-up failed', {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
   }
 
   /**
