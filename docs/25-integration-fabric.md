@@ -94,9 +94,11 @@ Alongside this async pipeline, a route may additionally declare a `response` con
 
 - **Ingress RPC** — the one new primitive. Delivers a verified inbound request into the worker and returns
   its HTTP result. The worker claims routes with `ctx.registerWebhook(route, handler)`.
-- **Ingress controller** — a `@Public` endpoint (`POST|GET /api/ingress/:pluginId/:instanceId/:route`).
-  It is public to the API-key guard because an external provider cannot present the gateway's API key, so
-  it self-validates (see §25.6). It never runs the plugin inline — providers enforce short acknowledgement
+- **Ingress controller** — a `@Public` endpoint accepting any HTTP method on
+  `/api/ingress/:pluginId/:instanceId/:route` (a `GET` on a route that declares `challenge` is answered
+  host-side as the verification handshake; every other request is a delivery). It is public to the
+  API-key guard because an external provider cannot present the gateway's API key, so it self-validates
+  (see §25.6). It never runs the plugin inline — providers enforce short acknowledgement
   deadlines, so the controller fast-acks and defers the work to the queue. A route may additionally
   declare a host-side `response` contract that shapes that synchronous reply without making the plugin
   inline. Its `preflight` checks (today: `session-alive`) run **after** signature verification and
