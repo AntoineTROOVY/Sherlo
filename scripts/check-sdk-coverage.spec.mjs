@@ -41,7 +41,9 @@ test('a run through a symlinked path still reports', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sdk-coverage-'));
   try {
     symlinkSync(fileURLToPath(new URL('..', import.meta.url)), join(dir, 'repo'));
-    const run = spawnSync(process.execPath, [join(dir, 'repo', 'scripts', 'check-sdk-coverage.mjs')], { encoding: 'utf8' });
+    const run = spawnSync(process.execPath, [join(dir, 'repo', 'scripts', 'check-sdk-coverage.mjs')], {
+      encoding: 'utf8',
+    });
     assert.match(run.stdout + run.stderr, /SDK contract coverage/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
