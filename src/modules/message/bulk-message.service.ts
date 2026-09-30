@@ -157,6 +157,7 @@ export class BulkMessageService implements OnApplicationBootstrap {
     this.stripBatchMediaPayloads(batch.messages);
     const failed = await this.batchRepository.update({ id: batch.id, status: BatchStatus.PROCESSING }, {
       status: BatchStatus.FAILED,
+      completedAt: new Date(),
       messages: batch.messages,
     } as QueryDeepPartialEntity<MessageBatch>);
     return Boolean(failed.affected);

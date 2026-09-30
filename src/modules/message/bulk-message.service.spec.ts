@@ -113,6 +113,16 @@ describe('BulkMessageService.onApplicationBootstrap', () => {
     expect(repo.save).not.toHaveBeenCalled();
   });
 
+  // FAILED is terminal, and the status route documents completedAt as null only while a batch runs.
+  it('stamps completedAt on a batch it fails, like every other terminal write', async () => {
+    repo.find.mockResolvedValue([{ id: 'b1', status: BatchStatus.PROCESSING, messages: [] }]);
+
+    await service.onApplicationBootstrap();
+
+    const written = (repo.update.mock.calls[0] as [unknown, Partial<MessageBatch>])[1];
+    expect(written.completedAt).toBeInstanceOf(Date);
+  });
+
   it('does nothing when there are no orphaned batches', async () => {
     repo.find.mockResolvedValue([]);
     await service.onApplicationBootstrap();
