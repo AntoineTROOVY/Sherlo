@@ -130,8 +130,9 @@ describe('WorkerHookRegistry', () => {
       reg.handleHook({ kind: 'hook', id: 1, event: 'e', data: { x: 1 }, source: 's' }),
     ).resolves.toBeUndefined();
 
-    const result = sent.find(m => m.kind === 'hook-result');
-    expect(result).toMatchObject({ id: 1, continue: true, error: expect.stringContaining('could not be sent') });
+    const result = sent.find(m => m.kind === 'hook-result') as Extract<WorkerToHostMessage, { kind: 'hook-result' }>;
+    expect(result).toMatchObject({ id: 1, continue: true });
+    expect(result.error).toContain('could not be sent');
     expect(result).not.toHaveProperty('data'); // the host keeps the original data
   });
 
