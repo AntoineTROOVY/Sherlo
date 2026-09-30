@@ -193,10 +193,10 @@ describe('webhook DTO url validation', () => {
   // The column is varchar(2048); PostgreSQL refuses a longer value on insert with a 500.
   const longUrl = (length: number) => 'https://x.example/' + 'a'.repeat(length - 'https://x.example/'.length);
 
-  const dtos = [
+  const dtos: [string, new () => object][] = [
     ['CreateWebhookDto', CreateWebhookDto],
     ['UpdateWebhookDto', UpdateWebhookDto],
-  ] as const;
+  ];
 
   it.each(dtos)('%s accepts http(s) URLs, dotless hosts included', async (_name, cls) => {
     for (const url of ['https://x.example/hook', 'http://localhost:3000/hook', longUrl(2048)]) {
