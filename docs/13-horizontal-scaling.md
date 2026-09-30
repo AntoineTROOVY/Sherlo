@@ -127,8 +127,10 @@
 > the older node keeps renewing. Running every node in `TZ=UTC` (the image default) removes it.
 >
 > **A forwarded request is throttled on both nodes.** The receiving node counts it before
-> forwarding, and the owner counts it again on arrival; with `REDIS_ENABLED=true` both counts land
-> in the same shared bucket. Size the rate limits with that in mind for a routed deployment.
+> forwarding, and the owner counts it again on arrival; with `REDIS_ENABLED=true`, and each peer
+> node listed in the owner's `TRUSTED_PROXIES` (below), both counts land in the same shared bucket.
+> Without that, the owner counts every request forwarded by a peer in one bucket keyed on that
+> peer's address. Size the rate limits with that in mind for a routed deployment.
 >
 > Forwards carry the client address in `x-forwarded-for` (inbound chain preserved, the
 > observed peer appended). For an `allowedIps`-restricted key or the per-IP throttler to see
