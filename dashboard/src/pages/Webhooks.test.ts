@@ -411,3 +411,48 @@ test('replacing headers sends the whole map, and no rows sends an empty map', as
   await rtl.waitFor(() => assert.equal(updateCalls, 1));
   assert.deepEqual(updateBody!.headers, {});
 });
+
+// FilterBuilder starts a condition as "sender is" with no contact, and the gateway refuses an empty
+// value list and more than 20 conditions. Either would come back as raw English in a toast.
+test('an incomplete filter condition keeps Create disabled and says why', async () => {
+  const { screen, fireEvent } = rtl;
+  const create = await openCreateModal();
+  assert.equal(create.disabled, false);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Add condition' }));
+  assert.equal(create.disabled, true);
+  screen.getByText('Give every filter condition a value, and use at most 20 conditions.');
+  fireEvent.click(create);
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(createCalls, 0);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Remove condition' }));
+  assert.equal(create.disabled, false);
+});
+
+test('more than 20 filter conditions keep Save disabled', async () => {
+  const { screen, fireEvent } = rtl;
+  webhooksStatus = 200;
+  webhookList = [
+    {
+      id: 'w1',
+      sessionId: 'sess-1',
+      url: 'https://example.test/hook',
+      events: ['message.received'],
+      active: true,
+      filters: { conditions: Array.from({ length: 20 }, () => ({ field: 'fromMe', operator: 'is', value: true })) },
+    },
+  ];
+  window.sessionStorage.setItem('openwa_user_role', 'operator');
+  renderWebhooks();
+  fireEvent.click(await screen.findByTitle('Edit'));
+  const save = screen.getByRole<HTMLButtonElement>('button', { name: 'Save Changes' });
+  assert.equal(save.disabled, false);
+
+  // A 21st condition that is complete on its own: only the count is wrong.
+  fireEvent.click(screen.getByRole('button', { name: 'Add condition' }));
+  const fields = screen.getAllByLabelText('Filter field');
+  fireEvent.change(fields[fields.length - 1], { target: { value: 'fromMe' } });
+  assert.equal(save.disabled, true);
+  screen.getByText('Give every filter condition a value, and use at most 20 conditions.');
+});

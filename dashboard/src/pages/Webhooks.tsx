@@ -37,6 +37,15 @@ import './Webhooks.css';
 // Filters only apply to message.* events (the wildcard subscribes to them too).
 const supportsFilters = (events: string[]) => events.some(e => e === '*' || e.startsWith('message.'));
 
+// The gateway refuses more than 20 conditions and an id or enum condition with no values, and a new
+// condition starts as "sender is" with none, so an untouched one would come back as a raw error.
+const MAX_FILTER_CONDITIONS = 20;
+const filtersInvalid = (events: string[], filters: WebhookFilters | null | undefined) =>
+  supportsFilters(events) &&
+  !!filters &&
+  (filters.conditions.length > MAX_FILTER_CONDITIONS ||
+    filters.conditions.some(c => Array.isArray(c.value) && c.value.length === 0));
+
 type TFn = ReturnType<typeof useTranslation>['t'];
 
 // One-line, human-readable summary of a condition for the badge popover, reusing the FilterBuilder labels.
@@ -223,8 +232,8 @@ export function Webhooks() {
     return t(`webhooks.eventDescriptions.${name}`, { defaultValue: name });
   };
 
-  // The gateway requires a URL and at least one event, so the buttons stay disabled until both are set
-  // instead of surfacing the raw validation message in a toast.
+  // The gateway requires a URL, at least one event and complete filters, so the buttons stay disabled
+  // until all are set instead of surfacing the raw validation message in a toast.
   const newHeaders = buildHeaderMap(newAuth.headers);
   const newAuthError = secretError(newAuth.secret) ?? (newHeaders.ok ? null : newHeaders.error);
   const editHeaders = buildHeaderMap(editAuth.headers);
@@ -236,12 +245,14 @@ export function Webhooks() {
     !!newWebhook.url.trim() &&
     !!newWebhook.sessionId &&
     newWebhook.events.length > 0 &&
+    !filtersInvalid(newWebhook.events, newWebhook.filters) &&
     !newAuthError;
   const canSave =
     !!editWebhook &&
     !updateMutation.isPending &&
     !!editWebhook.url.trim() &&
     editWebhook.events.length > 0 &&
+    !filtersInvalid(editWebhook.events, editWebhook.filters) &&
     !editAuthError;
 
   const handleCreate = async () => {
@@ -468,6 +479,11 @@ export function Webhooks() {
               chats={chats}
             />
           )}
+          {filtersInvalid(newWebhook.events, newWebhook.filters) && (
+            <span className="hint error" role="status">
+              {t('webhooks.filters.incomplete', 'Give every filter condition a value, and use at most 20 conditions.')}
+            </span>
+          )}
           <div className="filter-builder webhook-auth">
             <div className="filter-builder-head">
               <span className="filter-builder-title">{t('webhooks.auth.title')}</span>
@@ -543,6 +559,11 @@ export function Webhooks() {
               onChange={filters => setEditWebhook(prev => (prev ? { ...prev, filters } : prev))}
               chats={chats}
             />
+          )}
+          {filtersInvalid(editWebhook.events, editWebhook.filters) && (
+            <span className="hint error" role="status">
+              {t('webhooks.filters.incomplete', 'Give every filter condition a value, and use at most 20 conditions.')}
+            </span>
           )}
           <div className="filter-builder webhook-auth">
             <div className="filter-builder-head">
