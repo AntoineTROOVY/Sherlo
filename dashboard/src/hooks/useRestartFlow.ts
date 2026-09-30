@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { infraApi } from '../services/api';
 import { restartPollAttempts } from '../utils/restartPoll';
 
-// 'unknown': a proxy gave up waiting for the restart request, so whether it went through cannot be told.
+// 'unknown': a proxy answered in the gateway's place (a 504, a Cloudflare 52x, or a 502 with no gateway
+// code), so whether the restart went through cannot be told.
 export type RestartStatus = 'idle' | 'restarting' | 'waiting' | 'success' | 'error' | 'unknown';
 
 export interface RestartOpenRequest {
@@ -154,11 +155,13 @@ export function useRestartFlow(): RestartFlow {
       if (typeof failure?.status === 'number') {
         stopCountdown();
         setRestartCountdown(0);
-        // A 504, or a 502 the gateway did not stamp with a code, is a proxy answering in the gateway's place:
-        // a timeout, or an upstream connection that failed or dropped. The client cannot tell which, and the
-        // request may still be running (a first-time enable pulls an image before the restart), so this is
-        // neither a refusal nor something a readiness poll can settle: the old process answers.
-        if (failure.status === 504 || (failure.status === 502 && failure.code === undefined)) {
+        // A 502, a 504 or a Cloudflare 520-527 the gateway did not stamp with a code is a proxy answering in
+        // the gateway's place: a timeout, or an upstream connection that failed or dropped. The client cannot
+        // tell which, and the request may still be running (a first-time enable pulls an image before the
+        // restart), so this is neither a refusal nor something a readiness poll can settle: the old process
+        // answers.
+        const { status } = failure;
+        if (failure.code === undefined && (status === 502 || status === 504 || (status >= 520 && status <= 527))) {
           setRestartStatus('unknown');
           return;
         }
