@@ -970,15 +970,17 @@ The factory resolves the engine through the **plugin loader**, not a hard-coded 
 configured engine (`engine.type`, default `'whatsapp-web.js'`) is read once in the constructor; the
 built-in `whatsapp-web.js` and `baileys` plugins are registered and the configured one is enabled in
 `onModuleInit()`. `create()` takes an **options object** (engine-neutral per-call config —
-`sessionId` / `dbSessionId` / `proxyUrl` / `proxyType`), not a `type` argument. The two ids carry the
-same value: `sessionId` is the session **UUID** (`Session.id`), which is the on-disk auth-directory key
-since 0.23.5, and `dbSessionId` is that UUID under the name FK-bound stores such as
-`baileys_stored_messages` read. An out-of-tree engine plugin that keys its own storage by `sessionId`
-has to re-key it on upgrade: `SessionAuthDirMigration` renames the two built-in shapes only. There is
-no `EngineType` union and no `switch`. If the configured engine's plugin is not registered,
-`create()` throws `Engine '<type>' is not registered`; there is no direct-adapter fallback, so the
-session fails loudly at start instead of running some other engine. (A typo in `ENGINE_TYPE` is
-rejected at boot by `validateEnv`, which whitelists `whatsapp-web.js` | `baileys`.)
+`sessionId` / `dbSessionId` / `proxyUrl` / `proxyType`), not a `type` argument; when it calls the
+plugin's `createEngine()` it adds the `sessionDataPath` / `authDir` bases from config, since the factory
+hardens and purges the credential dirs under them. The two ids carry the same value: `sessionId` is the
+session **UUID** (`Session.id`), which is the on-disk auth-directory key since 0.23.5, and `dbSessionId`
+is that UUID under the name FK-bound stores such as `baileys_stored_messages` read. An out-of-tree
+engine plugin that keys its own storage by `sessionId` has to re-key it on upgrade:
+`SessionAuthDirMigration` renames the two built-in shapes only. There is no `EngineType` union and no
+`switch`. If the configured engine's plugin is not registered, `create()` throws
+`Engine '<type>' is not registered`; there is no direct-adapter fallback, so the session fails loudly
+at start instead of running some other engine. (A typo in `ENGINE_TYPE` is rejected at boot by
+`validateEnv`, which whitelists `whatsapp-web.js` | `baileys`.)
 
 ```typescript
 // engine/engine.factory.ts
@@ -1018,12 +1020,14 @@ export class EngineFactory implements OnModuleInit {
 
     if (enginePlugin?.instance && this.isEnginePlugin(enginePlugin.instance)) {
       // Engine-specific config (e.g. Puppeteer) was handed to the plugin as an opaque blob at
-      // registration, so the factory passes only engine-neutral per-call options here.
+      // registration; per-call options are engine-neutral plus the auth-dir bases the factory manages.
       return enginePlugin.instance.createEngine({
         sessionId: options.sessionId,
         dbSessionId: options.dbSessionId,
         proxyUrl: options.proxyUrl,
         proxyType: options.proxyType,
+        sessionDataPath: this.sessionDataPath(),
+        authDir: this.baileysAuthBase(),
       }) as IWhatsAppEngine;
     }
 
