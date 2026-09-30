@@ -258,9 +258,12 @@ describe('InfraStorageController storage stream failures surface as request erro
     try {
       // pipe() never forwards source errors: without a listener on the source this would be an
       // unhandled 'error' event and kill the process instead of failing the request.
+      // Some bytes land first, so the failure leaves a partial archive behind unless it is removed.
+      let reads = 0;
       const errStream = new Readable({
         read() {
-          this.destroy(new Error('archive boom'));
+          if (reads++ === 0) this.push(Buffer.alloc(1000));
+          else this.destroy(new Error('archive boom'));
         },
       });
       const storage = {
@@ -269,6 +272,7 @@ describe('InfraStorageController storage stream failures surface as request erro
       };
       const controller = new InfraStorageController(storage as never);
       await expect(controller.exportStorage()).rejects.toThrow(/archive boom/);
+      expect(fs.readdirSync(path.join(cwd, 'data', 'exports'))).toEqual([]);
     } finally {
       cwdSpy.mockRestore();
       fs.rmSync(cwd, { recursive: true, force: true });

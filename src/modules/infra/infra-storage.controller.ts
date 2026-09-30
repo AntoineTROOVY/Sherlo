@@ -178,22 +178,31 @@ export class InfraStorageController implements OnApplicationBootstrap {
     const writeStream = fs.createWriteStream(exportPath);
     stream.pipe(writeStream);
 
-    await new Promise<void>((resolve, reject) => {
-      writeStream.on('finish', resolve);
-      // The archive is filled while it is written: destroying the source stops the export from
-      // opening further files once the sink has failed.
-      writeStream.on('error', (err: Error) => {
-        stream.destroy();
-        reject(err);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        writeStream.on('finish', resolve);
+        // The archive is filled while it is written: destroying the source stops the export from
+        // opening further files once the sink has failed.
+        writeStream.on('error', (err: Error) => {
+          stream.destroy();
+          reject(err);
+        });
+        // pipe() does NOT forward source errors: an archiver/gzip failure surfaces as an 'error' event on
+        // the source stream, which without a listener crashes the process. Fail the request instead and
+        // tear down the sink so its fd isn't held open waiting for a 'finish' that never comes.
+        stream.on('error', (err: Error) => {
+          writeStream.destroy();
+          reject(err);
+        });
       });
-      // pipe() does NOT forward source errors: an archiver/gzip failure surfaces as an 'error' event on
-      // the source stream, which without a listener crashes the process. Fail the request instead and
-      // tear down the sink so its fd isn't held open waiting for a 'finish' that never comes.
-      stream.on('error', (err: Error) => {
-        writeStream.destroy();
-        reject(err);
-      });
-    });
+    } catch (error) {
+      // The TTL sweep below only covers a finished archive; a failed one would otherwise stay on the
+      // data volume until a restart a day later. Wait for the sink to close so the unlink cannot race
+      // an open that is still pending.
+      if (!writeStream.closed) await new Promise(resolve => writeStream.once('close', resolve));
+      await fs.promises.unlink(exportPath).catch(() => undefined);
+      throw error;
+    }
 
     // Sweep the throwaway archive so repeated exports don't accumulate on the data volume.
     const ttlRaw = Number.parseInt(process.env.STORAGE_EXPORT_TTL_MS ?? '', 10);
