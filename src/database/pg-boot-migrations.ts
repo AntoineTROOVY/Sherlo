@@ -28,7 +28,7 @@ export interface AdvisoryLockClient {
 // Test seams over the two constructions this module performs.
 export interface BootDataSourceDeps {
   createDataSource?: (options: DataSourceOptions) => DataSource;
-  createLockClient?: (config: ClientConfig) => AdvisoryLockClient;
+  createLockClient?: (config: ClientConfig, onLost: (error: Error) => void) => AdvisoryLockClient;
 }
 
 type PostgresOptions = Extract<DataSourceOptions, { type: 'postgres' }>;
@@ -77,14 +77,27 @@ export async function createBootDataSource(
     // Before any migration writes a row: a connection whose UTC pin did not take stores timestamps in
     // one zone and reads them in another, which nothing downstream can detect (see postgres-utc.ts).
     await assertDataConnectionUtc(migrator);
-    const lockClient = createLockClient(lockClientConfig(options));
+    // A holder whose lock connection drops has lost the lock with it, so another replica can start
+    // the same chain. Stop this one where it stands: tearing the migration pool down fails its
+    // in-flight statement and rolls the current migration back, and the boot fails so the retry loop
+    // reruns it under a new lock. A waiter needs nothing extra: its pending lock query rejects.
+    let holding = false;
+    let lockLost = false;
+    const lockClient = createLockClient(lockClientConfig(options), () => {
+      if (!holding) return;
+      lockLost = true;
+      void migrator.destroy().catch(() => undefined);
+    });
     try {
       await lockClient.connect();
       await lockClient.query('SELECT pg_advisory_lock($1, $2)', [...POSTGRES_BOOT_MIGRATION_LOCK_KEYS]);
+      holding = true;
       try {
         // Same transaction mode DataSource.initialize() passes for the built-in migrationsRun.
         await migrator.runMigrations({ transaction: options.migrationsTransactionMode });
+        if (lockLost) throw new Error('Boot migration lock connection lost while migrating; retrying the boot');
       } finally {
+        holding = false;
         // Session-scoped lock: even when the unlock call itself fails, end() below tears the
         // session — and with it the lock — down, so no crashed boot can leave it held.
         await lockClient
@@ -114,13 +127,14 @@ export async function createBootDataSource(
 
 // pg emits 'error' on the client when its socket drops while the client is not ending (a failover,
 // pg_terminate_backend, an idle-timeout on the silent wait inside pg_advisory_lock). Unheard, that
-// emit throws from the socket handler and exits the process. The in-flight query rejects on its own,
-// so the factory's cleanup and Nest's retry loop take it from there; a holder that loses the socket
-// has lost the lock with it, which is worth a warning.
-function createPgLockClient(config: ClientConfig): AdvisoryLockClient {
+// emit throws from the socket handler and exits the process. A waiter's pending lock query rejects on
+// its own, so the factory's cleanup and Nest's retry loop take it from there; a holder is stopped by
+// onLost, since it lost the lock with the socket.
+function createPgLockClient(config: ClientConfig, onLost: (error: Error) => void): AdvisoryLockClient {
   const client = new Client(config);
   client.on('error', (error: Error) => {
     logger.warn(`Boot migration lock connection lost: ${error.message}`);
+    onLost(error);
   });
   return client;
 }
