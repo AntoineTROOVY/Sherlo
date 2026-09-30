@@ -896,7 +896,9 @@ short TTL (~5s, so back-to-back scrapes don't repeat the DB scan), and exposes i
 
 Access is **disabled by default**: the endpoint returns **404** unless `METRICS_TOKEN` is set. When
 set, scrapers must send `Authorization: Bearer <token>` (compared with `timingSafeEqual`); a missing or
-wrong token returns 401. The token is **separate** from the API key — the route is `@Public()` (skips
+wrong token returns 401. After 10 failed attempts from one client IP within a minute, that client is
+answered 429 (even with the correct token) until the window slides; a successful scrape does not count
+against the limit. The token is **separate** from the API key — the route is `@Public()` (skips
 the API-key guard) and `@SkipThrottle()`.
 
 ```typescript
