@@ -6304,7 +6304,7 @@ Key facts:
 - **Path is exactly `POST /mcp` — no `/api` prefix.** The global `api` prefix applies only to Nest controllers; this route is mounted straight on Express.
 - Gated by **`MCP_ENABLED=true`**. When off, the module/route is never mounted and `POST /mcp` returns `404`.
 - MCP is **read-only by default**: only read-tier tools are registered unless you set `MCP_READONLY=false` to expose write tools. Per-key sliding-window rate limit: `MCP_RATE_LIMIT_MAX` (default 60) per `MCP_RATE_LIMIT_WINDOW_MS` (default 60000).
-- Stateless transport (no SSE/session id for normal calls). `GET /mcp` and `DELETE /mcp` answer `405` with `Allow: POST` and a JSON-RPC error body.
+- Stateless transport: no session id and no standalone stream. Every POST must send `Content-Type: application/json` and `Accept: application/json, text/event-stream` (both types, even though the answer is a single message). A `200` answer is `text/event-stream` carrying one `event: message` frame whose `data:` line is the JSON-RPC envelope; a POST that carries only notifications gets `202` with an empty body. `GET /mcp` and `DELETE /mcp` answer `405` with `Allow: POST` and a JSON-RPC error body.
 - Pre-auth per-IP throttle: `MCP_IP_RATE_LIMIT_MAX` (default 120) JSON-RPC messages per `MCP_IP_RATE_LIMIT_WINDOW_MS` (default 60000). Each element of a batch counts; an over-budget request gets HTTP `429` with a JSON-RPC error body and runs none of its messages, but still spends whatever budget the IP had left.
 
 **Request body** — JSON-RPC 2.0 envelope (validated by the MCP SDK, **not** the Nest ValidationPipe)
@@ -6328,7 +6328,7 @@ Key facts:
 }
 ```
 
-**Response** `200` — JSON-RPC 2.0 envelope
+**Response** `200` — `text/event-stream`; the `data:` line of its `event: message` frame is this JSON-RPC 2.0 envelope
 
 ```json
 {
@@ -6338,9 +6338,9 @@ Key facts:
 }
 ```
 
-For `tools/call` the result is an MCP `CallToolResult` (`content` array of `text` or embedded base64 `resource` items — payloads over 4096 bytes become a `resource`). **Tool-level failures are returned in-band as `CallToolResult` with `isError:true`** (HTTP stays 200), including a role, session or chat refusal (`name:'ForbiddenException'`) and rate-limit hits (`message:'MCP rate limit exceeded'`).
+For `tools/call` the result is an MCP `CallToolResult` (`content` array of `text` or embedded base64 `resource` items — payloads over 4096 bytes become a `resource`). **Tool-level failures are returned in-band as `CallToolResult` with `isError:true`** (HTTP stays 200), including a role, session or chat refusal (`name:'ForbiddenException'`), rate-limit hits (`message:'MCP rate limit exceeded'`), and an unknown tool or arguments that fail the tool's `inputSchema` (text `MCP error -32602: …`).
 
-**Errors:** `401` for a missing or invalid key and `403` for a key carrying `allowedIps`, each with a JSON-RPC error body · in-band JSON-RPC errors `-32601` (unknown method), `-32602` (invalid params / unknown tool), `-32700` (parse error), all at HTTP 200 · `500` if the key lookup fails for a reason other than a refused key, or if the transport throws before headers are sent · `404` when `MCP_ENABLED` is not `true`
+**Errors:** `401` for a missing or invalid key and `403` for a key carrying `allowedIps`, each with a JSON-RPC error body · `406` when `Accept` does not list both `application/json` and `text/event-stream` · `415` for a non-JSON `Content-Type` · `400` for malformed JSON, or with a `-32700` JSON-RPC error body for JSON that is not a valid JSON-RPC message · in-band JSON-RPC errors `-32601` (unknown method) and `-32603` (params that fail the method's schema, such as a `tools/call` without `name`; the message carries the validation issues), at HTTP 200 · `500` if the key lookup fails for a reason other than a refused key, or if the transport throws before headers are sent · `404` when `MCP_ENABLED` is not `true`
 
 > The full catalog of MCP tools (names, tiers, schemas) is documented separately — see **doc 24, MCP Integration**. This section documents only the transport endpoint.
 
