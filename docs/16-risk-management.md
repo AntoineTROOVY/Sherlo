@@ -168,7 +168,7 @@ enforces.
 | **Category**    | Security  |
 | **Probability** | Low (30%) |
 | **Impact**      | Critical  |
-| **Risk Level**  | High      |
+| **Risk Level**  | Medium    |
 
 **Description:**  
 Security vulnerabilities may lead to unauthorized access to sessions, data, or infrastructure.
