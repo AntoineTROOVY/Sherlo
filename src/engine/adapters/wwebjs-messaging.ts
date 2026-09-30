@@ -367,6 +367,8 @@ export class WwebjsMessaging {
       try {
         return await send(fresh);
       } catch (retryErr) {
+        // The page can die during the retry as well; report it exactly as the first attempt does.
+        this.host.reportIfPageTransportError(retryErr, 'sendMessage');
         // Same remap as the first attempt. Re-resolving the RECIPIENT says nothing about the quoted
         // message, so a send that reaches the page on the fresh id and only then fails on the quote
         // is the same caller fault — without this it would be a 500 on the retry where the identical
