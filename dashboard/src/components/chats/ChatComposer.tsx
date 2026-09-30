@@ -239,7 +239,9 @@ function ChatComposer({
 
     const currentAttachment = attachment;
     const currentReplyingTo = replyingTo;
-    handleRemoveAttachment();
+    // Clear only a file that is being sent: a pick still being read stages once it lands, so it is not
+    // silently dropped by text sent in the meantime.
+    if (currentAttachment) handleRemoveAttachment();
     setReplyingTo(null);
 
     try {
