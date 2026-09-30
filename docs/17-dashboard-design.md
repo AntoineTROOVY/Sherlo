@@ -57,11 +57,13 @@ backed by `localStorage` — there is no Zustand store.
    and `--warning-text` are darkened twins for anything rendered as text or an icon. As foregrounds
    the originals measure 1.98:1, 3.76:1, 2.28:1 and 2.15:1 on white. Each twin is set from the
    darkest surface it actually lands on, which is the 10 to 20 percent tint of its own hue that the
-   badges and callouts paint behind it, not white. Dark restates them as the originals, which are
-   already 6:1 or better on the dark surfaces.
-   Known gap: the exclusive button groups report `aria-pressed` without arrow-key roving focus. Four
-   pages have a render harness, so the rest are checked structurally. Treat the claim as directional,
-   not certified.
+   badges and callouts paint behind it, not white. Dark restates primary, success and warning as the
+   originals, which are 6:1 or better on the dark surfaces, and lightens error to `#f15e5e` because
+   the original measures 4.06:1 there.
+   Known gap: the exclusive button groups report `aria-pressed` without arrow-key roving focus. Every
+   page except Login has a render test, but only Infrastructure's resolves the caption references
+   against a real DOM; elsewhere they are checked structurally. Treat the claim as directional, not
+   certified.
 5. **Dark mode** - Support for light/dark themes
 
 ## 17.2 Information Architecture
