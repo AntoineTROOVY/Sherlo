@@ -392,8 +392,8 @@ flowchart TB
 Trimmed to the load-bearing directories — `src/modules/` holds 31 feature modules. Only `*.module.ts`
 is common to all of them; the rest of the shape varies. Most pair a `*.controller.ts` with a
 `*.service.ts`, but `events/` is a WebSocket gateway, `mcp/` an MCP server and `queue/` pure BullMQ
-wiring (none of the three has either); `docker/` and `status-store/` are service-only; `health/` and
-`settings/` are controller-only (`infra/` gained `infra-data.service.ts`); and 9 modules own an `entities/` directory:
+wiring (none of the three has either); `docker/`, `status-store/`, `chat-media/` and `takeover/` are
+service-only; `health/` and `settings/` are controller-only (`infra/` gained `infra-data.service.ts`); and 9 modules own an `entities/` directory:
 
 ```
 src/
