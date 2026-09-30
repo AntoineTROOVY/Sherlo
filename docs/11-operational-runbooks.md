@@ -504,7 +504,8 @@ curl -X POST http://localhost:2785/api/sessions/{sessionId}/messages/send-text \
 ```
 
 > If you deploy the published image instead of building from source — your own compose file with
-> `image: ghcr.io/rmyndharis/openwa:<tag>` — replace steps 5-6 with editing that tag, running
+> `image: ghcr.io/rmyndharis/openwa:<tag>` — keep step 5 (or copy the release's `docker-compose.yml`
+> changes into your own compose file) and replace step 6 with editing that tag, running
 > `docker compose pull openwa-api`, and confirming the image landed with
 > `docker image inspect ghcr.io/rmyndharis/openwa:<tag>`. `docker compose run` in step 7 has no
 > `--no-build`, so when the service keeps a `build:` section a failed pull would otherwise build from
