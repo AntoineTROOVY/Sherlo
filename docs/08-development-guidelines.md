@@ -1022,18 +1022,11 @@ export class EngineTeardownService {
 
 **Solution:**
 
-```typescript
-// config/typeorm.config.ts
-{
-  type: 'postgres',
-  // Limit pool size
-  extra: {
-    max: 20, // Default is 10
-    connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 30000,
-  },
-}
-```
+Set `DATABASE_POOL_SIZE` in `.env` (default 10). It becomes the pool `max` of the PostgreSQL data
+connection, both in the app and in the migration CLI. Keep the pool size times the number of
+replicas below the server's `max_connections`. See
+[12 - Troubleshooting](./12-troubleshooting-faq.md#issue-slow-api-response) for the related
+timeouts.
 
 #### Migration Fails
 
