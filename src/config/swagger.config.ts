@@ -142,11 +142,15 @@ const ERROR_RESPONSE: SchemaObject = {
   },
 };
 
+/** The auth guard's 403, answered before any handler runs. */
+const AUTH_FORBIDDEN = "API key's role, session or chat scope, or IP allow-list does not allow this operation";
+
 /**
  * Give every API-key operation its auth refusals and a schema for its error bodies. An operation
  * with its own `security` (the @Public routes and the metrics scrape) is skipped: those answer
- * their own shapes, such as the health probe's 503. Existing responses keep their descriptions;
- * only missing ones are added. Idempotent. Mutates and returns the document.
+ * their own shapes, such as the health probe's 503. Existing responses keep their descriptions,
+ * except that an operation's own 403 also gets the auth refusal, which the guard can answer there
+ * too. Idempotent. Mutates and returns the document.
  */
 export function documentErrorResponses(document: OpenAPIObject): OpenAPIObject {
   document.components ??= {};
@@ -157,9 +161,12 @@ export function documentErrorResponses(document: OpenAPIObject): OpenAPIObject {
       const op = (item as Record<string, OperationObject | undefined>)[method];
       if (!op || op.security !== undefined) continue;
       op.responses['401'] ??= { description: 'The API key is missing, unknown, revoked, or expired' };
-      op.responses['403'] ??= {
-        description: "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
-      };
+      const forbidden = op.responses['403'];
+      if (!forbidden) {
+        op.responses['403'] = { description: `The ${AUTH_FORBIDDEN}` };
+      } else if (!('$ref' in forbidden) && !forbidden.description.includes(AUTH_FORBIDDEN)) {
+        forbidden.description = `${forbidden.description.replace(/\.?$/, '.')} Also returned when the ${AUTH_FORBIDDEN}.`;
+      }
       for (const [status, response] of Object.entries(op.responses) as [string, ResponseObject | ReferenceObject][]) {
         if (Number(status) >= 400 && !('$ref' in response) && !response.content) {
           response.content = {
