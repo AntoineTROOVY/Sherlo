@@ -1191,14 +1191,18 @@ export interface HealthResponse {
   version?: string;
 }
 
+export interface HealthDependencyStatus {
+  status: 'up' | 'down';
+}
+
 export interface HealthReadyDetails {
-  mainDatabase?: string;
-  dataDatabase?: string;
+  mainDatabase?: HealthDependencyStatus;
+  dataDatabase?: HealthDependencyStatus;
 }
 
 export interface HealthReadyResponse {
   status: string;
-  details?: HealthReadyDetails;
+  details: HealthReadyDetails;
 }
 
 // ── Auth ──────────────────────────────────────────────────────────
