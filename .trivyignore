@@ -13,9 +13,10 @@
 # operator to run an npm command with an attacker-chosen glob inside the container.
 #
 # These are ID-level ignores, so they would also silence the same CVEs in the application tree,
-# which this file otherwise refuses to do. What keeps that honest is the root `overrides` entry
-# pinning brace-expansion to ^5.0.12: npm cannot resolve the application tree below the fixed
-# version, so there is no app-tree finding for these ids to hide. Raise that floor alongside any
+# which this file otherwise refuses to do. What keeps that honest is the root `overrides` entries
+# that pin brace-expansion per minimatch major (^1.1.21 under minimatch 3, ^2.1.7 under minimatch 5
+# and 9, ^5.0.12 under minimatch 10): npm cannot resolve the application tree below the fixed
+# versions, so there is no app-tree finding for these ids to hide. Raise those floors alongside any
 # future brace-expansion advisory rather than widening this list. Drop both entries once npm ships a
 # bundle with brace-expansion >= 5.0.11.
 CVE-2026-102276
