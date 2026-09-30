@@ -479,7 +479,7 @@ Three pages keep a server list in local state instead of the query cache:
   and marking a chat read update.
 - **Plugins** (`Plugins.tsx`) keeps the catalog in local state. It prefetches it silently on mount
   so installed cards can show an update chip, fetches it again when the Catalog tab opens with an
-  empty list, and reloads it after an install or update.
+  empty list, and reloads it after any install, update or uninstall.
 
 ### API client — raw payloads, no `{ data }` envelope
 
