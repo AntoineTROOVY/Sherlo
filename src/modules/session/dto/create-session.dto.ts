@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsObject, IsOptional, IsString, IsUrl, Matches, MaxLength, MinLength, Validate } from 'class-validator';
+import { MaxCodePoints } from '../../../common/validation/max-code-points';
 import { HasDecodableProxyCredentialsConstraint } from './has-decodable-proxy-credentials.validator';
 
 export class CreateSessionDto {
@@ -46,7 +47,7 @@ export class CreateSessionDto {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  @MaxCodePoints(255)
   // Reject a malformed/non-proxy URL at the boundary (credentialed http://user:pass@host and
   // socks4/5 still validate). The host is intentionally NOT SSRF-blocked here — a per-session proxy
   // is trusted egress that only an ADMIN key may set, and a loopback proxy sidecar is a legitimate setup.

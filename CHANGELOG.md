@@ -158,7 +158,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Webhook create and update answer `400` for a URL longer than 2048 characters instead of `500` on PostgreSQL.
 - With `WEBHOOK_SSRF_PROTECT=false`, webhook create and update answer `400` for a URL that is not an absolute `http://` or `https://` URL instead of storing one that fails every delivery.
 - `POST /api/sessions/:sessionId/status/send-text` answers `400` for an empty or whitespace-only text instead of posting a blank status.
-- A template name over 100 code points, such as one of emoji with variation selectors, is refused with `400` instead of failing with `500` on PostgreSQL.
+- A template, automation rule or API key name, a webhook URL or signing secret, or a session proxy URL longer than its column in code points, such as one of emoji with variation selectors, is refused with `400` instead of failing with `500` on PostgreSQL.
 - `POST /api/sessions/:sessionId/messages/send-bulk` answers `429` instead of `400` when the node already runs `BULK_MAX_CONCURRENT_BATCHES` batches, so clients retry it.
 - A bulk batch whose run failed before processing started, or whose process died first, ends `FAILED` instead of staying `PENDING`, and batches failed by the startup or takeover reap report `completedAt`.
 - Starting or stopping a session whose node's lease lapsed, with `POST /api/sessions/:sessionId/start` or `POST /api/sessions/:sessionId/stop`, fails that node's unfinished bulk batches, as the takeover sweep does; before, they stayed `PENDING` or `PROCESSING` until a node restarted.

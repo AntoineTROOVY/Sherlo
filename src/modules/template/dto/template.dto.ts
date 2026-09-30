@@ -1,15 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, MaxLength, ValidateIf } from 'class-validator';
+import { MaxCodePoints } from '../../../common/validation/max-code-points';
 
 const NAME_MAX_LENGTH = 100;
 const BODY_MAX_LENGTH = 4096;
 const HEADER_FOOTER_MAX_LENGTH = 1024;
-
-// name is a varchar(100) column, and PostgreSQL counts code points. @MaxLength does not: it folds a
-// presentation selector (U+FE0F) into the character before it, so 100 emoji of two code points each
-// passed and the INSERT failed as a 500. The u flag makes each matched unit one code point.
-const NAME_PATTERN = new RegExp(`^[\\s\\S]{0,${NAME_MAX_LENGTH}}$`, 'u');
-const NAME_LENGTH_MESSAGE = `name must be shorter than or equal to ${NAME_MAX_LENGTH} characters`;
 
 export class CreateTemplateDto {
   @ApiProperty({
@@ -19,7 +14,7 @@ export class CreateTemplateDto {
   })
   @IsString()
   @IsNotEmpty()
-  @Matches(NAME_PATTERN, { message: NAME_LENGTH_MESSAGE })
+  @MaxCodePoints(NAME_MAX_LENGTH)
   name!: string;
 
   @ApiProperty({
@@ -59,7 +54,7 @@ export class UpdateTemplateDto {
   @ValidateIf((o: UpdateTemplateDto) => o.name !== undefined)
   @IsString()
   @IsNotEmpty()
-  @Matches(NAME_PATTERN, { message: NAME_LENGTH_MESSAGE })
+  @MaxCodePoints(NAME_MAX_LENGTH)
   name?: string;
 
   @ApiPropertyOptional({ description: 'Template body with {{variable}} placeholders', maxLength: BODY_MAX_LENGTH })

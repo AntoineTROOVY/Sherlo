@@ -9,7 +9,6 @@ import {
   IsString,
   IsUrl,
   Max,
-  MaxLength,
   Min,
   MinLength,
   ValidateIf,
@@ -21,6 +20,7 @@ import type { FilterOperator, WebhookFilters } from '../filters/filter-types';
 import { IsValidWebhookFilters } from '../filters/filter-validation';
 import { IsHeaderMap } from './is-header-map.validator';
 import { ToStrictBoolean, ToStrictNumber } from '../../../common/utils/strict-boolean';
+import { MaxCodePoints } from '../../../common/validation/max-code-points';
 
 /**
  * Swagger metadata for the smart-filter shape — `WebhookFilters` in filters/filter-types.ts is a
@@ -115,7 +115,7 @@ export class CreateWebhookDto {
   // were stored and then failed every delivery. 2048 is the column width; PostgreSQL refuses a
   // longer value on insert with a 500.
   @IsUrl(WEBHOOK_URL_OPTIONS)
-  @MaxLength(2048)
+  @MaxCodePoints(2048)
   url!: string;
 
   @ApiPropertyOptional({
@@ -150,7 +150,7 @@ export class CreateWebhookDto {
   // A short secret signs webhooks badly: HMAC-SHA256 over a 4-char key is brute-forcible from one
   // observed signature. 16 is the floor, not a recommendation.
   @MinLength(16)
-  @MaxLength(255)
+  @MaxCodePoints(255)
   secret?: string;
 
   @ApiPropertyOptional({
@@ -203,7 +203,7 @@ export class UpdateWebhookDto {
   // (save() then failed with a 500). Only an omitted field means "leave unchanged".
   @ValidateIf((_: UpdateWebhookDto, v: unknown) => v !== undefined)
   @IsUrl(WEBHOOK_URL_OPTIONS)
-  @MaxLength(2048)
+  @MaxCodePoints(2048)
   url?: string;
 
   @ApiPropertyOptional({
@@ -240,7 +240,7 @@ export class UpdateWebhookDto {
   // (the service stores null for it); a non-string value is still rejected by @IsString.
   @ValidateIf((o: UpdateWebhookDto) => o.secret !== '')
   @MinLength(16)
-  @MaxLength(255)
+  @MaxCodePoints(255)
   secret?: string;
 
   @ApiPropertyOptional({
