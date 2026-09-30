@@ -60,8 +60,10 @@ whitespace-separated token is quoted (internal quotes doubled) before it reaches
 query grammar (phrases, bare `OR`/`AND`/`NOT`/`NEAR`, parentheses, `*`) is neutralised and inputs such
 as phone numbers or `…@lid` ids match as plain text; multiple tokens are still implicitly ANDed.
 Snippets are emitted with `<mark>`/`</mark>` highlight markers on both dialects so the
-`SearchHit.snippet` contract is dialect-agnostic — and the snippet is already XSS-safe text; render it
-as text, never as HTML.
+`SearchHit.snippet` contract is dialect-agnostic. The body text inside the snippet is **not**
+HTML-escaped: split on the literal `<mark>`/`</mark>` markers and render each segment as text (the
+dashboard does this with `renderHighlightedSnippet` in `dashboard/src/utils/search-highlight.ts`), and
+never assign the raw snippet to `innerHTML`.
 
 ## 26.4 Dual-database switching safety
 
