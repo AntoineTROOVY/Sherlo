@@ -110,8 +110,10 @@ func (e *APIError) Is(target error) bool {
 }
 
 // TimeoutError is returned when a request exceeds the configured timeout (or the
-// caller's context deadline).
+// caller's context deadline), whether waiting for the response or reading its body.
 type TimeoutError struct {
+	// Timeout is the client timeout that ran out, or zero when the caller's
+	// context deadline fired first.
 	Timeout time.Duration
 	// Err is the underlying cause (context.DeadlineExceeded or a net timeout).
 	Err error

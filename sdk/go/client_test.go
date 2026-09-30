@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -1638,5 +1639,59 @@ func TestDoPathWithoutLeadingSlashRefused(t *testing.T) {
 	}
 	if rt.lastReq != nil {
 		t.Fatalf("request sent to %s, want none", rt.lastReq.URL.Host)
+	}
+}
+
+// stallServer stalls every request before answering; with flush set it sends
+// the headers first and stalls the body instead. It blocks until the request is
+// cancelled or the test ends.
+func stallServer(t *testing.T, flush bool) *httptest.Server {
+	t.Helper()
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if flush {
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("partial"))
+			w.(http.Flusher).Flush()
+		}
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Cleanup(func() { close(release) })
+	return srv
+}
+
+func TestTimeoutReportsTheBudgetThatExpired(t *testing.T) {
+	for _, flush := range []bool{false, true} {
+		srv := stallServer(t, flush)
+
+		// The client timeout fired: the error names it.
+		c, err := New(srv.URL, "k", WithTimeout(100*time.Millisecond))
+		if err != nil {
+			t.Fatalf("New: %v", err)
+		}
+		_, err = c.Messages.Media(context.Background(), "s1", "c1", "m1")
+		var te *TimeoutError
+		if !errors.As(err, &te) || te.Timeout != 100*time.Millisecond {
+			t.Errorf("flush=%v client timeout: err = %v, want a *TimeoutError after 100ms", flush, err)
+		}
+
+		// The caller's shorter deadline fired: the 30s client timeout is not the
+		// budget that ran out, so the error does not name it.
+		c, err = New(srv.URL, "k")
+		if err != nil {
+			t.Fatalf("New: %v", err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		_, err = c.Messages.Media(ctx, "s1", "c1", "m1")
+		cancel()
+		te = nil
+		if !errors.As(err, &te) || te.Timeout != 0 || err.Error() != "openwa: request timed out" {
+			t.Errorf("flush=%v caller deadline: err = %v, want a *TimeoutError without a duration", flush, err)
+		}
 	}
 }

@@ -277,7 +277,7 @@ func (c *Client) doRaw(ctx context.Context, method, path string, query url.Value
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		if isTimeout(err) {
-			return nil, "", &TimeoutError{Timeout: c.timeout, Err: err}
+			return nil, "", c.timeoutErr(ctx, err)
 		}
 		return nil, "", fmt.Errorf("openwa: %s %s: %w", method, path, err)
 	}
@@ -285,6 +285,9 @@ func (c *Client) doRaw(ctx context.Context, method, path string, query url.Value
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
+		if isTimeout(err) {
+			return nil, "", c.timeoutErr(ctx, err)
+		}
 		return nil, "", fmt.Errorf("openwa: reading response body: %w", err)
 	}
 
@@ -293,6 +296,16 @@ func (c *Client) doRaw(ctx context.Context, method, path string, query url.Value
 		return nil, "", parseAPIError(resp.StatusCode, data, method+" "+path, resp.Header)
 	}
 	return data, resp.Header.Get("Content-Type"), nil
+}
+
+// timeoutErr names the client timeout only when it is the budget that ran out.
+// The client timeout never cancels ctx, so an expired ctx means the caller's own
+// deadline fired first and the error carries no duration.
+func (c *Client) timeoutErr(ctx context.Context, err error) *TimeoutError {
+	if ctx.Err() != nil {
+		return &TimeoutError{Err: err}
+	}
+	return &TimeoutError{Timeout: c.timeout, Err: err}
 }
 
 func isTimeout(err error) bool {
