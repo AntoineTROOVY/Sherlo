@@ -1825,6 +1825,62 @@ test("a search hit in another session opens that session's chat, not the one the
   }
 });
 
+// Search reads stored messages while the list comes from the engine, so a hit's chat can be missing.
+test("a search hit whose chat the other session's list lacks does not open it later on its own", async () => {
+  const { screen, fireEvent, within, act, waitFor } = rtl;
+  twoSessions = true;
+  const DAVE: Chat = { ...CHAT_2, id: '15550005555@c.us', name: 'Dave', timestamp: 1_700_000_900 };
+  searchHits = [{ ...THIRD_SESSION_HIT, sessionId: SESSION_2.id, chatId: DAVE.id }];
+  try {
+    const { container } = renderChats();
+    await screen.findByText('Alice');
+    await clickSearchHit(container);
+    const select = container.querySelector('select.session-selector') as HTMLSelectElement;
+    await waitFor(() => assert.equal(select.value, SESSION_2.id));
+    await flush();
+
+    fireEvent.click(await screen.findByText('Carol'));
+    const header = await waitFor(() => {
+      const found = container.querySelector('.room-header');
+      assert.ok(found, 'Carol did not open');
+      return found as HTMLElement;
+    });
+    await within(header).findByText('Carol');
+
+    // Dave writes; the refetch his unlisted chat triggers now lists him.
+    chatsResponder = () => Promise.resolve(jsonResponse([CHAT, CHAT_2, DAVE]));
+    const socket = lastSocket();
+    assert.ok(socket, 'expected the page to have opened a socket');
+    act(() =>
+      socket.receive('message', {
+        type: 'event',
+        timestamp: new Date(1_700_002_000_000).toISOString(),
+        payload: {
+          event: 'message.received',
+          sessionId: SESSION_2.id,
+          data: {
+            id: 'wamid.live.dave',
+            chatId: DAVE.id,
+            from: DAVE.id,
+            to: 'me',
+            body: 'dave says hi',
+            type: 'text',
+            fromMe: false,
+            timestamp: 1_700_001_900,
+          },
+        },
+      }),
+    );
+    await screen.findByText('Dave');
+    await flush();
+    await flush();
+    const room = container.querySelector('.room-header') as HTMLElement;
+    assert.equal(within(room).queryByText('Dave') === null, true, 'the old search hit opened Dave');
+  } finally {
+    twoSessions = false;
+  }
+});
+
 test('changing the UI language keeps the selected session and the open chat', async () => {
   const { screen, fireEvent, within, waitFor, act } = rtl;
   const { default: i18n } = await import('../i18n/index.ts');

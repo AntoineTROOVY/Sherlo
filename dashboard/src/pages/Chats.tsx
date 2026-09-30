@@ -782,7 +782,7 @@ export function Chats() {
   // target chat may not be available at click time. pendingHitRef carries the intent across that
   // async gap: the chat-select effect picks it up once the list lands, and the scroll effect runs
   // once the messages have rendered.
-  const pendingHitRef = useRef<{ chatId: string; waMessageId: string } | null>(null);
+  const pendingHitRef = useRef<{ sessionId: string; chatId: string; waMessageId: string } | null>(null);
 
   const handleSearchHit = useCallback(
     async (hit: SearchHit) => {
@@ -804,7 +804,7 @@ export function Chats() {
         }
         setSessions(ready);
       }
-      pendingHitRef.current = { chatId: hit.chatId, waMessageId: hit.waMessageId };
+      pendingHitRef.current = { sessionId: hit.sessionId, chatId: hit.chatId, waMessageId: hit.waMessageId };
       if (hit.sessionId !== selectedSessionId) {
         // Switching session triggers loadChats; the effect below selects the chat once the list lands.
         setSelectedSessionId(hit.sessionId);
@@ -837,28 +837,35 @@ export function Chats() {
 
   // After a session switch the chats list reloads — pick up the pending chat once it appears.
   // While the switch's list is loading, `chats` still holds the previous session's list, which can
-  // list the same id (a shared group or contact) as a Chat object from the other account.
+  // list the same id (a shared group or contact) as a Chat object from the other account. A hit whose
+  // chat the session's list lacks, or whose session the user left, is dropped: it would otherwise open
+  // on its own once a later list holds that id.
   useEffect(() => {
     const pending = pendingHitRef.current;
-    if (!pending || loadingChats || activeChat?.id === pending.chatId) return;
-    const chat = chats.find(c => c.id === pending.chatId);
-    if (chat) {
-      if (chat.kind === 'channel') {
-        switchTab('channels');
-        pendingHitRef.current = null;
-      } else if (chat.kind === 'status') {
-        setActiveTab('status');
-        setActiveChat(chat);
-        setActiveChannel(null);
-        setActiveStatusContactId(null);
-      } else {
-        setActiveTab('chats');
-        setActiveChat(chat);
-        setActiveChannel(null);
-        setActiveStatusContactId(null);
-      }
+    if (!pending) return;
+    if (pending.sessionId !== selectedSessionId) {
+      pendingHitRef.current = null;
+      return;
     }
-  }, [chats, loadingChats, activeChat, switchTab]);
+    if (loadingChats || listedSessionRef.current !== pending.sessionId || activeChat?.id === pending.chatId) return;
+    const chat = chats.find(c => c.id === pending.chatId);
+    if (!chat) {
+      pendingHitRef.current = null;
+    } else if (chat.kind === 'channel') {
+      switchTab('channels');
+      pendingHitRef.current = null;
+    } else if (chat.kind === 'status') {
+      setActiveTab('status');
+      setActiveChat(chat);
+      setActiveChannel(null);
+      setActiveStatusContactId(null);
+    } else {
+      setActiveTab('chats');
+      setActiveChat(chat);
+      setActiveChannel(null);
+      setActiveStatusContactId(null);
+    }
+  }, [chats, loadingChats, activeChat, selectedSessionId, switchTab]);
 
   // Best-effort scroll to the hit message. Runs as a layout effect (after useChatScrollPosition's
   // own restore on the same commit) so it overrides the bottom/saved jump with no visible flash.
