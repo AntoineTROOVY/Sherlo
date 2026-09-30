@@ -1157,7 +1157,7 @@
   },
   "search": {
     "placeholder": "Cari pesan…",
-    "results": "{{count}} hasil",
+    "loadMore": "Tampilkan lebih banyak ({{shown}} dari {{total}})",
     "empty": "Tidak ada pesan ditemukan.",
     "error": "Pencarian gagal. Coba lagi.",
     "unavailable": "Pencarian tidak dikonfigurasi.",

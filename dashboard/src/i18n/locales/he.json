@@ -1170,7 +1170,7 @@
   },
   "search": {
     "placeholder": "חיפוש הודעות…",
-    "results": "{{count}} תוצאות",
+    "loadMore": "הצג עוד ({{shown}} מתוך {{total}})",
     "empty": "לא נמצאו הודעות.",
     "error": "החיפוש נכשל. נסה שוב.",
     "unavailable": "החיפוש אינו מוגדר.",

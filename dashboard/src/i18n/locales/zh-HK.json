@@ -1157,7 +1157,7 @@
   },
   "search": {
     "placeholder": "搜尋訊息…",
-    "results": "{{count}} 個結果",
+    "loadMore": "顯示更多（{{shown}}/{{total}}）",
     "empty": "未找到訊息。",
     "error": "搜尋失敗。請重試。",
     "unavailable": "搜尋未設定。",

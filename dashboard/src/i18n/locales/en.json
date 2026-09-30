@@ -1157,7 +1157,7 @@
   },
   "search": {
     "placeholder": "Search messages…",
-    "results": "{{count}} results",
+    "loadMore": "Show more ({{shown}} of {{total}})",
     "empty": "No messages found.",
     "error": "Search failed. Try again.",
     "unavailable": "Search is not configured.",

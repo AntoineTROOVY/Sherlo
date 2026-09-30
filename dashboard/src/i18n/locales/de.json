@@ -1157,7 +1157,7 @@
   },
   "search": {
     "placeholder": "Nachrichten durchsuchen…",
-    "results": "{{count}} Ergebnisse",
+    "loadMore": "Mehr anzeigen ({{shown}} von {{total}})",
     "empty": "Keine Nachrichten gefunden.",
     "error": "Suche fehlgeschlagen. Versuche es erneut.",
     "unavailable": "Die Suche ist nicht konfiguriert.",

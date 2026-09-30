@@ -1163,7 +1163,7 @@
   },
   "search": {
     "placeholder": "Rechercher des messages…",
-    "results": "{{count}} résultats",
+    "loadMore": "Afficher plus ({{shown}} sur {{total}})",
     "empty": "Aucun message trouvé.",
     "error": "Échec de la recherche. Réessayez.",
     "unavailable": "La recherche n'est pas configurée.",

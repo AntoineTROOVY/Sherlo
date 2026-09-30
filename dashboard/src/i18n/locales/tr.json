@@ -1157,7 +1157,7 @@
   },
   "search": {
     "placeholder": "Mesajlarda ara…",
-    "results": "{{count}} sonuç",
+    "loadMore": "Daha fazla göster ({{total}} içinden {{shown}})",
     "empty": "Mesaj bulunamadı.",
     "error": "Arama başarısız oldu. Tekrar deneyin.",
     "unavailable": "Arama yapılandırılmamış.",
