@@ -1503,7 +1503,7 @@ There are no machine-readable WhatsApp error codes. Errors use the NestJS defaul
 
 When creating GitHub issue, include:
 
-```markdown
+````markdown
 ## Environment
 
 - OpenWA version: x.x.x
@@ -1531,24 +1531,24 @@ When creating GitHub issue, include:
 [What actually happens]
 
 ## Logs
+
 ```
-
 [Paste relevant logs here]
-
-````
+```
 
 ## Configuration
+
 ```yaml
 # Sanitized docker-compose.yml or .env
-````
-
 ```
+````
 
 ### Community Resources
 
 - **GitHub Issues**: [github.com/rmyndharis/OpenWA/issues](https://github.com/rmyndharis/OpenWA/issues)
 - **Discussions**: [github.com/rmyndharis/OpenWA/discussions](https://github.com/rmyndharis/OpenWA/discussions)
 - **Stack Overflow**: Tag with `openwa`
+
 ---
 
 <div align="center">
@@ -1556,4 +1556,3 @@ When creating GitHub issue, include:
 [← 11 - Operational Runbooks](./11-operational-runbooks.md) · [Documentation Index](./README.md) · [Next: 13 - Horizontal Scaling Guide →](./13-horizontal-scaling.md)
 
 </div>
-```
