@@ -3790,9 +3790,9 @@ Get recent messages from a channel/newsletter.
 
 **Query parameters**
 
-| Name    | Type   | Required | Default                           | Description                                                                                                                                                                                                                                                                                                      |
-| ------- | ------ | -------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `limit` | number | No       | engine default (Swagger notes 50) | Max messages to return. Taken as a raw query string and run through `parseInt(limit, 10)` when present. There is **no** DTO/ValidationPipe on this value, but a non-numeric `limit` (e.g. `?limit=abc`) parses to `NaN` and falls back to `undefined`, i.e. the engine default — it is never forwarded as `NaN`. |
+| Name    | Type   | Required | Default | Description                                                                                                                                                                                                                                                                                                                             |
+| ------- | ------ | -------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `limit` | number | No       | `50`    | Max messages to return. Taken as a raw query string and run through `parseInt(limit, 10)` when present. There is **no** DTO/ValidationPipe on this value; a missing or non-numeric `limit` (e.g. `?limit=abc`) uses `50`, and any other value is clamped to 1..100 (above 100 returns at most 100, `0` or a negative value asks for 1). |
 
 **Response** `200`
 
@@ -3802,13 +3802,12 @@ Get recent messages from a channel/newsletter.
     "id": "false_120363000000000000@newsletter_3EB0...",
     "body": "v0.7.3 is out!",
     "timestamp": 1719331200,
-    "hasMedia": false,
-    "mediaUrl": null
+    "hasMedia": false
   }
 ]
 ```
 
-Bare array. `timestamp` is an epoch number (seconds).
+Bare array. `timestamp` is an epoch number (seconds). `mediaUrl` is present only when the message carries media with a readable URL.
 
 **Errors:** `400` `Session is not started` · `401` missing/invalid API key · `409` conflict or engine not ready (retryable) · `501` not supported on the active engine
 
