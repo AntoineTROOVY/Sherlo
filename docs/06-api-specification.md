@@ -215,7 +215,7 @@ Base path `/api/sessions`. All routes that return a session return data shaped b
 
 List all sessions, scoped to the API key's `allowedSessions`, ordered `createdAt` DESC.
 
-**Auth:** API key · **Scope:** session-scoped (a scoped key sees only its `allowedSessions`; an ADMIN / null-allowlist key lists all)
+**Auth:** API key · **Scope:** session-scoped (a key with a non-empty `allowedSessions` sees only those sessions, whatever its role; a key with a null or empty `allowedSessions` lists all)
 
 **Query parameters**
 
@@ -6346,8 +6346,9 @@ the route and module entirely (the index is DB-maintained regardless — see
 [26 - Global Search](./26-global-search.md)). Requires at least `OPERATOR` role.
 
 **Auth:** API key (≥ `OPERATOR`) · **Scope:** session-scoped — a scoped key's `allowedSessions` is
-injected server-side from the key (never from the query), so a scoped key cannot broaden its reach; an
-ADMIN / null-allowlist key searches all sessions.
+injected server-side from the key (never from the query), so a scoped key cannot broaden its reach; a
+key with a non-empty `allowedSessions` searches only those sessions, whatever its role; a key with a
+null or empty `allowedSessions` searches all sessions.
 
 #### GET /api/search
 
