@@ -1248,6 +1248,15 @@ export class SessionEngineLifecycle {
       // engine was created, so there is nothing to evict and no dir to purge).
       await this.awaitPendingTeardown(session.name);
 
+      // A stop, force-kill, logout, delete or shutdown during the awaits above dropped or replaced this
+      // state, and a start after it may already run its own engine: registering one now would overwrite
+      // that engine in the registry and leave it running beyond any control's reach. Nothing is awaited
+      // between this check and the registration inside initializeEngine.
+      if (this.reconnectStates.get(id) !== state || this.stoppingSessions.has(id)) {
+        if (this.reconnectStates.get(id) === state) this.cancelReconnect(id);
+        return;
+      }
+
       // Re-initialize. An engine failure reported inside this window is parked (see
       // parkReconnectInitFailure): a failed launch must retry, not land FAILED and strand the session.
       state.initInFlight = true;

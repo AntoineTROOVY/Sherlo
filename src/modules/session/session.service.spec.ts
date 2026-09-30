@@ -1965,12 +1965,9 @@ describe('SessionService', () => {
 
       jest.useFakeTimers();
       try {
-        const run = intern().executeReconnect('sess-uuid-1', createMockSession(), {
-          attempts: 1,
-          timer: null,
-          maxAttempts: 5,
-          baseDelay: 5000,
-        });
+        const state = { attempts: 1, timer: null, maxAttempts: 5, baseDelay: 5000 };
+        (lifecycle as unknown as { reconnectStates: Map<string, unknown> }).reconnectStates.set('sess-uuid-1', state);
+        const run = intern().executeReconnect('sess-uuid-1', createMockSession(), state);
         await jest.advanceTimersByTimeAsync(10_000); // the graceful-destroy teardown race is lost
         await run;
 
@@ -2733,9 +2730,16 @@ describe('SessionService', () => {
       executeReconnect: (id: string, session: Session, state: unknown) => Promise<void>;
       stoppingSessions: Set<string>;
       engines: Map<string, unknown>;
+      reconnectStates: Map<string, unknown>;
     }
     const internals = (): Internals => lifecycle as unknown as Internals;
-    const reconnectState = { attempts: 1, timer: null, maxAttempts: 5, baseDelay: 5000 };
+    let reconnectState: { attempts: number; timer: null; maxAttempts: number; baseDelay: number };
+
+    beforeEach(() => {
+      // Registered as scheduleReconnect leaves it just before its timer fires executeReconnect.
+      reconnectState = { attempts: 1, timer: null, maxAttempts: 5, baseDelay: 5000 };
+      internals().reconnectStates.set('sess-uuid-1', reconnectState);
+    });
 
     it('does not create an engine when the session was already stopped (early guard)', async () => {
       const i = internals();
@@ -2837,6 +2841,33 @@ describe('SessionService', () => {
 
       expect(mockEngine.forceDestroy).toHaveBeenCalledTimes(1);
       expect(i.engines.has('sess-uuid-1')).toBe(false);
+    });
+
+    it('does not replace the engine a stop and start registered while it tore down the old engine', async () => {
+      const i = internals();
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      let releaseDestroy: () => void = () => undefined;
+      const old = {
+        destroy: jest.fn(() => new Promise<void>(resolve => (releaseDestroy = resolve))),
+        forceDestroy: jest.fn().mockResolvedValue(undefined),
+        disconnect: jest.fn().mockResolvedValue(undefined),
+      };
+      const started = { ...mockEngine, destroy: jest.fn(), forceDestroy: jest.fn() };
+      const replacement = { ...mockEngine };
+      (engineFactory.create as jest.Mock).mockReturnValueOnce(started).mockReturnValueOnce(replacement);
+      i.engines.set('sess-uuid-1', old);
+      const reconnect = i.executeReconnect('sess-uuid-1', createMockSession(), reconnectState);
+      await new Promise(resolve => setImmediate(resolve));
+      await service.stop('sess-uuid-1');
+      await service.start('sess-uuid-1', { explicit: true });
+      releaseDestroy();
+      await reconnect;
+
+      expect(engineFactory.create).toHaveBeenCalledTimes(1);
+      expect(i.engines.get('sess-uuid-1')).toBe(started);
+      expect(started.destroy).not.toHaveBeenCalled();
+      expect(started.forceDestroy).not.toHaveBeenCalled();
     });
 
     it('does not stack reconnect timers when scheduled twice back-to-back', () => {
