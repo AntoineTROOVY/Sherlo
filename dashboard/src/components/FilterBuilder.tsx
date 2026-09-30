@@ -39,6 +39,16 @@ const MESSAGE_FIELDS: FieldDescriptor[] = [
 const descriptorFor = (field: string): FieldDescriptor =>
   MESSAGE_FIELDS.find(f => f.field === field) ?? MESSAGE_FIELDS[0];
 
+// Rows are keyed by condition, not by index: with an index key, removing a row hands its unsent chip text
+// to the row that moves into its place. An edited condition is a new object, so it inherits the old key.
+const rowKeys = new WeakMap<WebhookFilterCondition, number>();
+let nextRowKey = 0;
+function rowKeyFor(condition: WebhookFilterCondition): number {
+  let key = rowKeys.get(condition);
+  if (key === undefined) rowKeys.set(condition, (key = nextRowKey++));
+  return key;
+}
+
 function defaultValueFor(kind: FieldKind): WebhookFilterCondition['value'] {
   if (kind === 'boolean') return true;
   if (kind === 'text') return '';
@@ -159,7 +169,14 @@ export function FilterBuilder({ filters, onChange, chats }: FilterBuilderProps) 
   const emit = (next: WebhookFilterCondition[]) => onChange(next.length ? { conditions: next } : null);
 
   const updateAt = (index: number, patch: Partial<WebhookFilterCondition>) =>
-    emit(conditions.map((c, i) => (i === index ? { ...c, ...patch } : c)));
+    emit(
+      conditions.map((c, i) => {
+        if (i !== index) return c;
+        const next = { ...c, ...patch };
+        rowKeys.set(next, rowKeyFor(c));
+        return next;
+      }),
+    );
 
   const addCondition = () => {
     const def = MESSAGE_FIELDS[0];
@@ -181,7 +198,7 @@ export function FilterBuilder({ filters, onChange, chats }: FilterBuilderProps) 
       {conditions.map((condition, index) => {
         const def = descriptorFor(condition.field);
         return (
-          <div key={index} className="filter-row">
+          <div key={rowKeyFor(condition)} className="filter-row">
             <select
               className="filter-field"
               aria-label={t('webhooks.filters.fieldLabel')}

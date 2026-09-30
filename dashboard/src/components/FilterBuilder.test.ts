@@ -3,7 +3,8 @@
 import '../test-helpers/register-hooks.ts';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createElement } from 'react';
+import { createElement, useState } from 'react';
+import type { WebhookFilters } from '../services/api.ts';
 
 let rtl: typeof import('@testing-library/react');
 let FilterBuilder: (typeof import('./FilterBuilder.tsx'))['FilterBuilder'];
@@ -68,4 +69,34 @@ test('the body text stops at the gateway limit of 1000 characters', () => {
     }),
   );
   assert.equal(container.querySelector<HTMLInputElement>('.filter-text input[type="text"]')?.maxLength, 1000);
+});
+
+test('removing a row does not hand its unsent chip text to the row below', () => {
+  let latest: WebhookFilters | null = null;
+  function Harness() {
+    const [filters, setFilters] = useState<WebhookFilters | null>({
+      conditions: [
+        { field: 'sender', operator: 'is', value: ['1@c.us'] },
+        { field: 'chatId', operator: 'is', value: ['2@c.us'] },
+      ],
+    });
+    latest = filters;
+    return createElement(FilterBuilder, { filters, onChange: setFilters, chats: [] });
+  }
+  const { container } = rtl.render(createElement(Harness));
+
+  const [first] = container.querySelectorAll<HTMLInputElement>('.chips-text');
+  rtl.fireEvent.change(first, { target: { value: '62812' } });
+  rtl.fireEvent.click(container.querySelector('.filter-remove')!);
+
+  const [left] = container.querySelectorAll<HTMLInputElement>('.chips-text');
+  assert.equal(left.value, '');
+  rtl.fireEvent.keyDown(left, { key: 'Enter' });
+  assert.deepEqual(latest, { conditions: [{ field: 'chatId', operator: 'is', value: ['2@c.us'] }] });
+
+  // Editing a row keeps its key, so the input is not remounted (and keeps focus) on every chip added.
+  rtl.fireEvent.change(left, { target: { value: '62813' } });
+  rtl.fireEvent.keyDown(left, { key: 'Enter' });
+  assert.deepEqual(latest, { conditions: [{ field: 'chatId', operator: 'is', value: ['2@c.us', '62813@c.us'] }] });
+  assert.equal(container.querySelector('.chips-text'), left);
 });
