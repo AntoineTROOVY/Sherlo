@@ -43,6 +43,9 @@
 #       is noted in the archive and printed by restore, which does not refuse it even with --strict
 #   (ab) a blank ./.env line keeps data/.env.generated from supplying the key, so the default applies
 #   (ac) a missing Baileys auth dir is reported when data/.env.generated selects the Baileys engine
+#   (ad) a file an engine deletes during the sessions/ or baileys/ copy is noted instead of failing the
+#       backup, a file the app deletes during the media or plugin copies is logged, and any other cp
+#       error still fails it
 #
 # Usage: ./scripts/smoke-test-backup-restore.sh
 # Requires: bash, tar, node (restore.sh path resolution). sqlite3 is optional (see (c) and (k)).
@@ -1263,6 +1266,54 @@ if ! printf '%s' "$OUT_AC" | grep -q 'ENGINE_TYPE=baileys but .* was not found';
   fail "(ac) a dashboard-selected Baileys engine with no auth dir was not reported: $OUT_AC"
 fi
 pass "(ac) the missing Baileys auth dir is reported when data/.env.generated selects Baileys"
+
+echo ""
+echo "==> (ad) a file the engine deletes during the state copy notes the copy instead of failing the backup"
+# Chromium and the Baileys auth store delete and rename files while they run, so cp can list a file
+# that is gone when it opens it. Under set -e that aborted the online backup with no archive. The shim
+# cp copies for real, then reports the error a vanished file gives; any other cp error stays fatal.
+AD="$WORK/ad"
+mkdir -p "$AD/data/sessions/session-s1" "$AD/data/baileys/s1" "$AD/data/media" "$AD/data/plugins" "$AD/shim"
+make_fixture "$AD/data/main.sqlite" "delta2-main"
+make_fixture "$AD/data/openwa.sqlite" "delta2-data"
+printf 'profile\n' >"$AD/data/sessions/session-s1/Preferences"
+printf '{}' >"$AD/data/baileys/s1/creds.json"
+printf 'jpeg\n' >"$AD/data/media/status.jpg"
+printf '{}' >"$AD/data/plugins/registry.json"
+cat >"$AD/shim/cp" <<SHIM
+#!/bin/sh
+$(command -v cp) "\$@" || exit
+case "\$3" in
+  */sessions | */baileys | */media | */plugin-*) echo "cp: cannot stat '\$2/gone': \$SHIM_CP_ERROR" >&2; exit 1 ;;
+esac
+SHIM
+chmod +x "$AD/shim/cp"
+set +e
+OUT_AD="$(cd "$AD" && SHIM_CP_ERROR='No such file or directory' PATH="$AD/shim:$PATH" BACKUP_DIR="$AD/out" "$BACKUP" 2>&1)"
+RC_AD=$?
+set -e
+if [ "$RC_AD" -ne 0 ]; then
+  fail "(ad) a file that vanished during the engine state copy failed the backup: $OUT_AD"
+fi
+NOTE_AD="$(tar -xOzf "$(ls "$AD"/out/openwa-backup-*.tar.gz)" ./ENGINE-STATE-NOTE 2>/dev/null || true)"
+if ! printf '%s\n' "$NOTE_AD" | grep -q '^sessions/ (files changed during the copy)' ||
+  ! printf '%s\n' "$NOTE_AD" | grep -q '^baileys/ (files changed during the copy)'; then
+  fail "(ad) the archive does not note the state copies that changed underneath: $NOTE_AD"
+fi
+for tree in media plugins; do
+  if ! printf '%s\n' "$OUT_AD" | grep -q "WARN: files under .*/$tree changed during the copy"; then
+    fail "(ad) the backup did not log the $tree copy that changed underneath: $OUT_AD"
+  fi
+done
+set +e
+OUT_AD="$(cd "$AD" && SHIM_CP_ERROR='Permission denied' PATH="$AD/shim:$PATH" BACKUP_DIR="$AD/out2" "$BACKUP" 2>&1)"
+RC_AD=$?
+set -e
+if [ "$RC_AD" -eq 0 ] || ! printf '%s' "$OUT_AD" | grep -q 'Permission denied' ||
+  [ -n "$(ls "$AD"/out2/openwa-backup-*.tar.gz 2>/dev/null)" ]; then
+  fail "(ad) a cp error other than a vanished file did not fail the backup: $OUT_AD"
+fi
+pass "(ad) a vanished engine file is noted, a vanished media or plugin file logged, other cp errors fatal"
 
 echo ""
 echo "All smoke tests passed!"
