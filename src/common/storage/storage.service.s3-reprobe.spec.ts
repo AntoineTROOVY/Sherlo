@@ -312,6 +312,24 @@ describe('StorageService S3 re-probe and recovery', () => {
     await expect(svc.openFile('missing.bin')).rejects.toThrow('NoSuchKey');
   });
 
+  it('openFile surfaces the local error when the fallback copy exists but cannot be opened', async () => {
+    mockSend.mockImplementation((cmd: unknown) => {
+      if (cmd instanceof GetObjectCommand) return Promise.reject(s3Error('NoSuchKey'));
+      return Promise.resolve({});
+    });
+    const svc = new StorageService(makeConfig());
+    await flush();
+    fs.writeFileSync(path.join(localPath, 'gap.bin'), 'gap-media');
+    const denied = Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+    const openSpy = jest.spyOn(fs.promises, 'open').mockRejectedValueOnce(denied);
+
+    try {
+      await expect(svc.openFile('gap.bin')).rejects.toBe(denied);
+    } finally {
+      openSpy.mockRestore();
+    }
+  });
+
   it('deleteFile removes the local fallback copy as well as the S3 object', async () => {
     mockSend.mockResolvedValue({}); // HeadBucket at boot, DeleteObject later
     const svc = new StorageService(makeConfig());

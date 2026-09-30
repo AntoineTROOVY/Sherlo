@@ -57,10 +57,12 @@ const contentFor = (name: string): Buffer => {
 };
 
 /** An openFile that counts the file streams open at once and the files ever opened. */
-function trackingOpener(failing: Record<string, 'open' | 'read'> = {}, withSize = true) {
+function trackingOpener(failing: Record<string, 'gone' | 'open' | 'read'> = {}, withSize = true) {
   const stats = { opened: 0, open: 0, maxOpen: 0 };
   const openFile = (name: string): Promise<ExportFileSource> => {
-    if (failing[name] === 'open') return Promise.reject(new Error(`ENOENT: ${name}`));
+    if (failing[name] === 'gone')
+      return Promise.reject(Object.assign(new Error(`ENOENT: ${name}`), { code: 'ENOENT' }));
+    if (failing[name] === 'open') return Promise.reject(new Error(`SlowDown: ${name}`));
     const data = contentFor(name);
     stats.opened++;
     stats.open++;
@@ -110,8 +112,8 @@ describe('createExportStream streams one file at a time', () => {
     output.destroy();
   });
 
-  it('holds one file stream open at a time, skips an unopenable file, and round-trips the rest', async () => {
-    const { stats, openFile } = trackingOpener({ 'media/file-c.bin': 'open' });
+  it('holds one file stream open at a time, skips a file deleted since the listing, and round-trips the rest', async () => {
+    const { stats, openFile } = trackingOpener({ 'media/file-c.bin': 'gone' });
     const logger = makeLogger();
     const output = await createExportStream(() => Promise.resolve(files), openFile, logger as never);
 
@@ -122,6 +124,20 @@ describe('createExportStream streams one file at a time', () => {
     expect(logger.warn).toHaveBeenCalledWith('Failed to export file: media/file-c.bin', expect.anything());
     expect([...imported.keys()].sort()).toEqual(files.filter(f => f !== 'media/file-c.bin'));
     for (const [name, data] of imported) expect(data.equals(contentFor(name))).toBe(true);
+  });
+
+  it('fails the output when a listed file cannot be opened for any other reason', async () => {
+    const { stats, openFile } = trackingOpener({ 'media/file-c.bin': 'open' });
+    const output = await createExportStream(() => Promise.resolve(files), openFile, makeLogger() as never);
+
+    const error = await new Promise<Error>(resolve => {
+      output.on('error', resolve);
+      output.resume();
+    });
+    await settle(20);
+
+    expect(error.message).toBe('SlowDown: media/file-c.bin');
+    expect(stats.opened).toBe(2);
   });
 
   it('still exports a file whose size the backend did not report', async () => {
