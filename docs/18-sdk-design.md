@@ -1009,9 +1009,9 @@ All payloads are associative arrays; all listed methods are synchronous and retu
 
 | Method        | Signature                                               | Description                                                   |
 | ------------- | ------------------------------------------------------- | ------------------------------------------------------------- |
-| `info`        | `info(string $sessionId): array`                        | Get catalog info.                                             |
+| `info`        | `info(string $sessionId): ?array`                       | Get catalog info, or null when the account has no catalog.    |
 | `products`    | `products(string $sessionId, array $query = []): array` | List products (e.g. `['page' => 1, 'limit' => 20]`).          |
-| `product`     | `product(string $sessionId, string $productId): array`  | Get one product.                                              |
+| `product`     | `product(string $sessionId, string $productId): ?array` | Get one product, or null when no product has that id.         |
 | `sendProduct` | `sendProduct(string $sessionId, array $body): array`    | Send a product message (`chatId` + `productId`). **OPERATOR** |
 
 #### `status` _(Stories)_
