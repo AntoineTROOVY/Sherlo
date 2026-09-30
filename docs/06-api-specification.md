@@ -5614,15 +5614,15 @@ Request a graceful server restart, optionally orchestrating Docker profiles (add
 
 ```json
 {
-  "message": "Restarting…",
+  "message": "Server is restarting. Enabling: postgres, redis. Disabling: minio.",
   "restarting": true,
   "profiles": ["postgres", "redis"],
   "profilesToRemove": ["minio"],
-  "estimatedTime": 48
+  "estimatedTime": 53
 }
 ```
 
-`estimatedTime` (seconds) = base 15 + 20/postgres + 13/redis + 15/minio + 5/removal. `orchestration` is present only when Docker is available and `profiles` is non-empty; `removal` only when Docker is available and `profilesToRemove` is non-empty. Without Docker, a `data/.orchestration-request.json` signal file is written instead. After responding, `shutdownService.shutdown()` runs (default ~3s grace); readiness returns `503` during drain.
+`estimatedTime` (seconds) = base 15 + 20/postgres + 13/redis + 15/minio + 5/removal. The echoed `profilesToRemove`, and the removal count, already omit any bundled service the environment pins the app to (for example `DATABASE_HOST=postgres` set in the host environment or the project `.env`); such a service is never stopped. `orchestration` is present only when Docker is available and at least one managed profile (`postgres`, `redis`, `minio`) remains in `profiles`; `removal` only when Docker is available and at least one managed profile remains in `profilesToRemove` after dropping pinned services and profiles that are also being started. Without Docker, a `data/.orchestration-request.json` signal file is written instead. After responding, `shutdownService.shutdown()` runs (default ~3s grace); readiness returns `503` during drain.
 
 **Errors:** `401` · `403`
 
