@@ -585,10 +585,10 @@ describe('SessionController: GET .../groups filters before paginating', () => {
 // most common start failure; clients generated from the OpenAPI contract need it declared.
 describe('SessionController.start() OpenAPI responses', () => {
   it('declares the 504 an engine start timeout returns', () => {
-    const responses = Reflect.getMetadata('swagger/apiResponse', SessionControllerClass.prototype.start) as Record<
-      string,
-      unknown
-    >;
+    const responses = Reflect.getMetadata(
+      'swagger/apiResponse',
+      Object.getOwnPropertyDescriptor(SessionControllerClass.prototype, 'start')!.value as object,
+    ) as Record<string, unknown>;
     expect(Object.keys(responses)).toContain('504');
   });
 });
