@@ -108,6 +108,34 @@ except OpenWANotFoundError as e:
 - Escape hatch for endpoints the SDK does not wrap:
   `client.request(method, path, query=…, body=…)`.
 
+## Receiving webhooks
+
+A webhook configured with a secret signs each delivery in its `X-OpenWA-Signature` header. Check it
+with `verify_webhook_signature` against the raw, unparsed request body (`bytes` or `str`), exactly
+as received, and parse the JSON only after the check passes: a re-serialized body can differ byte
+for byte and will not verify. The helper returns `False` (never raises) for a missing, malformed or
+non-matching signature. `WebhookDelivery` (in `openwa.types`) types the parsed body.
+
+```python
+import json
+
+from flask import Flask, request
+from openwa import verify_webhook_signature
+from openwa.types import WebhookDelivery
+
+app = Flask(__name__)
+
+
+@app.post("/openwa/webhook")
+def openwa_webhook():
+    raw_body = request.get_data()
+    if not verify_webhook_signature(raw_body, request.headers.get("X-OpenWA-Signature"), secret):
+        return "Invalid signature", 401
+    delivery: WebhookDelivery = json.loads(raw_body)
+    # Process delivery["event"] and delivery["data"] here.
+    return "OK", 200
+```
+
 ## Releasing
 
 Publishing to PyPI is done by the
