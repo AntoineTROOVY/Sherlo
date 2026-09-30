@@ -5535,7 +5535,7 @@ Merge-save infrastructure config to `data/.env.generated` (a `0600` secret file)
 | `storage.localPath`                                   | string                   | No                       | —                                         | Default `./data/media`                                                                                                                  |
 | `storage.s3Bucket` / `.s3Region` / `.s3Endpoint`      | string                   | No                       | —                                         | External S3                                                                                                                             |
 | `storage.s3AccessKey` / `.s3SecretKey`                | string                   | No                       | secret                                    | Empty keeps existing                                                                                                                    |
-| `engine.type`                                         | string                   | No                       | **must be a known engine id, else `400`** | The only validated field in the body                                                                                                    |
+| `engine.type`                                         | string                   | No                       | **must be a known engine id, else `400`** | Saved as `ENGINE_TYPE`                                                                                                                  |
 | `engine.headless`                                     | boolean                  | No                       | —                                         | Default true; saved as `PUPPETEER_HEADLESS`                                                                                             |
 | `engine.sessionDataPath`                              | string                   | No                       | —                                         | Default `./data/sessions`                                                                                                               |
 | `engine.browserArgs`                                  | string                   | No                       | —                                         | Saved as `PUPPETEER_ARGS`                                                                                                               |
@@ -5578,17 +5578,18 @@ Merge-save infrastructure config to `data/.env.generated` (a `0600` secret file)
 
 ```json
 {
-  "message": "Configuration saved. Server restart required.",
+  "message": "Configuration saved successfully. Docker profiles required: redis. Server restart required to apply changes.",
   "saved": true,
   "envPath": "data/.env.generated",
-  "profiles": ["postgres", "redis"]
+  "profiles": ["redis"]
 }
 ```
 
-Write/IO errors are caught and returned as HTTP `200` with `{ "saved": false, "envPath": "", "profiles": [], "message": "Failed to save configuration: …" }`. DTO validation, an unknown engine type, and CR/LF injection are real HTTP `400` responses. `profiles` lists newly-required Docker profiles.
+Write/IO errors are caught and returned as HTTP `200` with `{ "saved": false, "envPath": "", "profiles": [], "message": "Failed to save configuration: …" }`. DTO validation, an unknown engine type, an invalid `database.schema`, CR/LF injection, a value that cannot be stored so that it reads back unchanged, and a merged config the production boot guard would reject (an empty or default `DATABASE_PASSWORD` or S3 key on an external datastore, or a placeholder `REDIS_PASSWORD`; message starts `Refusing to save a configuration that would be rejected at production boot.`) are real HTTP `400` responses, and nothing is written. `profiles` lists newly-required Docker profiles.
 
 **Errors:** `400` unknown/mistyped body field, missing nested `database.type`/`storage.type`, unknown
-`engine.type`, or CR-LF in a value · `401` · `403`
+`engine.type`, invalid `database.schema`, CR-LF in a value, a value that cannot round-trip through the
+env file, or a config the production boot secret guard would reject · `401` · `403`
 
 ---
 
