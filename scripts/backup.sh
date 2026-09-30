@@ -203,12 +203,13 @@ fi
 if [ -d "$SESSIONS_DIR" ]; then
   log "Backing up whatsapp-web.js sessions"
   cp -pRH "$SESSIONS_DIR" "$STAGE/sessions"
-  # Chromium holds a SingletonLock (a symlink, so not `-e`) in every profile it has open, and the
-  # entrypoint clears stale ones at start, so a lock here means a browser was writing that profile.
+  # Chromium holds a SingletonLock (a symlink, so not `-e`) in every profile it has open. A browser
+  # killed outright (force-kill, a stop that timed out) leaves its lock behind until the next launch
+  # or container start clears it, so a lock here means the profile is open or was last hard-killed.
   OPEN_PROFILES="$(find -H "$SESSIONS_DIR" -mindepth 2 -maxdepth 2 -name SingletonLock -exec dirname {} \; |
     sed 's|.*/||' | sort | tr '\n' ' ')"
   if [ -n "$OPEN_PROFILES" ]; then
-    record_engine_state_note "sessions/ (whatsapp-web.js profiles open in a browser: ${OPEN_PROFILES% })"
+    record_engine_state_note "sessions/ (whatsapp-web.js profiles holding a Chromium SingletonLock, open or left by a killed browser: ${OPEN_PROFILES% })"
   fi
 else
   log "WARN: $SESSIONS_DIR not found — skipping sessions"

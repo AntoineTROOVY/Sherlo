@@ -1194,7 +1194,7 @@ printf '{}' >"$AA/src/data/baileys/s1/creds.json"
 OUT_AA="$(cd "$AA/src" && BACKUP_DIR="$AA/out" "$BACKUP" 2>&1)"
 ARCHIVE_AA="$(ls "$AA"/out/openwa-backup-*.tar.gz)"
 NOTE_AA="$(tar -xOzf "$ARCHIVE_AA" ./ENGINE-STATE-NOTE 2>/dev/null || true)"
-if ! printf '%s\n' "$NOTE_AA" | grep -q 'open in a browser: session-s1)' ||
+if ! printf '%s\n' "$NOTE_AA" | grep -q 'open or left by a killed browser: session-s1)' ||
   ! printf '%s\n' "$NOTE_AA" | grep -q '^baileys/'; then
   fail "(aa) the archive does not note the open profile and the Baileys state: $NOTE_AA"
 fi
