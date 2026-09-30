@@ -674,7 +674,8 @@ Then bump `appVersion` in `charts/openwa/Chart.yaml` to the same version — the
 image tag to `appVersion`, so a stale one deploys a tag that does not exist yet. Bump the chart's own
 `version:` by a patch in the same commit: Helm identifies a chart by that field alone, so leaving it
 while the templates change makes two different charts answer to one name in `helm list` and
-`helm history`. Every release from v0.13.0 onward has bumped it in lockstep, and nothing gates it —
+`helm history`. Releases from v0.13.0 onward bumped it, except v0.23.4 to v0.23.6, which kept v0.23.3's
+chart version 0.1.20, and nothing gates it —
 `npm run check:versions` reads only `appVersion`, and the `chart` job lints behaviour, not versions.
 
 Then in `CHANGELOG.md`, insert the new heading directly under the retained, now-empty
