@@ -45,11 +45,12 @@ class WebhooksResource:
         return self._http.request("GET", "/api/webhooks", query=query)
 
     def delivery_failures(self, query: DeliveryFailureQuery | None = None) -> list[WebhookDeliveryFailure]:
-        """Deliveries the gateway gave up on or could not send -- the diagnostic for a webhook that stopped arriving.
+        """Deliveries the gateway gave up on or could not dispatch: the diagnostic for a webhook that stopped arriving.
 
-        Rows with ``attempts > 0`` exhausted their retries against the receiver; rows with ``attempts == 0``
-        were never sent (payload over the size cap, a payload that could not be prepared or serialized,
-        dispatch capacity shed, or shutdown). A row is removed once a later replay delivers the event.
+        Rows with ``attempts > 0`` exhausted their retries against the receiver. Rows with ``attempts == 0``
+        were not given up after retries: the payload was over the size cap or could not be prepared or
+        serialized, dispatch capacity was shed, or shutdown interrupted the delivery (possibly between
+        retries, after earlier attempts were sent). A row is removed once a later replay delivers the event.
 
         Requires an ADMIN-level key. A delivery a smart filter suppressed never reaches this log. Most
         recent first.

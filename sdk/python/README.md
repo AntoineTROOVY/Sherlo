@@ -14,9 +14,9 @@ Requires Python 3.9+. The importable module is `openwa`.
 
 This README describes `main`. The 0.5.0 release lacks `sessions.get_proxy`,
 `sessions.update_proxy`, `messages.click_button`, `verify_webhook_signature`, the `WebhookDelivery`
-type, the `.code`, `.retry_after_seconds` and `.headers` error attributes and the `name` key of
-`ListSessionsQuery`; they ship with the next SDK release. See
-[the SDK overview](../README.md#coverage).
+type, the `.code`, `.retry_after_seconds` and `.headers` error attributes, the `name` key of
+`ListSessionsQuery` and the refusal of an empty, `.` or `..` id; they ship with the next SDK
+release. See [the SDK overview](../README.md#coverage).
 
 ## Usage
 

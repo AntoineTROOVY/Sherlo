@@ -15,9 +15,9 @@ public record WebhookDeliveryFailure(
     String deliveryId,
     /**
      * Delivery attempts recorded; 0 when the delivery was shed, refused or failed before sending
-     * (oversize payload, webhook:before hook error, capacity shed or shutdown). A direct delivery
-     * that shutdown caught in a retry backoff also records 0, although its earlier attempts were
-     * sent.
+     * (oversize payload, a payload that could not be serialized after the webhook:before hooks,
+     * capacity shed or shutdown). A direct delivery that shutdown caught in a retry backoff also
+     * records 0, although its earlier attempts were sent.
      */
     int attempts,
     /**

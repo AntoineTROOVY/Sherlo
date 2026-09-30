@@ -180,9 +180,9 @@ type WebhookTestResult struct {
 	Error      string `json:"error,omitempty"`
 }
 
-// WebhookDeliveryFailure is a webhook delivery that exhausted its retries, or
-// one never sent (Attempts 0) that the outbox replays, as listed by the
-// delivery-failure log. A later successful delivery removes the row.
+// WebhookDeliveryFailure is a webhook delivery the gateway gave up on or could
+// not dispatch, as listed by the delivery-failure log. A later successful
+// delivery removes the row.
 type WebhookDeliveryFailure struct {
 	ID        string `json:"id"`
 	WebhookID string `json:"webhookId"`

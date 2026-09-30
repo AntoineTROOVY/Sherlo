@@ -30,9 +30,9 @@ implementation 'com.rmyndharis:openwa:0.5.0'
 This README describes `main`. The 0.5.0 release lacks `sessions.getProxy`,
 `sessions.updateProxy`, `messages.clickButton`, the `name` filter of
 `ListSessionsQuery`, `WebhookSignature.verify`, the `WebhookDelivery` types, the
-`code()`, `retryAfterSeconds()` and `headers()` error accessors and the
-`UNKNOWN` enum fallback; they ship with the next SDK release. See [the SDK
-overview](../README.md#coverage).
+`code()`, `retryAfterSeconds()` and `headers()` error accessors, the `UNKNOWN`
+enum fallback and the refusal of an empty, `.` or `..` id or path segment; they
+ship with the next SDK release. See [the SDK overview](../README.md#coverage).
 
 ## Quickstart
 

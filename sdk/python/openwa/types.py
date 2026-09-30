@@ -953,7 +953,7 @@ class WebhookDelivery(TypedDict):
 
 
 class WebhookDeliveryFailure(TypedDict):
-    """A webhook delivery that exhausted its retries or was never sent, as listed by the delivery-failure log."""
+    """A webhook delivery the gateway gave up on or could not dispatch, as listed by the delivery-failure log."""
 
     id: str
     webhookId: str

@@ -65,7 +65,11 @@ export interface SessionResponse {
   lastActive?: string | null;
   createdAt: string;
   updatedAt: string;
-  /** Only present when `status === 'failed'` (terminal failure) or `status === 'action_required'` (operator must intervene). */
+  /**
+   * Human-readable reason while `status` is `'failed'` or `'action_required'`, or `'initializing'` during
+   * a prolonged automatic reconnect (fifth attempt onward, or while a failed relaunch waits to retry);
+   * `null` otherwise.
+   */
   lastError?: string | null;
   /**
    * A limit WhatsApp itself has placed on the account, or `null` when there is none. Distinct from
