@@ -605,6 +605,11 @@ export class SessionEngineLifecycle {
   }
 
   private async initializeEngine(id: string, session: Session): Promise<void> {
+    // A stop that landed before this engine exists had nothing to tear down and already wrote its
+    // DISCONNECTED; registering now would overwrite it with INITIALIZING and then retire. start()
+    // clears its own mark and executeReconnect checks it on entry, so a mark seen here always came
+    // from a later stop, force-kill, logout or delete.
+    if (this.stoppingSessions.has(id)) return;
     this.logger.log(`Initializing engine for session: ${session.name}`, {
       sessionId: id,
       action: 'engine_init',

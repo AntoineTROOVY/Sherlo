@@ -7083,6 +7083,28 @@ describe('SessionService', () => {
       expect(engineFactory.purgeSessionData).not.toHaveBeenCalledWith('sess-uuid-2');
     });
 
+    it('keeps the DISCONNECTED a stop wrote while start() awaited session:starting', async () => {
+      // The stop finds no engine yet, so nothing fences its write: an engine registered after it
+      // would overwrite the row with INITIALIZING and then retire, leaving a stopped session that
+      // reads as starting, with no engine, until the next boot.
+      const row = createMockSession({ status: SessionStatus.DISCONNECTED });
+      (repository.findOne as jest.Mock).mockImplementation(() => Promise.resolve({ ...row }));
+      (repository.update as jest.Mock).mockImplementation((_where: unknown, patch: Partial<Session>) => {
+        Object.assign(row, patch);
+        return Promise.resolve({ affected: 1 });
+      });
+      (hookManager.execute as jest.Mock).mockImplementation(async (event: string) => {
+        if (event === 'session:starting') await service.stop('sess-uuid-1');
+        return { continue: true, data: {} };
+      });
+
+      await service.start('sess-uuid-1');
+
+      expect(row).toMatchObject({ status: SessionStatus.DISCONNECTED, desiredState: 'stopped' });
+      expect(engineFactory.create).not.toHaveBeenCalled();
+      expect(service.getEngine('sess-uuid-1')).toBeUndefined();
+    });
+
     it('does not purge anything on a normal start (session row present throughout)', async () => {
       (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
       (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
