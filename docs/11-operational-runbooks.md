@@ -199,14 +199,13 @@ docker compose logs openwa-api 2>&1 | grep -i "heap\|memory\|gc"
 
 # 4. Immediate actions:
 
-# A. Clear the in-process cache (no runtime cache-clear API — restart the container;
-#    if using Redis, flush via redis-cli)
+# A. Restart container (will reconnect sessions). This also drops the in-process caches; there
+#    is no runtime cache-clear API. Flushing Redis frees no openwa-api memory, since Redis is a
+#    separate process. Never run FLUSHALL: the queue and rate limits live in db 0, and the cache
+#    has its own database (REDIS_CACHE_DB, default 1)
 docker compose restart openwa-api
 
-# B. Restart container (will reconnect sessions)
-docker compose restart openwa-api
-
-# C. If caused by too many sessions:
+# B. If caused by too many sessions:
 # List sessions (no sort param); process memory is in stats/overview (memoryUsage, MB)
 curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions/stats/overview
