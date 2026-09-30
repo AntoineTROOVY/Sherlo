@@ -5,6 +5,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement, useState, type ReactNode } from 'react';
 import type { Chat } from '../../services/api.ts';
+import type { ChatMessageView } from '../../utils/chatMessages.ts';
 import type { StagedAttachment } from './ChatComposer.tsx';
 
 let rtl: typeof import('@testing-library/react');
@@ -72,7 +73,7 @@ function Harness() {
   const [messageInput, setMessageInput] = useState('');
   const [attachment, setAttachment] = useState<StagedAttachment | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [replyingTo, setReplyingTo] = useState<null>(null);
+  const [replyingTo, setReplyingTo] = useState<ChatMessageView | null>(null);
   return createElement(ChatComposer, {
     selectedSessionId: 'sess-1',
     activeChat: chat,
