@@ -315,6 +315,11 @@ export function Chats() {
   const chatsRequestRef = useRef(0);
   const chatsAppliedRef = useRef(0);
   const chatsSessionRef = useRef('');
+  // The session whose list `chats` holds, which a switch leaves on screen until the new list lands.
+  const listedSessionRef = useRef('');
+  // The newest request number out when a live frame last moved each chat's row. A send stamps its row
+  // with the browser clock, so only this, not a newer timestamp, shows a row changed after a refetch left.
+  const liveRowsRef = useRef(new Map<string, number>());
   const loadChats = useCallback(
     async (sessionId: string, { background = false } = {}): Promise<boolean> => {
       if (!sessionId) return false;
@@ -329,14 +334,27 @@ export function Chats() {
         const data = await sessionApi.getChats(sessionId);
         if (stale()) return overtaken();
         chatsAppliedRef.current = request;
-        const sorted = [...data].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        setChats(sorted);
+        // A live frame can move a row past the snapshot a background refetch was built from while it is
+        // out. That row is kept, or its preview and unread badge would roll back until the next message.
+        const moved = (id: string) => (liveRowsRef.current.get(id) ?? 0) >= request;
+        const merge = background && listedSessionRef.current === sessionId;
+        listedSessionRef.current = sessionId;
+        setChats(prev => {
+          const live = new Map(merge ? prev.map(c => [c.id, c] as const) : []);
+          return data
+            .map(c => {
+              const row = live.get(c.id);
+              return row && moved(c.id) && (row.timestamp || 0) > (c.timestamp || 0) ? row : c;
+            })
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        });
         return true;
       } catch (err) {
         if (stale()) return overtaken();
         // A background refetch only refreshes summaries: keep the list it would have replaced.
         if (background) return false;
         showLoadError('chats.errors.loadChats', err);
+        listedSessionRef.current = sessionId;
         setChats([]);
         return false;
       } finally {
@@ -456,6 +474,7 @@ export function Chats() {
         // A location message's body is the (multi-KB) base64 map thumbnail; show a label instead.
         locationLabel: `📍 ${t('chats.media.location')}`,
       };
+      liveRowsRef.current.set(newMsg.chatId, chatsRequestRef.current);
       const { needsSidebarRefetch } = applyIncomingToChatList(chatsRef.current, newMsg, listOptions);
       setChats(prevChats => applyIncomingToChatList(prevChats, newMsg, listOptions).chats);
       if (needsSidebarRefetch) {

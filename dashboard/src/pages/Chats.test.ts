@@ -864,6 +864,78 @@ test('a socket reconnect refetches the chat list so the sidebar shows what arriv
   assert.equal(countFetchCalls('GET', chatsPath), 2);
 });
 
+test('a message that lands while a reconnect refetch is out survives the older snapshot', async () => {
+  const { screen, act, waitFor } = rtl;
+  resetFetchCalls();
+  renderChats();
+  await screen.findByText('Alice');
+
+  // The refetch's snapshot was built before the live message below reached the gateway.
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  chatsResponder = () => gate.then(() => jsonResponse([CHAT, CHAT_2]));
+  const socket = lastSocket();
+  assert.ok(socket, 'expected the page to have opened a socket');
+  act(() => socket.receive('disconnect', 'transport close'));
+  act(() => socket.receive('connect'));
+  await waitFor(() => assert.equal(countFetchCalls('GET', `/api/sessions/${SESSION.id}/chats`), 2));
+
+  act(() =>
+    socket.receive('message', {
+      type: 'event',
+      timestamp: new Date(1_700_002_000_000).toISOString(),
+      payload: {
+        event: 'message.received',
+        sessionId: SESSION.id,
+        data: {
+          id: 'wamid.live.refetch',
+          chatId: CHAT.id,
+          from: CHAT.id,
+          to: 'me',
+          body: 'while the list reloads',
+          type: 'text',
+          fromMe: false,
+          timestamp: 1_700_001_000,
+        },
+      },
+    }),
+  );
+  await screen.findByText('while the list reloads');
+
+  release();
+  await flush();
+  await flush();
+  assert.ok(screen.queryByText('while the list reloads'), 'the older snapshot replaced the live preview');
+  assert.ok(screen.queryByLabelText('3 unread messages'), 'the older snapshot dropped the live unread count');
+});
+
+test('a row a send stamped with the browser clock does not outrank a later reconnect snapshot', async () => {
+  const { screen, fireEvent, within, act, waitFor } = rtl;
+  const { container } = renderChats();
+  await screen.findByText('Main (15551234567)');
+  fireEvent.click(await screen.findByText('Alice'));
+  await within(container.querySelector('.room-messages') as HTMLElement).findByText('hello from alice');
+
+  // The send stamps Alice's row with the browser clock, far ahead of the fixture timestamps, and no
+  // echo arrives to replace that stamp with the gateway's.
+  fireEvent.change(screen.getByPlaceholderText('Type a message...'), { target: { value: 'hello back' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+  await waitFor(() => assert.ok(findFetchCall('POST', `/api/sessions/${SESSION.id}/messages/send-text`)));
+
+  chatsResponder = () =>
+    Promise.resolve(
+      jsonResponse([{ ...CHAT, lastMessage: 'a reply after the send', timestamp: 1_700_000_800 }, CHAT_2]),
+    );
+  const socket = lastSocket();
+  assert.ok(socket, 'expected the page to have opened a socket');
+  act(() => socket.receive('disconnect', 'transport close'));
+  act(() => socket.receive('connect'));
+
+  await screen.findByText('a reply after the send');
+});
+
 test('a socket reconnect keeps the open chat read instead of badging it with the gap count', async () => {
   const { screen, fireEvent, within, act, waitFor } = rtl;
   const { container } = renderChats();
