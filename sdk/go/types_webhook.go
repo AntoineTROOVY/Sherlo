@@ -180,8 +180,9 @@ type WebhookTestResult struct {
 	Error      string `json:"error,omitempty"`
 }
 
-// WebhookDeliveryFailure is a webhook delivery abandoned after every retry,
-// as listed by the delivery-failure log.
+// WebhookDeliveryFailure is a webhook delivery that exhausted its retries, or
+// one never sent (Attempts 0) that the outbox replays, as listed by the
+// delivery-failure log. A later successful delivery removes the row.
 type WebhookDeliveryFailure struct {
 	ID        string `json:"id"`
 	WebhookID string `json:"webhookId"`
@@ -191,13 +192,14 @@ type WebhookDeliveryFailure struct {
 	// IdempotencyKey is the key the receiver would have deduped on.
 	IdempotencyKey *string `json:"idempotencyKey,omitempty"`
 	DeliveryID     *string `json:"deliveryId,omitempty"`
-	// Attempts is the total number of attempts made before giving up.
+	// Attempts is the number of attempts recorded; 0 when the delivery was
+	// shed, refused or failed before sending.
 	Attempts int `json:"attempts"`
 	// LastStatusCode is the last HTTP status when the failure was a non-2xx
 	// response; nil for a network or timeout error.
 	LastStatusCode *int   `json:"lastStatusCode,omitempty"`
 	LastError      string `json:"lastError"`
-	// CreatedAt is the ISO timestamp of when the delivery was finally abandoned.
+	// CreatedAt is the ISO timestamp of when the failure was first recorded.
 	CreatedAt string `json:"createdAt"`
 }
 
