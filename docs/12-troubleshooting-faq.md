@@ -1441,23 +1441,25 @@ available_events:
 {
   "event": "message.received",
   "timestamp": "2026-02-02T10:30:00Z",
-  "sessionId": "sess_abc123",
-  "idempotencyKey": "msg_sess_abc123_ABC123_DEF456_f1e2d3c4-b5a6-7890-1234-567890abcdef",
+  "sessionId": "3f2a9c1e-7b4d-4e8a-9c2f-1d5e6a7b8c9d",
+  "idempotencyKey": "msg_3f2a9c1e-7b4d-4e8a-9c2f-1d5e6a7b8c9d_ABC123_DEF456_f1e2d3c4-b5a6-7890-1234-567890abcdef",
   "deliveryId": "dlv_550e8400-e29b-41d4-a716-446655440000",
   "data": {
     "id": "ABC123_DEF456",
     "from": "628123456789@c.us",
     "to": "628987654321@c.us",
+    "chatId": "628123456789@c.us",
     "body": "Hello!",
     "type": "text",
     "timestamp": 1706868600,
+    "fromMe": false,
     "isGroup": false,
-    "author": null,
-    "hasMedia": false,
-    "media": null
+    "kind": "individual"
   }
 }
 ```
+
+A media message also carries `media: { mimetype, filename?, data?, omitted?, sizeBytes? }`, and a group message carries `author` (the sender, since `from` is the group); neither is present on a 1:1 text message like this one. There is no `hasMedia` field: test for `media`.
 
 ## 12.9 Error Code Reference
 
