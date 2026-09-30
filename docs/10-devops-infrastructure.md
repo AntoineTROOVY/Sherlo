@@ -426,7 +426,8 @@ LOG_FORMAT=json
 # REDIS_HOST=localhost
 # REDIS_PORT=6379
 # REDIS_TLS=false      # true for a Redis that requires TLS (not the built-in container); every client
-#                      # (cache, rate limits, queue, WebSocket fan-out) uses it. Private CA: NODE_EXTRA_CA_CERTS
+#                      # (cache, rate limits, queue, WebSocket fan-out) uses it. Private CA: NODE_EXTRA_CA_CERTS in the launch
+#                      # environment (shell, systemd, compose environment:), not in .env
 # REDIS_CACHE_DB=1     # logical database for the cache
 # Redis-backed caching switches on when REDIS_ENABLED=true OR CACHE_ENABLED=true — enabling Redis
 # for the queue alone therefore also enables the cache.
@@ -446,8 +447,9 @@ LOG_FORMAT=json
 # PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 # PUPPETEER_HEADLESS=true
 # PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu
-# Optional per-browser-command budget, ms. Unset = Puppeteer's own budget. Raise only after seeing
-# "Runtime.callFunctionOn timed out"; positive integer, max 2147483647 (cost: see docs/12).
+# Optional per-browser-command budget, ms. Unset = Puppeteer's own budget. Raise only after a read answers
+# 503 "did not answer ... in time" or fails with "Runtime.callFunctionOn timed out"; positive integer, max
+# 2147483647 (cost: see docs/12).
 # PUPPETEER_PROTOCOL_TIMEOUT_MS=300000
 
 # ===========================================
