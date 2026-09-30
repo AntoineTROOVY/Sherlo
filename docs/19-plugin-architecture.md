@@ -543,8 +543,9 @@ sub-directory with a `manifest.json` it reads the manifest, validates the requir
 (`id`/`name`/`version`/`type`/`main`), and records an `INSTALLED` plugin plus a persisted registry
 entry — **without running any plugin code**. Persisted config and per-session activation/config are
 read back so an operator's choices survive a restart. There are two version gates. The manifest
-validator refuses a plugin whose `minOpenWAVersion` is newer than the running OpenWA (the plugin goes
-to `ERROR` with its config kept, and loads again after a host upgrade), and `validateIngressManifest`
+validator refuses a plugin whose `minOpenWAVersion` is newer than the running OpenWA (at boot the
+plugin is skipped and logged as `plugin_load_failed`, it does not appear in `GET /plugins`, and
+its config is kept so it loads again after a host upgrade), and `validateIngressManifest`
 refuses a manifest declaring `ingress` whose `sdkVersion` major is not the supported Integration SDK
 major (`1`).
 
