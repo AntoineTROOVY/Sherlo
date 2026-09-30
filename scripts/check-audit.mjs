@@ -22,7 +22,7 @@
  * Run locally: `npm run check:audit`.
  */
 import { execFileSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -167,13 +167,13 @@ export function evaluate(report, allowlist = ALLOWLIST) {
 
 // Guarded so the spec can import the two functions above without running a real audit.
 //
-// Compare RESOLVED PATHS, not a hand-built file URL. `import.meta.url` is percent-encoded, so any
+// Compare REAL PATHS, not a hand-built file URL. `import.meta.url` is percent-encoded, so any
 // checkout path needing escaping (a space, a `#`, non-ASCII) made `file://${process.argv[1]}`
 // differ and the gate exited 0 having run no audit at all. On Windows it never matched: argv[1] is
 // a native path with backslashes and a drive letter. `fileURLToPath` decodes the URL to a native
-// path and `resolve` normalises argv[1], which is the comparison check-sdk-docs.mjs and
-// check-upstream-surface.mjs already use.
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// path and `realpathSync` resolves argv[1], symlinks included (Node realpaths the main module URL,
+// so an unresolved path through a symlink never matched).
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const report = runAudit();
 
   // A registry that cannot answer the audit request must not be read as a clean tree. On a merge
