@@ -951,9 +951,13 @@ du -sh "$(docker inspect --format='{{.LogPath}}' openwa-api)"
 
 # 3. Clean up:
 
-# A. Docker cleanup
-docker system prune -af
-docker volume prune -f
+# A. Docker cleanup: dangling images and build cache only
+docker image prune -f
+docker builder prune -f
+# Never run `docker system prune` or `docker volume prune` on this host. They remove stopped
+# containers (a stopped openwa-api, or a built-in openwa-postgres/openwa-redis/openwa-minio), and on
+# Docker older than 23.0 or on Podman the volume prune deletes every unused named volume, including
+# openwa_openwa-data (API keys, session auth, media) and openwa_postgres-data.
 
 # B. Container log (Docker-managed; cap it at the daemon/compose log-driver level to stop it
 #    growing back)
@@ -962,9 +966,10 @@ sudo truncate -s 0 "$(docker inspect --format='{{.LogPath}}' openwa-api)"
 # C. Old backups
 find /backups -name "*.tar.gz" -mtime +30 -delete
 
-# D. Message attachments (if backed up)
-# Warning: This deletes media files
-find ./data/media -mtime +30 -delete
+# D. Archived chat media: let the app expire it instead of deleting files, which leaves rows
+#    pointing at missing files. Set CHAT_MEDIA_ARCHIVE_TTL_DAYS (default 0, keep forever) and
+#    restart; expiry clears the file and the row's media columns. Under the production compose the
+#    media lives in the openwa_openwa-data volume, not in ./data in the checkout.
 
 # 4. Verify
 df -h
