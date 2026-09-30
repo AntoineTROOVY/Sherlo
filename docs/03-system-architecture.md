@@ -507,16 +507,14 @@ classDiagram
 flowchart TB
     subgraph Outbound["Outbound Message Flow"]
         A1[API Request] --> V1[Validate]
-        V1 --> Q1[Queue Job]
-        Q1 --> P1[Process]
-        P1 --> E1[Engine Send]
+        V1 --> E1[Engine Send]
         E1 --> R1[Response]
     end
 
     subgraph Inbound["Inbound Message Flow"]
         E2[Engine Event] --> P2[Process]
         P2 --> S2[Store]
-        S2 --> W2[Webhook Queue]
+        S2 --> W2[Webhook Dispatch]
         W2 --> D2[Deliver]
     end
 ```
@@ -585,14 +583,14 @@ flowchart LR
 
     subgraph Processing["3. Processing"]
         E --> F[Get Session]
-        F --> G{Session Ready?}
+        F --> G{Engine loaded?}
         G -->|No| H[400 Error]
-        G -->|Yes| I[Queue Job]
+        G -->|Yes| G2{Engine ready?}
+        G2 -->|No| H2[409 Error]
+        G2 -->|Yes| K[Engine]
     end
 
     subgraph Execution["4. Execution"]
-        I --> J[Worker]
-        J --> K[Engine]
         K --> L[WhatsApp]
     end
 
@@ -608,12 +606,14 @@ flowchart LR
 ```mermaid
 flowchart TB
     A[Event Triggered] --> B[Create Payload]
-    B --> C[Sign Payload]
-    C --> D[Queue Delivery Job]
-    D --> E[Worker Process]
+    B --> Q{QUEUE_ENABLED?}
+    Q -->|No, default| D1[Direct in-process delivery]
+    Q -->|Yes| D2[BullMQ delivery job]
+    D1 --> E[Sign & POST]
+    D2 --> E
     E --> F{Deliver}
     F -->|Success| G[Mark Delivered]
-    F -->|Failed| H{Retry < 3?}
+    F -->|Failed| H{Attempts < webhook.retryCount?}
     H -->|Yes| I[Delay & Retry]
     I --> E
     H -->|No| J[Mark Failed]
