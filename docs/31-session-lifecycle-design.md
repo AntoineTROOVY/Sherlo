@@ -77,8 +77,11 @@ session lingers on disk.
 (`session-engine-lifecycle.service.ts`) call `isSessionRetired`, which treats a stop mark or a missing
 row as retired (delete clears its mark before a slow init resolves), then tear down the
 just-registered engine and re-purge with `purgeAuthDirsIfDeleted`.
-**Pinned by:** `session.service.spec.ts` ('tears down the just-initialized engine if a
-stop/delete lands during start() (no resurrection to READY)').
+**Pinned by:** `session.service.spec.ts` ('re-purges the auth dirs when a start completes after its
+row was deleted (init re-created them)' for `start()`, and 'tears down an engine created when a
+delete lands during init (session row gone, mark cleared)' for `executeReconnect`). The opposite half,
+that a stop retirement does not purge, is pinned by 'tears down the just-initialized engine if a
+stop/delete lands during start() (no resurrection to READY)'.
 
 ### INV-6 — Lease loss tears down local engines only; it never writes session rows
 
