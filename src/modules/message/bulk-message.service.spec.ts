@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, HttpException, PayloadTooLargeException } from '@nestjs/common';
 import { LoggerService } from '../../common/services/logger.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { In, Not } from 'typeorm';
+import { In } from 'typeorm';
 import {
   BulkMessageService,
   resolveFinalBatchStatus,
@@ -1038,7 +1038,9 @@ describe('BulkMessageService.processBatch', () => {
   });
 
   it('stops sending when the batch is cancelled in the DB by another instance/restart', async () => {
-    repo.findOne.mockResolvedValue(makeBatch(3));
+    repo.findOne
+      .mockResolvedValueOnce(makeBatch(3)) // pickup
+      .mockResolvedValueOnce({ status: BatchStatus.CANCELLED }); // re-read after the cadence write missed
     repo.update
       .mockResolvedValueOnce({ affected: 1 }) // start transition → PROCESSING
       .mockResolvedValueOnce({ affected: 0 }) // cadence write at i=0 loses to the committed CANCELLED
@@ -1053,9 +1055,72 @@ describe('BulkMessageService.processBatch', () => {
     // as a 0-row cadence write), a save would INSERT it again.
     expect(repo.save).not.toHaveBeenCalled();
     expect(repo.update).toHaveBeenLastCalledWith(
-      { id: 'b1' },
+      { id: 'b1', status: In([BatchStatus.PROCESSING, BatchStatus.CANCELLED]) },
       expect.objectContaining({ status: BatchStatus.CANCELLED, completedAt: expect.any(Date) as unknown }),
     );
+  });
+
+  // A session deleted mid-run takes the batch row with it; that reads as a cancel, as before.
+  it('treats a batch row deleted mid-run as a cancel', async () => {
+    repo.findOne
+      .mockResolvedValueOnce(makeBatch(3)) // pickup
+      .mockResolvedValueOnce(null); // re-read after the cadence write missed: the row is gone
+    repo.update
+      .mockResolvedValueOnce({ affected: 1 }) // start transition
+      .mockResolvedValueOnce({ affected: 0 }) // cadence write at i=0
+      .mockResolvedValue({ affected: 0 }); // the reconciling write finds no row either
+
+    await runProcessBatch();
+
+    expect(engine.sendTextMessage).toHaveBeenCalledTimes(1);
+    expect(repo.save).not.toHaveBeenCalled();
+    expect(repo.update).toHaveBeenNthCalledWith(
+      3,
+      { id: 'b1', status: In([BatchStatus.PROCESSING, BatchStatus.CANCELLED]) },
+      expect.objectContaining({ status: BatchStatus.CANCELLED }),
+    );
+    // The reconciliation found no row, so the results write follows; guarded on FAILED, it matches
+    // nothing either.
+    expect(repo.update).toHaveBeenLastCalledWith({ id: 'b1', status: BatchStatus.FAILED }, expect.anything());
+  });
+
+  // A lapsed lease does not mean a dead process: a node whose engine went away stops renewing while
+  // its batch loop runs on. Another node that takes the session over fails the batch; this run keeps
+  // that FAILED and records only the items it sent.
+  it('stops without writing over a batch another node failed mid-run, keeping what it sent', async () => {
+    repo.findOne
+      .mockResolvedValueOnce(makeBatch(3)) // pickup
+      .mockResolvedValueOnce({ status: BatchStatus.FAILED }); // re-read after the cadence write missed
+    repo.update
+      .mockResolvedValueOnce({ affected: 1 }) // start transition
+      .mockResolvedValueOnce({ affected: 0 }); // cadence write at i=0: the row is FAILED now
+
+    await runProcessBatch();
+
+    expect(engine.sendTextMessage).toHaveBeenCalledTimes(1);
+    expect(repo.update).toHaveBeenCalledTimes(3);
+    const [criteria, partial] = (repo.update.mock.calls as Array<[unknown, Partial<MessageBatch>]>).at(-1)!;
+    expect(criteria).toEqual({ id: 'b1', status: BatchStatus.FAILED });
+    expect(partial.status).toBeUndefined(); // the reap's FAILED stays
+    expect(partial.completedAt).toBeUndefined();
+    expect(partial).toMatchObject({ currentIndex: 1, progress: expect.objectContaining({ sent: 1 }) as unknown });
+    expect(partial.results).toHaveLength(1);
+  });
+
+  it('leaves the status of a batch another node failed before its last write, keeping what it sent', async () => {
+    repo.findOne
+      .mockResolvedValueOnce(makeBatch(1)) // pickup
+      .mockResolvedValueOnce({ status: BatchStatus.FAILED }); // pre-final re-read
+    await runProcessBatch();
+
+    const calls = repo.update.mock.calls as Array<[unknown, Partial<MessageBatch>]>;
+    expect(calls.map(([, p]) => p.status)).toEqual([BatchStatus.PROCESSING, undefined, undefined]);
+    const [criteria, partial] = calls.at(-1)!;
+    expect(criteria).toEqual({ id: 'b1', status: BatchStatus.FAILED }); // results only, never a status
+    expect(partial).toMatchObject({ currentIndex: 1, progress: expect.objectContaining({ sent: 1 }) as unknown });
+    expect(partial.results).toHaveLength(1);
+    expect(partial.completedAt).toBeUndefined();
+    expect(partial.messages).toBeUndefined();
   });
 
   it('sends nothing when the batch row is already CANCELLED at pickup (cancel-before-start)', async () => {
@@ -1122,7 +1187,8 @@ describe('BulkMessageService.processBatch', () => {
     const batch = makeBatch(1);
     repo.findOne
       .mockResolvedValueOnce(batch) // processBatch initial load
-      .mockResolvedValueOnce({ status: BatchStatus.PROCESSING }); // pre-final re-read — cancel not visible yet
+      .mockResolvedValueOnce({ status: BatchStatus.PROCESSING }) // pre-final re-read — cancel not visible yet
+      .mockResolvedValueOnce({ status: BatchStatus.CANCELLED }); // after the final write missed
     repo.update
       .mockResolvedValueOnce({ affected: 1 }) // start transition → PROCESSING
       .mockResolvedValueOnce({ affected: 1 }) // cadence write (i=0, also the last item)
@@ -1132,8 +1198,71 @@ describe('BulkMessageService.processBatch', () => {
 
     expect(batch.status).toBe(BatchStatus.CANCELLED); // terminal state follows the DB, not the runner
     expect(repo.save).not.toHaveBeenCalled(); // no unguarded terminal write happened
-    const finalCriteria = (repo.update.mock.calls as Array<[unknown, unknown]>).at(-1)![0];
-    expect(finalCriteria).toEqual({ id: 'b1', status: Not(BatchStatus.CANCELLED) });
+    const calls = repo.update.mock.calls as Array<[unknown, Partial<MessageBatch>]>;
+    expect(calls[2][0]).toEqual({ id: 'b1', status: BatchStatus.PROCESSING }); // the guarded final write
+    // The cancel keeps its status; the run's results and reconciled counters go under it.
+    expect(calls[3][0]).toEqual({ id: 'b1', status: BatchStatus.CANCELLED });
+    expect(calls[3][1].status).toBeUndefined();
+    expect(calls[3][1].results).toHaveLength(1);
+  });
+
+  // The loop can stop between progress saves (stopOnError here), so the final write is the only place
+  // the last items are recorded. A reap or a cross-process cancel that wins it keeps its status, and those
+  // items still go on the row: as they are under FAILED, reconciled as cancelBatch would under CANCELLED.
+  it.each([
+    [BatchStatus.FAILED, { sent: 2, failed: 1, pending: 1, cancelled: 0 }],
+    [BatchStatus.CANCELLED, { sent: 2, failed: 1, pending: 0, cancelled: 1 }],
+  ])('keeps the %s that won the final write race, and records what the run sent', async (winner, progress) => {
+    const batch = makeBatch(4);
+    batch.options = { ...batch.options, stopOnError: true };
+    engine.sendTextMessage
+      .mockResolvedValueOnce({ id: 'wa1', timestamp: 111 }) // i=0, saved by the cadence write
+      .mockResolvedValueOnce({ id: 'wa2', timestamp: 112 }) // i=1, sent after the last save
+      .mockRejectedValueOnce(new Error('boom')); // i=2 fails and stops the loop before any save
+    repo.findOne
+      .mockResolvedValueOnce(batch) // pickup
+      .mockResolvedValueOnce({ status: BatchStatus.PROCESSING }) // pre-final re-read
+      .mockResolvedValueOnce({ status: winner }); // after the final write missed
+    repo.update
+      .mockResolvedValueOnce({ affected: 1 }) // start transition
+      .mockResolvedValueOnce({ affected: 1 }) // cadence write at i=0
+      .mockResolvedValueOnce({ affected: 0 }); // final write loses the race
+
+    await runProcessBatch();
+
+    expect(batch.status).toBe(winner);
+    expect(repo.update).toHaveBeenCalledTimes(4);
+    const [criteria, partial] = (repo.update.mock.calls as Array<[unknown, Partial<MessageBatch>]>).at(-1)!;
+    expect(criteria).toEqual({ id: 'b1', status: winner });
+    expect(partial.status).toBeUndefined();
+    expect(partial.completedAt).toBeUndefined();
+    expect(partial.results).toHaveLength(3);
+    expect(partial.progress).toEqual(expect.objectContaining(progress));
+  });
+
+  it('records what the run sent when a reap beats its cancel reconciliation', async () => {
+    repo.findOne
+      .mockResolvedValueOnce(makeBatch(3)) // pickup
+      .mockResolvedValueOnce({ status: BatchStatus.PROCESSING }); // pre-final re-read
+    engine.sendTextMessage.mockImplementationOnce(() => {
+      inFlightMarkers().set('b1', false); // a cancel on this node lands while the first send is in flight
+      return Promise.resolve({ id: 'wa1', timestamp: 111 });
+    });
+    repo.update
+      .mockResolvedValueOnce({ affected: 1 }) // start transition
+      .mockResolvedValueOnce({ affected: 1 }) // cadence write at i=0
+      .mockResolvedValueOnce({ affected: 0 }); // the CANCELLED reconciliation loses to the reap
+
+    await runProcessBatch();
+
+    const calls = repo.update.mock.calls as Array<[unknown, Partial<MessageBatch>]>;
+    expect(calls).toHaveLength(4);
+    expect(calls[2][0]).toEqual({ id: 'b1', status: In([BatchStatus.PROCESSING, BatchStatus.CANCELLED]) });
+    expect(calls[3][0]).toEqual({ id: 'b1', status: BatchStatus.FAILED });
+    expect(calls[3][1].status).toBeUndefined();
+    expect(calls[3][1].results).toHaveLength(1);
+    // That cancel never took effect, so the FAILED row keeps the unreconciled counters.
+    expect(calls[3][1].progress).toMatchObject({ sent: 1, pending: 2, cancelled: 0 });
   });
 
   it('substitutes canonical {{name}} placeholders in bulk content', async () => {

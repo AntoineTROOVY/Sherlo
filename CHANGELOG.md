@@ -162,6 +162,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `POST /api/sessions/:sessionId/messages/send-bulk` answers `429` instead of `400` when the node already runs `BULK_MAX_CONCURRENT_BATCHES` batches, so clients retry it.
 - A bulk batch whose run failed before processing started, or whose process died first, ends `FAILED` instead of staying `PENDING`, and batches failed by the startup or takeover reap report `completedAt`.
 - Starting or stopping a session whose node's lease lapsed, with `POST /api/sessions/:sessionId/start` or `POST /api/sessions/:sessionId/stop`, fails that node's unfinished bulk batches, as the takeover sweep does; before, they stayed `PENDING` or `PROCESSING` until a node restarted.
+- A bulk batch failed by the node that took over its session stays `FAILED`: a node still running it stops at its next progress save and records only the items it sent, instead of writing its own outcome over it.
+- A bulk batch cancelled from another node just as its run finishes keeps the run's results, and its counters no longer report items that were delivered as cancelled.
 - `SEND_PACING_COLD_DAILY_CAP=0` or `off` turns the cold-reachout cap off; a blank value set in the container environment could not, because the boot drops blank container variables.
 - A session stopped while it was starting or reconnecting no longer reads `initializing` until the next restart.
 - A stop and start issued while a reconnect was still tearing down the old engine no longer leaves a second engine running on the same account.

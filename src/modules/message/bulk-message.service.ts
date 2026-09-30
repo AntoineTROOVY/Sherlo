@@ -102,7 +102,15 @@ interface BatchExecutionState {
   results: BatchMessageResult[];
   stoppedOnError: boolean;
   cancelledByDb: boolean;
+  /**
+   * Another writer ended the row (a reap after the session was taken over): keep its status and
+   * record only what this run sent.
+   */
+  endedElsewhere: boolean;
 }
+
+/** A terminal status only another writer can have put on a row this run still holds as PROCESSING. */
+const ENDED_ELSEWHERE = new Set<BatchStatus>([BatchStatus.FAILED, BatchStatus.COMPLETED]);
 
 @Injectable()
 export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap {
@@ -444,7 +452,7 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap 
     }
 
     const results: BatchMessageResult[] = batch.results || [];
-    const state: BatchExecutionState = { results, stoppedOnError: false, cancelledByDb: false };
+    const state: BatchExecutionState = { results, stoppedOnError: false, cancelledByDb: false, endedElsewhere: false };
     await this.processBatchMessages(batch, state);
     await this.finalizeBatch(batch, state);
   }
@@ -645,17 +653,16 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap 
 
     // Save progress periodically (every 10 messages or last message)
     if (i % 10 === 0 || i === batch.messages.length - 1) {
-      // Honor a cancellation issued by ANY process — the in-memory Map only sees same-process
-      // cancels. The guard lives IN the UPDATE (not a read-then-write), so a CANCELLED that
-      // committed first can never be clobbered back to PROCESSING: zero affected rows means the
-      // cancel won and the loop stops.
+      // Honor a cancellation issued by ANY process (the in-memory Map only sees same-process
+      // cancels), and a reap that failed the batch after another node took the session over. The
+      // guard lives IN the UPDATE (not a read-then-write), so neither can be written over: zero
+      // affected rows stops the loop, and the row says which of the two it was.
       const progressSaved = await this.batchRepository.update(
-        { id: batch.id, status: Not(BatchStatus.CANCELLED) },
+        { id: batch.id, status: BatchStatus.PROCESSING },
         { progress: batch.progress, results, currentIndex: batch.currentIndex },
       );
       if (!progressSaved.affected) {
-        state.cancelledByDb = true;
-        this.logger.log(`Batch ${batch.batchId} cancelled (DB) at index ${i}`);
+        await this.noteRowLeftProcessing(batch, state, `at index ${i}`);
         return false;
       }
     }
@@ -668,8 +675,44 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap 
     return true;
   }
 
+  /**
+   * The row stopped being PROCESSING under this run. CANCELLED, or a row deleted with its session, is
+   * a cancel, reconciled by finalizeBatch. FAILED was written by another node's reap after it took the
+   * session over (COMPLETED is matched too, though only this run writes it); that status is the
+   * batch's outcome now, and this run only records what it sent.
+   */
+  private async noteRowLeftProcessing(batch: MessageBatch, state: BatchExecutionState, where: string): Promise<void> {
+    const fresh = await this.batchRepository.findOne({ where: { id: batch.id }, select: { status: true } });
+    if (fresh && ENDED_ELSEWHERE.has(fresh.status)) {
+      state.endedElsewhere = true;
+      this.logger.warn(`Batch ${batch.batchId} was ended elsewhere (${fresh.status}) ${where}; keeping that status`);
+      return;
+    }
+    state.cancelledByDb = true;
+    this.logger.log(`Batch ${batch.batchId} cancelled (DB) ${where}`);
+  }
+
+  /**
+   * Another writer set this row's status (a reap's FAILED, or a cancel that won the final write), but
+   * only this run knows which items it sent: record them, so the batch status reports the delivered
+   * items and a re-issue can leave them out. Guarded on that status; status, completedAt and the
+   * stripped payloads stay as the other writer left them.
+   */
+  private async keepResultsOnEndedRow(
+    batch: MessageBatch,
+    results: BatchMessageResult[],
+    status: BatchStatus = BatchStatus.FAILED,
+    progress: BatchProgress = batch.progress,
+  ): Promise<void> {
+    await this.batchRepository.update(
+      { id: batch.id, status },
+      { progress, results, currentIndex: batch.currentIndex },
+    );
+  }
+
   private async finalizeBatch(batch: MessageBatch, state: BatchExecutionState): Promise<void> {
     const { results } = state;
+    if (state.endedElsewhere) return this.keepResultsOnEndedRow(batch, results);
     // Final update. `batch` still holds the in-memory PROCESSING status from the start, so the
     // terminal status is re-derived from the cancellation signals (DB + in-memory flag) rather than
     // saved blindly. The re-read below narrows the race window so the reconciled counters stay
@@ -678,15 +721,16 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap 
       const fresh = await this.batchRepository.findOne({ where: { id: batch.id }, select: { status: true } });
       if (fresh?.status === BatchStatus.CANCELLED) {
         state.cancelledByDb = true;
+      } else if (fresh && ENDED_ELSEWHERE.has(fresh.status)) {
+        this.logger.warn(`Batch ${batch.batchId} was ended elsewhere (${fresh.status}); keeping that status`);
+        return this.keepResultsOnEndedRow(batch, results);
       }
     }
     const cancelled = state.cancelledByDb || !this.processingBatches.get(batch.id);
     batch.status = resolveFinalBatchStatus(cancelled, state.stoppedOnError, batch.progress);
-    if (cancelled) {
-      // Reconcile the counters the same way cancelBatch does, so the persisted state is consistent.
-      batch.progress.cancelled = batch.progress.pending;
-      batch.progress.pending = 0;
-    }
+    // Counters reconciled the same way cancelBatch does, for a CANCELLED row only. A copy: a write that
+    // loses to a reap records the unreconciled counters, since that cancel never took effect.
+    const cancelledProgress: BatchProgress = { ...batch.progress, cancelled: batch.progress.pending, pending: 0 };
     batch.completedAt = new Date();
     batch.results = results;
     // The batch is terminal now (never resumed), so drop the base64 media payloads before persisting —
@@ -695,28 +739,38 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap 
     this.stripBatchMediaPayloads(batch.messages);
     const terminal = {
       status: batch.status,
-      progress: batch.progress,
+      progress: cancelled ? cancelledProgress : batch.progress,
       results,
       currentIndex: batch.currentIndex,
       completedAt: batch.completedAt,
       messages: batch.messages,
     } as QueryDeepPartialEntity<MessageBatch>;
     if (batch.status === BatchStatus.CANCELLED) {
-      // Persisting CANCELLED can never resurrect a finished batch — write the reconciled counters
-      // over cancelBatch's own (possibly earlier, staler) write. An UPDATE, not a save: a row deleted
+      // Write the reconciled counters over cancelBatch's own (possibly earlier, staler) write, but
+      // never over a batch another node's reap failed meanwhile. An UPDATE, not a save: a row deleted
       // with its session also reads as a cancel, and save() would INSERT it back.
-      await this.batchRepository.update({ id: batch.id }, terminal);
-    } else {
-      // A cancel may have committed after the re-read above; the guard IN the UPDATE makes this
-      // terminal write unable to flip a CANCELLED batch back to COMPLETED/FAILED. Zero affected
-      // rows means the cancel won the final race — the batch stays exactly as cancelBatch left it.
-      const finalized = await this.batchRepository.update(
-        { id: batch.id, status: Not(BatchStatus.CANCELLED) },
+      const reconciled = await this.batchRepository.update(
+        { id: batch.id, status: In([BatchStatus.PROCESSING, BatchStatus.CANCELLED]) },
         terminal,
       );
+      // A reap that failed the batch after the re-read above keeps its status; the items this run sent
+      // still go on the row (a no-op for a row deleted with its session).
+      if (!reconciled.affected) await this.keepResultsOnEndedRow(batch, results);
+    } else {
+      // A cancel or a reap may have committed after the re-read above; the guard IN the UPDATE makes
+      // this terminal write unable to replace either. Zero affected rows means one of them won the
+      // final race: its status stands, and this run still records what it sent, with the counters
+      // reconciled for a cancel.
+      const finalized = await this.batchRepository.update({ id: batch.id, status: BatchStatus.PROCESSING }, terminal);
       if (!finalized.affected) {
-        batch.status = BatchStatus.CANCELLED;
-        this.logger.log(`Batch ${batch.batchId} was cancelled just before completion; keeping CANCELLED`);
+        const stored = await this.batchRepository.findOne({ where: { id: batch.id }, select: { status: true } });
+        batch.status = stored?.status ?? BatchStatus.CANCELLED;
+        if (batch.status === BatchStatus.FAILED) {
+          await this.keepResultsOnEndedRow(batch, results);
+        } else if (batch.status === BatchStatus.CANCELLED && stored) {
+          await this.keepResultsOnEndedRow(batch, results, BatchStatus.CANCELLED, cancelledProgress);
+        }
+        this.logger.log(`Batch ${batch.batchId} left PROCESSING just before completion; keeping ${batch.status}`);
       }
     }
 
