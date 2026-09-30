@@ -8431,6 +8431,40 @@ describe('SessionService', () => {
         }
       });
 
+      // The stop's own write is a no-op on a row already marked stopped, so the start's clear that
+      // lands after it erased the stop, and the next boot relaunched a session left down by a stop.
+      it('a stop that finishes just before an explicit start clears the record keeps the session down', async () => {
+        const stopped = await sessions.save(
+          sessions.create({
+            name: 'cleared-late',
+            status: SessionStatus.DISCONNECTED,
+            phone: '628777',
+            config: {},
+            desiredState: 'stopped',
+          }),
+        );
+        (repository.findOne as jest.Mock).mockImplementation((opts: Parameters<Repository<Session>['findOne']>[0]) =>
+          sessions.findOne(opts),
+        );
+        let stopResult: Promise<unknown> | undefined;
+        (repository.update as jest.Mock).mockImplementation(
+          async (...args: Parameters<Repository<Session>['update']>) => {
+            const patch = args[1] as { desiredState?: unknown };
+            if (!stopResult && patch.desiredState === null) {
+              stopResult = service.stop(stopped.id);
+              await stopResult;
+            }
+            return sessions.update(...args);
+          },
+        );
+
+        await service.start(stopped.id, { explicit: true });
+
+        await expect(stopResult).resolves.toBeDefined();
+        expect(lifecycle.isEngineActive(stopped.id)).toBe(false);
+        expect((await sessions.findOneByOrFail({ id: stopped.id })).desiredState).toBe('stopped');
+      });
+
       // The start that holds the reservation already cleared the stop; the refused one must not
       // bring it back over the session that start is launching.
       it('an explicit start refused by another explicit start leaves the stop cleared', async () => {
