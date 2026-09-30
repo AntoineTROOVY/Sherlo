@@ -119,9 +119,10 @@ export function voiceEncodeArgs(): string[] {
  *
  * Baseline H.264 with yuv420p is the combination that plays on every WhatsApp client, including the
  * older Android ones that reject High profile. `faststart` relocates the index to the front so the
- * receiver can begin playback before the whole file arrives. The scale filter bounds the long edge
- * at 1280 while `-2` keeps the other edge even, which H.264 requires — and `min()` means a smaller
- * video is never upscaled into a larger file than it started as.
+ * receiver can begin playback before the whole file arrives. The scale filter caps whichever edge is
+ * longer at 1280 and truncates it to even, while `-2` derives the other edge and keeps it even, which
+ * H.264 requires — and `min()` means a smaller video is never upscaled into a larger file than it
+ * started as.
  */
 export function videoEncodeArgs(): string[] {
   return [
@@ -134,7 +135,7 @@ export function videoEncodeArgs(): string[] {
     '-pix_fmt',
     'yuv420p',
     '-vf',
-    "scale='min(1280,iw)':-2",
+    "scale='if(gte(iw,ih),min(1280,trunc(iw/2)*2),-2)':'if(gte(iw,ih),-2,min(1280,trunc(ih/2)*2))'",
     '-c:a',
     'aac',
     '-b:a',
