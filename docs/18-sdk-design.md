@@ -577,13 +577,13 @@ Resources are accessed as properties on the client (e.g. `client.messages`). All
 | ----------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `list`                        | `list(session_id, query=None) -> list[GroupSummary]`                                         | List groups (`query`: `limit`, `offset`).                                                                                  |
 | `get`                         | `get(session_id, group_id) -> GroupInfo`                                                     | Get group details.                                                                                                         |
-| `create`                      | `create(session_id, body) -> GroupInfo`                                                      | Create a group. **OPERATOR**                                                                                               |
+| `create`                      | `create(session_id, body) -> GroupSummary`                                                   | Create a group. **OPERATOR**                                                                                               |
 | `join_info`                   | `join_info(session_id, code) -> GroupJoinInfo`                                               | Preview a group from its invite code WITHOUT joining. Read-only, so it is safe to call on a code from an untrusted source. |
 | `join_group`                  | `join_group(session_id, body) -> JoinGroupResponse`                                          | Join a group via its invite code. **OPERATOR**                                                                             |
-| `add_participants`            | `add_participants(session_id, group_id, participants) -> SuccessResult`                      | Add participants (`list[str]`). **OPERATOR**                                                                               |
-| `remove_participants`         | `remove_participants(session_id, group_id, participants) -> SuccessResult`                   | Remove participants. **OPERATOR**                                                                                          |
-| `promote_participants`        | `promote_participants(session_id, group_id, participants) -> SuccessResult`                  | Promote to admin. **OPERATOR**                                                                                             |
-| `demote_participants`         | `demote_participants(session_id, group_id, participants) -> SuccessResult`                   | Demote from admin. **OPERATOR**                                                                                            |
+| `add_participants`            | `add_participants(session_id, group_id, participants) -> ParticipantsResult`                 | Add participants (`list[str]`). A partial refusal still answers 200, so check `results`. **OPERATOR**                      |
+| `remove_participants`         | `remove_participants(session_id, group_id, participants) -> ParticipantsResult`              | Remove participants. A partial refusal still answers 200, so check `results`. **OPERATOR**                                 |
+| `promote_participants`        | `promote_participants(session_id, group_id, participants) -> ParticipantsResult`             | Promote to admin. A partial refusal still answers 200, so check `results`. **OPERATOR**                                    |
+| `demote_participants`         | `demote_participants(session_id, group_id, participants) -> ParticipantsResult`              | Demote from admin. A partial refusal still answers 200, so check `results`. **OPERATOR**                                   |
 | `set_subject`                 | `set_subject(session_id, group_id, subject) -> SuccessResult`                                | Set group subject. **OPERATOR**                                                                                            |
 | `set_description`             | `set_description(session_id, group_id, description) -> SuccessResult`                        | Set group description. **OPERATOR**                                                                                        |
 | `get_group_settings`          | `get_group_settings(session_id, group_id) -> GroupSettings`                                  | Get the group settings (announce / locked / ephemeral timer).                                                              |
@@ -657,12 +657,12 @@ Resources are accessed as properties on the client (e.g. `client.messages`). All
 
 #### `client.catalog` _(WhatsApp Business)_
 
-| Method         | Signature                                               | Description                          |
-| -------------- | ------------------------------------------------------- | ------------------------------------ |
-| `info`         | `info(session_id) -> CatalogInfo`                       | Get catalog info.                    |
-| `products`     | `products(session_id, query=None) -> PaginatedProducts` | List products (paginated).           |
-| `product`      | `product(session_id, product_id) -> CatalogProduct`     | Get one product.                     |
-| `send_product` | `send_product(session_id, body) -> MessageResponse`     | Send a product message. **OPERATOR** |
+| Method         | Signature                                                  | Description                                                                         |
+| -------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `info`         | `info(session_id) -> CatalogInfo`                          | Get catalog info.                                                                   |
+| `products`     | `products(session_id, query=None) -> PaginatedProducts`    | List products (paginated).                                                          |
+| `product`      | `product(session_id, product_id) -> CatalogProduct`        | Get one product.                                                                    |
+| `send_product` | `send_product(session_id, body) -> ProductMessageResponse` | Send a product message; the message id is under `id`, not `messageId`. **OPERATOR** |
 
 #### `client.status` _(Stories)_
 
