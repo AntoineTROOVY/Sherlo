@@ -24,7 +24,8 @@ var (
 	// ErrUnauthorized is returned for a 401 (missing or invalid API key).
 	ErrUnauthorized = errors.New("openwa: unauthorized")
 	// ErrForbidden is returned for a 403: the API key's role or scope (session,
-	// IP or chat allow-list) refuses the call.
+	// IP or chat allow-list) refuses the call, or WhatsApp itself refused the
+	// operation (for example, missing group admin rights).
 	ErrForbidden = errors.New("openwa: forbidden")
 	// ErrNotFound is returned for a 404.
 	ErrNotFound = errors.New("openwa: not found")
