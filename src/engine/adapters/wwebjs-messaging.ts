@@ -24,6 +24,7 @@ import { buildVCard } from './vcard';
 import { EngineNotSupportedError } from '../../common/errors/engine-not-supported.error';
 import { RecipientUnreachableError } from '../../common/errors/recipient-unreachable.error';
 import { type WwebjsEngineHost, withPage } from './wwebjs-host';
+import { toCapturedPageError } from './wwebjs-lifecycle';
 
 /**
  * Map a whatsapp-web.js MessageAck integer to the neutral DeliveryStatus.
@@ -349,7 +350,7 @@ export class WwebjsMessaging {
         throw new MessageNotFoundError(quotedMessageId);
       }
       if (!chatId.endsWith('@c.us') || !isNoLidForUserError(err)) {
-        throw err;
+        throw toCapturedPageError(err);
       }
       this.resolvedSendIds.delete(chatId);
       const fresh = await this.resolveSendId(chatId);
@@ -378,7 +379,7 @@ export class WwebjsMessaging {
         if (isNoLidForUserError(retryErr)) {
           throw new RecipientUnreachableError(chatId);
         }
-        throw retryErr;
+        throw toCapturedPageError(retryErr);
       }
     }
   }
@@ -703,7 +704,7 @@ export class WwebjsMessaging {
       }
       await (message as MessageWithReactions).react(emoji);
     });
-    this.host.logger.log(`Reacted to message ${messageId} with ${emoji || '(removed)'}`);
+    this.host.logger.debug('Reacted to message', { messageId, emoji: emoji || '(removed)' });
   }
 
   async getMessageReactions(chatId: string, messageId: string): Promise<MessageReaction[]> {
@@ -881,7 +882,7 @@ export class WwebjsMessaging {
       }
       await message.delete(forEveryone);
     });
-    this.host.logger.log(`Deleted message ${messageId} from chat ${chatId} (forEveryone: ${forEveryone})`);
+    this.host.logger.debug('Deleted message', { chatId, messageId, forEveryone });
   }
 
   async editMessage(chatId: string, messageId: string, body: string, mentions?: string[]): Promise<MessageResult> {
@@ -913,7 +914,7 @@ export class WwebjsMessaging {
         `the edit of message ${messageId} was rejected — only the account's own text messages can be edited`,
       );
     }
-    this.host.logger.log(`Edited message ${messageId} in chat ${chatId}`);
+    this.host.logger.debug('Edited message', { chatId, messageId });
     return toMessageResult(edited);
   }
 
@@ -954,7 +955,7 @@ export class WwebjsMessaging {
       }
       throw error;
     }
-    this.host.logger.log(`Voted on poll ${pollMessageId} in chat ${chatId} (${options.length} option(s))`);
+    this.host.logger.debug('Voted on poll', { chatId, pollMessageId, options: options.length });
   }
 
   async pinMessage(chatId: string, messageId: string, durationSeconds: number): Promise<void> {
@@ -971,7 +972,7 @@ export class WwebjsMessaging {
         `the pin of message ${messageId} was rejected — in a group only admins may pin, and the duration must be 24h, 7d or 30d`,
       );
     }
-    this.host.logger.log(`Pinned message ${messageId} in chat ${chatId} for ${durationSeconds}s`);
+    this.host.logger.debug('Pinned message', { chatId, messageId, durationSeconds });
   }
 
   async starMessage(chatId: string, messageId: string, star: boolean): Promise<void> {
@@ -983,7 +984,7 @@ export class WwebjsMessaging {
       const message = await this.findInFetchWindow(chatId, messageId);
       await (star ? message.star() : message.unstar());
     });
-    this.host.logger.log(`${star ? 'Starred' : 'Unstarred'} message ${messageId} in chat ${chatId}`);
+    this.host.logger.debug(star ? 'Starred message' : 'Unstarred message', { chatId, messageId });
   }
 
   async unpinMessage(chatId: string, messageId: string): Promise<void> {
@@ -997,6 +998,6 @@ export class WwebjsMessaging {
     if (!unpinned) {
       throw new EngineRefusedError(`the unpin of message ${messageId} was rejected — in a group only admins may unpin`);
     }
-    this.host.logger.log(`Unpinned message ${messageId} in chat ${chatId}`);
+    this.host.logger.debug('Unpinned message', { chatId, messageId });
   }
 }
