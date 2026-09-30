@@ -93,6 +93,7 @@
     "unreadBadge": "{{count}} messaggio non letto",
     "unreadBadge_other": "{{count}} messaggi non letti",
     "unreadBadge_many": "{{count}} messaggi non letti",
+    "markedUnread": "Segnato come da leggere",
     "loadingMessages": "Caricamento messaggi...",
     "loadingOlderMessages": "Caricamento messaggi precedenti...",
     "loadOlderMessagesError": "Impossibile caricare i messaggi precedenti. Scorri verso l’alto per riprovare.",

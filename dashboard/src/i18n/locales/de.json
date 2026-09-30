@@ -90,6 +90,7 @@
     "noMessageYet": "Noch keine Nachrichten",
     "unreadBadge": "{{count}} ungelesene Nachricht",
     "unreadBadge_other": "{{count}} ungelesene Nachrichten",
+    "markedUnread": "Als ungelesen markiert",
     "loadingMessages": "Nachrichten werden geladen...",
     "loadingOlderMessages": "Ältere Nachrichten werden geladen...",
     "loadOlderMessagesError": "Ältere Nachrichten konnten nicht geladen werden. Zum erneuten Versuch nach oben scrollen.",

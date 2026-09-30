@@ -90,6 +90,7 @@
     "noMessageYet": "Belum ada pesan",
     "unreadBadge": "{{count}} pesan belum dibaca",
     "unreadBadge_other": "{{count}} pesan belum dibaca",
+    "markedUnread": "Ditandai belum dibaca",
     "loadingMessages": "Memuat pesan...",
     "loadingOlderMessages": "Memuat pesan lama...",
     "loadOlderMessagesError": "Gagal memuat pesan lama. Gulir ke atas untuk mencoba lagi.",

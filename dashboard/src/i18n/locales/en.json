@@ -90,6 +90,7 @@
     "noMessageYet": "No messages yet",
     "unreadBadge": "{{count}} unread message",
     "unreadBadge_other": "{{count}} unread messages",
+    "markedUnread": "Marked as unread",
     "loadingMessages": "Loading messages...",
     "loadingOlderMessages": "Loading older messages...",
     "loadOlderMessagesError": "Couldn't load older messages. Scroll up to retry.",

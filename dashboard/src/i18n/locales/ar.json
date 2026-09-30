@@ -102,6 +102,7 @@
     "unreadBadge_few": "{{count}} رسائل غير مقروءة",
     "unreadBadge_many": "{{count}} رسالة غير مقروءة",
     "unreadBadge_zero": "{{count}} رسالة غير مقروءة",
+    "markedUnread": "مُعلَّمة كغير مقروءة",
     "loadingMessages": "جارٍ تحميل الرسائل...",
     "loadingOlderMessages": "جارٍ تحميل الرسائل الأقدم...",
     "loadOlderMessagesError": "تعذر تحميل الرسائل الأقدم. مرر لأعلى للمحاولة مرة أخرى.",

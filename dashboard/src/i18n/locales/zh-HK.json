@@ -90,6 +90,7 @@
     "noMessageYet": "尚無訊息",
     "unreadBadge": "{{count}} 條未讀訊息",
     "unreadBadge_other": "{{count}} 條未讀訊息",
+    "markedUnread": "已標示為未讀",
     "loadingMessages": "正在載入訊息...",
     "loadingOlderMessages": "正在載入較舊的訊息...",
     "loadOlderMessagesError": "無法載入較舊的訊息。向上捲動重試。",

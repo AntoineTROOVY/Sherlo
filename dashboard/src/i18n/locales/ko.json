@@ -90,6 +90,7 @@
     "noMessageYet": "아직 메시지 없음",
     "unreadBadge": "읽지 않은 메시지 {{count}}개",
     "unreadBadge_other": "읽지 않은 메시지 {{count}}개",
+    "markedUnread": "읽지 않음으로 표시됨",
     "loadingMessages": "메시지 불러오는 중...",
     "loadingOlderMessages": "이전 메시지 불러오는 중...",
     "loadOlderMessagesError": "이전 메시지를 불러오지 못했습니다. 위로 스크롤하여 다시 시도하세요.",

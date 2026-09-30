@@ -90,6 +90,7 @@
     "noMessageYet": "Henüz mesaj yok",
     "unreadBadge": "{{count}} okunmamış mesaj",
     "unreadBadge_other": "{{count}} okunmamış mesaj",
+    "markedUnread": "Okunmadı olarak işaretlendi",
     "loadingMessages": "Mesajlar yükleniyor...",
     "loadingOlderMessages": "Daha eski mesajlar yükleniyor...",
     "loadOlderMessagesError": "Daha eski mesajlar yüklenemedi. Tekrar denemek için yukarı kaydırın.",
