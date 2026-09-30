@@ -93,8 +93,9 @@ export async function generateSafeLinkPreview(
         };
       },
       // The fetched URL comes from the message text, so it is caller-supplied the same way a media
-      // URL is: on a proxied session it leaves through the session proxy (#1626).
-      { proxyUrl: urlFetchProxy(opts.sessionProxyUrl) },
+      // URL is: on a proxied session it leaves through the session proxy (#1626). A bare domain, an
+      // http link and a short link all answer with a redirect; the guard vets every hop it follows.
+      { proxyUrl: urlFetchProxy(opts.sessionProxyUrl), followRedirects: true },
     );
   } catch {
     // Blocked destination, DNS failure, timeout, malformed response — all the same to a caller who
