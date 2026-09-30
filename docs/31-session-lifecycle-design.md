@@ -142,13 +142,13 @@ for minutes; detaching from bootstrap means the API answers while engines warm.
 Every transition has a known, enumerated set of writers. When debugging a status surprise, find the
 writer before anything else:
 
-| Transition                      | Writers                                                                                   |
-| ------------------------------- | ----------------------------------------------------------------------------------------- |
-| → `INITIALIZING`                | `initializeEngine` (persisted before `initialize()`)                                      |
-| → `QR_READY` / `AUTHENTICATING` | engine callbacks (wired in the lifecycle delegate), via the registry's liveness check     |
-| → `READY`                       | `handleEngineReady` (also drops a recorded failure reason, see INV-7's rationale comment) |
-| → `DISCONNECTED`                | init-timeout eviction, graceful stop, puppeteer-death detection                           |
-| → `FAILED`                      | four terminal paths only, all ownership-fenced: see below                                 |
+| Transition                      | Writers                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| → `INITIALIZING`                | `initializeEngine` (persisted before `initialize()`)                                                                                                                                                                                                                                                                                                                              |
+| → `QR_READY` / `AUTHENTICATING` | engine callbacks (wired in the lifecycle delegate), via the registry's liveness check                                                                                                                                                                                                                                                                                             |
+| → `READY`                       | `handleEngineReady` (also drops a recorded failure reason, see INV-7's rationale comment)                                                                                                                                                                                                                                                                                         |
+| → `DISCONNECTED`                | init-timeout eviction, graceful stop, logout, forceKill, a delete whose teardown fence times out, the engine `onDisconnected` callback and the liveness watchdog (`handleEngineDisconnected`), the boot reset, a backup import (active rows restored as disconnected), engine-reported `DISCONNECTED` via `onStateChanged`, the takeover sweep's `markLapsedDisconnected` (INV-6) |
+| → `FAILED`                      | five terminal paths only, all ownership-fenced: see below                                                                                                                                                                                                                                                                                                                         |
 
 `FAILED` is the one worth spelling out, because it is terminal (neither the boot reset nor the
 takeover sweep resumes a FAILED row, INV-7) and because more than one path reaches it:
@@ -160,10 +160,12 @@ takeover sweep resumes a FAILED row, INV-7) and because more than one path reach
    forwards verbatim (`session-engine-event-wiring.ts`).
 4. A reconnect chain that EXHAUSTS its attempts, so the session is not left silently stuck
    `DISCONNECTED` with no engine (`session-engine-lifecycle.service.ts`).
+5. `rejectRebind`, when a different WhatsApp account scans a bound session's QR: it logs that account
+   out and lands `FAILED` with the reason (`session-engine-lifecycle.service.ts`).
 
 What still holds, and is load-bearing, is the narrower claim: no reconnect ATTEMPT writes FAILED.
 Only the exhaustion of the whole chain does. A loop that marked each failed attempt would turn every
-transient network blip into an operator-visible terminal state and defeat INV-7's signal. All four
+transient network blip into an operator-visible terminal state and defeat INV-7's signal. All five
 paths are fenced on `ownsSession`, so a dying generation cannot park a peer's session in a status
 nothing resets automatically.
 
