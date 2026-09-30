@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -1692,6 +1693,31 @@ func TestTimeoutReportsTheBudgetThatExpired(t *testing.T) {
 		te = nil
 		if !errors.As(err, &te) || te.Timeout != 0 || err.Error() != "openwa: request timed out" {
 			t.Errorf("flush=%v caller deadline: err = %v, want a *TimeoutError without a duration", flush, err)
+		}
+	}
+}
+
+// argsLogger records every logged key-value argument as text.
+type argsLogger struct{ text strings.Builder }
+
+func (l *argsLogger) Log(_ context.Context, _ string, msg string, args ...any) {
+	fmt.Fprintln(&l.text, msg, args)
+}
+
+// A base URL may carry basic-auth credentials for a fronting proxy; the
+// password must not reach the request log.
+func TestRequestLogRedactsBaseURLPassword(t *testing.T) {
+	ok := &recordTransport{status: 200, body: `{}`}
+	failing := RoundTripperFunc(func(*http.Request) (*http.Response, error) { return nil, errors.New("refused") })
+	for _, rt := range []http.RoundTripper{ok, failing} {
+		lg := &argsLogger{}
+		c, err := New("https://proxyuser:s3cret@api.example.com", "k", WithTransport(rt), WithLogger(lg))
+		if err != nil {
+			t.Fatalf("New: %v", err)
+		}
+		_, _ = c.Health.Check(context.Background())
+		if got := lg.text.String(); !strings.Contains(got, "api.example.com") || strings.Contains(got, "s3cret") {
+			t.Errorf("request log = %q, want the URL without the password", got)
 		}
 	}
 }
