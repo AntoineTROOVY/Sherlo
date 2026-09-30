@@ -440,7 +440,7 @@ afterEach(async () => {
   statuses = [];
 });
 
-function renderChats(): { container: HTMLElement } {
+function renderChats(): ReturnType<RTL['render']> {
   // The avatar and message hooks set their own gcTime over this 1s default; afterEach cancels before it
   // clears so their timers cannot hold the test process open.
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 1_000 } } });
@@ -1021,6 +1021,37 @@ test('a reconnect refetch that settles after the open chat was left keeps its un
         (c.body as { chatId?: string } | undefined)?.chatId === CHAT.id,
     ),
     'the chat the user left was marked read',
+  );
+});
+
+test('a reconnect refetch that settles after the page was left sends no mark-as-read', async () => {
+  const { screen, fireEvent, within, act, waitFor } = rtl;
+  const { container, unmount } = renderChats();
+  await screen.findByText('Main (15551234567)');
+  fireEvent.click(await screen.findByText('Alice'));
+  await within(container.querySelector('.room-messages') as HTMLElement).findByText('hello from alice');
+  await new Promise(resolve => setTimeout(resolve, 1_000));
+  resetFetchCalls();
+
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  chatsResponder = () =>
+    gate.then(() => jsonResponse([{ ...CHAT, unreadCount: 4, lastMessage: 'sent after leaving' }, CHAT_2]));
+  const socket = lastSocket();
+  assert.ok(socket, 'expected the page to have opened a socket');
+  act(() => socket.receive('disconnect', 'transport close'));
+  act(() => socket.receive('connect'));
+  await waitFor(() => assert.equal(countFetchCalls('GET', `/api/sessions/${SESSION.id}/chats`), 1));
+
+  // The operator opens another page before the refetch lands; the gap messages were never seen.
+  unmount();
+  release();
+  await new Promise(resolve => setTimeout(resolve, 1_000));
+  assert.ok(
+    !findFetchCall('POST', `/api/sessions/${SESSION.id}/chats/read`),
+    'the chat was marked read after the page was left',
   );
 });
 

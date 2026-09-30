@@ -428,6 +428,14 @@ export function Chats() {
     chatsRef.current = chats;
     activeChatIdRef.current = activeChat?.id;
   });
+  // A request that settles after the page is left no longer finds the chat open, so its follow-ups
+  // (the reconnect mark-as-read) do nothing.
+  useEffect(
+    () => () => {
+      activeChatIdRef.current = undefined;
+    },
+    [],
+  );
   const handleIncomingMessage = useCallback(
     (event: { sessionId: string; message: Record<string, unknown> }) => {
       if (event.sessionId !== selectedSessionId) return;
