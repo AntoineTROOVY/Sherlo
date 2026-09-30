@@ -1225,6 +1225,9 @@ export class SessionEngineLifecycle {
       if (this.reconnectStates.get(id) === state) this.cancelReconnect(id);
       return;
     }
+    // The engine this attempt registers, captured like start() does: the catch must reap this one, not
+    // whatever a later attempt has registered by the time the init rejects.
+    let mine: IWhatsAppEngine | undefined;
     try {
       // Clean up old engine. Time-bound the teardown: a wedged Chromium (the common reconnect
       // trigger) makes destroy() hang, and a raw await here would stall the reconnect forever —
@@ -1261,7 +1264,11 @@ export class SessionEngineLifecycle {
       // parkReconnectInitFailure): a failed launch must retry, not land FAILED and strand the session.
       state.initInFlight = true;
       try {
-        await this.initializeEngine(id, session);
+        const before = this.engines.get(id);
+        const init = this.initializeEngine(id, session);
+        const registered = this.engines.get(id);
+        mine = registered !== before ? registered : undefined;
+        await init;
       } finally {
         state.initInFlight = false;
       }
@@ -1315,11 +1322,13 @@ export class SessionEngineLifecycle {
       // initializeEngine registers the engine in the map BEFORE engine.initialize() runs, so a rejected
       // re-init leaves a half-built engine behind. Evict + reap it: otherwise a reconnect that later
       // exhausts its attempts strands an orphaned Chromium holding a concurrency slot, and the next
-      // start() sees the session as "already started".
-      const halfBuilt = this.engines.get(id);
-      if (halfBuilt) {
-        this.evictAndForceDestroy(id, halfBuilt);
-      }
+      // start() sees the session as "already started". Only while it is still registered: otherwise the
+      // init deadline has reaped it already, or a later attempt destroyed it as its old engine.
+      if (mine && this.engines.isLive(id, mine)) this.evictAndForceDestroy(id, mine);
+      // A disconnect of this attempt's engine mid-init re-armed the same state, and a later attempt
+      // registered a replacement before this init rejected. That attempt owns the episode: arming
+      // another would destroy its engine as the old one, or kill it on the exhausted branch.
+      if (this.engines.has(id)) return;
       if (this.stoppingSessions.has(id)) {
         this.cancelReconnect(id);
         return;

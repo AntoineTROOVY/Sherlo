@@ -2957,6 +2957,26 @@ describe('SessionService', () => {
       for (const state of internals().reconnectStates.values()) if (state.timer) clearTimeout(state.timer);
     });
 
+    it('does not reap a replacement registered while its init ran, nor arm an attempt over it', async () => {
+      // A disconnect of this attempt's engine mid-init re-arms the same state, and the next attempt
+      // registers a replacement before this init rejects. That replacement owns the episode now.
+      const i = internals();
+      const init = deferredInit();
+      const state = armState();
+      const replacement = { ...mockEngine, forceDestroy: jest.fn().mockResolvedValue(undefined) };
+
+      const run = i.executeReconnect(ID, createMockSession(), state);
+      await flush();
+      i.engines.set(ID, replacement as never);
+      init.fail('net::ERR_CONNECTION_RESET');
+      await run;
+      await flush();
+
+      expect(i.engines.get(ID)).toBe(replacement);
+      expect(replacement.forceDestroy).not.toHaveBeenCalled();
+      expect(state.timer).toBeNull();
+    });
+
     it('retries a network rejection: same state re-armed, no FAILED, no session:error, engine evicted once', async () => {
       const i = internals();
       mockEngine.initialize.mockImplementationOnce(failingInit('net::ERR_NAME_NOT_RESOLVED'));
