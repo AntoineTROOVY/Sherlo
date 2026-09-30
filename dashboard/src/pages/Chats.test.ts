@@ -1881,6 +1881,32 @@ test("a search hit whose chat the other session's list lacks does not open it la
   }
 });
 
+test('a second search hit in the chat already open scrolls to it at once', async () => {
+  const { screen, fireEvent, within, waitFor } = rtl;
+  searchHits = [{ ...THIRD_SESSION_HIT, sessionId: SESSION.id, chatId: CHAT.id, waMessageId: DB_MESSAGE.waMessageId! }];
+  const scrolled: Element[] = [];
+  const original = Element.prototype.scrollIntoView;
+  Element.prototype.scrollIntoView = function (this: Element) {
+    scrolled.push(this);
+  };
+  try {
+    const { container } = renderChats();
+    fireEvent.click(await screen.findByText('Alice'));
+    await within(container.querySelector('.room-messages') as HTMLElement).findByText('hello from alice');
+    const toHit = () => scrolled.filter(el => el.getAttribute('data-wa-message-id') === DB_MESSAGE.waMessageId);
+
+    await clickSearchHit(container);
+    await waitFor(() => assert.equal(toHit().length, 1, 'the first hit did not scroll'));
+    // The same hit again, after the user scrolled away: the chat is open, so nothing else changes.
+    fireEvent.click(screen.getByLabelText('Search messages…'));
+    fireEvent.click(await waitFor(() => container.querySelector('.global-search-hit') as HTMLElement));
+    await flush();
+    assert.equal(toHit().length, 2, 'the second hit did not scroll');
+  } finally {
+    Element.prototype.scrollIntoView = original;
+  }
+});
+
 test('changing the UI language keeps the selected session and the open chat', async () => {
   const { screen, fireEvent, within, waitFor, act } = rtl;
   const { default: i18n } = await import('../i18n/index.ts');

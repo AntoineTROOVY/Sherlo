@@ -783,6 +783,9 @@ export function Chats() {
   // async gap: the chat-select effect picks it up once the list lands, and the scroll effect runs
   // once the messages have rendered.
   const pendingHitRef = useRef<{ sessionId: string; chatId: string; waMessageId: string } | null>(null);
+  // Bumped with every hit, so a hit in the chat already open still re-runs the scroll effect, where
+  // every other state it sets is unchanged and React skips the render.
+  const [hitSeq, setHitSeq] = useState(0);
 
   const handleSearchHit = useCallback(
     async (hit: SearchHit) => {
@@ -805,6 +808,7 @@ export function Chats() {
         setSessions(ready);
       }
       pendingHitRef.current = { sessionId: hit.sessionId, chatId: hit.chatId, waMessageId: hit.waMessageId };
+      setHitSeq(n => n + 1);
       if (hit.sessionId !== selectedSessionId) {
         // Switching session triggers loadChats; the effect below selects the chat once the list lands.
         setSelectedSessionId(hit.sessionId);
@@ -885,7 +889,7 @@ export function Chats() {
       }
     }
     pendingHitRef.current = null;
-  }, [activeChat, loadingMessages, messages, messagesContainerRef]);
+  }, [activeChat, loadingMessages, messages, messagesContainerRef, hitSeq]);
 
   // Helper formats
   const formatChatTime = useCallback(
