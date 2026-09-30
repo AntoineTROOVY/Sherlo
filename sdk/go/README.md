@@ -121,9 +121,12 @@ per-second tier, up to an hour for the hourly tier by default);
 honors. A 429 whose `APIError.Code` is `"SEND_PACING_LIMITED"` is not transient:
 do not retry it before `RetryAfter`, which then comes from the body and can be
 hours. `APIError.Header` holds the response headers. A timeout surfaces as
-`*openwa.TimeoutError`. In a routed deployment only 503 proves the request was
-never carried out: a forward that fails after the request reached the owner node
-answers 502 or 504.
+`*openwa.TimeoutError`. A 503 does not prove a write was never carried out: the
+engine answers it when WhatsApp did not confirm in time, and the change may still
+have been applied, so re-read the state before repeating it. In a routed
+deployment a forward that fails before reaching the owner node answers 503, one
+that fails after the request reached it answers 502 or 504, and a 503 from the
+owner itself is relayed unchanged.
 
 ## Retries
 
