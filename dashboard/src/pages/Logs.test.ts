@@ -7,6 +7,8 @@
 import '../test-helpers/register-hooks.ts';
 import { test, before, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { AuditLog } from '../services/api';
@@ -254,5 +256,16 @@ test('a row written while the export walks the pages is not exported twice', asy
   } finally {
     exportGrowsMidWalk = false;
     restore();
+  }
+});
+
+test('the table grid declares one column track per rendered cell', async () => {
+  const container = renderLogs();
+  await rtl.screen.findByText('infra.restart');
+  const css = readFileSync(fileURLToPath(new URL('./Logs.css', import.meta.url)), 'utf8');
+  const template = css.match(/\.logs-table \.table-row \{[^}]*grid-template-columns: ([^;]+);/)?.[1];
+  assert.ok(template, 'the row grid template was not found');
+  for (const row of container.querySelectorAll('.logs-table .table-row')) {
+    assert.equal(template.split(/\s+/).length, row.children.length, template);
   }
 });
