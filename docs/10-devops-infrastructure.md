@@ -1111,10 +1111,12 @@ These are the metrics OpenWA actually exports at `GET /api/metrics`:
 | **System**   | `openwa_process_heap_used_bytes`              | V8 heap used                                            | Growth                           |
 | **System**   | `openwa_process_uptime_seconds`               | Process uptime                                          | Frequent restarts (resets)       |
 
-> OpenWA does **not** expose request-rate, latency-histogram, webhook, queue, or Node default
-> (`nodejs_*`) metrics. For host/container-level signals (CPU, memory pressure, event-loop), scrape
-> external exporters: `up` and `container_memory_usage_bytes` come from blackbox/cAdvisor, and
-> `node_*` from node-exporter — not from the app.
+> This table is a starting subset. The HTTP (`http_requests_total`, `http_request_duration_seconds`),
+> webhook (`openwa_webhook_delivery_failures_total`), queue (`openwa_queue_jobs`) and event-loop
+> (`openwa_event_loop_delay_*`) series are in the complete list under **Exported metric names** above.
+> OpenWA does **not** expose Node default (`nodejs_*`) metrics or host/container CPU and memory
+> signals; scrape cAdvisor (`container_*`) or node-exporter (`node_*`) for those. `up` is recorded by
+> Prometheus itself for every scrape target.
 
 ## 10.7 Backup & Recovery
 
