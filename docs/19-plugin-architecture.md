@@ -186,9 +186,11 @@ it has an opaque origin and no access to the dashboard. It talks to the host by 
 
 `theme` matters because an opaque-origin iframe cannot read the dashboard's theme for itself; without it
 an editor can only guess, and a light-only editor becomes a glaring white panel inside a dark modal. It is
-sent once, with the handshake — the theme control sits behind the modal overlay, so the theme cannot
-change while an editor is open. Treat it as optional: an editor that ignores it still works, and one that
-uses it should fall back to `prefers-color-scheme` so it stays readable on an older host.
+sent once, with the handshake — the theme control sits behind the modal overlay, so an explicit Light or
+Dark choice cannot change while an editor is open. With the System theme, though, an OS color-scheme change
+is not forwarded, so an editor that wants to follow it should also listen to `prefers-color-scheme` inside
+the frame. Treat it as optional: an editor that ignores it still works, and one that uses it should fall
+back to `prefers-color-scheme` so it stays readable on an older host.
 
 `locale` is the dashboard's language code (`'es'`, `'zh-CN'`, ...), sent for the same reason: the iframe
 cannot read the operator's language setting, and `navigator.language` differs from it whenever the
