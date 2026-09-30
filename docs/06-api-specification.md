@@ -6964,7 +6964,7 @@ Live events are pushed as a **nested** envelope (note: `data` is under `payload`
 }
 ```
 
-Error `code` values include `UNAUTHORIZED`, `INVALID_MESSAGE`, `INVALID_SESSION`, `INVALID_EVENTS`, `FORBIDDEN_SESSION`, and `TOO_MANY_SUBSCRIPTIONS`. A subscribe answers `INVALID_SESSION` when `sessionId` is missing, or is neither `"*"` nor a session id of at most 128 letters, digits and hyphens. It answers `TOO_MANY_SUBSCRIPTIONS` when it would take the connection past 4096 rooms (one per session and event subscribed); unsubscribe before subscribing to more.
+Error `code` values include `UNAUTHORIZED`, `INVALID_MESSAGE`, `INVALID_SESSION`, `INVALID_EVENTS`, `FORBIDDEN_SESSION`, `TOO_MANY_SUBSCRIPTIONS`, and `RATE_LIMITED`. `RATE_LIMITED` is followed by a disconnect when a handshake exceeds the per-IP connection-attempt window or the key's concurrent-socket cap; a frame over the per-key frame budget gets `RATE_LIMITED` and is dropped undispatched, and the socket stays open. A subscribe answers `INVALID_SESSION` when `sessionId` is missing, or is neither `"*"` nor a session id of at most 128 letters, digits and hyphens. It answers `TOO_MANY_SUBSCRIPTIONS` when it would take the connection past 4096 rooms (one per session and event subscribed); unsubscribe before subscribing to more.
 
 ### Subscribable events
 
