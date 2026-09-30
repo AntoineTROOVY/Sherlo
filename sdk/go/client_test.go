@@ -1720,4 +1720,17 @@ func TestRequestLogRedactsBaseURLPassword(t *testing.T) {
 			t.Errorf("request log = %q, want the URL without the password", got)
 		}
 	}
+
+	// The retry layer logs the URL of every request it replays.
+	lg := &argsLogger{}
+	policy := RetryPolicy{MaxRetries: 1, BaseDelay: time.Millisecond, MaxDelay: time.Millisecond}
+	c, err := New("https://proxyuser:s3cret@api.example.com", "k",
+		WithTransport(&statusTransport{status: 503}), WithLogger(lg), WithRetry(policy))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	_, _ = c.Health.Check(context.Background())
+	if got := lg.text.String(); !strings.Contains(got, "openwa retrying request") || strings.Contains(got, "s3cret") {
+		t.Errorf("retry log = %q, want the retry logged without the password", got)
+	}
 }
