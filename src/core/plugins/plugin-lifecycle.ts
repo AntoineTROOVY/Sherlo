@@ -315,8 +315,9 @@ export class PluginLifecycle {
 
   registerBuiltInPlugin(manifest: PluginManifest, instance: IPlugin, config: Record<string, unknown> = {}): void {
     // Merge: env-derived defaults stay live each boot (so a changed .env wins), while an operator's
-    // persisted overrides win for the keys they actually set. Engine config is wholly env-derived
-    // (no persisted overrides), so it is never frozen to a first-boot snapshot.
+    // persisted overrides win for the keys they actually set. Engine plugin config can carry such an
+    // override too (PUT /api/plugins/:id/config), except the auth-dir bases, which EngineFactory
+    // passes to every createEngine call from the env config.
     const effectiveConfig = { ...config, ...(this.pluginStorage.getPluginConfig(manifest.id) ?? {}) };
 
     const pluginInstance: PluginInstance = {
