@@ -111,10 +111,12 @@ export class OpenWANotImplementedError extends OpenWAApiError {}
  *
  * Not every 503 is safe to repeat blindly: the non-idempotent sends (group create, channel create,
  * media send) are deliberately left unbounded by the gateway so a slow WhatsApp reply never answers
- * one, and in a multi-node deployment a forwarded request answers 503 only when the owner node was
- * never reached. A forward that fails after the request was sent answers 502 or 504 instead (a plain
- * `OpenWAApiError`): the owner may already have carried it out, so do not repeat a non-idempotent
- * send on those unchecked.
+ * one, and in a multi-node deployment a forward that fails before reaching the owner node answers
+ * 503. A 503 from the owner itself is relayed unchanged and means the engine did not confirm, so a
+ * bounded write such as a group, channel, contact or profile change may still have been applied;
+ * re-read the state before repeating it. A forward that fails after the request was sent answers
+ * 502 or 504 instead (a plain `OpenWAApiError`): the owner may already have carried it out, so do
+ * not repeat a non-idempotent send on those unchecked.
  */
 export class OpenWAServiceUnavailableError extends OpenWAApiError {}
 

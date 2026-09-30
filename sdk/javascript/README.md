@@ -54,9 +54,12 @@ any retry. A 429 from the global rate limiter lifts when its window expires
 default), and `.retryAfterSeconds` carries its `Retry-After` header. A 429 whose
 `.code` is `"SEND_PACING_LIMITED"` is not transient: do not retry it before
 `.retryAfterSeconds`, which then comes from the body and can be hours. Every API
-error also exposes the response `.headers`. In a routed deployment only 503
-proves the request was never carried out: a forward that fails after the request
-reached the owner node answers 502 or 504.
+error also exposes the response `.headers`. A 503 does not prove a write was
+never carried out: the engine answers it when WhatsApp did not confirm in time,
+and the change may still have been applied, so re-read the state before
+repeating it. In a routed deployment a forward that fails before reaching the
+owner node answers 503, one that fails after the request reached it answers 502
+or 504, and a 503 from the owner itself is relayed unchanged.
 
 ## Receiving webhooks
 
