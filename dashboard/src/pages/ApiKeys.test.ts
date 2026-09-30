@@ -108,6 +108,19 @@ test('a key row shows its prefix masked and offers no show/hide toggle', async (
   );
 });
 
+// ApiKeys.css turns rows into cards at max-width: 768px, which has no slot for the Last Used cell.
+test('at 768px the table drops the columns the card layout has no place for', async () => {
+  const width = window.innerWidth;
+  window.innerWidth = 768;
+  try {
+    renderApiKeys();
+    await rtl.screen.findByText('owa_k1ab****');
+    assert.equal(rtl.screen.queryByText('Last Used') === null, true, 'the Last Used column is still shown');
+  } finally {
+    window.innerWidth = width;
+  }
+});
+
 // An admin key restricted to sessions is refused here (the route needs an unscoped key), and a
 // failed read is not an empty list: "No API keys created" would read as a gateway with no keys.
 test('a refused read says so instead of showing the empty state', async () => {

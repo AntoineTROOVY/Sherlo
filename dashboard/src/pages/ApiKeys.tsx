@@ -229,7 +229,7 @@ export function ApiKeys() {
   );
 
   const windowWidth = useWindowSize();
-  const isMobile = windowWidth < 768;
+  const isMobile = windowWidth <= 768;
   const isSmall = windowWidth < 640;
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({});
 
