@@ -106,7 +106,7 @@ export function mergeTwinStates(rows: ChatStateValue[]): ChatStateValue | undefi
   return out;
 }
 
-type SessionWrites = { pending: Set<Promise<void>>; seq: number };
+type SessionWrites = { pending: Set<Promise<void>>; seq: number; generation: number };
 
 const SEP = '\u0000'; // a null byte never appears in a session name or JID, so the join cannot collide
 
@@ -150,8 +150,9 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
   /** Bumped by every write that indexes or persists, so a load can tell a write overlapped its read. */
   private writeSeq = 0;
   /**
-   * Per session: its writes queued or running, and a count bumped like {@link writeSeq} by its own
-   * writes only, so a refresh is not held up by another session's traffic.
+   * Per session: its writes queued or running, a count bumped like {@link writeSeq} by its own writes
+   * only, so a refresh is not held up by another session's traffic, and the generation
+   * {@link clearSession} bumps, so a write queued before an unlink cannot re-create a row after it.
    */
   private readonly sessionWrites = new Map<string, SessionWrites>();
   private warnedEviction = false;
@@ -220,8 +221,9 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
    */
   remember(sessionId: string, chatId: string, patch: Partial<ChatStateValue>, create = true): Promise<void> {
     const k = this.key(sessionId, chatId);
+    const generation = this.writesOf(sessionId).generation;
     return this.enqueue(sessionId, k, async () => {
-      await this.applyPatch(k, sessionId, chatId, patch, create);
+      await this.applyPatch(k, sessionId, chatId, patch, generation, create);
     });
   }
 
@@ -233,7 +235,8 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
     create = true,
   ): Promise<void> {
     const k = this.key(sessionId, chatId);
-    return this.enqueue(sessionId, k, () => this.applyFold(k, sessionId, chatId, twins, patch, create));
+    const generation = this.writesOf(sessionId).generation;
+    return this.enqueue(sessionId, k, () => this.applyFold(k, sessionId, chatId, twins, patch, generation, create));
   }
 
   /** Queues work on the chat's write chain and counts it under the session until it settles. */
@@ -249,10 +252,15 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
   private writesOf(sessionId: string): SessionWrites {
     let writes = this.sessionWrites.get(sessionId);
     if (!writes) {
-      writes = { pending: new Set(), seq: 0 };
+      writes = { pending: new Set(), seq: 0, generation: 0 };
       this.sessionWrites.set(sessionId, writes);
     }
     return writes;
+  }
+
+  /** True once {@link clearSession} ran after the write was queued: it must neither index nor persist. */
+  private cleared(sessionId: string, generation: number): boolean {
+    return this.writesOf(sessionId).generation !== generation;
   }
 
   private bumpWriteSeq(sessionId: string): void {
@@ -272,6 +280,7 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
     chatId: string,
     twins: string[],
     patch: Partial<ChatStateValue>,
+    generation: number,
     create: boolean,
   ): Promise<void> {
     const rows: ChatStateValue[] = [];
@@ -286,17 +295,17 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
         rows.push(v);
       }
     } catch {
-      await this.applyPatch(k, sessionId, chatId, patch, create);
+      await this.applyPatch(k, sessionId, chatId, patch, generation, create);
       return;
     }
     if (!found.length) {
-      await this.applyPatch(k, sessionId, chatId, patch, create);
+      await this.applyPatch(k, sessionId, chatId, patch, generation, create);
       return;
     }
     // Only the fields some row observed are carried, so the folded row still tells them from defaults.
     const merged = mergeTwinStates(rows)!;
     const base = Object.fromEntries(FIELDS.filter(f => saw(merged, f)).map(f => [f, merged[f]]));
-    if (await this.applyPatch(k, sessionId, chatId, { ...base, ...patch })) {
+    if (await this.applyPatch(k, sessionId, chatId, { ...base, ...patch }, generation)) {
       await this.forget(sessionId, found);
     }
   }
@@ -317,8 +326,10 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
     sessionId: string,
     chatId: string,
     patch: Partial<ChatStateValue>,
+    generation: number,
     create = true,
   ): Promise<boolean> {
+    if (this.cleared(sessionId, generation)) return false;
     // The merge base must be the CURRENT state, not DEFAULT_STATE, or a partial `chats.update` (Baileys
     // emits single-field patches, e.g. `{ pinned }` alone) would reset the columns it omits. On a cache
     // miss the persisted row is that base: the read path warms lazily, but the write path upserts every
@@ -337,6 +348,7 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
       try {
         row = await this.repo.findOne({ where: { sessionId, chatId } });
       } catch {
+        if (this.cleared(sessionId, generation)) return false;
         // Persisted but not indexed, so the session's cache no longer holds all of its rows.
         this.bumpWriteSeq(sessionId);
         this.completeSessions.delete(sessionId);
@@ -344,6 +356,7 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
         this.absent.delete(k);
         return ok;
       }
+      if (this.cleared(sessionId, generation)) return false;
       if (!row && restatesDefaults) {
         this.markAbsent(k);
         return true;
@@ -423,7 +436,15 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
     }
   }
 
+  /**
+   * Fences the session's writes first: one queued before the unlink skips its write, and the delete
+   * waits for any already writing, so none can land after it and hand the old account's chat to the
+   * next one.
+   */
   async clearSession(sessionId: string): Promise<void> {
+    const writes = this.writesOf(sessionId);
+    writes.generation++;
+    await Promise.allSettled([...writes.pending]);
     await this.repo.delete({ sessionId });
     // Evicted after the delete, so a read-through that raced it cannot leave a deleted row cached.
     const prefix = `${sessionId}${SEP}`;

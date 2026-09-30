@@ -487,6 +487,25 @@ describe('ChatStateStoreService', () => {
     expect(svc.chatIds('s')).toEqual([]);
   });
 
+  it('clearSession fences a write in flight, so the unlinked account leaves no row behind', async () => {
+    const repo = makeRepo();
+    let release!: () => void;
+    repo.findOne.mockImplementationOnce(() => new Promise(resolve => (release = () => resolve(undefined))));
+    const svc = svcWith(repo);
+    const inFlight = svc.remember('s', 'old', { pinned: true });
+    const queued = svc.remember('s', 'old', { archived: true }); // queued behind it, not started
+    await tick();
+    const cleared = svc.clearSession('s');
+    release();
+    await Promise.all([inFlight, queued, cleared]);
+    expect(repo.rows.size).toBe(0);
+    expect(svc.chatIds('s')).toEqual([]);
+    // The next account's writes are kept.
+    await svc.remember('s', 'new', { pinned: true });
+    expect([...repo.rows.keys()]).toEqual([KEY('s', 'new')]);
+    expect(svc.chatIds('s')).toEqual(['new']);
+  });
+
   it('forget swallows a repo error', async () => {
     const repo = makeRepo();
     repo.delete.mockRejectedValueOnce(new Error('SQLITE_BUSY'));
