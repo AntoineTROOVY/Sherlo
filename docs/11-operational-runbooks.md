@@ -247,7 +247,7 @@ as a delivery failure rather than retaining payloads without limit.
 
 **Prerequisites:**
 
-- API key, and an ADMIN key for step 2
+- An OPERATOR (or ADMIN) API key, and an ADMIN key for step 2
 - Access to webhook endpoint
 
 **Steps:**
