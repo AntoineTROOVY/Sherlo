@@ -4936,14 +4936,14 @@ Update mutable fields of an API key. `isActive` is **not** updatable here — us
 
 **Request body** — `UpdateApiKeyDto`
 
-| Field             | Type                                   | Required | Constraints              | Description                                                               |
-| ----------------- | -------------------------------------- | -------- | ------------------------ | ------------------------------------------------------------------------- |
-| `name`            | string                                 | no       | length 3–100             | Applied only if truthy.                                                   |
-| `role`            | enum `admin` \| `operator` \| `viewer` | no       | `@IsEnum`                | Applied only if truthy.                                                   |
-| `allowedIps`      | string[]                               | no       | IPv4 address / CIDR only | Applied if not `undefined` (can be set to `[]` to clear).                 |
-| `allowedSessions` | string[]                               | no       | each `@IsString`         | Applied if not `undefined`.                                               |
-| `allowedChats`    | string[]                               | no       | same as create           | Applied if not `undefined` (`[]` clears it, making the key unrestricted). |
-| `expiresAt`       | string (ISO 8601 date)                 | no       | `@IsDateString`          | Applied if not `undefined`; empty/falsy clears to `null`.                 |
+| Field             | Type                                   | Required | Constraints              | Description                                                                                              |
+| ----------------- | -------------------------------------- | -------- | ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `name`            | string                                 | no       | length 3–100             | Applied only if truthy.                                                                                  |
+| `role`            | enum `admin` \| `operator` \| `viewer` | no       | `@IsEnum`                | Applied only if truthy.                                                                                  |
+| `allowedIps`      | string[]                               | no       | IPv4 address / CIDR only | Applied if not `undefined` (can be set to `[]` to clear).                                                |
+| `allowedSessions` | string[]                               | no       | each `@IsString`         | Applied if not `undefined`.                                                                              |
+| `allowedChats`    | string[]                               | no       | same as create           | Applied if not `undefined` (`[]` clears it, making the key unrestricted).                                |
+| `expiresAt`       | string (ISO 8601 date) \| null         | no       | `@IsDateString`          | Applied if not `undefined`; `null` clears the expiry (an empty string fails `@IsDateString` with `400`). |
 
 ```json
 {
