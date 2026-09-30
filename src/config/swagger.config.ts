@@ -121,9 +121,10 @@ const ERROR_RESPONSE: SchemaObject = {
       type: 'string',
       description:
         'A stable machine-readable reason, on some errors only: SESSION_NAME_TEARDOWN_PENDING (409), ' +
-        'SESSION_STOP_INCOMPLETE and SESSION_LOGOUT_INCOMPLETE (502), SEND_PACING_LIMITED (429), ' +
+        'SESSION_STOP_INCOMPLETE, SESSION_LOGOUT_INCOMPLETE and SESSION_FORCE_KILL_INCOMPLETE (502), ' +
+        'SEND_PACING_LIMITED (429), ' +
         'ENGINE_PAGE_ERROR (500, whatsapp-web.js: WhatsApp Web threw inside the page during a send or status post), ' +
-        'IMPORT_ALREADY_RUNNING, IMPORT_WOULD_ORPHAN_ENGINES and IMPORT_NESTED_TRANSACTION (409).',
+        'IMPORT_ALREADY_RUNNING, EXPORT_IN_PROGRESS, IMPORT_WOULD_ORPHAN_ENGINES and IMPORT_NESTED_TRANSACTION (409).',
     },
     retryAfterSeconds: {
       type: 'integer',
