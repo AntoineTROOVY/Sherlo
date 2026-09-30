@@ -978,7 +978,7 @@
       "checking": "Checking server status...",
       "dontClose": "Please do not close this window",
       "successMsg": "Server is back online! The page will reload automatically.",
-      "errorMsg": "Server did not respond after 30 seconds. Please check the Docker logs and restart manually.",
+      "errorMsg": "Server did not respond. Please check the Docker logs and restart manually.",
       "outcomeUnknown": "The proxy returned an error before the server answered, so it is not known whether the restart is in progress. Reload in a minute to check.",
       "reload": "Reload Page"
     },
