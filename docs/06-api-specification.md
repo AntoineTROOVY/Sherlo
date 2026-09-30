@@ -104,6 +104,7 @@ A few refusals add a stable machine-readable `code`, so a client can branch with
 | `IMPORT_ALREADY_RUNNING`        | `409`  | Another data import is in progress                                                                                                            |
 | `IMPORT_WOULD_ORPHAN_ENGINES`   | `409`  | The backup lacks sessions whose engines are running; retry with `stopOrphans=true` or `force=true`                                            |
 | `IMPORT_NESTED_TRANSACTION`     | `409`  | Another database transaction is open on the connection; retry with no other data operation in flight                                          |
+| `EXPORT_IN_PROGRESS`            | `409`  | A data export is in progress; retry the import after it finishes                                                                              |
 
 Validation failures (`statusCode: 400`) return `message` as an **array** of field-level strings, with `error: "Bad Request"`, when field detail is enabled: by default outside production, or anywhere with `VALIDATION_ERROR_DETAIL=true`. Under `NODE_ENV=production` (the Docker image, compose and Helm default) detail is off unless that variable is set, and the body is only `{ "statusCode": 400, "message": "Bad Request" }`. Clients should accept `message` as either a string or an array of strings. A global `ValidationPipe` runs with `whitelist` + `forbidNonWhitelisted`, so any request-body field not declared on the DTO is rejected with `400`.
 
@@ -5711,7 +5712,7 @@ Rows are raw DB column shapes (e.g. `messageBatches` rows use snake_case columns
 
 `omittedInlineMedia` counts, per table, the inline media payloads the `EXPORT_INLINE_MEDIA_BUDGET_BYTES` budget dropped. Zeroes mean everything fitted; an archive with a non-zero count still restores, but those rows come back without their media.
 
-**Errors:** `401` · `403` · `500` DB error
+**Errors:** `401` · `403` · `409` `IMPORT_ALREADY_RUNNING` (a data import is running; export after it finishes) · `500` DB error
 
 ---
 
@@ -5816,7 +5817,7 @@ Inside the transaction every migration table is emptied. `webhooks` and `session
 
 On commit, plugin instance bindings are also re-applied: a session bound only by an instance the backup lacks, or restores disabled, is dropped from that plugin's active sessions and its per-session config is cleared, then every restored enabled instance is bound again. Sessions activated through `PUT /api/plugins/:id/sessions` with no instance behind them are left alone. If that re-sync fails the import still commits, with a notice and `restartRequired: true`. A restart re-applies the restored enabled instances but does not retire a binding the restore dropped, so check each plugin with `GET /api/plugins/:id` and correct it with `PUT /api/plugins/:id/sessions`, as the notice says. A session-wide (wildcard) instance's config was merged into the plugin's base config when it was bound, and a restore does not remove it; overwrite those keys with `PUT /api/plugins/:id/config`.
 
-**Errors:** `400` `tables` absent/not an object, a table whose value is not an array of rows, a row that is not an object (`null`, a bare string, a nested array), a flag spelled as anything but a boolean or exact `true`/`false`, or a property the route does not accept — nothing is written, and field-level detail is suppressed in production unless `VALIDATION_ERROR_DETAIL=true` · `401` · `403` · `409` refused, with the reason in `code` — `IMPORT_WOULD_ORPHAN_ENGINES` (live engines exist for sessions the backup does not contain; retry with `stopOrphans` or `force`), `IMPORT_ALREADY_RUNNING` (another import is running; wait for it), `IMPORT_NESTED_TRANSACTION` (another database transaction holds the connection; retry with nothing else in flight) · `500` unrecoverable DB error
+**Errors:** `400` `tables` absent/not an object, a table whose value is not an array of rows, a row that is not an object (`null`, a bare string, a nested array), a flag spelled as anything but a boolean or exact `true`/`false`, or a property the route does not accept — nothing is written, and field-level detail is suppressed in production unless `VALIDATION_ERROR_DETAIL=true` · `401` · `403` · `409` refused, with the reason in `code` — `IMPORT_WOULD_ORPHAN_ENGINES` (live engines exist for sessions the backup does not contain; retry with `stopOrphans` or `force`), `IMPORT_ALREADY_RUNNING` (another import is running; wait for it), `EXPORT_IN_PROGRESS` (a data export is running; wait for it), `IMPORT_NESTED_TRANSACTION` (another database transaction holds the connection; retry with nothing else in flight) · `500` unrecoverable DB error
 
 > A malformed archive is answered before the restore opens its transaction. Every table present is checked for being an array, and every row in it for being an object — not just `sessions`, since the rest are read inside the transaction where the same mistake would fail mid-restore instead of ahead of it. A hand-edited or truncated backup therefore reports `400` naming the offending `tables.<name>[<index>]`, rather than the `500` that told the operator the server had broken when their file was simply wrong.
 
