@@ -43,3 +43,29 @@ test('enum tags name message types and chat kinds in words', () => {
   assert.ok(!types.includes('Message'), `message type tags: ${types.join(', ')}`);
   assert.deepEqual(kinds, ['Individual', 'Group', 'Channel', 'Status', 'Broadcast', 'Unknown']);
 });
+
+test('adding a condition stops at the gateway limit of 20', () => {
+  const sender = { field: 'sender', operator: 'is' as const, value: ['1@c.us'] };
+  const view = (count: number) =>
+    rtl.render(
+      createElement(FilterBuilder, {
+        filters: { conditions: Array.from({ length: count }, () => ({ ...sender })) },
+        onChange: () => {},
+        chats: [],
+      }),
+    );
+  const add = (container: HTMLElement) => container.querySelector<HTMLButtonElement>('.filter-add')!;
+  assert.equal(add(view(19).container).disabled, false);
+  assert.equal(add(view(20).container).disabled, true);
+});
+
+test('the body text stops at the gateway limit of 1000 characters', () => {
+  const { container } = rtl.render(
+    createElement(FilterBuilder, {
+      filters: { conditions: [{ field: 'body', operator: 'contains', value: '' }] },
+      onChange: () => {},
+      chats: [],
+    }),
+  );
+  assert.equal(container.querySelector<HTMLInputElement>('.filter-text input[type="text"]')?.maxLength, 1000);
+});

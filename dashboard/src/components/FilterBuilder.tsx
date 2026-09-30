@@ -10,6 +10,7 @@ import {
   type WebhookFilterOperator,
 } from '../services/api';
 import { filterValueLabel } from '../utils/enumLabels';
+import { MAX_FILTER_CONDITIONS, MAX_FILTER_TEXT_LENGTH } from '../utils/webhookFilters';
 import './FilterBuilder.css';
 
 type FieldKind = 'id' | 'idArray' | 'text' | 'enum' | 'boolean';
@@ -244,6 +245,7 @@ export function FilterBuilder({ filters, onChange, chats }: FilterBuilderProps) 
                   <input
                     type="text"
                     value={typeof condition.value === 'string' ? condition.value : ''}
+                    maxLength={MAX_FILTER_TEXT_LENGTH}
                     placeholder={t('webhooks.filters.textPlaceholder')}
                     onChange={e => updateAt(index, { value: e.target.value })}
                   />
@@ -283,7 +285,12 @@ export function FilterBuilder({ filters, onChange, chats }: FilterBuilderProps) 
         );
       })}
 
-      <button type="button" className="filter-add" onClick={addCondition}>
+      <button
+        type="button"
+        className="filter-add"
+        onClick={addCondition}
+        disabled={conditions.length >= MAX_FILTER_CONDITIONS}
+      >
         <Plus size={14} />
         {t('webhooks.filters.addCondition')}
       </button>
