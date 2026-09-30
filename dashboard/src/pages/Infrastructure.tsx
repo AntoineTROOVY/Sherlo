@@ -885,7 +885,7 @@ export function Infrastructure() {
                   style={{
                     width:
                       restartFlow.restartCountdown > 0
-                        ? `${((30 - restartFlow.restartCountdown) / 30) * 100}%`
+                        ? `${((restartFlow.restartTotal - restartFlow.restartCountdown) / restartFlow.restartTotal) * 100}%`
                         : '100%',
                   }}
                 />

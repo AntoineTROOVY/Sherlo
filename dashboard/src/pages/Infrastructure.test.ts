@@ -847,6 +847,23 @@ test('a 502 the gateway stamped with a code is a refusal, not an unknown outcome
   assert.ok(within(dialog).getByText('Compose rejected the profile'), 'the server reason is not shown');
 });
 
+test('the restart progress bar measures the server estimate, not a fixed 30 s', async () => {
+  const { within } = rtl;
+  resetFetchCalls();
+  overrides = {
+    readyFails: true,
+    restart: () =>
+      jsonResponse({ message: 'restarting', restarting: true, profiles: [], profilesToRemove: [], estimatedTime: 35 }),
+  };
+  const dialog = await clickRestartNow();
+
+  // One second into a 35 s estimate. Against a fixed 30 s total the width would be negative, which
+  // the style drops, leaving the bar empty until the countdown fell under 30.
+  await within(dialog).findByText('Server restarting... 34s', undefined, { timeout: 2_000 });
+  const fill = dialog.querySelector<HTMLElement>('.restart-progress-fill');
+  assert.equal(fill?.style.width, `${(1 / 35) * 100}%`);
+});
+
 test(
   'services that failed to start are shown after the restart instead of reloading over them',
   { timeout: 15_000 },

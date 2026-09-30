@@ -17,6 +17,8 @@ export interface RestartOpenRequest {
 export interface RestartFlow {
   showRestartModal: boolean;
   restartCountdown: number;
+  /** The countdown's starting value, the server's estimate once it answers; the progress bar's 100%. */
+  restartTotal: number;
   restartStatus: RestartStatus;
   /** The server's reason when it refused the restart; shown in place of the generic error text. */
   restartError: string | null;
@@ -44,6 +46,7 @@ export interface RestartFlow {
 export function useRestartFlow(): RestartFlow {
   const [showRestartModal, setShowRestartModal] = useState(false);
   const [restartCountdown, setRestartCountdown] = useState(0);
+  const [restartTotal, setRestartTotal] = useState(30);
   const [restartStatus, setRestartStatus] = useState<RestartStatus>('idle');
   const [restartError, setRestartError] = useState<string | null>(null);
   const [restartWarnings, setRestartWarnings] = useState<string[]>([]);
@@ -142,6 +145,7 @@ export function useRestartFlow(): RestartFlow {
   const start = async () => {
     setRestartStatus('restarting');
     setRestartCountdown(30);
+    setRestartTotal(30);
 
     const profilesToRemove = profiles.running.filter(p => !profiles.pending.includes(p));
 
@@ -152,7 +156,10 @@ export function useRestartFlow(): RestartFlow {
     try {
       const response = await infraApi.restart(profiles.pending, profilesToRemove);
       estimatedTime = response.estimatedTime;
-      if (response.estimatedTime) setRestartCountdown(response.estimatedTime);
+      if (response.estimatedTime) {
+        setRestartCountdown(response.estimatedTime);
+        setRestartTotal(response.estimatedTime);
+      }
       warnings = [...(response.orchestration?.errors ?? []), ...(response.removal?.errors ?? [])];
       setRestartWarnings(warnings);
     } catch (err) {
@@ -198,6 +205,7 @@ export function useRestartFlow(): RestartFlow {
   return {
     showRestartModal,
     restartCountdown,
+    restartTotal,
     restartStatus,
     restartError,
     restartWarnings,
