@@ -1576,15 +1576,14 @@ Get the processing status and progress of a bulk batch.
       "status": "sent",
       "messageId": "true_628111111111@c.us_3EB0ABCD",
       "sentAt": "2026-06-25T09:21:00.000Z"
-    },
-    { "chatId": "628222222222@c.us", "status": "pending" }
+    }
   ],
   "startedAt": "2026-06-25T09:20:55.000Z",
   "completedAt": null
 }
 ```
 
-`status` is one of `pending|processing|completed|cancelled|failed`; per-result `status` is `pending|sent|failed|cancelled`. A failed result carries a sanitized `error { code, message }` (internals are not leaked).
+`status` is one of `pending|processing|completed|cancelled|failed`; `results` holds one entry per recipient already attempted, with `status` `sent` or `failed`; a recipient not yet attempted, or dropped by a cancel, appears only in the `progress` counters. A failed result carries a sanitized `error { code, message }` (internals are not leaked).
 
 **Errors:** `401` missing/invalid API key · `404` batch not found for this session
 
