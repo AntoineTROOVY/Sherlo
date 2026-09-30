@@ -171,13 +171,22 @@ describe('validateEnv', () => {
     expect(() => validateEnv({})).not.toThrow();
   });
 
-  it('rejects 0 for a rate-limit limit or the webhook timeout (self-DoS), but allows 0 where it is meaningful', () => {
+  it('rejects 0 for a rate-limit limit or window or the webhook timeout (self-DoS), but allows 0 where it is meaningful', () => {
     expect(() => validateEnv({ RATE_LIMIT_SHORT_LIMIT: '0' })).toThrow(/RATE_LIMIT_SHORT_LIMIT/);
     expect(() => validateEnv({ RATE_LIMIT_MEDIUM_LIMIT: '0' })).toThrow(/RATE_LIMIT_MEDIUM_LIMIT/);
     expect(() => validateEnv({ RATE_LIMIT_LONG_LIMIT: '0' })).toThrow(/RATE_LIMIT_LONG_LIMIT/);
     expect(() => validateEnv({ WEBHOOK_TIMEOUT: '0' })).toThrow(/WEBHOOK_TIMEOUT/);
-    // 0 stays valid where it has a real meaning: unlimited sessions, no webhook retries, a TTL.
-    expect(() => validateEnv({ MAX_CONCURRENT_SESSIONS: '0', RATE_LIMIT_SHORT_TTL: '0' })).not.toThrow();
+    // A 0 window expires every hit as it lands, which switches that tier off just as a 0 limit would.
+    for (const key of [
+      'RATE_LIMIT_SHORT_TTL',
+      'RATE_LIMIT_MEDIUM_TTL',
+      'RATE_LIMIT_LONG_TTL',
+      'INGRESS_INSTANCE_TTL',
+    ]) {
+      expect(() => validateEnv({ [key]: '0' })).toThrow(new RegExp(`${key} must be a positive integer`));
+    }
+    // 0 stays valid where it has a real meaning: unlimited sessions, no webhook retry backoff.
+    expect(() => validateEnv({ MAX_CONCURRENT_SESSIONS: '0', WEBHOOK_RETRY_DELAY: '0' })).not.toThrow();
     // a positive value still passes
     expect(() => validateEnv({ RATE_LIMIT_SHORT_LIMIT: '10', WEBHOOK_TIMEOUT: '10000' })).not.toThrow();
   });

@@ -211,9 +211,6 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     }
   };
   for (const key of [
-    'RATE_LIMIT_SHORT_TTL',
-    'RATE_LIMIT_MEDIUM_TTL',
-    'RATE_LIMIT_LONG_TTL',
     'WEBHOOK_RETRY_DELAY',
     'DATABASE_POOL_SIZE',
     'DATABASE_STATEMENT_TIMEOUT_MS',
@@ -221,7 +218,6 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     'DATABASE_CONNECTION_TIMEOUT_MS',
     'REDIS_CONNECT_TIMEOUT_MS',
     'MAX_CONCURRENT_SESSIONS', // 0 = unlimited
-    'INGRESS_INSTANCE_TTL',
     'WEBHOOK_DISPATCH_MAX_QUEUED',
     'STATS_CACHE_TTL_MS', // 0 = memo disabled
     'WEBHOOK_MAX_PER_SESSION', // 0 = unlimited
@@ -310,6 +306,11 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     'RATE_LIMIT_SHORT_LIMIT',
     'RATE_LIMIT_MEDIUM_LIMIT',
     'RATE_LIMIT_LONG_LIMIT',
+    // A 0 window expires each hit as it lands, so the tier never blocks: the same self-DoS as a 0 limit.
+    'RATE_LIMIT_SHORT_TTL',
+    'RATE_LIMIT_MEDIUM_TTL',
+    'RATE_LIMIT_LONG_TTL',
+    'INGRESS_INSTANCE_TTL',
     // WebSocket (/events) limits: 0 would disable a tier entirely (a self-DoS on the WS surface).
     'WS_RATE_LIMIT_FRAME_PER_SECOND',
     'WS_RATE_LIMIT_FRAME_BURST',
