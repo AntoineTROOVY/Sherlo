@@ -3979,7 +3979,7 @@ Unsubscribe from a channel.
 { "success": true }
 ```
 
-Note: this is the one route in the module that returns a literal `{ success: true }` (hard-coded by the controller after the void engine call resolves) rather than the raw engine return. There is no `@HttpCode` override, so it returns `200`, not `204`.
+Note: the controller returns a literal `{ success: true }` after the void engine call resolves, as the channel delete, mute, admin demote and ownership transfer routes do. There is no `@HttpCode` override, so it returns `200`, not `204`.
 
 **Errors:** `400` `Session is not started` · `401` missing/invalid API key · `403` API-key role below OPERATOR · `409` conflict or engine not ready (retryable) · `503` session not ready or dependency unavailable (retryable)
 
