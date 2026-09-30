@@ -30,7 +30,8 @@
  *
  * What one comparison covers, per mapped pair: field-name sets in both directions, required vs
  * optional (hand `?` vs the schema's `required` array), and — for fields whose both sides reduce
- * to a simple token (primitive, enum literal set, array of those, null union) — the token itself,
+ * to a simple token (primitive, enum literal set, array of those, null union; on the hand side, any
+ * union too) — the token itself,
  * which is what catches `string` widened to `string | number` or a re-ordered enum growing a
  * member. Complex/nested fields are compared by presence and optionality only; that limit is
  * deliberate (the hand parser stays regular), and the exclusions below record what is known to be
@@ -688,7 +689,8 @@ export function comparePair(handName, handMembers, schemaName, schema, schemas, 
         }
       }
       const absorbs = handInfo.absorbsNull && contract === `${hand}|null`;
-      if (hand !== contract && !absorbs && isSimpleToken(hand)) {
+      // A union never equals a simple contract token, so it is drift, not a shape too complex to read.
+      if (hand !== contract && !absorbs && (isSimpleToken(hand) || hand.startsWith('union('))) {
         diffs.push(`"${field}": hand ${hand}, contract ${contract}`);
       }
     }

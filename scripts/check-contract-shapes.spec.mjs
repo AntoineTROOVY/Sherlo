@@ -99,6 +99,19 @@ test('comparePair flags a widened union and an enum mismatch at token level', ()
   assert.ok(diffs.some(d => d.includes('"count": hand number|null, contract number')));
 });
 
+test('comparePair flags a primitive widened to a union of primitives', () => {
+  // A two-member union reduces to union(...), which is not a simple token; dropping the diff on that
+  // ground let `string | number` (or Python's `str | int`) stand in for a plain `string` unseen.
+  const hand = {
+    id: { optional: false, token: 'string | number' },
+    direction: { optional: false, token: "'incoming' | 'outgoing'" },
+    count: { optional: false, token: 'str | int' },
+  };
+  const diffs = comparePair('Sample', hand, 'SampleDto', schemas.SampleDto, schemas);
+  assert.ok(diffs.some(d => d.includes('"id": hand union(number,string), contract string')));
+  assert.ok(diffs.some(d => d.includes('"count": hand union(int,str), contract number')));
+});
+
 test('parseObjectToken splits nested object tokens without losing members', () => {
   const members = parseObjectToken('object(id:string,sub:object(a:number,b?:boolean),tail:string)');
   assert.deepEqual(Object.keys(members), ['id', 'sub', 'tail']);
