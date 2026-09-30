@@ -101,14 +101,21 @@ export const WEBHOOK_EVENTS = [
   ...WEBHOOK_RESERVED_EVENTS,
 ] as const;
 
+const WEBHOOK_URL_OPTIONS = { require_tld: false, require_protocol: true, protocols: ['http', 'https'] };
+
 export class CreateWebhookDto {
   @ApiProperty({
     description: 'Webhook URL to receive events',
     example: 'https://your-server.com/webhook',
+    maxLength: 2048,
   })
   // require_tld:false allows hostnames without a dot (e.g. http://localhost:3000); the SSRF
-  // guard still decides whether the host is actually allowed to be delivered to.
-  @IsUrl({ require_tld: false })
+  // guard still decides whether the host is actually allowed to be delivered to. The scheme is
+  // required and must be http(s): the defaults also took 'example.com/hook' and 'ftp://...', which
+  // were stored and then failed every delivery. 2048 is the column width; PostgreSQL refuses a
+  // longer value on insert with a 500.
+  @IsUrl(WEBHOOK_URL_OPTIONS)
+  @MaxLength(2048)
   url!: string;
 
   @ApiPropertyOptional({
@@ -191,11 +198,12 @@ export class CreateWebhookDto {
 }
 
 export class UpdateWebhookDto {
-  @ApiPropertyOptional({ description: 'Webhook URL' })
+  @ApiPropertyOptional({ description: 'Webhook URL', maxLength: 2048 })
   // Not @IsOptional: that also skips validation for null, which these NOT NULL columns cannot store
   // (save() then failed with a 500). Only an omitted field means "leave unchanged".
   @ValidateIf((_: UpdateWebhookDto, v: unknown) => v !== undefined)
-  @IsUrl({ require_tld: false })
+  @IsUrl(WEBHOOK_URL_OPTIONS)
+  @MaxLength(2048)
   url?: string;
 
   @ApiPropertyOptional({
