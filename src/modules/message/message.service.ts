@@ -524,8 +524,8 @@ export class MessageService implements PluginMessagePort {
    * the REST-persisted copy covers) — #1165. It also serves an inbound message whose archived file
    * was purged by retention while the inline copy lives on.
    *
-   * Unlike status media (only ever an image or video), chat media includes documents a sender chose
-   * the type of — so the declared mimetype is echoed back only when it is inert, and the caller
+   * Unlike status media (only ever an image, a video or a voice note), chat media includes documents
+   * a sender chose the type of — so the declared mimetype is echoed back only when it is inert, and the caller
    * serves the result as an attachment regardless. Both matter: an allow-list alone would still let
    * `image/svg+xml` through as active content on the API origin.
    */
