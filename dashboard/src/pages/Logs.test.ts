@@ -314,3 +314,10 @@ test('a severity filter that matches nothing says no logs exist, not that this p
   await screen.findByText('No logs match these filters. Adjust the severity filter to widen the search.');
   assert.ok(screen.getByRole('heading', { name: 'No logs found' }));
 });
+
+test('the severity badge shows the translated severity', async () => {
+  const container = renderLogs();
+  await rtl.screen.findByText('infra.restart');
+  const badges = [...container.querySelectorAll('.severity-badge')].map(badge => badge.textContent);
+  assert.deepEqual(badges, ['Info', 'Error']);
+});

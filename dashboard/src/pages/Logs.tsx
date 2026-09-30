@@ -225,7 +225,7 @@ export function Logs() {
                 <span className="api-key">{log.apiKeyName || '—'}</span>
                 <span className="ip">{log.ipAddress || '—'}</span>
                 <span>
-                  <span className={`severity-badge ${log.severity}`}>{log.severity.toUpperCase()}</span>
+                  <span className={`severity-badge ${log.severity}`}>{t(`logs.severity.${log.severity}`)}</span>
                 </span>
               </div>
             ))
