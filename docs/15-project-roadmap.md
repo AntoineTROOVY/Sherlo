@@ -698,10 +698,17 @@ Run the same gates the tag will run, so a failure costs a local minute rather th
 ```bash
 npm run check:versions && npm run openapi:check && npm run lint && npm run format:check
 npx tsc --noEmit -p tsconfig.json && npm run check:dockerignore
-npm audit --audit-level=high
-npm test && npm run test:e2e && npm run build
-cd dashboard && npm run lint && npm run typecheck && npm run i18n:check && npm run build && npm run test:unit
+npm run check:sdk-routes && npm run check:sdk-coverage && npm run check:sdk-events && npm run check:sdk-docs
+npm run check:contract-shapes
+npm run check:audit && (cd dashboard && npm audit --audit-level=high)
+npm run test:cov && npm run test:scripts && npm run test:docs && npm run test:e2e && npm run build && npm run test:engine-real
+cd dashboard && npm run lint && npm run format:check && npm run typecheck && npm run i18n:check && npm run build && npm run test:unit
 ```
+
+`build` also waits on the `scripts-smoke` job (`shellcheck docker-entrypoint.sh scripts/*.sh` and
+`./scripts/smoke-test-backup-restore.sh`, which need `shellcheck` and `sqlite3`) and the `chart` job
+(`helm lint`, `helm template` + `kubeconform`, `npm run check:chart` and `actionlint`, all run through
+Docker), and `docker` waits on `test-postgres`. Run those locally when the release touches their files.
 
 ```bash
 # SECURITY.md only on a MINOR; the chart's own `version:` bumps a patch alongside `appVersion`.
@@ -722,7 +729,7 @@ the tag string and `package.json` disagree.
 
 ```mermaid
 flowchart TB
-    A[push tag v*] --> B[lint / test / test-postgres / dashboard]
+    A[push tag v*] --> B[lint / test / test-postgres / dashboard / scripts-smoke / chart]
     B --> C[build]
     C --> D[docker: multi-arch build, staging tag only]
     D --> E[boot-smoke: run the image on amd64 + arm64]
@@ -762,8 +769,9 @@ supersede it with a new release instead (e.g. `v0.10.3` → `v0.10.4`).
 Two failure classes are worth anticipating because they depend on the outside world rather than on
 the change being released:
 
-- **`npm audit --audit-level=high`** in the release gate is time-dependent: a tree that was clean
-  last week can fail on a newly published advisory.
+- **The dependency audit** in the release gate (`npm run check:audit` for the root,
+  `npm audit --audit-level=high` for the dashboard) is time-dependent: a tree that was clean last week
+  can fail on a newly published advisory.
 - **The image scan reads the base image**, including the dependency tree bundled inside its npm CLI,
   which `npm audit` never sees. Accepted findings live in `.trivyignore`, each with a written
   justification and the condition for removing it.
