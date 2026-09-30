@@ -309,6 +309,13 @@ export class SessionController {
       'when a stop or force-kill of this session finished while the start was waiting: the stop ' +
       'stands, and a new POST /start clears it and starts the session.',
   })
+  @ApiResponse({
+    status: 504,
+    description:
+      'The engine did not finish starting within its timeout (WhatsApp Web or the network unreachable, ' +
+      'a stalled browser or resource limit, an unreachable proxyUrl, or the whatsapp-web.js auth ' +
+      'timeout); the engine is torn down and the start can be retried.',
+  })
   async start(@Param('sessionId', ParseUUIDPipe) id: string): Promise<SessionResponseDto> {
     const session = await this.sessionService.start(id, { explicit: true });
     await this.auditService.logInfo(AuditAction.SESSION_STARTED, {

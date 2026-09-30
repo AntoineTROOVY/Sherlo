@@ -580,3 +580,15 @@ describe('SessionController: GET .../groups filters before paginating', () => {
     expect(out).toHaveLength(1000);
   });
 });
+
+// The engine-init deadline and the whatsapp-web.js auth timeout both answer a start with 504, the
+// most common start failure; clients generated from the OpenAPI contract need it declared.
+describe('SessionController.start() OpenAPI responses', () => {
+  it('declares the 504 an engine start timeout returns', () => {
+    const responses = Reflect.getMetadata('swagger/apiResponse', SessionControllerClass.prototype.start) as Record<
+      string,
+      unknown
+    >;
+    expect(Object.keys(responses)).toContain('504');
+  });
+});
