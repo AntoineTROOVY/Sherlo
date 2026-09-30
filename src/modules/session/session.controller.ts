@@ -145,7 +145,7 @@ export class SessionController {
       throw new BadRequestException('name must be a single non-empty value');
     }
     // Scope to the key's allowedSessions so a session-restricted key cannot enumerate every
-    // session. A null/empty allowlist (e.g. ADMIN) still lists all.
+    // session. A null/empty allowlist lists all whatever the key's role; a scoped ADMIN key is filtered too.
     const sessions = await this.sessionService.findAll(apiKey?.allowedSessions, {
       limit: limit ? parseInt(limit, 10) : undefined,
       offset: offset ? parseInt(offset, 10) : undefined,
