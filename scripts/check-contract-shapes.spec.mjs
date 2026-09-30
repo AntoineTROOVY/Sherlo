@@ -10,6 +10,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   comparePair,
   handToken,
@@ -311,4 +316,19 @@ test('parseJavaTypes: boxed numerics reduce to number rather than their class na
   );
   const schema = { type: 'object', required: ['a'], properties: { a: { type: 'string' } } };
   assert.equal(comparePair('Sample', { a: s.a }, 'Dto', schema, {}, false).length, 1);
+});
+
+test('a run through a symlinked path still reports', () => {
+  // Node realpaths the main module's URL but not argv[1], so a guard comparing the unresolved path
+  // skipped every check and exited 0 whenever the invocation crossed a symlink (/tmp on macOS).
+  const dir = mkdtempSync(join(tmpdir(), 'contract-shapes-'));
+  try {
+    symlinkSync(fileURLToPath(new URL('..', import.meta.url)), join(dir, 'repo'));
+    const run = spawnSync(process.execPath, [join(dir, 'repo', 'scripts', 'check-contract-shapes.mjs')], {
+      encoding: 'utf8',
+    });
+    assert.match(run.stdout + run.stderr, /pairs compared/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

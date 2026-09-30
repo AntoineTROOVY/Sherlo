@@ -29,8 +29,8 @@
  *
  * Run locally: `npm run check:sdk-coverage`.
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // fileURLToPath, not URL.pathname: the latter stays percent-encoded, so a checkout under a path
@@ -356,8 +356,9 @@ const verbPairsOf = (sdk) => {
   return pairs;
 };
 
-// A spec imports the helpers above; only a direct run reports and exits.
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// A spec imports the helpers above; only a direct run reports and exits. argv[1] is realpathed because
+// Node realpaths the main module's URL: through a symlinked path the two never matched and nothing ran.
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const spec = JSON.parse(readFileSync(join(root, 'openapi.json'), 'utf8')).paths;
   // Same scope as the path layer: resources the README declares unexposed are not the SDKs' to build.
   const specByPath = new Map(Object.entries(spec).map(([k, v]) => [normalize(k), v]));

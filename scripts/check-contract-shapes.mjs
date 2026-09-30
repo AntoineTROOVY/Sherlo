@@ -45,8 +45,7 @@
  * under-describes reality, fix the backend DTO decorator, regenerate, and un-exclude).
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // Resolve from the script's own location, not process.cwd() — same reason check-sdk-coverage.mjs
@@ -1081,9 +1080,9 @@ export function parseJavaTypes(sources) {
 
 // Resolved-path comparison, not a basename match: splitting on `/` finds no separator in a Windows
 // path so the whole native path became the "basename" and never matched, and a bare `endsWith` on a
-// basename would also fire for any other script sharing this file's name. Same comparison as
-// check-sdk-docs.mjs and check-upstream-surface.mjs.
-const isDirectRun = Boolean(process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url));
+// basename would also fire for any other script sharing this file's name. argv[1] is realpathed
+// because Node realpaths the main module's URL, so an unresolved path through a symlink never matched.
+const isDirectRun = Boolean(process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url));
 if (isDirectRun) {
   const openapi = JSON.parse(readFileSync(`${REPO_ROOT}openapi.json`, 'utf8'));
   const schemas = openapi.components.schemas;
