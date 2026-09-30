@@ -233,6 +233,7 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     'INGRESS_RETRY_DELAY_MS', // 0 = retry without backoff
     'REDIS_CACHE_DB',
     'INBOUND_MEDIA_GLOBAL_CONCURRENCY', // 0 = no process-wide ceiling, only the per-session one
+    'SHUTDOWN_DELAY_MS', // 0 = no drain; parseInt read `3s` as a 3 ms drain
   ]) {
     checkNonNegativeInt(key);
   }
@@ -257,6 +258,11 @@ export function validateEnv(config: EnvConfig): EnvConfig {
   for (const key of [
     'AUDIT_RETENTION_DAYS', // <= 0 disables retention
     'MESSAGE_RETENTION_DAYS', // unset or <= 0 keeps messages forever
+    'WEBHOOK_FAILURE_RETENTION_DAYS', // <= 0 disables retention
+    'INGRESS_RETENTION_DAYS', // <= 0 disables retention
+    // <= 0 cannot disable these two: the read site warns and keeps its default.
+    'WEBHOOK_OUTBOX_RETENTION_DAYS',
+    'INGRESS_DEDUP_RETENTION_DAYS',
   ]) {
     checkInt(key);
   }
@@ -358,6 +364,16 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     // the boot sweep delete every archive older than 24 ms, breaking export, restart, import.
     'STORAGE_EXPORT_TTL_MS',
     'STORAGE_EXPORT_SWEEP_MAX_AGE_MS',
+    // Same parseInt read: `5mb` became a 5-byte plugin download cap, `30s` a 30 ms capability timeout
+    // and `64k` a 64-character template render cap.
+    'PLUGIN_DOWNLOAD_MAX_BYTES',
+    'PLUGIN_STORAGE_MAX_BYTES',
+    'PLUGIN_CAP_TIMEOUT_MS',
+    'TEMPLATE_RENDER_MAX_CHARS',
+    'STORAGE_IMPORT_MAX_BYTES',
+    'STORAGE_IMPORT_MAX_ENTRIES',
+    'STORAGE_LIST_MAX_FILES',
+    'BAILEYS_MESSAGE_STORE_LIMIT',
     // Each read fell back to its default on 0 or garbage, or passed a negative or fractional value on
     // (SEARCH_LIMIT_MAX reached plugin search providers as-is).
     'SEARCH_LIMIT_MAX',

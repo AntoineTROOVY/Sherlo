@@ -591,6 +591,39 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ CHAT_MEDIA_ARCHIVE_TTL_DAYS: '0' })).not.toThrow();
   });
 
+  // parseInt reads a unit-suffixed value as its leading digits: `5mb` became a 5-byte plugin download cap.
+  it.each([
+    ['PLUGIN_DOWNLOAD_MAX_BYTES', '5mb'],
+    ['PLUGIN_STORAGE_MAX_BYTES', '50mb'],
+    ['PLUGIN_CAP_TIMEOUT_MS', '30s'],
+    ['TEMPLATE_RENDER_MAX_CHARS', '64k'],
+    ['STORAGE_IMPORT_MAX_BYTES', '200mb'],
+    ['STORAGE_IMPORT_MAX_ENTRIES', '1e5'],
+    ['STORAGE_LIST_MAX_FILES', '100k'],
+    ['BAILEYS_MESSAGE_STORE_LIMIT', '5k'],
+  ])('rejects a unit-suffixed or zero %s', (key, bad) => {
+    expect(() => validateEnv({ [key]: bad })).toThrow(new RegExp(`${key} must be a positive integer`));
+    expect(() => validateEnv({ [key]: '0' })).toThrow(new RegExp(`${key} must be a positive integer`));
+    expect(() => validateEnv({ [key]: '1000' })).not.toThrow();
+  });
+
+  it('rejects a unit-suffixed SHUTDOWN_DELAY_MS but keeps 0 (no drain)', () => {
+    expect(() => validateEnv({ SHUTDOWN_DELAY_MS: '3s' })).toThrow(/SHUTDOWN_DELAY_MS must be a non-negative integer/);
+    expect(() => validateEnv({ SHUTDOWN_DELAY_MS: '0' })).not.toThrow();
+  });
+
+  it.each([
+    'WEBHOOK_FAILURE_RETENTION_DAYS',
+    'WEBHOOK_OUTBOX_RETENTION_DAYS',
+    'INGRESS_RETENTION_DAYS',
+    'INGRESS_DEDUP_RETENTION_DAYS',
+  ])('rejects a non-integer %s and keeps 0 and negatives', key => {
+    expect(() => validateEnv({ [key]: 'ninety' })).toThrow(new RegExp(`${key} must be an integer`));
+    expect(() => validateEnv({ [key]: '30d' })).toThrow(new RegExp(`${key} must be an integer`));
+    expect(() => validateEnv({ [key]: '0' })).not.toThrow();
+    expect(() => validateEnv({ [key]: '-1' })).not.toThrow();
+  });
+
   // Node fires a timer delay above 2^31-1 ms after 1 ms, so these would spin instead of waiting.
   it.each([
     'MEDIA_CONVERSION_TIMEOUT_MS',
