@@ -858,10 +858,13 @@ BODY_SIZE_LIMIT=25mb
 # is refused with 415 — the aggregate in-flight cap counts bytes on the wire, so a compressed
 # body would be admitted small and then inflated past the memory that cap exists to bound.
 
-# Note: one client IP may hold at most half the aggregate in-flight budget, and is refused with
-# 503 + Retry-After past that even while the gateway as a whole has room. Behind a reverse proxy,
-# set TRUSTED_PROXIES: without it every caller resolves to the proxy's own address and shares a
-# single half, which looks like a 503 at half the budget you configured.
+# Note: one active API key may hold at most half the aggregate in-flight budget, wherever its
+# requests come from, and is refused with 503 + Retry-After past that even while the gateway as a
+# whole has room. Requests without a recognised key (ingress deliveries included) share a pool of a
+# quarter of the budget or twice BODY_SIZE_LIMIT, whichever is larger, and each client IP gets at
+# most half of that pool (never less than one full-size body). Behind a reverse proxy, set
+# TRUSTED_PROXIES: without it every unkeyed caller resolves to the proxy's own address and shares
+# a single IP's share of that pool.
 
 # Supported formats
 # Images: jpg, jpeg, png, gif, webp
