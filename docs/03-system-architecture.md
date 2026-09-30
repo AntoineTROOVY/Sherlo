@@ -1211,7 +1211,7 @@ flowchart TB
 
     subgraph Migration["Migration Path"]
         C[Update engine library]
-        D[Switch to Baileys]
+        D[Switch ENGINE_TYPE to the other engine]
         E[Track upstream fix\nOperators use fallback channel]
     end
 
@@ -1221,7 +1221,7 @@ flowchart TB
 
     A --> B
     B -->|Minor| C --> F
-    B -->|Major wwebjs| D --> F
+    B -->|Major one engine| D --> F
     B -->|Major Both| E --> C
 ```
 
