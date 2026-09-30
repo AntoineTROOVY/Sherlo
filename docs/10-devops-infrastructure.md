@@ -666,6 +666,8 @@ services:
     image: prom/alertmanager:v0.26.0
     volumes:
       - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      # Holds the Slack webhook URL; see the Alertmanager config below
+      - ./monitoring/slack_webhook_url:/etc/alertmanager/slack_webhook_url:ro
     ports:
       - '127.0.0.1:9093:9093'
     restart: unless-stopped
@@ -795,7 +797,8 @@ groups:
 # monitoring/alertmanager.yml
 global:
   resolve_timeout: 5m
-  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  # Alertmanager does not expand env vars in its config, so mount the webhook URL as a file.
+  slack_api_url_file: /etc/alertmanager/slack_webhook_url
 
 route:
   group_by: ['alertname', 'severity']
