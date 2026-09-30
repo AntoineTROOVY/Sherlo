@@ -252,8 +252,10 @@ function ConfigField({
  * iframe cannot read the parent's language setting either, and the manifest block covers only top-level
  * field text, so `locale` is what lets an editor translate its own strings. Additive, like `theme`.
  *
- * Sending them once, with the handshake, is sufficient: the theme and language controls sit behind the
- * modal overlay, so neither can change while an editor is open, and reopening re-runs the handshake.
+ * They are sent once, with the handshake. The theme and language controls sit behind the modal overlay,
+ * so neither setting can change while an editor is open, and reopening re-runs the handshake. The OS
+ * appearance can, though: under the 'system' theme the dashboard repaints when it flips, while the
+ * handshake theme stays as sent, so an editor that follows it should also watch `prefers-color-scheme`.
  */
 function PluginConfigUi({ plugin, sessionId }: { plugin: Plugin; sessionId?: string }) {
   const { t, i18n } = useTranslation();
