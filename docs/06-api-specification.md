@@ -4237,10 +4237,10 @@ Get status updates posted by a specific contact, read from the store (24h TTL, b
 
 **Path parameters**
 
-| Name      | Type   | Description                                |
-| --------- | ------ | ------------------------------------------ |
-| sessionId | string | WhatsApp session identifier                |
-| contactId | string | Contact JID/id (e.g. `6281234567890@c.us`) |
+| Name      | Type   | Description                                                       |
+| --------- | ------ | ----------------------------------------------------------------- |
+| sessionId | string | WhatsApp session identifier                                       |
+| id        | string | Contact JID/id whose statuses to read (e.g. `6281234567890@c.us`) |
 
 **Response** `200`
 
@@ -4475,7 +4475,7 @@ Delete one of the session's own posted statuses.
 | Name      | Type   | Description                                                             |
 | --------- | ------ | ----------------------------------------------------------------------- |
 | sessionId | string | WhatsApp session identifier                                             |
-| statusId  | string | Id of the status to delete (the `statusId` returned by a `send-*` call) |
+| id        | string | Id of the status to delete (the `statusId` returned by a `send-*` call) |
 
 **Response** `200`
 
