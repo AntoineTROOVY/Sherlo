@@ -442,7 +442,8 @@ LOG_FORMAT=json
 # SESSION_DATA_PATH=./data/sessions
 
 # Puppeteer (for whatsapp-web.js)
-PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+# Path to a system Chromium/Chrome binary. Leave unset to use the bundled browser; the Docker image sets its own.
+# PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 # PUPPETEER_HEADLESS=true
 # PUPPETEER_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu
 # Optional per-browser-command budget, ms. Unset = Puppeteer's own budget. Raise only after seeing
