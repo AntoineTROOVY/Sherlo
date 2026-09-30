@@ -5363,16 +5363,19 @@ Aggregate infrastructure status (database, Redis, queue, storage, engine).
     "type": "whatsapp-web.js",
     "headless": true,
     "sessionDataPath": "./data/sessions",
-    "browserArgs": "--no-sandbox --disable-gpu",
+    "browserArgs": "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --lang=en-US",
     "webVersion": "2.3000.1040641150-alpha",
     "webVersionSource": "auto"
-  }
+  },
+  "envPinned": ["ENGINE_TYPE"]
 }
 ```
 
 The `queue.webhooks` counters are live BullMQ job counts (`pending` = waiting + active + delayed; plus `completed`/`failed`), degrading to zeros when the queue is disabled or Redis is unreachable. `redis.connected` is a live probe.
 
-`builtIn` (on `database`/`redis`/`storage`) reports whether OpenWA's own bundled container is actually running _and_ backing this service, detected live from the labelled container; when Docker is unreachable it falls back to the saved `*_BUILTIN` intent from `data/.env.generated`. In S3 mode `storage` additionally carries `bucket` (when one is configured) and `s3Available` (re-probed, throttled, while false; once true it stays true until a restart, so a later outage does not clear it); in local mode neither key is present. `engine.webVersion`/`engine.webVersionSource` (`pinned` / `auto` / `native`) appear only on `whatsapp-web.js`; `webVersion` is `null` until the auto-resolve first succeeds.
+`builtIn` (on `database`/`redis`/`storage`) reports whether OpenWA's own bundled container is actually running _and_ backing this service, detected live from the labelled container; when Docker is unreachable it falls back to the saved `*_BUILTIN` intent from `data/.env.generated`. In S3 mode `storage` additionally carries `bucket` (when one is configured) and `s3Available` (re-probed, throttled, while false; once true it stays true until a restart, so a later outage does not clear it); in local mode neither key is present. `engine.webVersion`/`engine.webVersionSource` (`pinned` / `auto` / `native`) appear only on `whatsapp-web.js`; `webVersion` is `null` until the auto-resolve first succeeds. `engine.browserArgs` is the effective launch argument list: `PUPPETEER_ARGS` (or the four defaults shown) with `--lang=en-US` appended unless a `--lang` flag is already present.
+
+`envPinned` lists which of `DATABASE_TYPE`, `REDIS_ENABLED`, `STORAGE_TYPE`, `STORAGE_LOCAL_PATH`, `ENGINE_TYPE`, `PUPPETEER_HEADLESS`, `SESSION_DATA_PATH` and `PUPPETEER_ARGS` the host environment or the project `.env` sets. Those layers win over `data/.env.generated`, so a value saved for one of these keys through `PUT /api/infra/config` cannot take effect until that layer is changed.
 
 **Errors:** `401` missing/invalid key · `403` key role < ADMIN, or key is session-scoped
 
