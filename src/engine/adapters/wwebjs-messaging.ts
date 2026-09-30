@@ -634,13 +634,19 @@ export class WwebjsMessaging {
       // the forwarded copy from an earlier send with the same whole-second timestamp. Only messages
       // WhatsApp Web already holds are read, so this never pages the chat's history in ahead of the
       // send. A failed read never blocks the forward; it only leaves the copy unidentified.
+      // The newest timestamp it saw is kept too: a concurrent call on the destination chat can page
+      // older history in before the second read, and those messages are older than every one loaded.
       let resolvedTo = toChatId;
-      let before = undefined as Set<string> | undefined;
+      let before = undefined as { ids: Set<string>; newest: number } | undefined;
       await this.sendResolved(toChatId, async to => {
         resolvedTo = to;
         before = undefined;
         try {
-          before = new Set((await this.loadedOwnMessages(to)).map(m => toMessageResult(m).id));
+          const snapshot = await this.loadedOwnMessages(to);
+          before = {
+            ids: new Set(snapshot.map(m => toMessageResult(m).id)),
+            newest: snapshot.reduce((newest, m) => Math.max(newest, m.timestamp), 0),
+          };
         } catch (error) {
           this.host.logger.warn(`Could not read the destination chat before forwarding: ${String(error)}`);
         }
@@ -661,7 +667,7 @@ export class WwebjsMessaging {
           const known = before;
           const fresh = (await this.loadedOwnMessages(resolvedTo)).filter(m => {
             const id = toMessageResult(m).id;
-            return id !== '' && !known.has(id);
+            return id !== '' && !known.ids.has(id) && m.timestamp >= known.newest;
           });
           const forwarded = fresh.filter(m => m.isForwarded);
           const sent = fresh.length === 1 ? fresh[0] : forwarded.length === 1 ? forwarded[0] : undefined;
