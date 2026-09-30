@@ -170,7 +170,8 @@ The host enforces these before/after the RPC, so the plugin doesn't have to:
   feeds the plugin health check (`GET /api/plugins/:id/health`); implement it to report your backend's
   reachability.
 - **Selection.** When `SEARCH_PROVIDER=auto` (the default), the plugin supersedes the built-in
-  `builtin-fts` on enable. Set `SEARCH_PROVIDER=builtin-fts` to keep the built-in active.
+  `builtin-fts` on enable. Set `SEARCH_PROVIDER=builtin-fts` to keep the built-in active. Selection is
+  not health-gated: the plugin stays active while its `healthCheck()` reports unhealthy.
 
 ## 27.5 A minimal full example
 
