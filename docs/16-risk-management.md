@@ -47,7 +47,7 @@ WhatsApp can change its Web and multi-device protocols at any time, which can st
 
 ```mermaid
 flowchart TB
-    R[Risk: Protocol Change] --> M1[Monitor whatsapp-web.js repo]
+    R[Risk: Protocol Change] --> M1[Monitor both engine libraries]
     R --> M2[Implement abstraction layer]
     R --> M3[Prepare alternative engines]
     R --> M4[Quick response plan]
