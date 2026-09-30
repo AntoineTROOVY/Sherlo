@@ -143,6 +143,32 @@ describe('createInflightBodyBudget middleware', () => {
     expect(res.listenerCount('finish')).toBe(0);
   });
 
+  it('answers 413 without Retry-After, on an idle server, for a declared body that could never be admitted', () => {
+    // Default share 0.5 -> a 500-byte per-client cap: 600 bytes would never fit, however long the client waits.
+    const budget = createInflightBodyBudget(1000);
+    const rejected = makeReq({ 'content-length': '600' });
+    const { res, headers, state, next } = run(budget, rejected);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(state.code).toBe(413);
+    expect(headers['retry-after']).toBeUndefined();
+    expect(headers['connection']).toBe('close');
+    expect(state.payload).toEqual({
+      statusCode: 413,
+      message: 'Request body exceeds what this server can accept',
+      error: 'Payload Too Large',
+    });
+    expect(budget.currentBytes()).toBe(0);
+    expect(res.listenerCount('finish')).toBe(0);
+  });
+
+  it('answers 413 for an unkeyed body declared above the whole budget', () => {
+    const budget = createInflightBodyBudget(1000, { classify: () => undefined, bodyLimitBytes: 250 });
+    const { state, headers } = run(budget, makeReq({ 'content-length': '1001' }));
+    expect(state.code).toBe(413);
+    expect(headers['retry-after']).toBeUndefined();
+  });
+
   it('sends the configured Retry-After value', () => {
     const budget = createInflightBodyBudget(100, { retryAfterSeconds: 5, perClientShare: 1 });
     run(budget, makeReq({ 'content-length': '100' }));
@@ -929,7 +955,8 @@ describe('compressed request bodies', () => {
 
     const reply = await send({ 'Content-Type': 'application/json', 'Content-Length': String(plain.length) }, plain);
 
-    expect(reply.status).toBe(503);
+    // Larger than the whole budget, so it could never be admitted: 413, not a retryable 503.
+    expect(reply.status).toBe(413);
   });
 
   it('refuses a compressed body whose Content-Length is zero', async () => {

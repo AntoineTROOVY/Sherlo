@@ -11,7 +11,8 @@
  * This middleware closes the gap. It tracks the aggregate body bytes currently in flight across
  * ALL connections — the declared Content-Length where present, one budget slot otherwise — and
  * refuses NEW requests with 503 + Retry-After once the budget is exhausted, without reading a
- * single byte of the rejected body.
+ * single byte of the rejected body. A declared body too large to fit even on an idle server gets
+ * 413 instead, since retrying it cannot help.
  *
  * The bound is on WIRE bytes, and it holds as heap only while a body is stored as it arrives.
  * A compressed body would break that — admitted at its compressed length, then inflated by the
@@ -121,7 +122,8 @@ export interface InflightBodyBudgetOptions {
   /**
    * Per-client share of the aggregate budget as a fraction in (0, 1]. Default 0.5: no single
    * client can pin more than half the budget, so two independent heavy uploaders still coexist;
-   * a legitimate bulk uploader above the share gets 503 + Retry-After, not a hang.
+   * a legitimate bulk uploader above the share gets 503 + Retry-After, not a hang (a single declared
+   * body larger than the share gets 413).
    */
   perClientShare?: number;
   /**
@@ -226,6 +228,19 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
     });
   };
 
+  /** Same disposal again, for a body that could not be admitted even with nothing else in flight. */
+  const rejectTooLarge = (req: Request, res: Response): void => {
+    if (res.headersSent || res.writableEnded) {
+      req.destroy();
+      return;
+    }
+    res.status(413).set('Connection', 'close').json({
+      statusCode: 413,
+      message: 'Request body exceeds what this server can accept',
+      error: 'Payload Too Large',
+    });
+  };
+
   const middleware = (req: Request, res: Response, next: NextFunction): void => {
     const declared = parseDeclaredLength(req.headers['content-length']);
     // A body with no declared length is expected only when the request is chunk-encoded (Node
@@ -282,6 +297,13 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
       keyId === undefined && clientInFlight.size >= MAX_TRACKED_CLIENTS && !clientInFlight.has(clientKey);
     // The aggregate check uses the full declared size; the tier and share checks the charged size.
     const charge = Math.min(reserved, ceiling);
+    // A declared body that would be refused on an idle server can never be admitted, so a retryable
+    // 503 would only invite the client (and the SDKs, which retry a 503) to send it again. A chunked
+    // body is refused on its placeholder, not its size, so it keeps the 503.
+    if (declared !== undefined && (declared > budgetBytes || charge > shareCap || (anonymous && charge > anonPool))) {
+      rejectTooLarge(req, res);
+      return;
+    }
     if (
       inFlightBytes + reserved > budgetBytes ||
       clientBusy + charge > shareCap ||
