@@ -545,25 +545,30 @@ classDiagram
 
     class WebhookPayload {
         +event: EventType
-        +timestamp: Date
+        +timestamp: string
         +sessionId: string
-        +data: any
-        +signature: string
+        +idempotencyKey: string
+        +deliveryId: string
+        +data: object
     }
 
     class EventType {
         <<enumeration>>
-        MESSAGE_RECEIVED
-        MESSAGE_SENT
-        MESSAGE_ACK
-        SESSION_STATUS
-        QR_CODE
+        message.received
+        message.sent
+        message.ack
+        session.status
+        session.qr
     }
 
     WebhookManager --> Webhook
     WebhookManager --> WebhookPayload
     Webhook --> EventType
 ```
+
+`timestamp` is an ISO 8601 string. The body carries no signature: when the webhook has a secret, the
+HMAC travels in the `X-OpenWA-Signature: sha256=<hex>` header. `EventType` shows a few of the dotted
+event names; `WEBHOOK_EVENTS` in `src/modules/webhook/dto/webhook.dto.ts` is the full list.
 
 ## 3.6 Data Flow Diagrams
 
