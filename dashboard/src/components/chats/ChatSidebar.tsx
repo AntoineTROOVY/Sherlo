@@ -105,7 +105,14 @@ function ChatSidebar({
               {formatLastMessageSnippet(chat) ||
                 (!chat.timestamp && <span className="no-message">{t('chats.noMessageYet')}</span>)}
             </span>
-            {chat.unreadCount > 0 && (
+            {/* A negative count is a chat marked unread (Baileys reports -1): a badge with no number. */}
+            {chat.unreadCount < 0 ? (
+              <span
+                className="chat-unread-badge"
+                title={t('chats.markedUnread')}
+                aria-label={t('chats.markedUnread')}
+              />
+            ) : chat.unreadCount > 0 ? (
               <span
                 className="chat-unread-badge"
                 title={t('chats.unreadBadge', { count: chat.unreadCount })}
@@ -113,7 +120,7 @@ function ChatSidebar({
               >
                 {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
               </span>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
