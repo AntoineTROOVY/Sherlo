@@ -267,6 +267,31 @@ describe('production HTTP surface (configureApp)', () => {
 
     expect(res.status).toBe(415);
   });
+
+  it('answers every body rejection with the CORS, helmet and request-id headers', async () => {
+    const post = () =>
+      request(app.getHttpServer())
+        .post('/api/echo')
+        .set('Content-Type', 'application/json')
+        .set('Origin', 'https://allowed.example');
+    const rejections = [
+      await post().send('{bad'),
+      await post().send({ blob: 'x'.repeat(1100 * 1024) }),
+      await post()
+        .set('Content-Length', String(8 * 1024 * 1024))
+        .timeout({ deadline: 5000, response: 5000 })
+        .send('{}'),
+      await post().set('Content-Encoding', 'gzip').send('{}'),
+    ];
+
+    expect(rejections.map(res => res.status)).toEqual([400, 413, 503, 415]);
+    for (const res of rejections) {
+      // Without the CORS header a cross-origin browser sees an opaque network error, not the status.
+      expect(res.headers['access-control-allow-origin']).toBe('https://allowed.example');
+      expect(res.headers['x-request-id']).toBeDefined();
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+    }
+  });
 });
 
 describe('in-flight body budget tiers (configureApp)', () => {
