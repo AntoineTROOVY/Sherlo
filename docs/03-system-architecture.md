@@ -187,9 +187,11 @@ normalizes like any other lid. Baileys makes the same fold itself on every inbou
 The shared implementation lives in `src/engine/identity/wa-id.ts` (`parseWaId` / `toNeutralJid`); the
 contract is documented on the `IWhatsAppEngine` interface.
 
-> **Rollout status:** the contract is applied per-engine. It currently covers the **Baileys inbound
-> read path** (message / revoked / reaction payloads). Outbound id de-normalization (neutral -> engine
-> dialect on send) and contact/chat list ids are tracked follow-ups.
+> **Rollout status:** the contract is applied per-engine. On Baileys it covers **inbound event
+> payloads** (message / revoked / reaction, group, call and presence events), the ids returned by the
+> contact, chat and blocklist listings and by the number check, and **outbound ids**: sends, message
+> actions and contact / group-participant writes fold a neutral id back to the engine dialect with
+> `toEngineJid` (`baileys-session-store.ts`).
 
 ### Engine Lifecycle State Machine
 
