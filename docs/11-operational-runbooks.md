@@ -146,8 +146,11 @@ curl -H "X-API-Key: $API_KEY" \
 curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions/{sessionId}/qr
 
-# Display QR in terminal: there is no raw/format param — consume the `session.qr`
-# webhook/WebSocket event to get the raw QR string for qrencode.
+# Save the QR as a PNG to open or scan. There is no raw QR string: the `session.qr`
+# webhook/WebSocket event carries the same PNG data URL as this endpoint.
+curl -s -H "X-API-Key: $API_KEY" \
+  http://localhost:2785/api/sessions/{sessionId}/qr \
+  | jq -r .qrCode | sed 's#^data:image/png;base64,##' | base64 -d > qr.png
 ```
 
 **Verification:**
