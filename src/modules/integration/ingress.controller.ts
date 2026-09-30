@@ -18,7 +18,8 @@ import { InstanceThrottlerGuard } from './instance-throttler.guard';
 // per-instance limit's 120/min, so a provider delivering every tenant's webhooks from one shared
 // egress IP was 429'd at the IP tier before the instance bound ever fired). InstanceThrottlerGuard
 // bounds each client instead, and IngressService charges a per-(pluginId, instanceId) bucket once a
-// delivery's signature verifies, so a noisy tenant sheds alone.
+// delivery's signature verifies. The client tier counts every request, including one the instance
+// bucket then sheds, so a tenant pushing one shared IP past INGRESS_IP_LIMIT sheds its neighbours too.
 @SkipThrottle()
 @Controller('ingress')
 export class IngressController {
