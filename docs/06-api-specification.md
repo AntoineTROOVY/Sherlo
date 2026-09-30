@@ -1536,8 +1536,9 @@ cleared on revoke, and this route answers `404` for it.
 | messageId | string | WhatsApp message ID whose media to download |
 
 **Response** `200` — the raw media bytes as the response body, served as an **attachment**
-(`Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`). `Content-Type` is the stored
-mimetype when it is in a conservative inert set (common image/video/audio types) and
+(`Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`). `Content-Type` is the essence of the
+stored mimetype (the part before any `;`, trimmed and lowercased; parameters are dropped) when that is in a
+conservative inert set (common image/video/audio types) and
 `application/octet-stream` otherwise — a document, or an `image/svg+xml`, is never served as active
 content on the API origin.
 
