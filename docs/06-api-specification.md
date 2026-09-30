@@ -4631,7 +4631,7 @@ List webhook deliveries that exhausted every retry, most recent first. This is t
     "deliveryId": "dlv_0f8c1a2b-3c4d-5e6f-7a8b-9c0d1e2f3a4b",
     "attempts": 4,
     "lastStatusCode": 502,
-    "lastError": "Request failed with status code 502",
+    "lastError": "HTTP 502: Bad Gateway",
     "createdAt": "2026-06-25T11:59:00.000Z"
   }
 ]
