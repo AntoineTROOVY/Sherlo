@@ -96,4 +96,6 @@ jobs:
       - name: Publish to npm (trusted publishing, provenance automatic)
         # No --provenance flag: npm attaches provenance on its own for a trusted-publisher release, and
         # passing it is redundant. --access public is explicit because the package is scoped.
-        run: npm publish --access public
+        # --ignore-scripts skips prepublishOnly, which would rebuild dist/ after smoke: the dist/ that
+        # passed the gates above is the one that ships. prepublishOnly stays for a manual publish.
+        run: npm publish --access public --ignore-scripts
