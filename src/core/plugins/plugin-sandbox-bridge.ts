@@ -585,8 +585,11 @@ export class PluginSandboxBridge {
         typeof message === 'string' && message.length > SANDBOX_LOG_MAX_MESSAGE_LENGTH
           ? `${message.slice(0, SANDBOX_LOG_MAX_MESSAGE_LENGTH)}…[truncated]`
           : message;
+      // The level comes off the wire unchecked (plugin code can post to parentPort directly), and the
+      // plugin logger has no method for anything outside PluginLogLevel.
       if (level === 'error') context.logger.error(bounded, undefined, meta);
-      else context.logger[level](bounded, meta);
+      else if (level === 'debug' || level === 'warn') context.logger[level](bounded, meta);
+      else context.logger.log(bounded, meta);
     };
   }
 

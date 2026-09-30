@@ -6,6 +6,9 @@ import {
   PluginLogLevel,
 } from './protocol';
 import type { SearchQuery, SearchResults } from '../../../modules/search/search.types';
+import { createLogger } from '../../../common/services/logger.service';
+
+const logger = createLogger('PluginWorkerHost');
 
 /**
  * Capability verbs whose host-side work IS an outbound message send. A media send (the URL
@@ -388,6 +391,20 @@ export class PluginWorkerHost {
   }
 
   private handleMessage(message: WorkerToHostMessage): void {
+    // Plugin code can post to parentPort directly, so a message is untrusted input. Anything that throws
+    // here escapes the channel's listener as an uncaught exception and takes the whole host down.
+    if (typeof message !== 'object' || message === null) return;
+    try {
+      this.routeMessage(message);
+    } catch (error) {
+      logger.warn(
+        `Dropped a malformed sandbox worker message: ${error instanceof Error ? error.message : String(error)}`,
+        { action: 'sandbox_worker_message_dropped' },
+      );
+    }
+  }
+
+  private routeMessage(message: WorkerToHostMessage): void {
     // Only answers to host requests count as progress: a synchronous loop can still post log, cap or
     // subscribe messages, but it cannot finish a dispatch.
     if (this.probe && PROGRESS_KINDS.has(message.kind)) this.armProbe(this.probe.id);
