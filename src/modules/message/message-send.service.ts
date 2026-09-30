@@ -70,7 +70,7 @@ export interface SaveOutgoingMessageData {
  *
  * Backpressure is applied at the edges instead: bulk sends self-throttle via
  * `delayBetweenMessages` (default 3s) and a per-process concurrent-batch cap (see
- * `BulkMessageService`), and the global throttler enforces per-key rate limits.
+ * `BulkMessageService`), and the global throttler enforces per-route, per-client-IP rate limits.
  */
 @Injectable()
 export class MessageSendService {
