@@ -98,7 +98,7 @@ curl -X GET "$BASE/api/sessions/stats/overview" \
 
 #### POST /api/sessions
 
-Create a new session (OPERATOR).
+Create a new session (OPERATOR, unscoped key: a key with `allowedSessions` or `allowedChats` gets `403`).
 
 ```bash
 curl -X POST "$BASE/api/sessions" \
@@ -1249,7 +1249,7 @@ curl -X POST "$BASE/api/auth/api-keys" \
 
 #### PUT /api/auth/api-keys/:id
 
-Update name/role/allowedIps/allowedSessions/expiresAt.
+Update name/role/allowedIps/allowedSessions/allowedChats/expiresAt.
 
 ```bash
 curl -X PUT "$BASE/api/auth/api-keys/3f2a1c9e-1b2d-4a5f-9c8e-aa11bb22cc33" \
@@ -1351,7 +1351,7 @@ curl "$BASE/api/stats/messages?period=7d" \
 Per-session stats. Any role; a session-restricted key can only read stats for its allowed sessions.
 
 ```bash
-curl "$BASE/api/stats/sessions/9f1c2d3e-…" \
+curl "$BASE/api/stats/sessions/$SESSION_ID" \
   -H "X-API-Key: $API_KEY"
 ```
 
