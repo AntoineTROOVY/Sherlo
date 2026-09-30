@@ -117,7 +117,7 @@ Setting `proxyUrl` requires an unscoped ADMIN key; any other key gets `403`.
 curl -X POST "$BASE/api/sessions" \
   -H "X-API-Key: $API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "name": "my-bot", "proxyUrl": "http://user:pass@your-real-proxy.host:8080", "proxyType": "http" }'
+  -d '{ "name": "my-bot", "proxyUrl": "http://user:pass@your-real-proxy.host:8080" }'
 ```
 
 #### GET /api/sessions/:sessionId/proxy
@@ -137,7 +137,7 @@ Update per-session proxy settings (ADMIN, unscoped key). No restart — changes 
 curl -X PATCH "$BASE/api/sessions/$SESSION_ID/proxy" \
   -H "X-API-Key: $API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "proxyUrl": "http://user:pass@your-real-proxy.host:8080", "proxyType": "http" }'
+  -d '{ "proxyUrl": "http://user:pass@your-real-proxy.host:8080" }'
 ```
 
 #### POST /api/sessions/:sessionId/start
