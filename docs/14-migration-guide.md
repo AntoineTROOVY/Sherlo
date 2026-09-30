@@ -1033,7 +1033,11 @@ flowchart TD
 > column's migration. To recover, restore `main.sqlite` from the backup taken before the rollback,
 > which brings the chat scopes back with it, or delete that ledger row as
 > [05 - Database Design, section 5.6](./05-database-design.md#56-migration-strategy) shows, after which
-> the column comes back empty, which means every chat. Before such a rollback, revoke every key that has
+> the column comes back empty, which means every chat. Section 5.6 gives the source and compose forms;
+> on the Helm chart, scale the StatefulSet to 0, start the helper pod on the release's data PVC as
+> [11 - Runbook: Restore from Backup](./11-operational-runbooks.md#runbook-restore-from-backup) does,
+> run the same `sqlite3 /app/data/main.sqlite` command there with `kubectl exec openwa-restore --`,
+> then delete the pod and scale back to 1. Before such a rollback, revoke every key that has
 > `allowedChats` (`POST /api/auth/api-keys/:id/revoke`) and issue new ones after upgrading again.
 > Starting the older image with `MAIN_DATABASE_SYNCHRONIZE=false` keeps the column and its values for
 > the next upgrade (the compose file forwards it since 0.14.5), but the older image still does not
