@@ -999,7 +999,9 @@ export class InfraDataService {
 
         // restartRequired was computed in the pre-flight, from three independent causes: orphans left
         // running (force=true legacy path), a stopOrphans teardown that failed for at least one
-        // engine, and sessions held by another node, which this request cannot reach to stop.
+        // engine, and sessions held by another node, which this request cannot reach to stop. It is
+        // also set above when the post-commit plugin binding re-sync fails; a restart does not repair
+        // that one, so its notice names the manual check instead.
         return {
           imported: true,
           counts,
