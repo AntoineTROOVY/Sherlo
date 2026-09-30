@@ -323,7 +323,7 @@ claims a route the manifest already declared under `ingress`: the host owns the 
 ### Capability facade
 
 A plugin reaches WhatsApp, the engine, and the network **only** through these namespaces. Each call is
-gated by the matching declared permission (and, for everything except `net`, the session scope) — a
+gated by the matching declared permission (and, for everything except `net` and `storage`, the session scope) — a
 missing grant throws a `PluginCapabilityError`.
 
 ```typescript
@@ -757,7 +757,7 @@ first `ctx.registerSearchProvider` call.
 
 Two further checks apply on top of the permission:
 
-- **Session scope.** Every capability but `net` is session-scoped through `assertSessionActive`, which
+- **Session scope.** Every capability but `net` and `storage` is session-scoped through `assertSessionActive`, which
   requires **both** that the manifest `sessions` list admits the session (`assertSessionAllowed`; `['*']` =
   all) and that the operator has activated the plugin for it. Most verbs run it up front, on the
   `sessionId` the plugin passed; `ctx.mappings.getByProvider` takes no `sessionId`, so it runs the check
