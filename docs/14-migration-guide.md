@@ -924,8 +924,21 @@ git checkout "v${TARGET_VERSION}"
 #    so SQLite cannot replay them into the restored file.
 echo "📥 Restoring database..."
 if [ -f "$BACKUP_DIR/database.sql" ]; then
-    # PostgreSQL
-    psql -h "$DATABASE_HOST" -U "$DATABASE_USERNAME" -d "$DATABASE_NAME" < "$BACKUP_DIR/database.sql"
+    # PostgreSQL: load the dump into an empty database. Replayed over the upgraded tables, its CREATE
+    # statements fail and its rows mix with theirs. This is the built-in PostgreSQL (the compose
+    # `postgres` service, or the openwa-postgres container Dashboard > Infrastructure created, which
+    # carries no compose labels, so step 1 left it running). docker start covers a leftover or
+    # dashboard-created container; compose creates the service only when none exists. For an external
+    # server, rename the database and load the dump as step 3 of 11 - Runbook: Restore from Backup
+    # shows. The upgraded database is kept under a _pre_restore_ name, and sed drops the pg_dump 17
+    # line PostgreSQL 16 rejects.
+    docker start openwa-postgres 2>/dev/null || docker compose --profile postgres up -d postgres
+    docker exec openwa-postgres sh -c 'until pg_isready -q -U "$POSTGRES_USER"; do sleep 1; done'
+    docker exec openwa-postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres \
+      -c "ALTER DATABASE \"$POSTGRES_DB\" RENAME TO \"${POSTGRES_DB}_pre_restore_$(date +%Y%m%d%H%M%S)\"" \
+      -c "CREATE DATABASE \"$POSTGRES_DB\" OWNER \"$POSTGRES_USER\""'
+    sed '/^SET transaction_timeout = 0;$/d' "$BACKUP_DIR/database.sql" |
+      docker exec -i openwa-postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
 else
     # SQLite
     rm -f ./data/openwa.sqlite-{wal,shm,journal}
