@@ -199,7 +199,7 @@ export class InfraStorageController implements OnApplicationBootstrap {
       // The TTL sweep below only covers a finished archive; a failed one would otherwise stay on the
       // data volume until a restart a day later. Wait for the sink to close so the unlink cannot race
       // an open that is still pending.
-      if (!writeStream.closed) await new Promise(resolve => writeStream.once('close', resolve));
+      if (!writeStream.closed) await new Promise<void>(resolve => writeStream.once('close', () => resolve()));
       await fs.promises.unlink(exportPath).catch(() => undefined);
       throw error;
     }

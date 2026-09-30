@@ -389,9 +389,9 @@ describe('InfraDataController.importData round-trips export-data (no silent mess
     // The export reads each table separately, so a session paired mid-export is missing from the
     // archive while a child row written for it before its table is read is not.
     const query = ds.query.bind(ds);
-    jest.spyOn(ds, 'query').mockImplementation(async (sql: string, params?: unknown[]) => {
-      const rows: unknown = await query(sql, params);
-      if (sql === 'SELECT * FROM sessions') {
+    jest.spyOn(ds, 'query').mockImplementation(async (...args: Parameters<DataSource['query']>) => {
+      const rows: unknown = await query(...args);
+      if (args[0] === 'SELECT * FROM sessions') {
         await seedSession('s2');
         await ds
           .getRepository(Template)
