@@ -165,8 +165,10 @@ The host enforces these before/after the RPC, so the plugin doesn't have to:
   key never sees an out-of-scope hit even if the plugin leaks one.
 - **Timeout.** The plugin's `search()` handler must answer within **10 seconds** (`SANDBOX_SEARCH_TIMEOUT_MS`).
   A slow/wedged handler resolves `ok:false` → the caller sees `503 Service Unavailable`. Fail fast.
-- **Health.** The host reuses the plugin's general `healthCheck()` (the `health` lifecycle method) for
-  the `/search` health check. Implement `healthCheck()` to report your backend's reachability.
+- **Health.** The search provider's health reuses the plugin's general `healthCheck()` (the `health`
+  lifecycle method), but search-provider health is not yet exposed on any route. `healthCheck()` still
+  feeds the plugin health check (`GET /api/plugins/:id/health`); implement it to report your backend's
+  reachability.
 - **Selection.** When `SEARCH_PROVIDER=auto` (the default), the plugin supersedes the built-in
   `builtin-fts` on enable. Set `SEARCH_PROVIDER=builtin-fts` to keep the built-in active.
 
@@ -237,7 +239,7 @@ module.exports = class MySearchPlugin {
     return body.replace(new RegExp(term, 'gi'), '<mark>$&</mark>');
   }
 
-  // Optional: report backend health to the /search health check.
+  // Optional: report backend health to the plugin health check.
   async healthCheck() {
     const ok = await this._pingBackend();
     return { healthy: ok, message: ok ? undefined : 'backend unreachable' };
