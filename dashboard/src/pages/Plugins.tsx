@@ -725,6 +725,8 @@ export default function Plugins() {
     try {
       const installed = await pluginsApi.install(installFile);
       refetchAll();
+      // The catalog's installed and update flags are computed per request, so they changed too.
+      void loadCatalog();
       toast.success(t('plugins.toasts.installed', 'Plugin installed'), installed.name);
       setShowInstallModal(false);
       setInstallFile(null);
@@ -821,6 +823,7 @@ export default function Plugins() {
     try {
       await pluginsApi.uninstall(plugin.id);
       refetchAll();
+      void loadCatalog();
       toast.success(t('plugins.toasts.uninstalled', 'Plugin uninstalled'), localizePlugin(plugin, i18n.language).name);
     } catch (err) {
       toast.error(t('plugins.toasts.uninstallFailed', 'Uninstall failed'), err instanceof Error ? err.message : '');

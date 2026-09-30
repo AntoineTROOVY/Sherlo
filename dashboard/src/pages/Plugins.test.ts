@@ -205,3 +205,18 @@ test('a catalog prefetch that fails after the Catalog tab opened shows the error
   assert.ok(rtl.within(message).getByRole('button', { name: 'Refresh' }));
   assert.equal(screen.queryByText('No plugins in the catalog.'), null);
 });
+
+test('uninstalling a plugin reloads the catalog, whose installed flags it changed', async () => {
+  const { screen, fireEvent, waitFor } = rtl;
+  const realConfirm = window.confirm;
+  window.confirm = () => true;
+  try {
+    renderPlugins();
+    await waitFor(() => assert.equal(catalogReads, 1));
+    fireEvent.click(await screen.findByTitle('Uninstall'));
+    await screen.findByText('Plugin uninstalled');
+    await waitFor(() => assert.equal(catalogReads, 2));
+  } finally {
+    window.confirm = realConfirm;
+  }
+});
