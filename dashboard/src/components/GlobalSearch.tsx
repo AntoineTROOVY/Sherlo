@@ -197,7 +197,7 @@ export function GlobalSearch({ onHit, currentSessionId }: GlobalSearchProps) {
             // preventDefault on mousedown keeps focus in the input, so a mouse click does not start the
             // close timer; click still fires for the mouse and for Enter/Space.
             <button className="global-search-more" onMouseDown={e => e.preventDefault()} onClick={loadMore}>
-              {t('search.results', { count: total })}
+              {t('search.loadMore', { shown: hits.length, total })}
             </button>
           )}
         </div>
