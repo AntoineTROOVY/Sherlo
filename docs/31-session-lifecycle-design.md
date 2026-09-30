@@ -28,8 +28,8 @@ starting" read; two engines come up; one is leaked forever (registry holds the s
 **Defense:** `initializingSessions` is reserved SYNCHRONOUSLY (before any `await`) in
 `session-engine-controls.ts` — the second request observes the reservation and fails fast.
 **Pinned by:** `session.service.spec.ts` (the maxConcurrent/double-start cases, incl. the concurrent-start
-claim-holding verbs at `')() keeps the claim when a concurrent start still holds the session
-here'`).
+claim-holding verbs at
+`'%s() keeps the claim when a concurrent start still holds the session here'`).
 **The naive fix that is wrong:** checking session.status instead — status is written to the DB
 and read back with an await in between; the reservation map is the only synchronous view.
 
