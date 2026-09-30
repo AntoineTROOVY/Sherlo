@@ -592,3 +592,17 @@ describe('SessionController.start() OpenAPI responses', () => {
     expect(Object.keys(responses)).toContain('504');
   });
 });
+
+describe('SessionController OpenAPI error responses', () => {
+  it.each([
+    ['create', '400'],
+    ['findAll', '400'],
+    ['forceKill', '502'],
+  ])('%s declares %s', (method, status) => {
+    const responses = Reflect.getMetadata(
+      'swagger/apiResponse',
+      Object.getOwnPropertyDescriptor(SessionControllerClass.prototype, method)!.value as object,
+    ) as Record<string, unknown>;
+    expect(Object.keys(responses)).toContain(status);
+  });
+});
