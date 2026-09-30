@@ -382,7 +382,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - From the next SDK release after 0.5.0, all five SDKs refuse an empty, `.` or `..` id before sending, instead of sending a request that resolved to the parent route; the JavaScript, Go and Java raw-request methods also refuse a `.` or `..` path segment (also written `%2e`) and still send a trailing or double slash as written.
 - Status media stored with a mixed-case `image/svg+xml` type, or several comma-joined types, is served as `application/octet-stream`.
 - Queued webhook jobs no longer copy the webhook's custom headers and signature into Redis, where the queue dashboard displayed them.
-- The JavaScript SDK release job pins npm 12.0.2 instead of installing `npm@latest` while it can mint a publish credential.
+- The JavaScript SDK release job pins npm 12.1.0 instead of installing `npm@latest` while it can mint a publish credential.
 - The Python SDK release workflow builds and tests in a job that cannot mint the PyPI publish credential; the publish job only downloads the built files and uploads them.
 - MCP: every `POST /mcp` request, including `initialize` and `tools/list`, needs a valid API key; a missing, unknown, revoked or expired key gets `401`.
 - `GET /api/health` looks up at most 30 failing API keys per client IP per minute; past that, the client gets the answer without `version` whatever key it sends.
