@@ -6842,19 +6842,19 @@ response only; the `verifyToken` is also shown (unchanged).
 
 #### GET /api/ingress/:pluginId/:instanceId/:path
 
-**Errors:** `401` signature verification failed (missing, stale, or wrong per-instance secret) · `413` payload too large · `429` rate limit exceeded · `503` a route declaring a `session-alive` preflight whose bound session is not connected
+**Errors:** `401` signature verification failed (missing, stale, or wrong per-instance secret) · `413` payload too large · `415` body in a content type no parser reads · `429` rate limit exceeded · `503` a route declaring a `session-alive` preflight whose bound session is not connected
 
 #### POST /api/ingress/:pluginId/:instanceId/:path
 
-**Errors:** `401` signature verification failed (missing, stale, or wrong per-instance secret) · `413` payload too large · `429` rate limit exceeded · `503` a route declaring a `session-alive` preflight whose bound session is not connected
+**Errors:** `401` signature verification failed (missing, stale, or wrong per-instance secret) · `413` payload too large · `415` body in a content type no parser reads · `429` rate limit exceeded · `503` a route declaring a `session-alive` preflight whose bound session is not connected
 
 #### PUT /api/ingress/:pluginId/:instanceId/:path
 
-**Errors:** `401` signature verification failed (missing, stale, or wrong per-instance secret) · `413` payload too large · `429` rate limit exceeded · `503` a route declaring a `session-alive` preflight whose bound session is not connected
+**Errors:** `401` signature verification failed (missing, stale, or wrong per-instance secret) · `413` payload too large · `415` body in a content type no parser reads · `429` rate limit exceeded · `503` a route declaring a `session-alive` preflight whose bound session is not connected
 
 #### PATCH /api/ingress/:pluginId/:instanceId/:path
 
-**Errors:** `401` signature verification failed (missing, stale, or wrong per-instance secret) · `413` payload too large · `429` rate limit exceeded · `503` a route declaring a `session-alive` preflight whose bound session is not connected
+**Errors:** `401` signature verification failed (missing, stale, or wrong per-instance secret) · `413` payload too large · `415` body in a content type no parser reads · `429` rate limit exceeded · `503` a route declaring a `session-alive` preflight whose bound session is not connected
 
 #### DELETE /api/ingress/:pluginId/:instanceId/:path
 
@@ -6878,7 +6878,7 @@ first delivery, and is not enqueued again. The ack is rendered from the retry, s
 an ack body is the retry's time and `{rawBody}` is the retry's body. A retry still passes the checks
 that run before dedup: while a `session-alive` route's bound session is down it gets the `503`.
 
-**Errors:** `401` signature verification failed (missing, stale, or wrong secret) · `403` `GET` verification challenge failed (`verifyToken` mismatch) · `404` unknown pluginId/instanceId, or no such claimed route · `413` body over the route's `maxBodyBytes` · `429` rate limit: the per-instance bucket (`INGRESS_INSTANCE_LIMIT`, counted only for deliveries that pass signature verification) or the per-client-IP bucket (`INGRESS_IP_LIMIT`), both per `INGRESS_INSTANCE_TTL`; the global per-IP tiers skip this route, so these two are its bounds, and `Retry-After-instance` / `Retry-After-ingress-ip` names the one that shed the request, alongside a plain `Retry-After` carrying the same delay · `503` a route declaring a `session-alive` preflight whose bound session is not connected: the delivery is not persisted, so the provider's retry is treated as a new delivery, and `Retry-After` carries the delay
+**Errors:** `401` signature verification failed (missing, stale, or wrong secret) · `403` `GET` verification challenge failed (`verifyToken` mismatch) · `404` unknown pluginId/instanceId, or no such claimed route · `413` body over the route's `maxBodyBytes` · `415` a body in a content type no parser reads (only `application/json` and `application/x-www-form-urlencoded` are read) · `429` rate limit: the per-instance bucket (`INGRESS_INSTANCE_LIMIT`, counted only for deliveries that pass signature verification) or the per-client-IP bucket (`INGRESS_IP_LIMIT`), both per `INGRESS_INSTANCE_TTL`; the global per-IP tiers skip this route, so these two are its bounds, and `Retry-After-instance` / `Retry-After-ingress-ip` names the one that shed the request, alongside a plain `Retry-After` carrying the same delay · `503` a route declaring a `session-alive` preflight whose bound session is not connected: the delivery is not persisted, so the provider's retry is treated as a new delivery, and `Retry-After` carries the delay
 
 ## 6.5 Real-time API (WebSocket)
 
