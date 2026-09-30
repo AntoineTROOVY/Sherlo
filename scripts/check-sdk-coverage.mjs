@@ -4,8 +4,8 @@
  *
  * `check-sdk-routes` asks: does every route an SDK builds exist in the contract? That catches a
  * renamed route. It cannot catch a route the gateway publishes that no client ever got, because
- * nothing is there to scan. Ten routes reached `main` that way — five found by an audit, five more
- * found by writing this file, all of them added in the release that announced them.
+ * nothing is there to scan. Ten routes reached `main` that way, all of them added in the release
+ * that announced them.
  *
  * So this asks the other question: does every route the contract publishes, minus the resources
  * `sdk/README.md` declares unexposed, have a method in EVERY SDK?

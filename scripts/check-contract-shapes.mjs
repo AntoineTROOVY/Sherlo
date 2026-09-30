@@ -168,9 +168,9 @@ const MAPPINGS = {
 
 /**
  * Floor on the mapping SIZE per client. The per-file compared-pairs guard above cannot see a
- * rewrite that silently DROPS entries (protection shrinks while everything stays green — observed
- * in review: a from-memory rewrite lost four conforming pairs and the run still passed). Raising
- * these floors as pairs are added makes the shrink loud.
+ * rewrite that silently DROPS entries (protection shrinks while everything stays green: a rewrite
+ * once lost four conforming pairs and the run still passed). Raising these floors as pairs are
+ * added makes the shrink loud.
  */
 const MINIMUM_MAPPED = {
   'sdk/javascript/src/types.ts': 83,
