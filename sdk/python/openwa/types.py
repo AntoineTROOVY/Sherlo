@@ -284,7 +284,7 @@ class SessionConfig(TypedDict):
 
 
 class UpdateSessionConfigRequest(TypedDict, total=False):
-    """Partial update of a running session's config -- no re-link, no QR scan.
+    """Partial update of a session's config, in any state -- no re-link, no QR scan.
 
     Send ``None`` for ``maxReconnectAttempts`` to restore unlimited retries, which no in-range number
     can express.
