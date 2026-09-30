@@ -206,7 +206,8 @@ Four tables live on the data connection, each created by a hand-authored dual-di
   `ERROR`. When the operator has opted in, the loader still logs its boot warning for every such route.
 - **Raw-body content types.** Signature verification observes exact bytes for `application/json` and
   `application/x-www-form-urlencoded`. Plain text, XML, octet streams, and non-UTF JSON charsets are not
-  supported ingress body formats and fail verification/content handling rather than being re-serialized.
+  supported ingress body formats and are refused with `415` on every signature scheme, before
+  verification or persistence, rather than being re-serialized.
 - **Egress.** The only sanctioned outbound path remains the SSRF-guarded `ctx.net.fetch`, scoped to the
   manifest's allowed hosts; a direct Node socket opened by the worker is not covered (see [30 - Plugin
   Sandboxing](./30-plugin-sandboxing.md)).
