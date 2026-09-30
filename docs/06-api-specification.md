@@ -2788,11 +2788,11 @@ Set the group's picture. The account must be a group admin.
 
 **Request body** — `SetGroupPictureDto` (same shape as the profile-picture body)
 
-| Field    | Type   | Required          | Constraints          | Description                                |
-| -------- | ------ | ----------------- | -------------------- | ------------------------------------------ |
-| url      | string | One of url/base64 | http(s) URL          | Fetched server-side through the SSRF guard |
-| base64   | string | One of url/base64 | —                    | Wins over `url` when both are present      |
-| mimetype | string | With `base64`     | must match `image/*` | Defaults to `image/jpeg`                   |
+| Field    | Type   | Required          | Constraints          | Description                                       |
+| -------- | ------ | ----------------- | -------------------- | ------------------------------------------------- |
+| url      | string | One of url/base64 | http(s) URL          | Fetched server-side through the SSRF guard        |
+| base64   | string | One of url/base64 | —                    | Wins over `url` when both are present             |
+| mimetype | string | With `base64`     | must match `image/*` | Defaults to `image/jpeg` when only `url` is given |
 
 **Response** `200` — `{ "success": true, "message": "Group picture updated" }`
 
@@ -2891,9 +2891,9 @@ Add participants to a group.
 
 **Request body** — `ParticipantsDto`
 
-| Field        | Type     | Required | Constraints                                            | Description                     |
-| ------------ | -------- | -------- | ------------------------------------------------------ | ------------------------------- |
-| participants | string[] | Yes      | `@IsArray`, `@ArrayNotEmpty`, `@IsString({each:true})` | Non-empty array of WhatsApp IDs |
+| Field        | Type     | Required | Constraints                                                        | Description                     |
+| ------------ | -------- | -------- | ------------------------------------------------------------------ | ------------------------------- |
+| participants | string[] | Yes      | `@IsArray`, `@ArrayNotEmpty`, `@IsString({each:true})`, 1..256 ids | Non-empty array of WhatsApp IDs |
 
 ```json
 { "participants": ["628123456789@c.us"] }
@@ -2933,9 +2933,9 @@ Remove participants from a group. Note: this DELETE carries a JSON request body.
 
 **Request body** — `ParticipantsDto`
 
-| Field        | Type     | Required | Constraints                                            | Description                     |
-| ------------ | -------- | -------- | ------------------------------------------------------ | ------------------------------- |
-| participants | string[] | Yes      | `@IsArray`, `@ArrayNotEmpty`, `@IsString({each:true})` | Non-empty array of WhatsApp IDs |
+| Field        | Type     | Required | Constraints                                                        | Description                     |
+| ------------ | -------- | -------- | ------------------------------------------------------------------ | ------------------------------- |
+| participants | string[] | Yes      | `@IsArray`, `@ArrayNotEmpty`, `@IsString({each:true})`, 1..256 ids | Non-empty array of WhatsApp IDs |
 
 ```json
 { "participants": ["628123456789@c.us"] }
@@ -2970,9 +2970,9 @@ Promote participants to group admin.
 
 **Request body** — `ParticipantsDto`
 
-| Field        | Type     | Required | Constraints                                            | Description                     |
-| ------------ | -------- | -------- | ------------------------------------------------------ | ------------------------------- |
-| participants | string[] | Yes      | `@IsArray`, `@ArrayNotEmpty`, `@IsString({each:true})` | Non-empty array of WhatsApp IDs |
+| Field        | Type     | Required | Constraints                                                        | Description                     |
+| ------------ | -------- | -------- | ------------------------------------------------------------------ | ------------------------------- |
+| participants | string[] | Yes      | `@IsArray`, `@ArrayNotEmpty`, `@IsString({each:true})`, 1..256 ids | Non-empty array of WhatsApp IDs |
 
 ```json
 { "participants": ["628123456789@c.us"] }
@@ -3005,9 +3005,9 @@ Demote participants from group admin.
 
 **Request body** — `ParticipantsDto`
 
-| Field        | Type     | Required | Constraints                                            | Description                     |
-| ------------ | -------- | -------- | ------------------------------------------------------ | ------------------------------- |
-| participants | string[] | Yes      | `@IsArray`, `@ArrayNotEmpty`, `@IsString({each:true})` | Non-empty array of WhatsApp IDs |
+| Field        | Type     | Required | Constraints                                                        | Description                     |
+| ------------ | -------- | -------- | ------------------------------------------------------------------ | ------------------------------- |
+| participants | string[] | Yes      | `@IsArray`, `@ArrayNotEmpty`, `@IsString({each:true})`, 1..256 ids | Non-empty array of WhatsApp IDs |
 
 ```json
 { "participants": ["628123456789@c.us"] }
@@ -3040,9 +3040,9 @@ Change the group name/subject.
 
 **Request body** — `GroupSubjectDto`
 
-| Field   | Type   | Required | Constraints                | Description            |
-| ------- | ------ | -------- | -------------------------- | ---------------------- |
-| subject | string | Yes      | `@IsString`, `@IsNotEmpty` | New group subject/name |
+| Field   | Type   | Required | Constraints                              | Description            |
+| ------- | ------ | -------- | ---------------------------------------- | ---------------------- |
+| subject | string | Yes      | `@IsString`, `@IsNotEmpty`, 1..100 chars | New group subject/name |
 
 ```json
 { "subject": "New Team Name" }
@@ -3073,9 +3073,9 @@ Change the group description. An empty string clears the description.
 
 **Request body** — `GroupDescriptionDto`
 
-| Field       | Type   | Required | Constraints                    | Description                                                                |
-| ----------- | ------ | -------- | ------------------------------ | -------------------------------------------------------------------------- |
-| description | string | Yes      | `@IsString` (no `@IsNotEmpty`) | Must be present and a string, but `""` is valid and clears the description |
+| Field       | Type   | Required | Constraints                                  | Description                                                                |
+| ----------- | ------ | -------- | -------------------------------------------- | -------------------------------------------------------------------------- |
+| description | string | Yes      | `@IsString` (no `@IsNotEmpty`), ≤ 1024 chars | Must be present and a string, but `""` is valid and clears the description |
 
 ```json
 { "description": "Internal coordination group." }
@@ -3192,9 +3192,9 @@ Join a group via an invite code (the part after `https://chat.whatsapp.com/`).
 
 **Request body** — `JoinGroupDto`
 
-| Field      | Type   | Required | Constraints | Description       |
-| ---------- | ------ | -------- | ----------- | ----------------- |
-| inviteCode | string | Yes      | non-empty   | Group invite code |
+| Field      | Type   | Required | Constraints  | Description       |
+| ---------- | ------ | -------- | ------------ | ----------------- |
+| inviteCode | string | Yes      | 1..128 chars | Group invite code |
 
 ```json
 { "inviteCode": "XyZ987654321" }
@@ -3329,9 +3329,9 @@ the contact themselves. On whatsapp-web.js the engine pauses 250–500ms between
 
 **Request body** — `MembershipRequestActionDto`
 
-| Field        | Type     | Required | Constraints                                                           | Description                                                   |
-| ------------ | -------- | -------- | --------------------------------------------------------------------- | ------------------------------------------------------------- |
-| participants | string[] | No       | `@IsOptional`, `@IsArray`, `@ArrayNotEmpty`, `@IsString({each:true})` | Requester WhatsApp IDs. Omit to act on every pending request. |
+| Field        | Type     | Required | Constraints                                                                       | Description                                                   |
+| ------------ | -------- | -------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| participants | string[] | No       | `@IsOptional`, `@IsArray`, `@ArrayNotEmpty`, `@IsString({each:true})`, 1..256 ids | Requester WhatsApp IDs. Omit to act on every pending request. |
 
 ```json
 { "participants": ["628123456789@c.us"] }
