@@ -577,6 +577,15 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     // Perf/observability only, but same silent-typo class.
     'CACHE_ENABLED',
     'DATABASE_LOGGING',
+    // Exact 'true'/'false' overrides; any other spelling silently falls back to the NODE_ENV default,
+    // so `CSP_UPGRADE_INSECURE_REQUESTS=False` kept the blank-dashboard upgrade on in production and a
+    // `PLUGIN_INSTALL_REQUIRE_PIN=True` outside production left the integrity pin unenforced.
+    'CSP_UPGRADE_INSECURE_REQUESTS',
+    'ENABLE_SWAGGER',
+    'VALIDATION_ERROR_DETAIL',
+    'PLUGIN_INSTALL_REQUIRE_PIN',
+    // `=== 'true'` in the SSRF guard: a typo keeps redirects refused when the operator allowed them.
+    'WEBHOOK_SSRF_REDIRECTS',
     // DELIBERATELY NOT LISTED. `MCP_READONLY` is read `!== 'false'` and mcp.server.spec.ts asserts
     // that `yes` keeps it read-only — a tolerance the repo tests on purpose. `PUPPETEER_HEADLESS` is
     // read `!== 'false'` and `new` is a real Puppeteer value that works today. Both fail toward the

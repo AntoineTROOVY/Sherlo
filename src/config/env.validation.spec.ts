@@ -595,6 +595,23 @@ describe('validateEnv', () => {
     },
   );
 
+  // Read as an exact 'true'/'false' override; anything else falls back to the NODE_ENV default, so
+  // CSP_UPGRADE_INSECURE_REQUESTS=False kept the blank-dashboard trap on in production.
+  it.each([
+    'CSP_UPGRADE_INSECURE_REQUESTS',
+    'ENABLE_SWAGGER',
+    'VALIDATION_ERROR_DETAIL',
+    'PLUGIN_INSTALL_REQUIRE_PIN',
+    'WEBHOOK_SSRF_REDIRECTS',
+  ])('accepts only an exact true or false for %s', key => {
+    for (const bad of ['False', 'TRUE', '0', 'false\r']) {
+      expect(() => validateEnv({ [key]: bad })).toThrow(new RegExp(`${key} must be "true" or "false"`));
+    }
+    for (const ok of ['true', 'false', '']) {
+      expect(() => validateEnv({ [key]: ok })).not.toThrow();
+    }
+  });
+
   it('accepts only an exact true or false for REDIS_TLS', () => {
     expect(() => validateEnv({ REDIS_TLS: 'yes' })).toThrow(/REDIS_TLS must be "true" or "false"/);
     expect(() => validateEnv({ REDIS_TLS: 'true ' })).toThrow(/REDIS_TLS/);
