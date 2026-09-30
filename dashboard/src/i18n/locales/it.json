@@ -606,6 +606,7 @@
     },
     "empty": {
       "title": "Nessun modello salvato",
+      "noMatch": "Nessun modello corrisponde alla tua ricerca.",
       "description": "Crea un modello riutilizzabile per velocizzare le risposte e le notifiche più comuni..",
       "noSessionsTitle": "Nessuna sessione disponibile",
       "noSessionsDesc": "Crea una sessione WhatsApp prima di aggiungere i modelli.",

@@ -850,6 +850,7 @@
     },
     "empty": {
       "title": "No hay plantillas guardadas",
+      "noMatch": "Ninguna plantilla coincide con tu búsqueda.",
       "description": "Crea una plantilla reutilizable para agilizar respuestas y notificaciones habituales.",
       "noSessionsTitle": "No hay sesiones disponibles",
       "noSessionsDesc": "Crea una sesión de WhatsApp antes de añadir plantillas.",

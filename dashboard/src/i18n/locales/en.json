@@ -600,6 +600,7 @@
     },
     "empty": {
       "title": "No templates saved",
+      "noMatch": "No templates match your search.",
       "description": "Create a reusable template to speed up common replies and notifications.",
       "noSessionsTitle": "No sessions available",
       "noSessionsDesc": "Create a WhatsApp session before adding templates.",

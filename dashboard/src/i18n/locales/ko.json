@@ -600,6 +600,7 @@
     },
     "empty": {
       "title": "저장된 템플릿이 없습니다",
+      "noMatch": "검색과 일치하는 템플릿이 없습니다.",
       "description": "자주 쓰는 답장이나 알림을 빠르게 보내려면 재사용 가능한 템플릿을 만드세요.",
       "noSessionsTitle": "사용 가능한 세션이 없습니다",
       "noSessionsDesc": "템플릿을 추가하기 전에 WhatsApp 세션을 만드세요.",

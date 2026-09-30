@@ -606,6 +606,7 @@
     },
     "empty": {
       "title": "Aucun template enregistré",
+      "noMatch": "Aucun template ne correspond à votre recherche.",
       "description": "Créez un template réutilisable pour accélérer vos réponses et notifications courantes.",
       "noSessionsTitle": "Aucune session disponible",
       "noSessionsDesc": "Créez une session WhatsApp avant d'ajouter des templates.",

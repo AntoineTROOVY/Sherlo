@@ -600,6 +600,7 @@
     },
     "empty": {
       "title": "Kayıtlı şablon yok",
+      "noMatch": "Aramanızla eşleşen şablon yok.",
       "description": "Sık kullanılan yanıtları ve bildirimleri hızlandırmak için yeniden kullanılabilir bir şablon oluşturun.",
       "noSessionsTitle": "Kullanılabilir oturum yok",
       "noSessionsDesc": "Şablon eklemeden önce bir WhatsApp oturumu oluşturun.",

@@ -600,6 +600,7 @@
     },
     "empty": {
       "title": "Belum ada templat tersimpan",
+      "noMatch": "Tidak ada templat yang cocok dengan pencarian Anda.",
       "description": "Buat templat yang dapat digunakan kembali untuk mempercepat balasan dan notifikasi umum.",
       "noSessionsTitle": "Tidak ada sesi tersedia",
       "noSessionsDesc": "Buat sesi WhatsApp sebelum menambahkan templat.",
