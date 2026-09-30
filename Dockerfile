@@ -223,14 +223,14 @@ RUN npm ci --omit=dev --ignore-scripts \
 
 # Replace the npm the base image bundles. npm is not on the request path — the entrypoint runs
 # `node dist/main` — but it stays in the image because the operator runbooks drive it
-# (`docker exec openwa npm run cli …`, `npm run export`), and its own bundled dependency tree is
-# what the release image scan reports. node:22-slim ships npm 10.9 (10.9.9 at the pinned digest),
+# (`docker compose run --rm openwa-api npm run migration:run:prod`), and its own bundled dependency
+# tree is what the release image scan reports. node:22-slim ships npm 10.9 (10.9.9 at the pinned digest),
 # whose bundle has carried a critical node-tar advisory plus sigstore/picomatch ones; npm 12 fixes
 # all three.
 # Deliberately AFTER `npm ci`, so the application tree is still resolved by the npm the lockfile
 # was generated with and only the global CLI is swapped. Pinned to the exact patch release —
 # a floating npm@12 would make the image's bundled npm tree depend on when the build happened.
-RUN npm install -g npm@12.0.2 && npm cache clean --force
+RUN npm install -g npm@12.1.0 && npm cache clean --force
 
 # amd64: download Chrome for Testing via Puppeteer and symlink it.
 # arm64: use Debian's chromium installed above (a choice; see the note at that install).
