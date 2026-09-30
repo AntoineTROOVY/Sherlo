@@ -81,13 +81,13 @@ flowchart TB
         WEBHOOKS[Webhooks /webhooks]
         TEMPLATES[Templates /templates]
         TESTER[Message Tester /message-tester]
-        LOGS[Logs /logs]
     end
 
     subgraph "Admin-only"
         APIKEYS[API Keys /api-keys]
         INFRA[Infrastructure /infrastructure]
         PLUGINS[Plugins /plugins]
+        LOGS[Logs /logs]
     end
 
     HOME --> SESSIONS
@@ -110,7 +110,7 @@ a non-admin hitting the path falls through to the `*` redirect.
 /webhooks          → Webhooks (per-session webhook endpoints)
 /templates         → Message Templates
 /message-tester    → Message Tester (ad-hoc send-* + check-number)
-/logs              → Activity / Audit Logs
+/logs              → Activity / Audit Logs            [admin only]
 /api-keys          → API Keys Management              [admin only]
 /infrastructure    → Infrastructure status & config   [admin only]
 /plugins           → Plugins (install / enable / configure) [admin only]
