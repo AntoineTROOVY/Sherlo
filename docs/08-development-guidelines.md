@@ -426,10 +426,14 @@ describe('resolveReconnectConfig', () => {
 
 ```typescript
 // test/app.e2e-spec.ts
+// archiver is ESM-only and AppModule pulls it in; stub it so ts-jest (CommonJS) can load the graph.
+jest.mock('archiver', () => ({ TarArchive: jest.fn() }));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { applyGlobalValidation } from '../src/config/app-validation';
 
 describe('App (e2e)', () => {
   let app: INestApplication;
@@ -440,6 +444,7 @@ describe('App (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    applyGlobalValidation(app);
     await app.init();
   });
 
