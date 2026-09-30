@@ -921,21 +921,11 @@ const sessions = await sessionRepo
 
 ### Caching Strategy
 
-```typescript
-// CacheService exposes typed helpers; prefer those over ad hoc string keys in feature code.
-@Injectable()
-export class SessionStatsService {
-  constructor(private readonly cache: CacheService) {}
-
-  async getCachedStats(): Promise<SessionStats | null> {
-    return this.cache.getSessionsStats();
-  }
-
-  async updateCachedStats(stats: SessionStats): Promise<void> {
-    await this.cache.setSessionsStats(stats);
-  }
-}
-```
+Memoize a hot, expensive read in-process with a TTL, as `StatsService` does for its aggregate
+responses (`STATS_CACHE_TTL_MS`, default 30000; `0` disables the memo). `CacheService` is an optional,
+fail-open Redis layer: when Redis is disabled or down every read returns `null` and every write is a
+no-op, so never make a request path depend on it. No request path reads from it today (see
+[3.13.3 Cache Service](./03-system-architecture.md#3133-cache-service)).
 
 ### Async Operations
 
