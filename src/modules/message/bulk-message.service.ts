@@ -670,22 +670,27 @@ export class BulkMessageService implements OnApplicationBootstrap {
     // otherwise the message_batches row retains multi-MB media forever. Intermediate (cadence) saves
     // above keep the payload so a batch interrupted mid-run can still resume from currentIndex.
     this.stripBatchMediaPayloads(batch.messages);
+    const terminal = {
+      status: batch.status,
+      progress: batch.progress,
+      results,
+      currentIndex: batch.currentIndex,
+      completedAt: batch.completedAt,
+      messages: batch.messages,
+    } as QueryDeepPartialEntity<MessageBatch>;
     if (batch.status === BatchStatus.CANCELLED) {
-      // Persisting CANCELLED can never resurrect a finished batch — save the reconciled counters
-      // over cancelBatch's own (possibly earlier, staler) write.
-      await this.batchRepository.save(batch);
+      // Persisting CANCELLED can never resurrect a finished batch — write the reconciled counters
+      // over cancelBatch's own (possibly earlier, staler) write. An UPDATE, not a save: a row deleted
+      // with its session also reads as a cancel, and save() would INSERT it back.
+      await this.batchRepository.update({ id: batch.id }, terminal);
     } else {
       // A cancel may have committed after the re-read above; the guard IN the UPDATE makes this
       // terminal write unable to flip a CANCELLED batch back to COMPLETED/FAILED. Zero affected
       // rows means the cancel won the final race — the batch stays exactly as cancelBatch left it.
-      const finalized = await this.batchRepository.update({ id: batch.id, status: Not(BatchStatus.CANCELLED) }, {
-        status: batch.status,
-        progress: batch.progress,
-        results,
-        currentIndex: batch.currentIndex,
-        completedAt: batch.completedAt,
-        messages: batch.messages,
-      } as QueryDeepPartialEntity<MessageBatch>);
+      const finalized = await this.batchRepository.update(
+        { id: batch.id, status: Not(BatchStatus.CANCELLED) },
+        terminal,
+      );
       if (!finalized.affected) {
         batch.status = BatchStatus.CANCELLED;
         this.logger.log(`Batch ${batch.batchId} was cancelled just before completion; keeping CANCELLED`);

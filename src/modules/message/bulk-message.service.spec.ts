@@ -990,8 +990,13 @@ describe('BulkMessageService.processBatch', () => {
     // Only the first message (before the guarded cadence write saw the cancel) was sent.
     expect(engine.sendTextMessage).toHaveBeenCalledTimes(1);
     // The terminal write persists CANCELLED with reconciled counters — never a PROCESSING rewrite.
-    const savedBatch = (repo.save.mock.calls as [MessageBatch][]).at(-1)![0];
-    expect(savedBatch.status).toBe(BatchStatus.CANCELLED);
+    // It is an UPDATE, not a save: when the row is gone (its session was deleted, which also reads
+    // as a 0-row cadence write), a save would INSERT it again.
+    expect(repo.save).not.toHaveBeenCalled();
+    expect(repo.update).toHaveBeenLastCalledWith(
+      { id: 'b1' },
+      expect.objectContaining({ status: BatchStatus.CANCELLED, completedAt: expect.any(Date) as unknown }),
+    );
   });
 
   it('sends nothing when the batch row is already CANCELLED at pickup (cancel-before-start)', async () => {
@@ -1042,8 +1047,9 @@ describe('BulkMessageService.processBatch', () => {
     await runProcessBatch();
 
     expect(engine.sendTextMessage).toHaveBeenCalledTimes(1); // the remaining two items were not sent
-    const savedBatch = (repo.save.mock.calls as [MessageBatch][]).at(-1)![0];
-    expect(savedBatch.status).toBe(BatchStatus.CANCELLED);
+    expect(repo.save).not.toHaveBeenCalled();
+    const finalPartial = (repo.update.mock.calls as Array<[unknown, { status?: BatchStatus }]>).at(-1)![1];
+    expect(finalPartial.status).toBe(BatchStatus.CANCELLED);
     // No guarded write ever carried a non-cancelled terminal status back to the row.
     for (const [, partial] of repo.update.mock.calls as Array<[unknown, { status?: BatchStatus }]>) {
       expect(partial.status).not.toBe(BatchStatus.COMPLETED);
