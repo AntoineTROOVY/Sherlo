@@ -13,6 +13,13 @@ go get github.com/rmyndharis/OpenWA/sdk/go
 
 Requires Go 1.22+.
 
+This README describes `main`. The v0.5.0 release lacks `Sessions.GetProxy`,
+`Sessions.UpdateProxy`, `Messages.ClickButton`, `VerifyWebhookSignature`, the
+`WebhookDelivery` type, the `ListSessionsQuery.Name` filter, the `APIError`
+fields `Code`, `RetryAfter` and `Header` and the refusal of empty and dot ids;
+they ship with the next SDK release. See
+[the SDK overview](../README.md#coverage).
+
 ## Quick start
 
 ```go
