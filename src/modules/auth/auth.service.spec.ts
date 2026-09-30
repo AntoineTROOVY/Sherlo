@@ -210,7 +210,12 @@ describe('AuthService', () => {
           const guardPasses =
             !this.guarded ||
             !isUsableAdminRow(target) ||
-            [...keys.values()].some(k => k.id !== target.id && isUsableAdminRow(k));
+            [...keys.values()].some(
+              k =>
+                k.id !== target.id &&
+                isUsableAdminRow(k) &&
+                (!k.expiresAt || (!!target.expiresAt && k.expiresAt >= target.expiresAt)),
+            );
           if (!guardPasses) return Promise.resolve({ affected: 0 });
           if (this.mode === 'delete') keys.delete(this.targetId as string);
           else Object.assign(target, this.patch ?? {});
