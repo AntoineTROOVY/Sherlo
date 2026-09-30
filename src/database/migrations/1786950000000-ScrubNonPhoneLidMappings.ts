@@ -11,12 +11,17 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * under. A deleted row is only a cache miss, so the next lookup asks WhatsApp again. A null phone is a
  * cached negative result and stays.
  *
- * Idempotent, and `down` is a no-op: the removed values were wrong.
+ * Idempotent, and `down` is a no-op: the removed values were wrong. `scrub` is shared with
+ * import-data, which restores rows from archives taken before this migration ran.
  */
 export class ScrubNonPhoneLidMappings1786950000000 implements MigrationInterface {
   name = 'ScrubNonPhoneLidMappings1786950000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await ScrubNonPhoneLidMappings1786950000000.scrub(queryRunner);
+  }
+
+  static async scrub(queryRunner: QueryRunner): Promise<void> {
     if (!(await queryRunner.hasTable('lid_mappings'))) return;
     const notDigits =
       queryRunner.dataSource.options.type === 'postgres' ? `"phone" !~ '^[0-9]+$'` : `"phone" GLOB '*[^0-9]*'`;

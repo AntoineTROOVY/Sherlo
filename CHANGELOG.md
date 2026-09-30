@@ -109,6 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A built-in PostgreSQL, Redis or MinIO container is created from the image already on the host instead of pulling it every time, so it still starts when the registry is unreachable.
 - `POST /api/infra/import-data` retires the plugin bindings of instances the restored backup drops or disables and re-applies the restored ones, so a dropped session-scoped instance no longer keeps receiving message hooks with its old endpoint and credentials.
 - `POST /api/infra/import-data` re-keys `chat_states` rows from a backup taken before 0.23.5, so their mute, archive and pin state is read again.
+- `POST /api/infra/import-data` applies the 0.24.0 cleanup to the rows it restores: revoked messages lose their media, quote and reactions, and lid mappings stored with `status` or a broadcast-list id as the phone are dropped.
 - Concurrent group creates and participant adds can no longer together exceed the send-pacing cold-reachout daily allowance.
 - `GET /api/sessions/:sessionId/contacts/profile-pictures` answers `409` when the engine is not ready, instead of `200` with every picture null.
 - Listing messages (`GET /api/sessions/:sessionId/messages` and the `MessageList` MCP tool) reads a page in size-bounded chunks, so a page of large inline media no longer holds every payload in memory at once.
