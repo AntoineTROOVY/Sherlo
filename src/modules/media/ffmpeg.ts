@@ -192,7 +192,9 @@ function execute(args: string[], options: FfmpegRunOptions): Promise<void> {
   return new Promise((resolve, reject) => {
     // An argument array, never a shell string: nothing here can be word-split or expanded, so a
     // filename with a space or a quote is data rather than syntax.
-    const child = spawn(options.ffmpegPath, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    // `detached` puts the child at the head of its own process group, so the timeout can kill
+    // everything under it (see below).
+    const child = spawn(options.ffmpegPath, args, { stdio: ['ignore', 'ignore', 'pipe'], detached: true });
 
     let stderr = '';
     let timedOut = false;
@@ -204,8 +206,16 @@ function execute(args: string[], options: FfmpegRunOptions): Promise<void> {
     const timer = setTimeout(() => {
       timedOut = true;
       // SIGKILL rather than SIGTERM: the case being defended against is a codec stuck in a loop,
-      // which is exactly the case that would ignore a polite signal.
-      child.kill('SIGKILL');
+      // which is exactly the case that would ignore a polite signal. The whole group, because a
+      // wrapper script that runs ffmpeg without `exec` leaves the real worker as a grandchild, and
+      // killing only the wrapper would free the concurrency slot while that worker keeps running.
+      try {
+        // A negative pid addresses the process group; no pid means the spawn failed and nothing runs.
+        if (child.pid !== undefined) process.kill(-child.pid, 'SIGKILL');
+      } catch {
+        // The group is already gone, or the platform has no process groups: fall back to the child.
+        child.kill('SIGKILL');
+      }
       // Let go of our end of the stderr pipe too. A descendant of the killed process (ffmpeg under a
       // wrapper script) can still hold the inherited stderr, and the open pipe would keep this
       // process alive until that descendant exits.
