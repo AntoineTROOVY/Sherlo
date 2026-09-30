@@ -637,8 +637,13 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     }
   }
 
-  private handleUnsubscribe(client: Socket, message: WSUnsubscribeRequest): WSUnsubscribedResponse {
+  private handleUnsubscribe(client: Socket, message: WSUnsubscribeRequest): WSUnsubscribedResponse | WSErrorResponse {
     const { sessionId, requestId } = message;
+    // Same check as subscribe: a missing sessionId matched no room, left every subscription in place,
+    // and was still answered 'unsubscribed'.
+    if (!sessionId || typeof sessionId !== 'string') {
+      return this.createError('INVALID_SESSION', 'sessionId is required', requestId);
+    }
 
     // Leave all rooms for this session
     const clientRooms = Array.from(client.rooms);

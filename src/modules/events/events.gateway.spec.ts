@@ -365,6 +365,24 @@ describe('EventsGateway connection auth + subscribe re-validation', () => {
     expect(sessionRoomJoins(sock)).toEqual([]);
   });
 
+  it('answers an unsubscribe without a sessionId with INVALID_SESSION and leaves the rooms alone', async () => {
+    authService.validateApiKey.mockResolvedValue({ name: 'k', allowedSessions: null });
+    const sock = makeSocket({ apiKey: 'good' });
+    await gateway.handleConnection(asSocket(sock));
+    sock.rooms.add(buildRoomName('sess-1', 'message.received'));
+
+    for (const sessionId of [undefined, null, 5]) {
+      const res = (await gateway.handleMessage(asSocket(sock), {
+        type: 'unsubscribe',
+        sessionId,
+        requestId: 'r1',
+      } as unknown as WSClientMessage)) as WSErrorResponse;
+      expect(res.code).toBe('INVALID_SESSION');
+      expect(res.requestId).toBe('r1');
+    }
+    expect(sock.leave).not.toHaveBeenCalledWith(buildRoomName('sess-1', 'message.received'));
+  });
+
   it('forbids a session-scoped key from subscribing to the * wildcard', async () => {
     authService.validateApiKey.mockResolvedValue({ name: 'k', allowedSessions: ['sess-1'] });
     const sock = makeSocket({ apiKey: 'good' });
