@@ -188,7 +188,8 @@ plugins/my-search/
   "name": "My Search Backend",
   "version": "1.0.0",
   "type": "extension",
-  "main": "index.js"
+  "main": "index.js",
+  "permissions": ["search:provide"]
 }
 ```
 
@@ -236,7 +237,12 @@ module.exports = class MySearchPlugin {
     /* run your backend's query, honoring query.q + filters + limit/offset */ return { rows: [], total: 0 };
   }
   _highlight(body, term) {
-    return body.replace(new RegExp(term, 'gi'), '<mark>$&</mark>');
+    // Escape the query so `c++` or `(` matches literally instead of throwing a SyntaxError.
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return body.replace(new RegExp(escaped, 'gi'), '<mark>$&</mark>');
+  }
+  async _pingBackend() {
+    /* ping your backend */ return true;
   }
 
   // Optional: report backend health to the plugin health check.
