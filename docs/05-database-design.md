@@ -543,6 +543,7 @@ CREATE INDEX "IDX_36bc604c820bb9adc4c75cd411" ON messages("chatId");
 CREATE INDEX "IDX_messages_sessionId_chatId_createdAt" ON messages("sessionId", "chatId", "createdAt");
 CREATE INDEX "IDX_befd307485dbf0559d17e4a4d2" ON messages(status);
 CREATE INDEX "IDX_messages_createdAt" ON messages("createdAt");   -- createdAt-only stats aggregates
+CREATE INDEX "IDX_messages_mediaPath" ON messages("mediaPath") WHERE "mediaPath" IS NOT NULL;   -- partial; chat-media orphan sweep
 
 -- Inbound dedup (issue #464): one row per ("sessionId", "waMessageId").
 -- NULL "waMessageId" rows are exempt (SQL treats NULLs as distinct).
