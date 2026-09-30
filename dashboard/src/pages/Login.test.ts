@@ -39,6 +39,19 @@ afterEach(() => {
   rtl.cleanup();
 });
 
+test('a key pasted with surrounding whitespace is sent and stored trimmed', async () => {
+  const { screen, fireEvent, waitFor } = rtl;
+  const logins: string[] = [];
+  rtl.render(createElement(Login, { onLogin: (key: string) => logins.push(key) }));
+
+  fireEvent.change(screen.getByLabelText('API Key'), { target: { value: '  owa_k1_secret ' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+
+  await waitFor(() => assert.equal(logins.length, 1));
+  assert.deepEqual(logins, ['owa_k1_secret']);
+  assert.equal(sentKey, 'owa_k1_secret');
+});
+
 test('the login form aligns to the document direction, which is set on <html>', () => {
   const css = readFileSync(fileURLToPath(new URL('./Login.css', import.meta.url)), 'utf8');
   // i18n sets `dir` on the document element only, so a `[dir]` compound after another selector part
