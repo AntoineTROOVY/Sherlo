@@ -68,3 +68,24 @@ test('a role 403 keeps the key and rejects with the status', async () => {
   assert.equal(sessionStorage.getItem('openwa_api_key'), 'stored-key');
   assert.deepEqual(navigations, []);
 });
+
+test('the contact list walks past the 1000 contacts one response carries', async () => {
+  const { contactApi } = await import('./api.ts');
+  const requested: string[] = [];
+  globalThis.fetch = ((input: RequestInfo | URL) => {
+    const url = String(input);
+    requested.push(url.replace(/^.*\/api/, ''));
+    const count = url.includes('offset=0') ? 1000 : 5;
+    const contacts = Array.from({ length: count }, (_, i) => ({ id: `${i}@c.us`, name: null, number: `${i}` }));
+    return Promise.resolve(
+      new Response(JSON.stringify(contacts), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+  }) as typeof fetch;
+
+  const contacts = await contactApi.list('s1');
+  assert.equal(contacts.length, 1005);
+  assert.deepEqual(requested, [
+    '/sessions/s1/contacts?limit=1000&offset=0',
+    '/sessions/s1/contacts?limit=1000&offset=1000',
+  ]);
+});
