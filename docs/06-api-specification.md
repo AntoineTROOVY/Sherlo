@@ -2474,7 +2474,7 @@ Check whether a phone number exists on WhatsApp and return its canonical WhatsAp
 
 > Route-order caveat: this route is two path segments (`check/:number`), so it never collides with the single-segment `GET /:contactId` — a contact id of literally `check` resolves to `GET /:contactId`.
 
-**Errors:** `400` session is not started · `401` missing/invalid API key · `403` API-key role below OPERATOR · `409` conflict or engine not ready (retryable) · `503` session not ready or dependency unavailable (retryable)
+**Errors:** `400` session is not started · `401` missing/invalid API key · `403` key lacks OPERATOR role, is not scoped to this session, is restricted to selected chats, or its IP allow-list excludes the client · `409` conflict or engine not ready (retryable) · `503` session not ready or dependency unavailable (retryable)
 
 #### GET /api/sessions/:sessionId/contacts/:contactId
 
