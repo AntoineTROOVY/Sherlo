@@ -86,6 +86,19 @@ type WebhookFilters struct {
 	Conditions []WebhookFilterCondition `json:"conditions"`
 }
 
+// MarshalJSON encodes a nil Conditions as `[]` rather than `null`.
+//
+// The gateway requires conditions to be an array and answers 400 for `null`, so the zero value
+// &WebhookFilters{} could not express the documented empty filter `{ "conditions": [] }`.
+func (f WebhookFilters) MarshalJSON() ([]byte, error) {
+	type alias WebhookFilters
+	out := alias(f)
+	if out.Conditions == nil {
+		out.Conditions = []WebhookFilterCondition{}
+	}
+	return json.Marshal(out)
+}
+
 // CreateWebhookRequest registers a webhook. RetryCount is 0–5 (default 3).
 //
 // Secret is optional and signs every delivery as X-OpenWA-Signature: sha256=<hex>. The gateway
