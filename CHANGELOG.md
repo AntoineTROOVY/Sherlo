@@ -168,7 +168,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A session stopped while it was starting or reconnecting no longer reads `initializing` until the next restart.
 - A stop and start issued while a reconnect was still tearing down the old engine no longer leaves a second engine running on the same account.
 - Stop, logout, force-kill and delete no longer fail with `500` when the session's pending `initializing` status write hit a database error.
-- `POST /api/sessions/:sessionId/force-kill` answers `502` with `code: SESSION_FORCE_KILL_INCOMPLETE` when the engine could not be killed, instead of reporting a clean kill; the session is still marked `disconnected`.
+- `POST /api/sessions/:sessionId/force-kill` answers `502` with `code: SESSION_FORCE_KILL_INCOMPLETE` when the engine could not be killed, instead of reporting a clean kill; the session is still marked `disconnected`, and the dashboard shows the gateway's advice to restart the node.
 - A session stopped or restarted during a lease heartbeat is no longer reported as a lost lease, which could tear down its restarting engine.
 - A WhatsApp restriction imposed again after the previous one expired raises `session.restriction` again, with its WebSocket event and audit row.
 - Engines write session credentials under `SESSION_DATA_PATH` or `BAILEYS_AUTH_DIR` even when an engine config saved with `PUT /api/plugins/:id/config` names another path, so the owner-only permissions and the session-delete purge cover them.

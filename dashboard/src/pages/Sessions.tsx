@@ -566,7 +566,14 @@ export function Sessions() {
       toast.success(t('sessions.forceKill.successTitle'), t('sessions.forceKill.success'));
     } catch (err) {
       console.error('Failed to force-kill:', err);
-      toast.error(t('sessions.forceKill.failedTitle'), t('sessions.forceKill.failed'));
+      // 502 + SESSION_FORCE_KILL_INCOMPLETE: the session is stopped, but the engine process may still
+      // run. Show the gateway's guidance (restart the node). Any other error, a reverse-proxy 502
+      // without that code included, stays generic.
+      const incomplete = (err as { code?: string } | null)?.code === 'SESSION_FORCE_KILL_INCOMPLETE';
+      toast.error(
+        t('sessions.forceKill.failedTitle'),
+        incomplete && err instanceof Error && err.message ? err.message : t('sessions.forceKill.failed'),
+      );
       await fetchSessions();
     } finally {
       setKillConfirmId(null);

@@ -101,6 +101,7 @@ function resetFetchCalls(): void {
   startGate = null;
   startResult = null;
   stopFailure = null;
+  forceKillFailure = null;
   qrGate = null;
   listGate = null;
   pairingGate = null;
@@ -133,6 +134,8 @@ let startFailure: { status: number; message: string; leaves?: Partial<Session> }
 let startResult: { answer: Partial<Session>; leaves?: Partial<Session> } | null = null;
 // When set, POST .../stop answers with this error.
 let stopFailure: { status: number; message: string } | null = null;
+// When set, POST .../force-kill answers with this status and body.
+let forceKillFailure: { status: number; body: Record<string, unknown> } | null = null;
 // When set, POST .../start answers, whichever way it answers, only once this settles.
 let startGate: Promise<void> | null = null;
 // When set, GET .../qr for that one session answers only once `until` settles.
@@ -282,6 +285,9 @@ function installFetchStub(): void {
         }
         if (lifecycleMatch[2] === 'stop' && stopFailure) {
           return jsonResponse({ message: stopFailure.message }, stopFailure.status);
+        }
+        if (lifecycleMatch[2] === 'force-kill' && forceKillFailure) {
+          return jsonResponse(forceKillFailure.body, forceKillFailure.status);
         }
         if (isStart && startResult) {
           const answered = { ...base, ...startResult.answer };
@@ -1774,3 +1780,34 @@ test('a failed stop is reported instead of only logged', async () => {
   within(alert).getByText('Stop Failed');
   within(alert).getByText('Session is busy');
 });
+
+// The session is already stopped when the gateway reports the kill incomplete, so the toast carries its
+// guidance. A 502 without that code may come from a reverse proxy and stays generic.
+for (const [label, body, shown] of [
+  [
+    'a force-kill the gateway reports incomplete shows its guidance',
+    { message: 'Engine process may still be running. Restart the node.', code: 'SESSION_FORCE_KILL_INCOMPLETE' },
+    'Engine process may still be running. Restart the node.',
+  ],
+  [
+    'a force-kill 502 without the gateway code stays generic',
+    { message: 'Bad Gateway' },
+    'Failed to force-kill the session.',
+  ],
+] as const) {
+  test(label, async () => {
+    const { screen, fireEvent, within } = rtl;
+    resetFetchCalls();
+    forceKillFailure = { status: 502, body };
+    renderSessions();
+
+    const card = (await screen.findByText('stale-engine')).closest('.session-card') as HTMLElement;
+    fireEvent.click(within(card).getByRole('button', { name: 'Kill Stuck' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Kill Session' }));
+
+    const alert = await screen.findByRole('alert');
+    assert.ok(alert.classList.contains('toast-error'), 'the force-kill failure was not shown as an error toast');
+    within(alert).getByText('Force-Kill Failed');
+    within(alert).getByText(shown);
+  });
+}
