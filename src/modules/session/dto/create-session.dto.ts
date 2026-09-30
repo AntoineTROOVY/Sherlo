@@ -65,9 +65,9 @@ export class CreateSessionDto {
   proxyUrl?: string;
 
   @ApiPropertyOptional({
-    description: 'Proxy type',
+    description: 'Deprecated and ignored: the proxyUrl scheme selects the proxy protocol. Accepted for compatibility.',
     enum: ['http', 'https', 'socks4', 'socks5'],
-    example: 'http',
+    deprecated: true,
   })
   @IsOptional()
   @IsIn(['http', 'https', 'socks4', 'socks5'])
