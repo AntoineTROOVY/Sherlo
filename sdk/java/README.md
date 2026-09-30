@@ -113,17 +113,17 @@ try {
 }
 ```
 
-| Class                           | HTTP | Meaning                                 |
-| ------------------------------- | ---- | --------------------------------------- |
-| `OpenWAAuthError`               | 401  | Missing or invalid API key              |
-| `OpenWAForbiddenError`          | 403  | API key role or scope refuses the call  |
-| `OpenWANotFoundError`           | 404  | Resource not found                      |
-| `OpenWAConflictError`           | 409  | Engine not ready                        |
-| `OpenWARateLimitError`          | 429  | Rate limited                            |
-| `OpenWANotImplementedError`     | 501  | Active engine does not support the call |
-| `OpenWAServiceUnavailableError` | 503  | Engine did not confirm in time          |
-| `OpenWAApiError`                | —    | Any other non-2xx (carries `.status()`) |
-| `OpenWATimeoutError`            | —    | Request exceeded the configured timeout |
+| Class                           | HTTP | Meaning                                                     |
+| ------------------------------- | ---- | ----------------------------------------------------------- |
+| `OpenWAAuthError`               | 401  | Missing or invalid API key                                  |
+| `OpenWAForbiddenError`          | 403  | API key role or scope, or WhatsApp itself, refuses the call |
+| `OpenWANotFoundError`           | 404  | Resource not found                                          |
+| `OpenWAConflictError`           | 409  | Engine not ready                                            |
+| `OpenWARateLimitError`          | 429  | Rate limited                                                |
+| `OpenWANotImplementedError`     | 501  | Active engine does not support the call                     |
+| `OpenWAServiceUnavailableError` | 503  | Engine did not confirm in time                              |
+| `OpenWAApiError`                | —    | Any other non-2xx (carries `.status()`)                     |
+| `OpenWATimeoutError`            | —    | Request exceeded the configured timeout                     |
 
 All extend `OpenWAError` (a `RuntimeException`). 503 is transient, but a catalog 503 can persist because WhatsApp may never answer that query, so bound any retry. A 429 from the global rate limiter lifts when its window expires (seconds for the per-second tier, up to an hour for the hourly tier by default), and `retryAfterSeconds()` carries its `Retry-After` header. A 429 whose `code()` is `"SEND_PACING_LIMITED"` is not transient: do not retry it before `retryAfterSeconds()`, which then comes from the body and can be hours. `headers()` returns the response headers. In a routed deployment only 503 proves the request was never carried out: a forward that fails after the request reached the owner node answers 502 or 504.
 
