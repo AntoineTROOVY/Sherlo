@@ -453,6 +453,7 @@
     "filters": {
       "title": "Filtreler (isteğe bağlı)",
       "hint": "Yalnızca tüm koşullar eşleştiğinde tetiklenir. Mesaj olayları için geçerlidir.",
+      "incomplete": "Her filtre koşuluna bir değer verin ve en fazla 20 koşul kullanın.",
       "badge": "{{count}} filtre",
       "badge_other": "{{count}} filtre",
       "addCondition": "Koşul ekle",

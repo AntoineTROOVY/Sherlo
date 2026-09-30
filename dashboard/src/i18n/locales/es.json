@@ -458,6 +458,7 @@
     "filters": {
       "title": "Filtros (opcional)",
       "hint": "Activar solo cuando se cumplan todas las condiciones. Se aplica a eventos de mensajes.",
+      "incomplete": "Asigna un valor a cada condición de filtro y usa como máximo 20 condiciones.",
       "badge": "{{count}} filtro",
       "badge_other": "{{count}} filtros",
       "badge_many": "{{count}} filtros",

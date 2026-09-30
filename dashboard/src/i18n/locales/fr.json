@@ -458,6 +458,7 @@
     "filters": {
       "title": "Filtres (facultatif)",
       "hint": "Déclencher uniquement lorsque toutes les conditions sont remplies. S'applique aux événements de message.",
+      "incomplete": "Attribuez une valeur à chaque condition de filtre et utilisez au plus 20 conditions.",
       "badge": "{{count}} filtre",
       "badge_other": "{{count}} filtres",
       "badge_many": "{{count}} filtres",

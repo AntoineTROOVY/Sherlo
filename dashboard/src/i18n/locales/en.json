@@ -453,6 +453,7 @@
     "filters": {
       "title": "Filters (optional)",
       "hint": "Only fire when all conditions match. Applies to message events.",
+      "incomplete": "Give every filter condition a value, and use at most 20 conditions.",
       "badge": "{{count}} filter",
       "badge_other": "{{count}} filters",
       "addCondition": "Add condition",

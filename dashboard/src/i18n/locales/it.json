@@ -458,6 +458,7 @@
     "filters": {
       "title": "Filtri (opzionale)",
       "hint": "Attiva solo quando tutte le condizioni corrispondono. Si applica agli eventi dei messaggi.",
+      "incomplete": "Assegna un valore a ogni condizione di filtro e usa al massimo 20 condizioni.",
       "badge": "{{count}} filtro",
       "badge_other": "{{count}} filtri",
       "badge_many": "{{count}} filtri",

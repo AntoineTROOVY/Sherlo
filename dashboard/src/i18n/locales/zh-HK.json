@@ -453,6 +453,7 @@
     "filters": {
       "title": "篩選條件（選填）",
       "hint": "僅當所有條件都符合時才觸發。適用於訊息事件。",
+      "incomplete": "請為每個篩選條件填寫值，且條件最多 20 個。",
       "badge": "{{count}} 個篩選條件",
       "badge_other": "{{count}} 個篩選條件",
       "addCondition": "新增條件",

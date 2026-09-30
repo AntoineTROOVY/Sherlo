@@ -453,6 +453,7 @@
     "filters": {
       "title": "Filter (opsional)",
       "hint": "Hanya terpicu jika semua kondisi cocok. Berlaku untuk kejadian pesan.",
+      "incomplete": "Beri nilai pada setiap kondisi filter, dan gunakan paling banyak 20 kondisi.",
       "badge": "{{count}} filter",
       "badge_other": "{{count}} filter",
       "addCondition": "Tambah kondisi",

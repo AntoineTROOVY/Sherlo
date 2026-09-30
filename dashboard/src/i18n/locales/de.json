@@ -453,6 +453,7 @@
     "filters": {
       "title": "Filter (optional)",
       "hint": "Wird nur ausgelöst, wenn alle Bedingungen erfüllt sind. Gilt für Nachrichtenereignisse.",
+      "incomplete": "Gib jeder Filterbedingung einen Wert und verwende höchstens 20 Bedingungen.",
       "badge": "{{count}} Filter",
       "badge_other": "{{count}} Filter",
       "addCondition": "Bedingung hinzufügen",
