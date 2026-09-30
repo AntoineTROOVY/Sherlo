@@ -29,7 +29,7 @@ always a SQLite file on each node, and running more than one replica is not supp
 > SQLite can be used in production with limitations:
 >
 > - Maximum ~5 concurrent sessions (due to single-writer limitation)
-> - Single-file storage — back up `./data/*.sqlite` rather than relying on a dump tool
+> - Single-file storage — back up with [`scripts/backup.sh`](../scripts/backup.sh) (§5.8), which copies `main.sqlite` and the data store (consistently while the app runs, when `sqlite3` is installed) and also captures the engine auth state; a bare copy of `./data/*.sqlite` restores every session unpaired
 > - No horizontal scaling support
 > - Ideal for: personal bots, small businesses with 1-3 WhatsApp numbers
 >
