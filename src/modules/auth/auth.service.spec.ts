@@ -770,7 +770,8 @@ describe('AuthService', () => {
       const [criteria, patch] = (repository.update as jest.Mock).mock.calls[0] as [{ id: string }, Partial<ApiKey>];
       expect(criteria).toEqual({ id: key.id });
       expect(Object.keys(patch).sort()).toEqual(['lastUsedAt', 'usageCount']);
-      expect(patch.usageCount).toBe(6);
+      // An increment by this request's delta, not the loaded value plus it.
+      expect((patch.usageCount as () => string)()).toBe('"usageCount" + 1');
       expect(repository.save).not.toHaveBeenCalled();
     });
 
@@ -919,7 +920,7 @@ describe('AuthService', () => {
       // failed delta plus this request's increment — nothing is lost.
       await service.validateApiKey(rawKey);
       const writes = (repository.update as jest.Mock).mock.calls as Array<[unknown, Partial<ApiKey>]>;
-      expect(writes[1][1].usageCount).toBe(7); // DB 5 + failed delta 1 + this request 1
+      expect((writes[1][1].usageCount as () => string)()).toBe('"usageCount" + 2'); // failed delta 1 + this request 1
 
       // The successful retry drained the accumulator — nothing left for the shutdown flush.
       await service.onModuleDestroy();
