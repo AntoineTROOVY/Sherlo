@@ -361,7 +361,10 @@ export class WebhookResponseDto {
   }
 }
 
-/** A webhook delivery that exhausted every retry — the shape `GET /webhooks/delivery-failures` serves. */
+/**
+ * A webhook delivery that exhausted its retries, or one not sent (attempts 0) that the outbox replays; the
+ * shape `GET /webhooks/delivery-failures` serves. A later successful delivery removes the row.
+ */
 export class WebhookDeliveryFailureDto {
   @ApiProperty({ example: '0a941dac-a965-45e7-b318-74ae8be134f0' })
   id!: string;
@@ -388,7 +391,10 @@ export class WebhookDeliveryFailureDto {
   @ApiPropertyOptional({ type: String, nullable: true })
   deliveryId?: string | null;
 
-  @ApiProperty({ description: 'Total attempts made before giving up.', example: 5 })
+  @ApiProperty({
+    description: 'Attempts recorded for the delivery; 0 when it was shed, refused or failed before sending.',
+    example: 5,
+  })
   attempts!: number;
 
   @ApiPropertyOptional({
@@ -402,7 +408,7 @@ export class WebhookDeliveryFailureDto {
   @ApiProperty({ example: 'connect ECONNREFUSED 10.0.0.1:443' })
   lastError!: string;
 
-  @ApiProperty({ type: String, format: 'date-time', description: 'When the delivery was finally abandoned.' })
+  @ApiProperty({ type: String, format: 'date-time', description: 'When the failure was first recorded.' })
   createdAt!: Date;
 }
 
