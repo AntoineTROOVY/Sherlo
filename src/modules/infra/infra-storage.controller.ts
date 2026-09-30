@@ -266,7 +266,12 @@ export class InfraStorageController implements OnApplicationBootstrap {
     try {
       ({ imported: count, failed } = await this.storageService.importFromStream(readStream));
     } catch (error) {
-      throw new BadRequestException(`Storage import failed: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      // An abort keeps the entries written before it (there is no rollback), so it is audited too.
+      await this.auditService?.logWarn(AuditAction.INFRA_STORAGE_IMPORTED, {
+        metadata: { aborted: true, error: message, storageType: this.storageService.getCurrentStorageType() },
+      });
+      throw new BadRequestException(`Storage import failed: ${message}`);
     }
     const storageType = this.storageService.getCurrentStorageType();
 
