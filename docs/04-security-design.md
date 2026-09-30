@@ -247,8 +247,8 @@ export class CreateWebhookDto {
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
-  // The full WEBHOOK_EVENTS catalog (message.*, status.received, session.*, group.*,
-  // call.received) plus '*' for subscribe-all.
+  // The full WEBHOOK_EVENTS catalog (message.*, status.received, session.*, presence.update,
+  // group.*, call.*) plus '*' for subscribe-all.
   @IsIn([...WEBHOOK_EVENTS, '*'], { each: true })
   events?: string[];
 }
