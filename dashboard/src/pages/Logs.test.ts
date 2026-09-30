@@ -61,6 +61,10 @@ let exportTotal: number | null = null;
 let exportThrottledFrom: number | null = null;
 // When set, the export walks a 300-row table that gains a newest row after its first page is read.
 let exportGrowsMidWalk = false;
+// When set, the on-screen list reports this many rows in total, so the page has a pager.
+let listTotal: number | null = null;
+// When set, a request for the first on-screen page waits for it before answering.
+let firstPageGate: Promise<void> | null = null;
 
 /** Row `i` of a table walked newest first; every row has its own id, as the gateway's rows do. */
 function exportRow(i: number): AuditLog {
@@ -88,7 +92,8 @@ function installFetchStub(): void {
       const shifted = [exportRow(-1), ...[...Array(300).keys()].map(exportRow)];
       return Promise.resolve(jsonResponse({ data: shifted.slice(offset), total: 301 }));
     }
-    return Promise.resolve(jsonResponse({ data: LOGS, total: LOGS.length }));
+    const reply = jsonResponse({ data: LOGS, total: listTotal ?? LOGS.length });
+    return firstPageGate && offset === 0 ? firstPageGate.then(() => reply) : Promise.resolve(reply);
   }) as typeof fetch;
 }
 
@@ -128,8 +133,8 @@ before(async () => {
 
 afterEach(() => rtl.cleanup());
 
-function renderLogs(): HTMLElement {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderLogs(gcTime?: number): HTMLElement {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime } } });
   return rtl.render(
     createElement(QueryClientProvider, { client }, createElement(ToastProvider, null, createElement(Logs))),
   ).container;
@@ -267,5 +272,31 @@ test('the table grid declares one column track per rendered cell', async () => {
   assert.ok(template, 'the row grid template was not found');
   for (const row of container.querySelectorAll('.logs-table .table-row')) {
     assert.equal(template.split(/\s+/).length, row.children.length, template);
+  }
+});
+
+test('typing a search on a later page keeps the search box mounted while page one loads', async () => {
+  const { screen, fireEvent, waitFor } = rtl;
+  listTotal = 60;
+  let release!: () => void;
+  try {
+    // A zero gcTime drops page one from the cache as soon as page two replaces it, as the default
+    // five minutes does for an operator who stays on a later page.
+    renderLogs(0);
+    await screen.findByText('infra.restart');
+    fireEvent.click(screen.getByRole('button', { name: '2' }));
+    await waitFor(() => assert.equal(screen.getByRole('button', { name: '2' }).className, 'active'));
+    await screen.findByText('infra.restart');
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    firstPageGate = new Promise(resolve => (release = resolve));
+    const search = screen.getByPlaceholderText('Search logs...');
+    fireEvent.change(search, { target: { value: 'sess' } });
+    assert.ok(search.isConnected, 'the search box was replaced by the page spinner mid-typing');
+    release();
+    await screen.findByText('session.stop');
+  } finally {
+    listTotal = null;
+    firstPageGate = null;
   }
 });
