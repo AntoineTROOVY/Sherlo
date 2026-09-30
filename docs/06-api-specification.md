@@ -3556,7 +3556,7 @@ No content (empty body). The handler looks the template up first, so a missing t
 
 ### 6.4.6 Catalog & Channels
 
-WhatsApp Business catalog browsing/sending and channel (newsletter) operations. Catalog read routes (`/catalog…`) require any valid API key; the two product/catalog **send** routes live under the `/messages` path and require an **OPERATOR** key. Channel read routes require any valid API key; subscribe/unsubscribe require **OPERATOR**.
+WhatsApp Business catalog browsing/sending and channel (newsletter) operations. Catalog read routes (`/catalog…`) require any valid API key; the product **send** route (`POST /api/sessions/:sessionId/messages/send-product`) lives under the `/messages` path and requires an **OPERATOR** key. Channel read routes require any valid API key; subscribe/unsubscribe require **OPERATOR**.
 
 #### GET /api/sessions/:sessionId/catalog
 
