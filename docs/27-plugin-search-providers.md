@@ -136,7 +136,9 @@ not from the core `messages` table, and returns at most the 100 most recent mess
 `getChatHistory` exists only on the whatsapp-web.js engine. On Baileys it rejects with
 `EngineNotSupportedError` (see [29 - Engine Capability Matrix](./29-engine-capability-matrix.md)), so a
 Baileys deployment has no backfill path and a provider there indexes live `message:persisted` traffic
-only. Catch that error once and skip the backfill rather than retrying it chat after chat.
+only. A sandboxed plugin receives that rejection as a plain `Error` (its class and name do not cross the
+worker boundary) whose message starts with `Operation not supported by the active engine`. Match on that
+prefix on the first chat and skip the backfill rather than retrying it chat after chat.
 
 There is no capability that reads the `messages` table. Reading the database directly bypasses the
 capability model and is unsupported; see [30 - Plugin Sandboxing](./30-plugin-sandboxing.md) for what a
@@ -147,9 +149,9 @@ Keep a `waMessageId` lookup too, and when a later `message:persisted` arrives fo
 backfilled, upsert onto that document instead of adding a second one.
 
 Start the backfill from `onEnable` without awaiting it: a sandboxed lifecycle call is cut off after 30 s,
-and walking every chat's history takes longer on a real deployment. Record a marker in `ctx.storage` when
-it finishes so a restart does not repeat it. The built-in DB-FTS provider is unaffected (its index is
-DB-synced via triggers on every insert, including backfill).
+and walking every chat's history takes longer on a real deployment. Record a marker in `ctx.storage` (which
+needs the `storage:use` permission) when it finishes so a restart does not repeat it. The built-in DB-FTS
+provider is unaffected (its index is DB-synced via triggers on every insert, including backfill).
 
 ## 27.4 Host-side guarantees (the plugin author doesn't handle these)
 
