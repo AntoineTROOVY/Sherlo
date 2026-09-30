@@ -181,7 +181,10 @@ keep working unchanged when you switch backends.
 > traffic — outbound on send, inbound on receive, and again when a stored message is revoked (see
 > [27.3](./27-plugin-search-providers.md#273-indexing-via-the-messagepersisted-hook)) — never for
 > history-backfill persistence. So a plugin provider installed on a deployment that already has message
-> history must perform its own one-time backfill (read `messages` and index) at enablement; its index
+> history must perform its own one-time backfill at enablement, through `ctx.engine.getChats` +
+> `getChatHistory` (needs `engine:read`, works on whatsapp-web.js only and returns at most 100 messages
+> per chat; Baileys has no backfill path, see
+> [27.3](./27-plugin-search-providers.md#273-indexing-via-the-messagepersisted-hook)); its index
 > will otherwise miss pre-installation rows. The built-in DB-FTS provider is
 > unaffected — its index is DB-synced via triggers on every insert, including backfill.
 
