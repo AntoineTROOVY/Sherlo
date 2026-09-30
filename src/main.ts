@@ -148,9 +148,9 @@ async function bootstrap() {
   // the adapter. Inert (plain in-memory adapter) without REDIS_ENABLED, so single-node pays nothing.
   app.useWebSocketAdapter(new RedisIoAdapter(app));
 
-  // The production HTTP surface: in-flight body budget, body parsers, request context, the CSP
-  // nonce, helmet, the SPA document handler and CORS. Extracted so the e2e lane runs the SAME
-  // stack instead of a copy of it (src/config/configure-app.ts).
+  // The production HTTP surface: request context, the CSP nonce, helmet, the SPA document handler,
+  // CORS, in-flight body budget, body parsers and the trailing-slash DELETE refusal. Extracted so the
+  // e2e lane runs the SAME stack instead of a copy of it (src/configure-app.ts).
   const { bodyLimit, inflightBudgetBytes } = configureApp(app);
   bootstrapLogger.log(`Request body caps: ${bodyLimit} per request, ${inflightBudgetBytes} bytes aggregate in flight`);
 
