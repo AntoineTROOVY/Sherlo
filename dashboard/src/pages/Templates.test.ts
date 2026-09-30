@@ -4,11 +4,14 @@
 import '../test-helpers/register-hooks.ts';
 import { test, before, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 let templatesStatus = 200;
 let sessionsStatus = 200;
+// When set, GET /api/sessions answers only once this settles, holding the page on its first load.
+let sessionsGate: Promise<void> | null = null;
 let templates: Array<{ id: string; name: string; body: string }> = [];
 const deleted: string[] = [];
 
@@ -21,6 +24,7 @@ function installFetchStub(): void {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     const path = url.replace(/^https?:\/\/[^/]+/, '');
     if (path === '/api/sessions') {
+      if (sessionsGate) return sessionsGate.then(() => jsonResponse([]));
       if (sessionsStatus !== 200) return Promise.resolve(jsonResponse({ message: 'gateway restarting' }, 502));
       return Promise.resolve(
         jsonResponse([
@@ -151,4 +155,27 @@ test('a failed sessions read shows the error, not "no sessions available"', asyn
   rtl.within(alert).getByText('gateway restarting');
   assert.equal(rtl.screen.queryByText('No sessions available'), null);
   assert.equal(rtl.screen.queryByRole('option', { name: 'No sessions' }), null);
+});
+
+// The full-page loader puts both classes on the page root itself, so its rule must be a compound
+// selector: a descendant one never matches, leaving the spinner in the top-left corner.
+test('the first-load spinner is centered in a 400px block', async () => {
+  const style = document.createElement('style');
+  style.textContent = readFileSync(new URL('./Templates.css', import.meta.url), 'utf8');
+  document.head.appendChild(style);
+  let release!: () => void;
+  sessionsGate = new Promise<void>(resolve => (release = resolve));
+  try {
+    renderTemplates();
+    const loader = document.querySelector('.templates-loading') as HTMLElement;
+    assert.ok(loader, 'the page did not render its loading state');
+    const computed = getComputedStyle(loader);
+    assert.equal(computed.display, 'flex');
+    assert.equal(computed.justifyContent, 'center');
+    assert.equal(computed.minHeight, '400px');
+  } finally {
+    release();
+    sessionsGate = null;
+    style.remove();
+  }
 });
