@@ -26,6 +26,14 @@ function htmlResponse(status: number): Response {
   return new Response(`<html><body>${status}</body></html>`, { status, headers: { 'Content-Type': 'text/html' } });
 }
 
+function deferred(): { promise: Promise<Response>; resolve: (r: Response) => void } {
+  let resolve!: (r: Response) => void;
+  const promise = new Promise<Response>(r => (resolve = r));
+  return { promise, resolve };
+}
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 before(async () => {
   const { installJsdomGlobals } = (await import('../test-helpers/jsdom.ts')) as {
     installJsdomGlobals: typeof installJsdomGlobalsFn;
@@ -72,4 +80,58 @@ test('a proxy 503 page and a coded gateway 5xx stay refusals', async () => {
   rtl.cleanup();
   const coded = jsonResponse({ message: 'Compose rejected the profile', code: 'SOME_CODE' }, 524);
   assert.equal(await statusAfterRestart(() => Promise.resolve(coded)), 'error');
+});
+
+test(
+  'a restart answer that lands after unmount starts no countdown and no readiness poll',
+  { timeout: 10_000 },
+  async () => {
+    const restart = deferred();
+    restartAnswer = () => restart.promise;
+    const live = new Set<unknown>();
+    const { setInterval: realSet, clearInterval: realClear } = globalThis;
+    globalThis.setInterval = ((fn: () => void, ms?: number) => {
+      const handle = realSet(fn, ms);
+      live.add(handle);
+      return handle;
+    }) as typeof setInterval;
+    globalThis.clearInterval = ((handle: ReturnType<typeof setInterval>) => {
+      live.delete(handle);
+      realClear(handle);
+    }) as typeof clearInterval;
+    try {
+      const { result, unmount } = rtl.renderHook(() => useRestartFlow());
+      rtl.act(() => void result.current.start());
+      await rtl.waitFor(() => assert.ok(calls.includes('POST /api/infra/restart')));
+
+      unmount();
+      restart.resolve(jsonResponse({ message: 'restarting', restarting: true, estimatedTime: 5 }));
+      // Past the first readiness poll (3s after the answer).
+      await wait(3500);
+
+      assert.ok(!calls.includes('GET /api/health/ready'), 'the readiness poll ran after unmount');
+      assert.equal(live.size, 0, 'a countdown interval outlived the component');
+    } finally {
+      for (const handle of live) realClear(handle as ReturnType<typeof setInterval>);
+      globalThis.setInterval = realSet;
+      globalThis.clearInterval = realClear;
+    }
+  },
+);
+
+test('a readiness check in flight at unmount does not schedule another one', { timeout: 12_000 }, async () => {
+  restartAnswer = () => Promise.resolve(jsonResponse({ message: 'restarting', restarting: true, estimatedTime: 5 }));
+  const ready = deferred();
+  readyAnswer = () => ready.promise;
+  const { result, unmount } = rtl.renderHook(() => useRestartFlow());
+  rtl.act(() => void result.current.start());
+  await rtl.waitFor(() => assert.ok(calls.includes('GET /api/health/ready')), { timeout: 5_000 });
+
+  unmount();
+  ready.resolve(jsonResponse({ status: 'error', details: {} }, 503));
+  readyAnswer = () => Promise.resolve(jsonResponse({ status: 'error', details: {} }, 503));
+  // Past the 1s retry a failed check schedules.
+  await wait(1500);
+
+  assert.equal(calls.filter(c => c === 'GET /api/health/ready').length, 1, 'the poll re-armed after unmount');
 });

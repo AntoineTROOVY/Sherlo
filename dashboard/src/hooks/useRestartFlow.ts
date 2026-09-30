@@ -60,12 +60,19 @@ export function useRestartFlow(): RestartFlow {
   // away mid-restart) cancels them instead of letting them fire setState on a dead component. The
   // trailing window.location.reload() on success is kept — a restart that already completed is meant
   // to reload the page.
+  // mountedRef stops what an unmount cannot clear: a restart answer or a readiness check still in
+  // flight would otherwise arm a new interval or poll after the cleanup ran, and that poll could end
+  // by reloading whatever page the operator moved on to. Set in the effect body, not the initializer,
+  // so StrictMode's dev unmount/remount leaves it true.
   const pollTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
+    mountedRef.current = true;
     const pollTimeouts = pollTimeoutsRef.current;
     return () => {
+      mountedRef.current = false;
       for (const handle of pollTimeouts) clearTimeout(handle);
       pollTimeouts.clear();
       if (countdownIntervalRef.current) {
@@ -76,6 +83,7 @@ export function useRestartFlow(): RestartFlow {
   }, []);
 
   const schedulePollTimeout = (fn: () => void, ms: number) => {
+    if (!mountedRef.current) return;
     const handle = setTimeout(() => {
       pollTimeoutsRef.current.delete(handle);
       fn();
@@ -170,6 +178,7 @@ export function useRestartFlow(): RestartFlow {
         return;
       }
     }
+    if (!mountedRef.current) return;
 
     setRestartStatus('waiting');
     stopCountdown();
