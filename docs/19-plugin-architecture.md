@@ -535,10 +535,10 @@ whole seconds from WhatsApp, so messages sent within the same second cannot be p
 `PluginLoaderService` (`src/core/plugins/plugin-loader.service.ts`) is the NestJS provider that
 discovers, loads, and runs plugins.
 
-**Discovery & load.** On `onModuleInit` it registers built-in plugins programmatically (the engine
-adapters; see §19.7), then scans the plugins directory (`plugins.dir`, default `<dataDir>/plugins` — the same tree the
+**Discovery & load.** On `onModuleInit` it scans the plugins directory (`plugins.dir`, default `<dataDir>/plugins` — the same tree the
 registry and each plugin's `ctx.storage` live in, so code and persisted state stay together on one
-volume; `PLUGINS_DIR` overrides it). For each
+volume; `PLUGINS_DIR` overrides it). The engine built-ins are not registered here: `EngineFactory`
+registers them in its own `onModuleInit` through `registerBuiltInPlugin` (see §19.7). For each
 sub-directory with a `manifest.json` it reads the manifest, validates the required fields
 (`id`/`name`/`version`/`type`/`main`), and records an `INSTALLED` plugin plus a persisted registry
 entry — **without running any plugin code**. Persisted config and per-session activation/config are
