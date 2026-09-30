@@ -17,15 +17,15 @@
 | **Dashboard UI**         | ✅ Implemented | `dashboard/src/pages/Plugins.tsx`                                  |
 | **REST API**             | ✅ Implemented | `src/modules/plugins/plugins.controller.ts`                        |
 
-| Component                    | Status         | Notes                                                                                                                             |
-| ---------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **Sandboxed execution**      | ✅ Implemented | User-installed (disk-loaded) plugins run in a `worker_thread`; see [30 — Plugin Sandboxing](./30-plugin-sandboxing.md). No `vm2`. |
-| **Permission enforcement**   | ✅ Implemented | Capability permissions enforced at the call boundary via `assertPermission`                                                       |
-| **Per-session activation**   | ✅ Implemented | A session-scoped plugin runs only for the sessions an operator activated it for                                                   |
-| **Per-session config**       | ✅ Implemented | Per-session config overrides shallow-merged over the base config at hook time                                                     |
-| **Built-in plugins**         | ✅ Implemented | The two engine adapters (`whatsapp-web.js`, `baileys`) register as in-process built-ins                                           |
-| **Plugin install / catalog** | ✅ Implemented | Install a `.zip` by upload or URL, or from the remote catalog                                                                     |
-| **@openwa/plugin-sdk**       | 🔜 Planned     | NPM package not yet published; plugins implement `IPlugin` directly today                                                         |
+| Component                    | Status         | Notes                                                                                                                                    |
+| ---------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sandboxed execution**      | ✅ Implemented | User-installed (disk-loaded) plugins run in a `worker_thread`; see [30 — Plugin Sandboxing](./30-plugin-sandboxing.md). No `vm2`.        |
+| **Permission enforcement**   | ✅ Implemented | Capability permissions enforced at the call boundary via `assertPermission`                                                              |
+| **Per-session activation**   | ✅ Implemented | A session-scoped plugin runs only for the sessions an operator activated it for                                                          |
+| **Per-session config**       | ✅ Implemented | Per-session config overrides deep-merged over the base config at hook time (nested objects merge key by key; arrays and scalars replace) |
+| **Built-in plugins**         | ✅ Implemented | The two engine adapters (`whatsapp-web.js`, `baileys`) register as in-process built-ins                                                  |
+| **Plugin install / catalog** | ✅ Implemented | Install a `.zip` by upload or URL, or from the remote catalog                                                                            |
+| **@openwa/plugin-sdk**       | 🔜 Planned     | NPM package not yet published; plugins implement `IPlugin` directly today                                                                |
 
 ---
 
