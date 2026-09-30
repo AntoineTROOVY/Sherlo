@@ -792,7 +792,7 @@ v0.10.5 published its GitHub Release.
 Upgrading a Compose deployment that builds from source is `git pull && docker compose up -d --build`:
 the bundled `docker-compose.yml` **builds** the API service rather than pulling it, so
 `docker compose pull` is a no-op for OpenWA itself. A deployment whose `docker-compose.override.yml`
-sets a published image (see the README) upgrades with
+sets a published image (see the README) upgrades with `git pull` followed by
 `docker compose pull openwa-api && docker compose up -d --no-build` instead; `--build` there would
 build from source and tag the result with the published image name.
 
