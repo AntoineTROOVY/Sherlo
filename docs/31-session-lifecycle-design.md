@@ -109,9 +109,13 @@ worth resuming: unauthenticated, mid-pairing, or operator-flagged failed').
 
 **Interleaving:** `client.logout()` chains `authStrategy.logout()` → `fs.rm(userDataDir)` while
 the Chromium process still holds file handles → rm fails or races a browser re-write.
-**Defense:** the logout path force-destroys the browser first, waits, then removes the dir; the
-spec enumerates the interleavings.
-**Pinned by:** `logout-teardown-race.spec.ts` — the module's most complete race corpus. Read it
+**Defense:** whatsapp-web.js's own `Client.logout()` closes the browser and polls up to ~1 s for it
+to disconnect before LocalAuth removes the profile dir. OpenWA's part is the name-keyed
+credential-teardown fence: `teardownEngineSafely` registers the whole `engine.logout()` promise under
+the session name, and `start()`, `delete()` and `executeReconnect` wait for it through
+`awaitPendingTeardown` (bounded at 10 s and fail-closed: a timeout is a 409 for `start()`/`delete()`
+and a failed attempt for a reconnect), so no new engine or purge races the rm.
+**Pinned by:** `logout-teardown-race.spec.ts`, which enumerates that fence's interleavings. Read it
 before touching anything in the logout/forceKill path.
 
 ### INV-9 — The reconnect loop bounds itself: backoff with jitter, clamp ≤ 5 min and ≤ setTimeout's 32-bit range, alert every 5 consecutive attempts
