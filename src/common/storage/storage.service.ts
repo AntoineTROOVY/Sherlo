@@ -132,6 +132,7 @@ export class StorageService implements OnModuleDestroy {
       this.logger.log(`S3 bucket '${this.s3Bucket}' is available`);
     } catch (error: unknown) {
       this.logger.error('S3 bucket check failed', String(error));
+      this.lastS3Error = String(error);
       this.warnLocalFallback();
     }
   }
@@ -163,8 +164,9 @@ export class StorageService implements OnModuleDestroy {
 
   private warnLocalFallback(): void {
     this.logger.warn(
-      `S3 bucket '${this.s3Bucket}' is unreachable — media storage degraded, using the local fallback dir ` +
-        `'${this.localPath}'. Re-probing every ${this.s3ReprobeIntervalMs}ms; writes return to S3 once it recovers.`,
+      `S3 bucket '${this.s3Bucket}' is unavailable (${this.lastS3Error}); media storage degraded, using the ` +
+        `local fallback dir '${this.localPath}'. Re-probing every ${this.s3ReprobeIntervalMs}ms; writes return ` +
+        'to S3 once it recovers.',
     );
   }
 
@@ -208,6 +210,8 @@ export class StorageService implements OnModuleDestroy {
   }
 
   private lastS3Check = 0;
+  /** Why the last probe failed. The fallback warning names it: a store refusing the create is not an outage. */
+  private lastS3Error = '';
   private s3CheckInFlight: Promise<void> | null = null;
 
   /**
@@ -236,8 +240,9 @@ export class StorageService implements OnModuleDestroy {
           `S3 bucket '${this.s3Bucket}' recovered — media storage back on S3. Files written to the local ` +
             `fallback dir '${this.localPath}' during the outage remain there (still readable via read-through).`,
         );
-      } catch {
-        // still unreachable — leave s3Available false; a later poll retries after the throttle window
+      } catch (error: unknown) {
+        // still unavailable: leave s3Available false; a later poll retries after the throttle window
+        this.lastS3Error = String(error);
       } finally {
         this.s3CheckInFlight = null;
       }

@@ -179,11 +179,12 @@ describe('StorageService S3 re-probe and recovery', () => {
     expect(svc.isS3Available()).toBe(false);
   });
 
-  it('stays on the local fallback when the re-probe cannot create the missing bucket', async () => {
+  it('stays on the local fallback when the re-probe cannot create the missing bucket, and says why', async () => {
     mockSend.mockRejectedValueOnce(s3Error('NetworkingError'));
     const svc = new StorageService(makeConfig());
-    warnSpyOf(svc);
+    const warn = warnSpyOf(svc);
     await flush();
+    expect(warn).toHaveBeenLastCalledWith(expect.stringContaining('NetworkingError'));
 
     mockSend.mockImplementation((cmd: unknown) =>
       Promise.reject(s3Error(cmd instanceof HeadBucketCommand ? 'NoSuchBucket' : 'AccessDenied')),
@@ -191,6 +192,8 @@ describe('StorageService S3 re-probe and recovery', () => {
     await jest.advanceTimersByTimeAsync(DEFAULT_S3_REPROBE_INTERVAL_MS);
 
     expect(svc.isS3Available()).toBe(false);
+    // The store answered: the periodic warning names the refused create, not the boot-time outage.
+    expect(warn).toHaveBeenLastCalledWith(expect.stringContaining('AccessDenied'));
   });
 
   it('never transitions true→false: an S3-healthy boot ignores later transient probe failures', async () => {
