@@ -709,15 +709,16 @@ curl -H "X-API-Key: $API_KEY" \
 ```typescript
 // Correct format
 const validFormats = [
-  '628123456789@c.us',      // Indonesian
-  '14155552671@c.us',       // US
+  '628123456789@c.us', // Indonesian
+  '14155552671@c.us', // US
   '628123456789-1234@g.us', // Group ID
 ];
+```
 
-// API to check if number exists
-// GET /api/sessions/{id}/contacts/check/{number}
+```bash
+# Check whether a number is on WhatsApp (needs an OPERATOR key; {sessionId} is the id from GET /api/sessions)
 curl -H "X-API-Key: $API_KEY" \
-  "http://localhost:2785/api/sessions/default/contacts/check/628123456789"
+  "http://localhost:2785/api/sessions/{sessionId}/contacts/check/628123456789"
 ```
 
 ### Issue: Sends return 500 "engine returned no message", and chats or media fail with `r: r`
