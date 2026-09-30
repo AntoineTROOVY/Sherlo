@@ -255,9 +255,10 @@ export class PluginLifecycle {
 
   /**
    * Set (or clear) a plugin's per-session config override for `sessionId`. Hooks for that session then
-   * see the override shallow-merged over the base via ctx.config — applied on the next event
-   * (resolution reads plugin.sessionConfig live) and persisted across restart. An empty override
-   * removes it (the session falls back to the base). Global plugins have no per-session config.
+   * see the override deep-merged over the base via ctx.config (nested objects merge key by key; arrays
+   * and scalars replace), applied on the next event (resolution reads plugin.sessionConfig live) and
+   * persisted across restart. An empty override removes it (the session falls back to the base).
+   * Global plugins have no per-session config.
    */
   setPluginSessionConfig(pluginId: string, sessionId: string, config: Record<string, unknown>): PluginInstance {
     const plugin = this.plugins.get(pluginId);
