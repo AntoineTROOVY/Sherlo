@@ -52,9 +52,8 @@ def build_url(base_url: str, path: str, query: Mapping[str, Any] | None = None) 
     params = {k: _serialize(v) for k, v in query.items() if v is not None}
     if not params:
         return url
-    req = httpx.Request("GET", url, params=params)
-    # httpx.Request already encoded params into the URL string.
-    return str(req.url)
+    # Merge rather than pass params= to httpx.Request, which replaces a query already in the path.
+    return str(httpx.URL(url).copy_merge_params(params))
 
 
 class HttpExecutor:

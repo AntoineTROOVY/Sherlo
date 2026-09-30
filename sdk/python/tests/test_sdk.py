@@ -149,6 +149,11 @@ class TestClientCore:
         assert "sessionId" not in url
         assert "None" not in url
 
+    def test_raw_request_keeps_a_query_string_in_the_path(self):
+        backend = MockBackend().on("GET", "/api/sessions", body=[])
+        make_client(backend).request("GET", "/api/sessions?limit=5", query={"name": "x"})
+        assert backend.last_call.url == "http://localhost:2785/api/sessions?limit=5&name=x"
+
     def test_204_is_none(self):
         # `delete` is declared `-> None`, so asserting on its result is a type error and proves
         # nothing the signature does not already guarantee. What is worth asserting is that a 204
