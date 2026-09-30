@@ -691,7 +691,8 @@ URL / catalog), not an npm/github source descriptor.
 > and `X-Content-Type-Options: nosniff`. The dashboard fetches it **with** the API key and injects the
 > body as an iframe `srcdoc` (opaque origin), applying the current document's CSP nonce to inline scripts;
 > the editor exchanges config over a `postMessage` bridge, so the API key never reaches the iframe. If
-> the bridge does not initialize, the dashboard shows an error and keeps a declared `configSchema` form usable.
+> the bridge does not initialize within 5 s, the dashboard shows an error; the generated `configSchema`
+> form is not rendered as a fallback.
 
 ## 19.9 Plugin Security
 
