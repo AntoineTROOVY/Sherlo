@@ -397,12 +397,6 @@ export class SessionOwnershipService {
   }
 
   /**
-   * Session ids another node currently holds on a live lease.
-   *
-   * For operations that can only act on this process's own engines and would otherwise report
-   * success over work they never touched.
-   */
-  /**
    * Whether ONE session is held by another node on a live lease.
    *
    * The scoped counterpart of {@link heldByOtherNodes}, for the lifecycle verbs that act on a single
@@ -430,6 +424,12 @@ export class SessionOwnershipService {
     );
   }
 
+  /**
+   * Session ids another node currently holds on a live lease.
+   *
+   * For operations that can only act on this process's own engines and would otherwise report
+   * success over work they never touched.
+   */
   async heldByOtherNodes(now = new Date()): Promise<string[]> {
     const rows = await this.sessions
       .createQueryBuilder('session')
