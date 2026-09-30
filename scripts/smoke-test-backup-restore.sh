@@ -42,6 +42,7 @@
 #   (aa) engine auth state copied from a running app (an open whatsapp-web.js profile, Baileys state)
 #       is noted in the archive and printed by restore, which does not refuse it even with --strict
 #   (ab) a blank ./.env line keeps data/.env.generated from supplying the key, so the default applies
+#   (ac) a missing Baileys auth dir is reported when data/.env.generated selects the Baileys engine
 #
 # Usage: ./scripts/smoke-test-backup-restore.sh
 # Requires: bash, tar, node (restore.sh path resolution). sqlite3 is optional (see (c) and (k)).
@@ -1247,6 +1248,21 @@ if [ "$(db_fingerprint "$AB/extract/openwa.sqlite")" != "bravo2-default" ]; then
   fail "(ab) a blank DATABASE_NAME in ./.env fell through to data/.env.generated"
 fi
 pass "(ab) a blank ./.env line stops the lookup and the built-in default applies"
+
+echo ""
+echo "==> (ac) a Baileys engine chosen in the dashboard is warned about when its auth dir is missing"
+# Compose forwards a blank ENGINE_TYPE and the dashboard saves the real one in data/.env.generated, so
+# reading the environment alone never saw Baileys there and skipped the re-pairing warning.
+AC="$WORK/ac"
+mkdir -p "$AC/data"
+make_fixture "$AC/data/main.sqlite" "charlie2-main"
+make_fixture "$AC/data/openwa.sqlite" "charlie2-data"
+printf 'ENGINE_TYPE=baileys\n' >"$AC/data/.env.generated"
+OUT_AC="$(cd "$AC" && ENGINE_TYPE='' BACKUP_DIR="$AC/out" "$BACKUP" 2>&1)"
+if ! printf '%s' "$OUT_AC" | grep -q 'ENGINE_TYPE=baileys but .* was not found'; then
+  fail "(ac) a dashboard-selected Baileys engine with no auth dir was not reported: $OUT_AC"
+fi
+pass "(ac) the missing Baileys auth dir is reported when data/.env.generated selects Baileys"
 
 echo ""
 echo "All smoke tests passed!"

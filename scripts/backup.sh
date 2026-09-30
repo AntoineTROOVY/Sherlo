@@ -222,7 +222,7 @@ if [ -d "$BAILEYS_DIR" ]; then
   if [ -n "$(find -H "$BAILEYS_DIR" -mindepth 1 -maxdepth 1 -type d -print -quit)" ]; then
     record_engine_state_note "baileys/ (recorded whenever Baileys state exists; it cannot show whether it was live)"
   fi
-elif [ "${ENGINE_TYPE:-}" = "baileys" ]; then
+elif [ "$(openwa_resolve ENGINE_TYPE '')" = "baileys" ]; then
   log "WARN: ENGINE_TYPE=baileys but $BAILEYS_DIR was not found — restored sessions will require pairing"
 fi
 
