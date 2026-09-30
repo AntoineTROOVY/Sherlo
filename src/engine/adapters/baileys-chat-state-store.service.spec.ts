@@ -379,6 +379,49 @@ describe('ChatStateStoreService', () => {
       expect(svc.get('s', 'late')).toEqual(expect.objectContaining({ pinned: true }));
     });
 
+    it('is not complete when a write in flight as the read began settled before the read did', async () => {
+      const repo = seeded();
+      let releaseUpsert!: () => void;
+      repo.upsert.mockImplementationOnce(
+        (v: ChatState) =>
+          new Promise(resolve => {
+            releaseUpsert = () => {
+              repo.rows.set(KEY(v.sessionId, v.chatId), { ...v });
+              resolve(undefined);
+            };
+          }),
+      );
+      const svc = svcWith(repo);
+      const pending = svc.remember('s', 'late', { pinned: true });
+      await tick(); // the write is indexed and waiting on its upsert
+      // The read's snapshot predates the upsert, but the read resolves after it (pooled connections).
+      let releaseFind!: () => void;
+      repo.find.mockImplementationOnce(() => {
+        const snapshot = [...repo.rows.values()].filter(r => r.sessionId === 's');
+        return new Promise(resolve => (releaseFind = () => resolve(snapshot)));
+      });
+      const refresh = svc.refreshSession('s');
+      releaseUpsert();
+      await pending;
+      await tick();
+      releaseFind();
+      await refresh;
+      expect(svc.get('s', 'late')).toBeUndefined();
+      await tick();
+      expect(svc.get('s', 'late')).toEqual(expect.objectContaining({ pinned: true }));
+    });
+
+    it("is complete when only another session's write overlapped the refresh read", async () => {
+      const repo = seeded();
+      repo.upsert.mockImplementationOnce(() => new Promise(() => undefined)); // never settles
+      const svc = svcWith(repo);
+      void svc.remember('other', 'x', { pinned: true });
+      await tick();
+      await svc.refreshSession('s');
+      svc.get('s', 'unknown');
+      expect(repo.findOne).not.toHaveBeenCalledWith({ where: { sessionId: 's', chatId: 'unknown' } });
+    });
+
     it('a write whose read-through failed leaves the session incomplete, so the row is read back', async () => {
       const repo = seeded();
       const svc = svcWith(repo);
