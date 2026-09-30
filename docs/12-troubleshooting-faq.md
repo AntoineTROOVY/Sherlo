@@ -1547,7 +1547,6 @@ When creating GitHub issue, include:
 
 - **GitHub Issues**: [github.com/rmyndharis/OpenWA/issues](https://github.com/rmyndharis/OpenWA/issues)
 - **Discussions**: [github.com/rmyndharis/OpenWA/discussions](https://github.com/rmyndharis/OpenWA/discussions)
-- **Stack Overflow**: Tag with `openwa`
 
 ---
 
