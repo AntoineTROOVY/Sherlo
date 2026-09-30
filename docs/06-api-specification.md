@@ -5943,7 +5943,7 @@ List the remote plugin catalog annotated with this instance's install state. (De
 ]
 ```
 
-Returns `[]` when no `plugins.catalogUrl` is configured.
+The catalog is fetched from `PLUGIN_CATALOG_URL`, which defaults to the OpenWA-plugins `plugins.json` on raw.githubusercontent.com. An empty value falls back to that default, so the catalog cannot be disabled, and on a host that cannot reach it this route answers `400`.
 
 The dashboard installs and updates an entry by passing its `download` URL to `POST /api/plugins/install-url` or `POST /api/plugins/:id/update`, so the pin rule of those routes applies: under `NODE_ENV=production` (unless `PLUGIN_INSTALL_REQUIRE_PIN=false`) an entry whose `download` has no `#sha256=` pin cannot be installed. Every entry in the default catalog carries one.
 
