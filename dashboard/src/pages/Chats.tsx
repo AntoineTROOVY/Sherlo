@@ -979,7 +979,10 @@ export function Chats() {
       <PageHeader
         title={t('nav.chats')}
         subtitle={t('chats.subtitle')}
-        actions={sessions.length > 0 && <GlobalSearch currentSessionId={selectedSessionId} onHit={handleSearchHit} />}
+        actions={
+          sessions.length > 0 &&
+          canWrite && <GlobalSearch currentSessionId={selectedSessionId} onHit={handleSearchHit} />
+        }
       />
 
       {/* Real-time connection permanently dropped — let the user re-establish it instead of

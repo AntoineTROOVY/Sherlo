@@ -705,6 +705,19 @@ test('a read-only key is offered no status compose trigger', async () => {
   }
 });
 
+// GET /search needs an operator key, so a viewer would only ever get "Search failed. Try again."
+test('a read-only key is offered no message search', async () => {
+  const { screen } = rtl;
+  window.sessionStorage.setItem('openwa_user_role', 'viewer');
+  try {
+    renderChats();
+    await screen.findByText('Alice');
+    assert.ok(!screen.queryByLabelText('Search messages…'), 'a viewer key was offered message search');
+  } finally {
+    window.sessionStorage.setItem('openwa_user_role', 'admin');
+  }
+});
+
 test('an operator key on whatsapp-web.js posts a status without the admin-only engine route', async () => {
   const { screen, fireEvent, within, waitFor } = rtl;
   window.sessionStorage.setItem('openwa_user_role', 'operator');
