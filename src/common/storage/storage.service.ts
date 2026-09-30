@@ -40,6 +40,12 @@ interface S3Config {
 /** How often an S3-configured service re-probes a bucket that was unreachable at boot. */
 export const DEFAULT_S3_REPROBE_INTERVAL_MS = 60_000;
 
+/**
+ * Cap on one S3 DeleteObject. The retention purges delete row by row behind a single-flight guard,
+ * so a delete that never settles would hold that guard and stop every later purge until a restart.
+ */
+export const S3_DELETE_TIMEOUT_MS = 30_000;
+
 function positiveIntFromEnv(name: string, fallback: number): number {
   const parsed = Number.parseInt(process.env[name] ?? '', 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
@@ -595,6 +601,7 @@ export class StorageService implements OnModuleDestroy {
         Bucket: this.s3Bucket,
         Key: `${this.s3KeyRoot}${filePath}`,
       }),
+      { abortSignal: AbortSignal.timeout(S3_DELETE_TIMEOUT_MS) },
     );
   }
 }

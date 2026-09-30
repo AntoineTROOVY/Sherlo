@@ -32,7 +32,7 @@ import {
   HeadBucketCommand,
   ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
-import { DEFAULT_S3_REPROBE_INTERVAL_MS, StorageService } from './storage.service';
+import { DEFAULT_S3_REPROBE_INTERVAL_MS, S3_DELETE_TIMEOUT_MS, StorageService } from './storage.service';
 
 const ENV_KEYS = [
   'S3_ENDPOINT',
@@ -358,6 +358,38 @@ describe('StorageService S3 re-probe and recovery', () => {
     await expect(svc.deleteFile('s3-only.bin')).resolves.toBeUndefined();
     const deleteCalls = mockSend.mock.calls.filter(([cmd]) => cmd instanceof DeleteObjectCommand);
     expect(deleteCalls.length).toBe(1);
+  });
+
+  it('deleteFile rejects once a DeleteObject that never settles hits its timeout', async () => {
+    // A hung delete used to await forever, holding the retention purges' single-flight guard so no
+    // purge ran again until a restart. The SDK's HTTP handler rejects when the abort signal fires.
+    mockSend.mockImplementation((cmd: unknown, options?: { abortSignal?: AbortSignal }) => {
+      if (!(cmd instanceof DeleteObjectCommand)) return Promise.resolve({});
+      return new Promise((_resolve, reject) => {
+        options?.abortSignal?.addEventListener('abort', () => reject(s3Error('AbortError')));
+      });
+    });
+    // AbortSignal.timeout runs on Node's internal timers, which fake timers do not reach.
+    const timeout = jest.spyOn(AbortSignal, 'timeout').mockImplementation((ms: number) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ms);
+      return controller.signal;
+    });
+    try {
+      const svc = new StorageService(makeConfig());
+      await flush();
+
+      const outcome = svc.deleteFile('hung.bin').then(
+        () => 'resolved',
+        (error: Error) => error.name,
+      );
+      await jest.advanceTimersByTimeAsync(S3_DELETE_TIMEOUT_MS - 1);
+      await expect(Promise.race([outcome, Promise.resolve('pending')])).resolves.toBe('pending');
+      await jest.advanceTimersByTimeAsync(1);
+      await expect(outcome).resolves.toBe('AbortError');
+    } finally {
+      timeout.mockRestore();
+    }
   });
 
   it('listFiles unions S3 objects with the local fallback dir (each key once)', async () => {
