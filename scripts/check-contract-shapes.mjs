@@ -86,6 +86,7 @@ const MAPPINGS = {
     GroupParticipant: 'GroupParticipantDto',
     GroupSubjectRequest: 'GroupSubjectDto',
     GroupSummary: 'GroupSummaryDto',
+    HealthReadyResponse: 'ReadinessResponseDto',
     JoinGroupRequest: 'JoinGroupDto',
     MarkChatReadRequest: 'MarkChatReadDto',
     MarkChatRequest: 'MarkChatUnreadDto',
@@ -172,11 +173,11 @@ const MAPPINGS = {
  * added makes the shrink loud.
  */
 const MINIMUM_MAPPED = {
-  'sdk/javascript/src/types.ts': 83,
+  'sdk/javascript/src/types.ts': 84,
   'dashboard/src/services/api.ts': 21,
   'sdk/python/openwa/types.py': 79,
   'sdk/go': 79,
-  'sdk/java': 83,
+  'sdk/java': 84,
 };
 
 /** Known drift, deliberately not gated yet — each line is a to-adjudicate follow-up. */
@@ -408,6 +409,7 @@ const JAVA_MAPPING = {
   GroupParticipant: 'GroupParticipantDto',
   GroupSubjectRequest: 'GroupSubjectDto',
   GroupSummary: 'GroupSummaryDto',
+  HealthReadyResponse: 'ReadinessResponseDto',
   JoinGroupRequest: 'JoinGroupDto',
   MarkChatReadRequest: 'MarkChatReadDto',
   MarkChatRequest: 'MarkChatUnreadDto',
