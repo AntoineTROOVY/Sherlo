@@ -213,3 +213,17 @@ test('a selected session that disappears from the list is replaced by the first 
   screen.getByText('Saved under support-bot');
   window.sessionStorage.setItem('openwa_user_role', 'viewer');
 });
+
+// The count above the list still shows the library is not empty, so a search that matches nothing
+// must say so rather than claim no templates are saved.
+test('a search with no match says so instead of reporting an empty library', async () => {
+  const { screen, fireEvent } = rtl;
+  templatesStatus = 200;
+  templates = [{ id: 'tpl-1', name: 'invoice-reminder', body: 'Hi {{name}}' }];
+  renderTemplates();
+
+  await screen.findByText('invoice-reminder');
+  fireEvent.change(screen.getByPlaceholderText('Search'), { target: { value: 'no-such-template' } });
+  await screen.findByText('No templates match your search.');
+  assert.equal(screen.queryByText('No templates saved'), null);
+});

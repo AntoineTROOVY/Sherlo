@@ -281,7 +281,7 @@ export function Templates() {
             ) : filteredTemplates.length === 0 ? (
               <div className="templates-empty-list compact">
                 <Search size={32} strokeWidth={1.5} />
-                <h3>{t('templates.empty.title')}</h3>
+                <h3>{t('templates.empty.noMatch', 'No templates match your search.')}</h3>
               </div>
             ) : (
               <div className="template-list" role="list">
