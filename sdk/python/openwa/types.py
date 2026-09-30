@@ -1212,9 +1212,13 @@ class HealthResponse(TypedDict, total=False):
     version: str
 
 
+class HealthDependencyStatus(TypedDict):
+    status: str
+
+
 class HealthReadyResponse(TypedDict, total=False):
     status: str
-    details: dict[str, str]
+    details: dict[str, HealthDependencyStatus]
 
 
 # ── Auth ──────────────────────────────────────────────────────────
