@@ -12,6 +12,12 @@ npm install @rmyndharis/openwa
 
 Requires Node.js >= 18 (relies on the global `fetch`).
 
+This README describes `main`. The 0.5.0 release lacks `sessions.getProxy`,
+`sessions.updateProxy`, `messages.clickButton`, the `name` filter on
+`sessions.list`, `verifyWebhookSignature`, the `WebhookDelivery` types and the
+`code`, `retryAfterSeconds` and `headers` error fields; they ship with the next
+SDK release. See [the SDK overview](../README.md#coverage).
+
 ## Usage
 
 ```typescript
