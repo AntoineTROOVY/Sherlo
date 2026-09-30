@@ -839,11 +839,11 @@ receivers:
 All health endpoints are `@Public()` (no API key) and `@SkipThrottle()`, and live under the global
 `api` prefix. There is **no** `/health/detailed` endpoint.
 
-| Endpoint                | Purpose                                                                                                                                 | Body                                                           | Codes     |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | --------- |
-| `GET /api/health`       | Basic check                                                                                                                             | `{ status, timestamp, version }` (version from `package.json`) | 200       |
-| `GET /api/health/live`  | Liveness (deliberately static — a transient dependency outage must not KILL the pod)                                                    | `{ status: 'ok' }`                                             | 200       |
-| `GET /api/health/ready` | Readiness — probes **both** databases (`main` + `data`, `SELECT 1`, 3s timeout each) and reports 503 while draining (graceful shutdown) | `{ status, details: { mainDatabase, dataDatabase } }`          | 200 / 503 |
+| Endpoint                | Purpose                                                                                                                                 | Body                                                                                                                                   | Codes     |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| `GET /api/health`       | Basic check                                                                                                                             | `{ status, timestamp, version? }`: `version` (from `package.json`) only for a request carrying a valid API key (`X-API-Key` or Bearer) | 200       |
+| `GET /api/health/live`  | Liveness (deliberately static — a transient dependency outage must not KILL the pod)                                                    | `{ status: 'ok' }`                                                                                                                     | 200       |
+| `GET /api/health/ready` | Readiness — probes **both** databases (`main` + `data`, `SELECT 1`, 3s timeout each) and reports 503 while draining (graceful shutdown) | `{ status, details: { mainDatabase, dataDatabase } }`                                                                                  | 200 / 503 |
 
 ```typescript
 // health/health.controller.ts
@@ -852,8 +852,14 @@ All health endpoints are `@Public()` (no API key) and `@SkipThrottle()`, and liv
 @SkipThrottle()
 export class HealthController {
   @Get()
-  check(): { status: string; timestamp: string; version: string } {
-    return { status: 'ok', timestamp: new Date().toISOString(), version: APP_VERSION };
+  async check(@Req() req: Request): Promise<{ status: string; timestamp: string; version?: string }> {
+    const body: { status: string; timestamp: string; version?: string } = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+    };
+    // The version is disclosed only to a caller presenting a valid key (X-API-Key or Bearer).
+    if (await this.hasValidApiKey(req)) body.version = APP_VERSION;
+    return body;
   }
 
   @Get('live')
