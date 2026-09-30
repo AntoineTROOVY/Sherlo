@@ -39,7 +39,7 @@ Rather than invent new machinery that would have to re-earn those properties, th
 
 | Concern                                                   | Cloned from                         |
 | --------------------------------------------------------- | ----------------------------------- |
-| Host→worker dispatch with fail-open timeout + crash-drain | the existing hook bridge            |
+| Host→worker dispatch with a bounded timeout + crash-drain | the existing hook bridge            |
 | Worker→host capability calls                              | the existing capability router      |
 | Durable delivery with retry + dead-letter                 | the outbound webhook queue and DLQ  |
 | Identity mapping table (no foreign key, last-write-wins)  | the LID↔phone mapping table         |
@@ -49,9 +49,9 @@ Rather than invent new machinery that would have to re-earn those properties, th
 
 Exactly **one** genuinely new primitive exists: a host→worker RPC that returns an **HTTP status + body**
 from a sandboxed worker — inbound webhook ingress. It is modelled line-for-line on the hook bridge so its
-correctness properties (its own pending map, a fail-open timeout, and a drain in the worker-exit handler)
-come for free. If a worker crashes mid-request, the pending ingress call resolves to a `502` instead of
-hanging the HTTP request forever.
+correctness properties (its own pending map, a bounded timeout, and a drain in the worker-exit handler)
+come for free. A timeout resolves `504` and a mid-dispatch crash resolves `502`; the ingress job treats
+either as a failed delivery and retries or dead-letters it.
 
 ## 25.3 Architecture
 
