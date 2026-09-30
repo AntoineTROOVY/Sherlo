@@ -1205,7 +1205,8 @@ networks:
 
 ```bash
 # Test connectivity from container
-docker exec openwa-api ping postgres
+docker exec openwa-api getent hosts postgres            # DNS: does the name resolve?
+docker exec openwa-api pg_isready -h postgres -p 5432    # TCP + PostgreSQL accepting connections
 docker exec openwa-api curl http://host.docker.internal:8080
 ```
 
