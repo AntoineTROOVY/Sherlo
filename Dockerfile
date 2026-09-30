@@ -41,7 +41,8 @@ COPY scripts/postinstall.js ./scripts/
 # Coolify (and similar PaaS) promote every ${VAR} referenced in the compose file to a build-time
 # variable, so docker-compose.yml's `NODE_ENV=${NODE_ENV:-production}` leaks NODE_ENV=production
 # into this stage and a bare `npm ci` would skip @nestjs/cli → `sh: 1: nest: not found` (exit 127).
-# (docker-compose.dev.yml hardcodes NODE_ENV=development, which is why the dev build never hit this.)
+# (docker-compose.dev.yml forwards `NODE_ENV=${NODE_ENV:-development}`, so the dev build only sees
+# production when the host sets it.)
 # This stage only builds dist/ and the dashboard SPA and never launches a browser; the production
 # stage downloads Chrome explicitly. Skip the Puppeteer postinstall download so @puppeteer/browsers 3
 # does not try to extract a zip here, where no archiver is installed.
