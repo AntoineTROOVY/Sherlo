@@ -29,8 +29,11 @@ public final class WebhooksResource {
     }
 
     /**
-     * Deliveries that were ATTEMPTED and failed — the diagnostic for a webhook that stopped arriving.
-     * Requires an ADMIN-level key.
+     * Deliveries the gateway gave up on or could not dispatch: the diagnostic for a webhook that
+     * stopped arriving. Rows with {@code attempts > 0} exhausted their retries against the receiver;
+     * rows with {@code attempts == 0} were never sent (payload over the size cap, a webhook:before
+     * hook error, dispatch capacity shed, or shutdown). A row is removed once a later replay delivers
+     * the event. Requires an ADMIN-level key.
      *
      * <p>A delivery a smart filter suppressed never reaches this log. Most recent first.
      */
