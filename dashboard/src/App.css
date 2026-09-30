@@ -102,16 +102,8 @@
 
 body {
   margin: 0;
-  font-family:
-    'Plus Jakarta Sans Variable',
-    'Plus Jakarta Sans',
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Helvetica,
-    Arial,
-    sans-serif;
+  /* No font-family here: body inherits it from <html>, where index.css sets the Latin stack and the
+     Hebrew and Arabic ones per lang. Declaring one on body would shadow those. */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg-light);
