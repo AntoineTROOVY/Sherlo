@@ -55,6 +55,9 @@ Nor is the Java fallback to `UNKNOWN`: 0.5.0 decodes a response enum value it
 does not recognise to `null` (`MessageType` and `ChatKind` included), and
 `SessionStatus`, `DeliveryStatus` and the other response enums that lack an
 `unknown` wire value have no `UNKNOWN` constant there.
+Nor is the `name` filter on `sessions.list` (`ListSessionsQuery.Name` in Go,
+the `name` field of `ListSessionsQuery` in Java, JavaScript and Python); it
+ships with the next SDK release.
 
 > ⚠️ Endpoints requiring an `OPERATOR`-level API key are noted in the inline
 > docs. Deliberately **not** exposed, matching `docs/18-sdk-design.md` exactly:
