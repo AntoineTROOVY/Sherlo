@@ -82,7 +82,9 @@ class OpenWAAuthError(OpenWAApiError):
 
 
 class OpenWAForbiddenError(OpenWAApiError):
-    """403 Forbidden: the API key's role or scope (session, IP or chat allow-list) refuses the call."""
+    """403 Forbidden: the API key's role or scope (session, IP or chat allow-list) refuses the call,
+    or WhatsApp itself refused the operation (for example, missing group admin rights).
+    """
 
 
 class OpenWANotFoundError(OpenWAApiError):
