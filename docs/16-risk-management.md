@@ -613,6 +613,10 @@ flowchart TB
 
 ## 16.6 Escalation Procedures
 
+Optional template: the project does not run this process. OpenWA has one maintainer and no on-call
+rotation, paging, chat channel or status page; incidents are handled through GitHub Issues, and security
+reports through GitHub Security Advisories (see [SECURITY.md](../SECURITY.md)).
+
 ### Severity Levels
 
 | Level             | Description              | Response Time | Notification  |
