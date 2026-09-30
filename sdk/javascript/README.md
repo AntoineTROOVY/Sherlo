@@ -58,6 +58,31 @@ error also exposes the response `.headers`. In a routed deployment only 503
 proves the request was never carried out: a forward that fails after the request
 reached the owner node answers 502 or 504.
 
+## Receiving webhooks
+
+A webhook configured with a secret signs each delivery in its
+`X-OpenWA-Signature` header. Check it with `verifyWebhookSignature` against the
+raw request body, exactly as received, and parse the JSON only after the check
+passes: a re-serialized body can differ byte for byte and will not verify. The
+helper resolves `false` (never throws) for a missing, malformed or non-matching
+signature. `WebhookDelivery` types the parsed body.
+
+```typescript
+import express from 'express';
+import { verifyWebhookSignature, type WebhookDelivery } from '@rmyndharis/openwa';
+
+const app = express();
+
+app.post('/openwa/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!(await verifyWebhookSignature(req.body, req.get('X-OpenWA-Signature'), secret))) {
+    return res.status(401).send('Invalid signature');
+  }
+  const delivery = JSON.parse(req.body.toString('utf8')) as WebhookDelivery;
+  // Process delivery.event and delivery.data here.
+  return res.status(200).send('OK');
+});
+```
+
 ## Releasing
 
 Publishing to npm is done by the
