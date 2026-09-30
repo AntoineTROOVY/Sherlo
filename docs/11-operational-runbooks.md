@@ -86,6 +86,9 @@ docker compose restart openwa-api
 # Check health
 curl http://localhost:2785/api/health
 
+# Sessions reconnect on their own only with AUTO_START_SESSIONS=true. The production compose
+# leaves it unset (off), so start each session first:
+#   curl -X POST -H "X-API-Key: $API_KEY" http://localhost:2785/api/sessions/{sessionId}/start
 # Check all sessions reconnected (id alongside status — the send below needs the id)
 curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions | jq '.[] | {id, name, status}'
@@ -199,9 +202,10 @@ docker compose logs openwa-api 2>&1 | grep -i "heap\|memory\|gc"
 
 # 4. Immediate actions:
 
-# A. Restart container (will reconnect sessions). This also drops the in-process caches; there
-#    is no runtime cache-clear API. Flushing Redis frees no openwa-api memory, since Redis is a
-#    separate process. Never run FLUSHALL: the queue and rate limits live in db 0, and the cache
+# A. Restart container (sessions reconnect on their own only with AUTO_START_SESSIONS=true;
+#    otherwise POST /api/sessions/{sessionId}/start each one). This also drops the in-process
+#    caches; there is no runtime cache-clear API. Flushing Redis frees no openwa-api memory, since
+#    Redis is a separate process. Never run FLUSHALL: the queue and rate limits live in db 0, and the cache
 #    has its own database (REDIS_CACHE_DB, default 1)
 docker compose restart openwa-api
 
@@ -391,6 +395,8 @@ sleep 30
 curl http://localhost:2785/api/health
 
 # 10. Verify all sessions reconnected
+#     (on their own only with AUTO_START_SESSIONS=true; otherwise POST
+#     /api/sessions/{sessionId}/start each one first)
 curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions | jq '.[].status'
 
@@ -482,6 +488,8 @@ curl http://localhost:2785/api/health
 curl -H "X-API-Key: $API_KEY" http://localhost:2785/api/health | jq '.version'
 
 # 11. Verify all sessions
+#     (they reconnect on their own only with AUTO_START_SESSIONS=true; otherwise POST
+#     /api/sessions/{sessionId}/start each one first)
 curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions
 
