@@ -22,7 +22,7 @@ const messageTypeFromMime = (mimetype: string): MessageType => {
 // Client pre-check before base64-encoding an upload, same cap as the message tester: base64
 // inflates ~1.33x, so ~18 MiB raw stays under the backend's default 25 MiB body limit and the
 // pick fails here with a toast instead of OOMing the tab on the FileReader.
-const MEDIA_UPLOAD_MAX_BYTES = 18 * 1024 * 1024;
+export const MEDIA_UPLOAD_MAX_BYTES = 18 * 1024 * 1024;
 
 /** A picked-but-unsent file, staged until send, removal, or a move to another chat. */
 export interface StagedAttachment {
