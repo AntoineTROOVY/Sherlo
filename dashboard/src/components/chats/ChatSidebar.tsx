@@ -63,9 +63,9 @@ function ChatSidebar({
 
   const formatLastMessageSnippet = (chat: Chat) => chat.lastMessage || '';
 
-  // Shared row markup for the Chats and Status lists — a plain function (not memoized) since it
-  // closes over render-scoped props (chatsTab.activeChatId, chatsTab.pictures) that already
-  // change every render.
+  // Row markup for the Chats list: a plain function (not memoized) since it closes over
+  // render-scoped props (chatsTab.activeChatId, chatsTab.pictures) that already change every
+  // render.
   const renderChatRow = (chat: Chat) => {
     const isActive = chatsTab.activeChatId === chat.id;
     return (
