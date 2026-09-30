@@ -1060,19 +1060,19 @@ ANALYZE sessions;
 ANALYZE messages;
 ```
 
-Pooling and caching are environment variables — OpenWA has no config file:
+Pool size and Redis are set in Dashboard > Infrastructure, which saves them to `data/.env.generated`; an uncommented value in `.env` or the process environment pins them over the dashboard. The timeouts below are environment-only:
 
 ```bash
 # Connection pool + timeouts (applied to the PostgreSQL data connection)
-DATABASE_POOL_SIZE=10                 # max pooled connections (default 10)
+# DATABASE_POOL_SIZE=10               # max pooled connections (default 10)
 DATABASE_IDLE_TIMEOUT_MS=30000        # idle client eviction (default 30000)
 DATABASE_CONNECTION_TIMEOUT_MS=10000  # wait for a free connection (default 10000)
 DATABASE_STATEMENT_TIMEOUT_MS=30000   # server-side per-query cap (default 30000)
 
 # Redis caching (per-key TTLs are fixed in code — there is no cache TTL env var)
-REDIS_ENABLED=true
-REDIS_HOST=localhost
-REDIS_PORT=6379
+# REDIS_ENABLED=true
+# REDIS_HOST=localhost
+# REDIS_PORT=6379
 ```
 
 ## 12.6 Database Issues
