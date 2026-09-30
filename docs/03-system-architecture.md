@@ -484,6 +484,7 @@ classDiagram
         AUTHENTICATING
         READY
         DISCONNECTED
+        ACTION_REQUIRED
         FAILED
     }
 
@@ -717,13 +718,13 @@ Errors use the NestJS default shape.
 {
   "id": "abc",
   "name": "my-session",
-  "status": "READY"
+  "status": "ready"
 }
 
 // List Response — a bare array
 [
-  { "id": "abc", "name": "my-session", "status": "READY" },
-  { "id": "def", "name": "other-session", "status": "DISCONNECTED" }
+  { "id": "abc", "name": "my-session", "status": "ready" },
+  { "id": "def", "name": "other-session", "status": "disconnected" }
 ]
 
 // Error Response — NestJS default shape
