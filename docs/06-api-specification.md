@@ -1708,7 +1708,7 @@ rejected with `400` rather than guessing which half was meant.
 { "messageId": "true_628123456789@c.us_3EB0ABCD", "timestamp": 1719312000 }
 ```
 
-`messageId` is the WhatsApp message id from the engine. An optional `SIMULATE_TYPING` humanising pause may run before send.
+`messageId` is the WhatsApp message id from the engine. By default (`SIMULATE_TYPING`; set it to `false` to disable) a typing indicator and a humanising pause run before the send: 500 ms plus 45 ms per character, capped at `SIMULATE_TYPING_MAX_MS` (default 5000 ms), with +/-15% jitter.
 
 **Errors:** `400` unknown body field, validation failure, or session not active / blocked by a plugin hook · `401` missing/invalid API key · `403` key role below OPERATOR · `404` session not found · `500` engine error · `409` conflict or engine not ready (retryable) · `501` not supported on the active engine
 
