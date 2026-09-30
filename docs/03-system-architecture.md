@@ -793,11 +793,12 @@ flowchart TB
 
 ## 3.11 Scalability Considerations
 
-> **Future design, not the shipped topology.** Live engines are held in an in-process `Map` in
-> `SessionService`, so a session can only be driven by the instance that started it — there is no
-> session registry, node claim, or affinity router in the codebase. OpenWA runs as one API instance
-> per session-data volume; the two sketches below are retained for planning. See the single-instance
-> note in §3.2 and [13 - Horizontal Scaling](13-horizontal-scaling.md).
+> **Partially implemented; still deploy `replicas: 1`.** Live engines are held in an in-process `Map`
+> in `EngineRegistry`. Each session carries an owner lease (`nodeId`, `nodeUrl`, `leaseExpiresAt`)
+> claimed by `SessionOwnershipService`, a takeover sweep adopts sessions whose lease lapsed, and when
+> `NODE_URL` is set `SessionProxyInterceptor` forwards session-scoped requests to the owner node.
+> OpenWA still runs as one API instance per session-data volume; the two sketches below are retained
+> for planning. See the single-instance note in §3.2 and [13 - Horizontal Scaling](13-horizontal-scaling.md).
 
 ### Horizontal Scaling Strategy (sketch)
 
