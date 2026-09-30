@@ -269,14 +269,15 @@ tier, and a `handler` that calls a service. To add one, append to the relevant t
 `src/core/agent-tools/tools/<domain>.tools.ts`:
 
 ```ts
-{
+defineTool({
   name: 'SessionFindOne',
   description: 'Get one session by its UUID, including connection status.',
   tier: 'read',
   sessionScoped: true,
   inputSchema: z.object({ sessionId: z.string().min(1).describe('Session UUID') }),
-  handler: (input, _apiKey) => session.findOne(input.sessionId).then(SessionResponseDto.fromEntity),
-}
+  handler: input =>
+    session.findOne(input.sessionId).then(s => SessionResponseDto.fromEntity(s, session.engineLoaded(s))),
+}),
 ```
 
 Guidelines:
