@@ -248,7 +248,7 @@ erDiagram
 
     MESSAGE {
         uuid id PK
-        uuid sessionId FK
+        uuid sessionId
         varchar waMessageId
         varchar chatId
         varchar chatName
@@ -301,6 +301,8 @@ erDiagram
         timestamp createdAt
     }
 ```
+
+`messages` and `message_batches` reference `sessions.id` through a plain `sessionId` (`session_id` on `message_batches`) with no foreign key. Deleting a session through the API removes their rows explicitly; a raw `DELETE FROM sessions` leaves them behind.
 
 ## 5.3 Table Specifications
 
