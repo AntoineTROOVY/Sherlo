@@ -1437,6 +1437,45 @@ test('a staged reply is kept on reopening its chat and dropped when a different 
   );
 });
 
+test('a chat reopened after switching sessions and back fetches its thread again', async () => {
+  const { screen, fireEvent, within, waitFor } = rtl;
+  twoSessions = true;
+  chatsResponder = sessionId => Promise.resolve(jsonResponse(sessionId === SESSION.id ? [CHAT] : [CHAT_2]));
+  // The stub folds session 2's routes onto session 1's, so the thread reads are counted before that.
+  const threadPath = `/api/sessions/${SESSION.id}/messages?chatId=${encodeURIComponent(CHAT.id)}&`;
+  let threadFetches = 0;
+  const stub = globalThis.fetch;
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).includes(threadPath)) threadFetches++;
+    return stub(input, init);
+  }) as typeof fetch;
+  try {
+    const { container } = renderChats();
+    const selectSession = (id: string) =>
+      fireEvent.change(container.querySelector('select.session-selector') as HTMLSelectElement, {
+        target: { value: id },
+      });
+
+    await screen.findByText('Main (15551234567)');
+    fireEvent.click(await screen.findByText('Alice'));
+    await within(container.querySelector('.room-messages') as HTMLElement).findByText('hello from alice');
+    assert.equal(threadFetches, 1);
+
+    // Session 1's events are not delivered while session 2 is selected, so its cached threads may
+    // have missed messages by the time it is selected again.
+    selectSession(SESSION_2.id);
+    await screen.findByText('Carol');
+    await waitFor(() => assert.equal(screen.queryByText('Alice'), null));
+    selectSession(SESSION.id);
+    fireEvent.click(await screen.findByText('Alice'));
+    await within(container.querySelector('.room-messages') as HTMLElement).findByText('hello from alice');
+    await waitFor(() => assert.equal(threadFetches, 2, 'the cached thread was shown without a refetch'));
+  } finally {
+    globalThis.fetch = stub;
+    twoSessions = false;
+  }
+});
+
 test('a staged reply is dropped when another session is opened', async () => {
   const { screen, fireEvent, within, waitFor } = rtl;
   twoSessions = true;

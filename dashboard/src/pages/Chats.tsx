@@ -622,11 +622,11 @@ export function Chats() {
   );
   const { isConnected, connectionFailed, reconnect, subscribe, unsubscribe } = useWebSocket(wsEvents);
 
-  // A transient WebSocket gap means message.received/ack/revoke events were missed, and the chat
-  // cache uses staleTime: Infinity so it won't refetch on its own. On a reconnect (isConnected
-  // false→true after a prior connect), invalidate the active session's messages so the thread the
-  // gap left stale refreshes. A failed feed counts as a gap even if it never connected, so the
-  // banner's retry refreshes too. The transition logic is unit-tested in utils/reconnectState.
+  // A transient WebSocket gap means message.received/ack/revoke/status events were missed. On a
+  // reconnect (isConnected false→true after a prior connect), refresh what the gap left stale; the
+  // threads are refreshed by the subscribe effect below, which runs on every connect. A failed feed
+  // counts as a gap even if it never connected, so the banner's retry refreshes too. The transition
+  // logic is unit-tested in utils/reconnectState.
   const reconnectHadConnected = useRef(false);
   const reconnectWasDisconnected = useRef(false);
   const activeChatId = activeChat?.id;
@@ -640,7 +640,6 @@ export function Chats() {
     reconnectHadConnected.current = decision.hadConnected;
     reconnectWasDisconnected.current = decision.wasDisconnected;
     if (decision.invalidate) {
-      queryClient.invalidateQueries({ queryKey: ['messages', selectedSessionId] });
       // Statuses are live now (status.received): a story posted during the socket gap would
       // otherwise stay invisible until a focus refetch.
       queryClient.invalidateQueries({ queryKey: ['contact-statuses', selectedSessionId] });
@@ -673,11 +672,15 @@ export function Chats() {
         'message.edited',
         'status.received',
       ]);
+      // The threads cache at staleTime: Infinity, and events for this session were not delivered before
+      // this subscribe: after a mount, a session switch or a reconnect, a cached thread may miss some.
+      // Mark them stale so the open one refetches and the others do when opened.
+      void queryClient.invalidateQueries({ queryKey: ['messages', selectedSessionId] });
       return () => {
         unsubscribe(selectedSessionId);
       };
     }
-  }, [selectedSessionId, isConnected, subscribe, unsubscribe]);
+  }, [selectedSessionId, isConnected, subscribe, unsubscribe, queryClient]);
 
   // 4. Message history is fetched by useChatMessages (React Query). The active-chat side effects
   // (mark-as-read + clear sidebar unread badge) live in a small effect below.
