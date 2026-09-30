@@ -137,7 +137,7 @@ Update per-session proxy settings (ADMIN, unscoped key). No restart — changes 
 curl -X PATCH "$BASE/api/sessions/$SESSION_ID/proxy" \
   -H "X-API-Key: $API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{ "proxyUrl": "http://user:pass@your-real-proxy.host:8080" }'
+  -d '{ "proxyUrl": "http://user:pass@your-real-proxy.host:8080", "proxyType": "http" }'
 ```
 
 #### POST /api/sessions/:sessionId/start
@@ -1141,9 +1141,9 @@ curl -X GET "$BASE/api/webhooks?limit=100&offset=0" \
 
 #### GET /api/webhooks/delivery-failures
 
-List webhook deliveries that exhausted every retry, most recent first (ADMIN; results stay confined
-to the key's allowed sessions). `lastStatusCode` is `null` when the failure was a
-network/timeout/SSRF error rather than a non-2xx response.
+List webhook deliveries that failed or were not sent (attempts 0, pending replay), most recent first
+(ADMIN; results stay confined to the key's allowed sessions). `lastStatusCode` is `null` when the
+failure was a network/timeout/SSRF error rather than a non-2xx response.
 
 ```bash
 curl -X GET "$BASE/api/webhooks/delivery-failures?limit=100&offset=0" \
