@@ -13,6 +13,7 @@ import {
 } from './config/inflight-body-budget';
 import { ActiveKeyIndex } from './modules/auth/active-key-index';
 import { requestContextMiddleware } from './common/middleware/request-context.middleware';
+import { createLogger } from './common/services/logger.service';
 import { injectDashboardCspNonce } from './config/dashboard-csp';
 import { resolveCorsPolicy, isUpgradeInsecureRequestsEnabled, resolveBodyLimit } from './config/bootstrap-security';
 import { resolveRequestTimeoutMs } from './config/http-timeouts';
@@ -142,8 +143,8 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
   // CORS Configuration (#221 hardening)
   const corsPolicy = resolveCorsPolicy(process.env.CORS_ORIGINS, process.env.NODE_ENV);
   if (process.env.NODE_ENV === 'production' && corsPolicy.origins.length === 0 && !corsPolicy.allowAnyOrigin) {
-    console.warn(
-      '[Bootstrap] No explicit CORS_ORIGINS in production (wildcard "*" is refused): cross-origin browser ' +
+    createLogger('Bootstrap').warn(
+      'No explicit CORS_ORIGINS in production (wildcard "*" is refused): cross-origin browser ' +
         'requests will be blocked. Set CORS_ORIGINS to your dashboard origin(s).',
     );
   }
