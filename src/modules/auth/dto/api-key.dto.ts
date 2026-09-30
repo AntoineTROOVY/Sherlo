@@ -90,7 +90,7 @@ export class ApiKeyResponseDto {
   name!: string;
 
   @ApiProperty({
-    description: 'First 8 characters of the key (for identification)',
+    description: 'First 12 characters of the key (for identification)',
   })
   keyPrefix!: string;
 
@@ -181,8 +181,12 @@ export class UpdateApiKeyDto {
   @Validate(IsChatIdConstraint, { each: true })
   allowedChats?: string[];
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: 'Expiration date (ISO 8601); null clears it (an empty string is rejected)',
+  })
   @IsOptional()
   @IsDateString()
-  expiresAt?: string;
+  expiresAt?: string | null;
 }
