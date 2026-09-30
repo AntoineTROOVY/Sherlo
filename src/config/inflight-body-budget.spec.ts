@@ -690,12 +690,30 @@ describe('stall reaper', () => {
     const req = makeReq({ 'transfer-encoding': 'chunked' });
     const { res } = run(budget, req);
 
-    // A finished chunked body is priced at what arrived, not the opening placeholder.
+    // A finished chunked body keeps at least its opening placeholder until the request is released.
     (req as unknown as { socket: { bytesRead: number } }).socket.bytesRead = 300;
     req.emit('end');
     jest.advanceTimersByTime(120_000);
     expect(destroyMock(req)).not.toHaveBeenCalled();
-    expect(budget.currentBytes()).toBe(300);
+    expect(budget.currentBytes()).toBe(1000);
+
+    res.emit('finish');
+    expect(budget.currentBytes()).toBe(0);
+  });
+
+  it('keeps pricing a chunked body that arrived with its headers while the handler still holds it', () => {
+    const budget = createInflightBodyBudget(1000, { perClientShare: 1 });
+    const req = makeReq({ 'transfer-encoding': 'chunked' });
+    // The middleware runs inside the parse of the read that carried the headers, so the socket counter
+    // already includes a body sent in the same write: nothing more "arrives" after admission.
+    (req as unknown as { socket: { bytesRead: number } }).socket.bytesRead = 600;
+    const { res } = run(budget, req);
+
+    req.emit('end');
+    expect(budget.currentBytes()).toBe(1000);
+    (req as unknown as { complete: boolean }).complete = true;
+    jest.advanceTimersByTime(10_000);
+    expect(budget.currentBytes()).toBe(1000);
 
     res.emit('finish');
     expect(budget.currentBytes()).toBe(0);

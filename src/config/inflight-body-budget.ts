@@ -190,9 +190,9 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
   // probes) never touch the map, so a full map cannot refuse them.
   const clientInFlight = new Map<string, number>();
   const MAX_TRACKED_CLIENTS = 10_000;
-  // Opening reservation for a body with no declared length (chunked). It is only a placeholder:
-  // the poller below reconciles it against the bytes that actually arrive, so a small chunked
-  // request ends up costing what it really weighs. Reserving a whole per-request cap up front
+  // Opening reservation for a body with no declared length (chunked). It is only a floor: the
+  // poller below raises it to the bytes that actually arrive, so a small chunked request costs this
+  // placeholder rather than a whole per-request slot. Reserving a whole per-request cap up front
   // instead would make the budget a concurrency limit of DEFAULT_BUDGET_MULTIPLIER for chunked
   // senders — four 6-byte uploads would refuse every further body-carrying request.
   const undeclaredReservation = Math.max(1, Math.min(UNDECLARED_OPENING_RESERVATION_BYTES, budgetBytes));
@@ -358,16 +358,17 @@ export function createInflightBodyBudget(budgetBytes: number, options?: Inflight
     let lastProgress = admittedAt;
 
     // A declared body keeps its declared size until it is released. A chunked body is re-priced at
-    // the bytes that have arrived, never below its opening placeholder until it is complete: budget
-    // handed back mid-stream would be taken back, unchecked, by a body that then completes between
-    // polls. Growth that crosses the aggregate, the client share or the anonymous pool aborts the
-    // request mid-stream, the same bound a declared length gets at admission. A complete body is
-    // re-priced at its real size but never aborted: it is already buffered. reserved is updated
-    // BEFORE release() so the exactly-once decrement subtracts the reconciled size.
+    // the bytes that have arrived, never below its opening placeholder: budget handed back mid-stream
+    // would be taken back, unchecked, by a body that then completes between polls. The floor holds
+    // after completion too, because bytes that arrived in the same read as the headers were already
+    // counted in startBytes, so a small body sent with its headers measures as 0 while the handler
+    // still holds it. Growth that crosses the aggregate, the client share or the anonymous pool
+    // aborts the request mid-stream, the same bound a declared length gets at admission. A complete
+    // body is never aborted: it is already buffered. reserved is updated BEFORE release() so the
+    // exactly-once decrement subtracts the reconciled size.
     const reconcile = (complete: boolean): void => {
       if (released || declared !== undefined) return;
-      const floor = complete ? 0 : undeclaredReservation;
-      const actual = Math.min(Math.max(floor, socket.bytesRead - startBytes), ceiling);
+      const actual = Math.min(Math.max(undeclaredReservation, socket.bytesRead - startBytes), ceiling);
       const delta = actual - reserved;
       if (delta === 0) return;
       inFlightBytes += delta;
