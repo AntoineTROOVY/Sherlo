@@ -1067,10 +1067,10 @@ Archive or unarchive a chat.
 
 **Request body** — `ArchiveChatDto`
 
-| Field     | Type    | Required | Constraints                                                                                 | Description                                   |
-| --------- | ------- | -------- | ------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `chatId`  | string  | Yes      | `@IsString`; `@IsNotEmpty`; `@Matches(/^[^\s@]+@[^\s@]+$/)` (localpart@host, no whitespace) | Engine-native JID, e.g. `1234567890-123@g.us` |
-| `archive` | boolean | Yes      | `@IsBoolean` (strict — the string `"false"` is rejected, not coerced to `true`)             | `true` to archive, `false` to unarchive       |
+| Field     | Type    | Required | Constraints                                                                                                                                              | Description                                   |
+| --------- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `chatId`  | string  | Yes      | `@IsString`; `@IsNotEmpty`; `@Matches(/^[^\s@]+@[^\s@]+$/)` (localpart@host, no whitespace)                                                              | Engine-native JID, e.g. `1234567890-123@g.us` |
+| `archive` | boolean | Yes      | `@IsBoolean` (strict: the exact strings `"true"`/`"false"` map to booleans; any other string such as `"0"` or `"no"` is rejected, not coerced to `true`) | `true` to archive, `false` to unarchive       |
 
 ```json
 { "chatId": "1234567890-123@g.us", "archive": true }
@@ -1159,10 +1159,10 @@ Pin a chat to the top of the chat list, or unpin it. Chat-level — distinct fro
 
 **Request body** — `PinChatDto`
 
-| Field    | Type    | Required | Constraints                                                                                 | Description                                   |
-| -------- | ------- | -------- | ------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `chatId` | string  | Yes      | `@IsString`; `@IsNotEmpty`; `@Matches(/^[^\s@]+@[^\s@]+$/)` (localpart@host, no whitespace) | Engine-native JID, e.g. `1234567890-123@g.us` |
-| `pin`    | boolean | Yes      | `@IsBoolean` (strict — the string `"false"` is rejected, not coerced to `true`)             | `true` to pin, `false` to unpin               |
+| Field    | Type    | Required | Constraints                                                                                                                                              | Description                                   |
+| -------- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `chatId` | string  | Yes      | `@IsString`; `@IsNotEmpty`; `@Matches(/^[^\s@]+@[^\s@]+$/)` (localpart@host, no whitespace)                                                              | Engine-native JID, e.g. `1234567890-123@g.us` |
+| `pin`    | boolean | Yes      | `@IsBoolean` (strict: the exact strings `"true"`/`"false"` map to booleans; any other string such as `"0"` or `"no"` is rejected, not coerced to `true`) | `true` to pin, `false` to unpin               |
 
 ```json
 { "chatId": "1234567890-123@g.us", "pin": true }
