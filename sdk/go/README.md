@@ -103,8 +103,9 @@ case err != nil:
 }
 ```
 
-Sentinels: `ErrUnauthorized` (401), `ErrForbidden` (403), `ErrNotFound` (404),
-`ErrConflict` (409), `ErrRateLimited` (429), `ErrNotImplemented` (501),
+Sentinels: `ErrBadRequest` (400), `ErrUnauthorized` (401),
+`ErrForbidden` (403), `ErrNotFound` (404), `ErrConflict` (409),
+`ErrRateLimited` (429), `ErrNotImplemented` (501),
 `ErrServiceUnavailable` (503). 503 is transient, but a catalog 503 can persist
 because WhatsApp may never answer that query, so bound any retry. A 429 from
 the global rate limiter lifts when its window expires (seconds for the
