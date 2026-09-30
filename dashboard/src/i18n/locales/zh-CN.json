@@ -1022,7 +1022,7 @@
     "config": {
       "title": "配置 {{name}}",
       "noOptions": "此插件没有可用配置项",
-      "uiHandshakeError": "插件配置界面未初始化。如有可用的架构表单，请使用下方表单。",
+      "uiHandshakeError": "插件配置界面未初始化。",
       "save": "保存配置",
       "addItem": "添加",
       "tabConfig": "配置",

@@ -1022,7 +1022,7 @@
     "config": {
       "title": "設定 {{name}}",
       "noOptions": "此外掛沒有可用設定選項",
-      "uiHandshakeError": "外掛設定介面未初始化。如有可用的結構表單，請使用下方表單。",
+      "uiHandshakeError": "外掛設定介面未初始化。",
       "save": "儲存設定",
       "addItem": "新增",
       "tabConfig": "設定",

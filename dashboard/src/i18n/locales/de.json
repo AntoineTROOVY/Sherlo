@@ -1022,7 +1022,7 @@
     "config": {
       "title": "{{name}} konfigurieren",
       "noOptions": "Für dieses Plugin sind keine Konfigurationsoptionen verfügbar",
-      "uiHandshakeError": "Die Benutzeroberfläche zur Plugin-Konfiguration konnte nicht initialisiert werden. Verwende, sofern verfügbar, das Schemaformular unten.",
+      "uiHandshakeError": "Die Benutzeroberfläche zur Plugin-Konfiguration konnte nicht initialisiert werden.",
       "save": "Konfiguration speichern",
       "addItem": "Hinzufügen",
       "tabConfig": "Konfiguration",

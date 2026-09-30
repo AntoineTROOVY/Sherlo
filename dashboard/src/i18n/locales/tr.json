@@ -1022,7 +1022,7 @@
     "config": {
       "title": "{{name}} Yapılandır",
       "noOptions": "Bu eklenti için yapılandırma seçeneği bulunmuyor",
-      "uiHandshakeError": "Eklenti yapılandırma arayüzü başlatılamadı. Varsa aşağıdaki şema formunu kullanın.",
+      "uiHandshakeError": "Eklenti yapılandırma arayüzü başlatılamadı.",
       "save": "Yapılandırmayı Kaydet",
       "addItem": "Ekle",
       "tabConfig": "Yapılandırma",

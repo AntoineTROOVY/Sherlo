@@ -1022,7 +1022,7 @@
     "config": {
       "title": "Configure {{name}}",
       "noOptions": "No configuration options available for this plugin",
-      "uiHandshakeError": "The plugin configuration UI did not initialize. Use the schema form below if available.",
+      "uiHandshakeError": "The plugin configuration UI did not initialize.",
       "save": "Save Configuration",
       "addItem": "Add",
       "tabConfig": "Configuration",

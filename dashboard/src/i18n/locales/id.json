@@ -1022,7 +1022,7 @@
     "config": {
       "title": "Konfigurasi {{name}}",
       "noOptions": "Tidak ada opsi konfigurasi untuk plugin ini",
-      "uiHandshakeError": "UI konfigurasi plugin tidak terinisialisasi. Gunakan formulir skema di bawah jika tersedia.",
+      "uiHandshakeError": "UI konfigurasi plugin tidak terinisialisasi.",
       "save": "Simpan Konfigurasi",
       "addItem": "Tambah",
       "tabConfig": "Konfigurasi",

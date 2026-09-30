@@ -1028,7 +1028,7 @@
     "config": {
       "title": "Configurar {{name}}",
       "noOptions": "Não há opções de configuração disponíveis para este plugin",
-      "uiHandshakeError": "A interface de configuração do plugin não foi iniciada. Use o formulário abaixo, se disponível.",
+      "uiHandshakeError": "A interface de configuração do plugin não foi iniciada.",
       "save": "Salvar configuração",
       "addItem": "Adicionar",
       "tabConfig": "Configuração",
