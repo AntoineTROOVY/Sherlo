@@ -355,6 +355,32 @@ describe('InfraDataController.importData round-trips export-data (no silent mess
     await expect(controller.importData({ tables: dump.tables })).resolves.toMatchObject({ imported: true });
   });
 
+  // On better-sqlite3 an export's reads share the import's connection, so they would see its
+  // uncommitted, possibly rolled-back tables and archive a state that is neither the old nor the new DB.
+  it('refuses an export while an import is running', async () => {
+    await seedSession('s1');
+    const dump = await controller.exportData();
+
+    const importing = controller.importData({ tables: dump.tables });
+    const refusal = await controller.exportData().catch((e: unknown) => e);
+    expect(refusal).toBeInstanceOf(ConflictException);
+    expect((refusal as ConflictException).getResponse()).toMatchObject({ code: 'IMPORT_ALREADY_RUNNING' });
+    await expect(importing).resolves.toMatchObject({ imported: true });
+    await expect(controller.exportData()).resolves.toMatchObject({ counts: { sessions: 1 } });
+  });
+
+  it('refuses an import while an export is running', async () => {
+    await seedSession('s1');
+    const dump = await controller.exportData();
+
+    const exporting = controller.exportData();
+    const refusal = await controller.importData({ tables: dump.tables }).catch((e: unknown) => e);
+    expect(refusal).toBeInstanceOf(ConflictException);
+    expect((refusal as ConflictException).getResponse()).toMatchObject({ code: 'EXPORT_IN_PROGRESS' });
+    await expect(exporting).resolves.toMatchObject({ counts: { sessions: 1 } });
+    await expect(controller.importData({ tables: dump.tables })).resolves.toMatchObject({ imported: true });
+  });
+
   it('releases the loss-detection token even when the transaction never opens', async () => {
     await seedSession('s1');
     const dump = await controller.exportData();
