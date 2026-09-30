@@ -402,11 +402,17 @@ export class ChatStateStoreService implements ChatStateStore, OnModuleInit {
     }
   }
 
-  /** Queued behind each chat's pending writes, so a patch still in flight cannot re-create the row. */
+  /**
+   * Queued behind each chat's pending writes, so a patch still in flight cannot re-create the row. The
+   * cache drops the chat at once and knows it absent, so a listing in the meantime neither shows it nor
+   * warms it back from the table; the drop repeats after the delete for a patch queued ahead of it.
+   */
   async forget(sessionId: string, chatIds: string[]): Promise<void> {
     await Promise.all(
       chatIds.map(chatId => {
         const k = this.key(sessionId, chatId);
+        this.states.delete(k);
+        this.markAbsent(k);
         return new Promise<void>(resolve =>
           this.writes.enqueue(k, async () => {
             try {

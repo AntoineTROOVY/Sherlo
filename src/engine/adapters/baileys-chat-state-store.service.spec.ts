@@ -426,6 +426,24 @@ describe('ChatStateStoreService', () => {
     expect(svc.get('t', 'c')).toEqual(expect.objectContaining({ pinned: true }));
   });
 
+  it('drops a forgotten chat from the listing before its row delete settles', async () => {
+    const repo = makeRepo([{ sessionId: 's', chatId: 'c', pinned: true }]);
+    const svc = svcWith(repo);
+    svc.get('s', 'c');
+    await tick();
+    expect(svc.chatIds('s')).toEqual(['c']);
+    let release!: () => void;
+    repo.delete.mockImplementationOnce(() => new Promise(resolve => (release = () => resolve(undefined))));
+    const done = svc.forget('s', ['c']);
+    expect(svc.chatIds('s')).toEqual([]);
+    expect(svc.get('s', 'c')).toBeUndefined();
+    await tick(); // a read in the window must not warm the row back from the table
+    expect(svc.chatIds('s')).toEqual([]);
+    release();
+    await done;
+    expect(svc.chatIds('s')).toEqual([]);
+  });
+
   it('forget swallows a repo error', async () => {
     const repo = makeRepo();
     repo.delete.mockRejectedValueOnce(new Error('SQLITE_BUSY'));
