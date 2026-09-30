@@ -381,6 +381,33 @@ describe('InfraDataController.importData round-trips export-data (no silent mess
     await expect(controller.importData({ tables: dump.tables })).resolves.toMatchObject({ imported: true });
   });
 
+  it('leaves out child rows of a session created after the sessions table was read', async () => {
+    await seedSession('s1');
+    await ds
+      .getRepository(Template)
+      .save(ds.getRepository(Template).create({ id: 't1', sessionId: 's1', name: 'greet', body: 'Hi' }));
+    // The export reads each table separately, so a session paired mid-export is missing from the
+    // archive while a child row written for it before its table is read is not.
+    const query = ds.query.bind(ds);
+    jest.spyOn(ds, 'query').mockImplementation(async (sql: string, params?: unknown[]) => {
+      const rows: unknown = await query(sql, params);
+      if (sql === 'SELECT * FROM sessions') {
+        await seedSession('s2');
+        await ds
+          .getRepository(Template)
+          .save(ds.getRepository(Template).create({ id: 't2', sessionId: 's2', name: 'late', body: 'Hi' }));
+      }
+      return rows;
+    });
+
+    const dump = await controller.exportData();
+    jest.restoreAllMocks();
+
+    expect(dump.counts).toMatchObject({ sessions: 1, templates: 1 });
+    expect((dump.tables.templates as Array<{ id: string }>).map(t => t.id)).toEqual(['t1']);
+    await expect(controller.importData({ tables: dump.tables })).resolves.toMatchObject({ imported: true });
+  });
+
   it('releases the loss-detection token even when the transaction never opens', async () => {
     await seedSession('s1');
     const dump = await controller.exportData();

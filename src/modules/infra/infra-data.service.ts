@@ -425,6 +425,17 @@ export class InfraDataService {
       counts[entry.key] = rows.length;
     }
 
+    // See ExportTable.sessionFk: a child row of a session missing from the archive cannot be restored.
+    const exportedSessions = new Set(tables.sessions.map(session => session.id));
+    for (const entry of EXPORT_TABLES) {
+      if (!entry.sessionFk) continue;
+      const kept = (tables[entry.key] as Array<{ sessionId: string }>).filter(row =>
+        exportedSessions.has(row.sessionId),
+      );
+      tables[entry.key] = kept as never;
+      counts[entry.key] = kept.length;
+    }
+
     // Audit the full-DB export: this payload carries plugin-instance secrets, so WHO pulled
     // a dump (and the per-table row counts) must land in the audit log. Data itself is never
     // logged — only counts.
