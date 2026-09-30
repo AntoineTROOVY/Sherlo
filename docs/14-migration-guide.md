@@ -897,10 +897,11 @@ The authoritative list is `CHANGELOG.md`; breaking items are flagged there with 
 ```bash
 #!/bin/bash
 # rollback.sh
+set -euo pipefail
 
 # A DIRECTORY of restored files — not the tar.gz that scripts/backup.sh writes (see the TIP below).
-BACKUP_DIR=$1
-TARGET_VERSION=$2
+BACKUP_DIR=${1:-}
+TARGET_VERSION=${2:-}
 
 if [ -z "$BACKUP_DIR" ] || [ -z "$TARGET_VERSION" ]; then
     echo "Usage: ./rollback.sh <backup-dir> <target-version>"
@@ -913,8 +914,10 @@ echo "🔄 Rolling back to v${TARGET_VERSION}..."
 # Started with docker-compose.dev.yml (the README Quick Start)? Add `-f docker-compose.dev.yml` to
 # every docker compose command below, and write `openwa` wherever one names the `openwa-api` service.
 
-# 1. Stop current
+# 1. Stop current and check out the target version. The checkout comes before step 4: a restored
+#    docker-compose.yml that differs from the checked-out one makes git refuse the checkout.
 docker compose down
+git checkout "v${TARGET_VERSION}"
 
 # 2. Restore the databases, both from the same backup. The main DB (API keys, audit log) is always
 #    SQLite, whatever the data store is. Stale journal files go first, as scripts/restore.sh does,
@@ -943,11 +946,10 @@ echo "📥 Restoring configuration..."
 cp "$BACKUP_DIR/.env" .
 cp "$BACKUP_DIR/docker-compose.yml" .
 
-# 5. Start the target version. The repo compose BUILDS the image, so check out the tag and rebuild;
-#    a deployment pinned to a published image bumps the tag and runs
+# 5. Start the target version. The repo compose BUILDS the image, so rebuild from the tag checked
+#    out in step 1; a deployment pinned to a published image bumps the tag and runs
 #    `docker compose pull openwa-api && docker compose up -d --no-build` instead.
 echo "▶️ Starting v${TARGET_VERSION}..."
-git checkout "v${TARGET_VERSION}"
 docker compose up -d --build
 
 # 6. Verify
