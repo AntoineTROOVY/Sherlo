@@ -56,6 +56,7 @@ function installFetchStub(): void {
       catalogReads++;
       return catalogReply();
     }
+    if (method === 'POST' && path === '/api/plugins/install') return Promise.resolve(jsonResponse(PLUGIN));
     if (method === 'DELETE' && path === `/api/plugins/${PLUGIN.id}`) {
       return Promise.resolve(jsonResponse({ success: true, message: 'Uninstalled' }));
     }
@@ -219,6 +220,22 @@ test('uninstalling a plugin reloads the catalog, whose installed flags it change
   } finally {
     window.confirm = realConfirm;
   }
+});
+
+test('uploading a plugin .zip reloads the catalog, whose installed flags it changed', async () => {
+  const { screen, fireEvent, waitFor } = rtl;
+  renderPlugins();
+  await waitFor(() => assert.equal(catalogReads, 1));
+  fireEvent.click(await screen.findByRole('button', { name: 'Install plugin' }));
+  const input = document.querySelector<HTMLInputElement>('.install-drop input[type="file"]');
+  assert.ok(input);
+  fireEvent.change(input, { target: { files: [new File(['zip'], 'greeter.zip', { type: 'application/zip' })] } });
+  await screen.findByText('greeter.zip');
+  const submit = screen.getAllByRole<HTMLButtonElement>('button', { name: 'Install plugin' }).at(-1);
+  assert.ok(submit && !submit.disabled);
+  fireEvent.click(submit);
+  await screen.findByText('Plugin installed');
+  await waitFor(() => assert.equal(catalogReads, 2));
 });
 
 test('a config schema without properties opens the config modal and the Sessions tab', async () => {
