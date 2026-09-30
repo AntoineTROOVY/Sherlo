@@ -177,6 +177,12 @@ test('a create sends the IP allow-list, chats and expiry only when filled in', a
   });
 });
 
+// A production gateway refuses a name over 100 characters with a bare "Bad Request".
+test('the key name cannot exceed the 100 characters the gateway takes', async () => {
+  await openCreate();
+  assert.equal(rtl.screen.getByLabelText<HTMLInputElement>('Name').maxLength, 100);
+});
+
 test('an IP or chat line the gateway would refuse keeps Create disabled and names the line', async () => {
   const { screen, fireEvent } = rtl;
   const create = await openCreate();
