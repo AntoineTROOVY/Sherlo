@@ -104,6 +104,8 @@ function resetFetchCalls(): void {
   qrGate = null;
   listGate = null;
   pairingGate = null;
+  configPatchGate = null;
+  proxyPatchGate = null;
   afterMutation = null;
 }
 
@@ -140,6 +142,10 @@ let qrGate: { sessionId: string; until: Promise<void> } | null = null;
 let listGate: Promise<void> | null = null;
 // When set, POST .../pairing-code answers only once this settles.
 let pairingGate: Promise<void> | null = null;
+// When set, PATCH .../config is applied and answered only once this settles.
+let configPatchGate: Promise<void> | null = null;
+// When set, PATCH .../proxy answers only once this settles.
+let proxyPatchGate: Promise<void> | null = null;
 // When set, runs on the macrotask after a create or delete has answered: a push that lands before
 // React has rendered what that answer wrote.
 let afterMutation: (() => void) | null = null;
@@ -216,9 +222,12 @@ function installFetchStub(): void {
       if (method === 'PATCH') {
         // Per-test switch: the revert case needs the write to fail while the initial read succeeds,
         // which a single stub response cannot express.
-        if (configPatchFails) return Promise.resolve(jsonResponse({ message: 'nope' }, 500));
-        Object.assign(sessionConfig, body as Record<string, unknown>);
-        return Promise.resolve(jsonResponse({ ...sessionConfig }));
+        const answer = (): Response => {
+          if (configPatchFails) return jsonResponse({ message: 'nope' }, 500);
+          Object.assign(sessionConfig, body as Record<string, unknown>);
+          return jsonResponse({ ...sessionConfig });
+        };
+        return configPatchGate ? configPatchGate.then(answer) : Promise.resolve(answer());
       }
     }
 
@@ -240,7 +249,8 @@ function installFetchStub(): void {
             hasCredentials: !!(parsed.username || parsed.password),
           };
         }
-        return Promise.resolve(jsonResponse({ ...sessionProxy }));
+        const answer = jsonResponse({ ...sessionProxy });
+        return proxyPatchGate ? proxyPatchGate.then(() => answer) : Promise.resolve(answer);
       }
     }
 
@@ -1618,6 +1628,91 @@ test('a rejected write reverts the toggle instead of leaving it showing a state 
   // are being auto-rejected when the gateway still has it off.
   await rtl.waitFor(() => assert.equal((rtl.screen.getByRole('checkbox') as HTMLInputElement).checked, false));
   configPatchFails = false;
+});
+
+// Close stays enabled while a toggle is saving, so another session's modal can be open by the time the
+// answer lands. That answer, or the revert of a failed one, belongs to the session it was sent for.
+test('a toggle answer that lands after its modal closed does not change another session', async () => {
+  const { screen, within, fireEvent, waitFor } = rtl;
+  resetFetchCalls();
+  sessionConfig = { autoRejectCalls: false, maxReconnectAttempts: null, reconnectBaseDelay: 5000 };
+  configPatchFails = false;
+  let release!: () => void;
+  configPatchGate = new Promise<void>(resolve => (release = resolve));
+  renderSessions();
+
+  fireEvent.click(await openDetailFor('new-device'));
+  await waitFor(() => assert.ok(fetchCalls.some(c => c.method === 'PATCH')));
+  fireEvent.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: 'Close' })[0]);
+  await waitFor(() => assert.equal(screen.queryByRole('dialog'), null));
+
+  const other = await openDetailFor('stale-engine');
+  assert.equal(other.checked, false);
+  release();
+  await waitFor(() => assert.equal(sessionConfig.autoRejectCalls, true));
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal((screen.getByRole('checkbox') as HTMLInputElement).checked, false);
+});
+
+test('a failed toggle that lands after its modal closed does not revert another session', async () => {
+  const { screen, within, fireEvent, waitFor } = rtl;
+  resetFetchCalls();
+  sessionConfig = { autoRejectCalls: false, maxReconnectAttempts: null, reconnectBaseDelay: 5000 };
+  configPatchFails = true;
+  let release!: () => void;
+  configPatchGate = new Promise<void>(resolve => (release = resolve));
+  renderSessions();
+
+  try {
+    fireEvent.click(await openDetailFor('new-device'));
+    await waitFor(() => assert.ok(fetchCalls.some(c => c.method === 'PATCH')));
+    fireEvent.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: 'Close' })[0]);
+    await waitFor(() => assert.equal(screen.queryByRole('dialog'), null));
+
+    // The second session has auto-reject on.
+    sessionConfig = { autoRejectCalls: true, maxReconnectAttempts: null, reconnectBaseDelay: 5000 };
+    const other = await openDetailFor('stale-engine');
+    assert.equal(other.checked, true);
+    release();
+    await screen.findByRole('alert');
+    assert.equal((screen.getByRole('checkbox') as HTMLInputElement).checked, true);
+  } finally {
+    configPatchFails = false;
+  }
+});
+
+// Cancel stays enabled while a proxy save runs, so another session's proxy modal can be open by the
+// time it answers. That modal must be neither locked by the save nor closed when it lands.
+test('a proxy save that lands after its modal closed leaves another session proxy modal alone', async () => {
+  const { screen, fireEvent, within, waitFor } = rtl;
+  resetFetchCalls();
+  let release!: () => void;
+  proxyPatchGate = new Promise<void>(resolve => (release = resolve));
+  renderSessions();
+
+  const firstCard = (await screen.findByText('new-device')).closest('.session-card') as HTMLElement;
+  fireEvent.click(within(firstCard).getByRole('button', { name: 'Proxy' }));
+  let dialog = await screen.findByRole('dialog');
+  fireEvent.click(await within(dialog).findByRole('checkbox'));
+  fireEvent.change(within(dialog).getByLabelText('Proxy URL'), { target: { value: 'http://proxy.internal:8080' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  await waitFor(() => assert.ok(findFetchCall('PATCH', '/api/sessions/sess-qr-1/proxy')));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => assert.equal(screen.queryByRole('dialog'), null));
+
+  const secondCard = screen.getByText('stale-engine').closest('.session-card') as HTMLElement;
+  fireEvent.click(within(secondCard).getByRole('button', { name: 'Proxy' }));
+  dialog = await screen.findByRole('dialog');
+  await waitFor(() => assert.ok(findFetchCall('GET', '/api/sessions/sess-stale-1/proxy')));
+  // Not locked by the first session's save: its form is editable and Save is offered.
+  assert.equal(((await within(dialog).findByRole('checkbox')) as HTMLInputElement).disabled, false);
+  await within(dialog).findByRole('button', { name: 'Save' });
+
+  release();
+  await screen.findByText('Proxy Saved');
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(screen.getByRole('dialog'), dialog);
+  within(dialog).getByText('stale-engine');
 });
 
 test('a failed proxy read offers no Save, so it cannot clear a proxy nobody could see', async () => {
