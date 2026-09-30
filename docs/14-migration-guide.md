@@ -709,10 +709,11 @@ ssh new-server "cd $APP_DIR && docker compose stop openwa-api"
 # 2. Copy the auth profile out of the source container, to the target host, and back in.
 #    whatsapp-web.js: /app/data/sessions/session-<id>.
 #    Baileys:         /app/data/baileys/<id> (no "session-" prefix).
+#    rsync refuses two remote ends, so the copy goes through this workstation in two hops.
 ssh old-server "cd $APP_DIR && docker compose cp \
     openwa-api:/app/data/sessions/session-$OLD_ID ./session-$OLD_ID"
-rsync -avz --progress "old-server:$APP_DIR/session-$OLD_ID/" \
-    "new-server:$APP_DIR/session-$NEW_ID/"
+rsync -avz --progress "old-server:$APP_DIR/session-$OLD_ID/" "./session-$OLD_ID/"
+rsync -avz --progress "./session-$OLD_ID/" "new-server:$APP_DIR/session-$NEW_ID/"
 ssh new-server "cd $APP_DIR && docker compose cp \
     ./session-$NEW_ID openwa-api:/app/data/sessions/session-$NEW_ID"
 
@@ -720,7 +721,8 @@ ssh new-server "cd $APP_DIR && docker compose cp \
 ssh new-server "cd $APP_DIR && docker compose start openwa-api"
 ```
 
-Delete the staging copies (`$APP_DIR/session-$OLD_ID` and `$APP_DIR/session-$NEW_ID`) afterwards — they hold
+Delete the staging copies (`$APP_DIR/session-$OLD_ID` and `$APP_DIR/session-$NEW_ID` on the hosts, and
+`./session-$OLD_ID` on the workstation) afterwards — they hold
 live WhatsApp credentials.
 
 #### Method 2: Records via the Infra API + auth state by file copy
