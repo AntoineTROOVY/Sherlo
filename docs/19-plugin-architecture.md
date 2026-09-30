@@ -522,10 +522,10 @@ also applies the per-session activation gate.
 Chains for different messages run concurrently, so a handler can see one chat's messages out of order.
 The gateway still stores and emits each chat's messages in arrival order: the `message:received` and
 `message:sent` chains run concurrently, but the row insert, the websocket event, `message:persisted` and
-the webhook enqueue wait for every earlier message of the same chat. A slow handler therefore delays that
-chat's later messages, by at most its 5 s hook timeout (`SANDBOX_HOOK_TIMEOUT_MS`) for a sandboxed
-plugin. Webhook HTTP deliveries still run concurrently, so a receiver that needs order should sort by
-`timestamp`.
+the start of webhook dispatch wait for every earlier message of the same chat. A slow handler therefore
+delays that chat's later messages, by at most its 5 s hook timeout (`SANDBOX_HOOK_TIMEOUT_MS`) for a
+sandboxed plugin. Webhook dispatch itself is not ordered: its queue jobs and HTTP deliveries run
+concurrently, so a receiver that needs order should sort by the message's `data.timestamp`.
 
 ## 19.6 Plugin Loader
 

@@ -629,15 +629,16 @@ export class WwebjsMessaging {
       // it (and self-heal a stale mapping) via sendResolved. Capture the id actually sent to so the
       // id-recovery below reads back from the SAME (resolved) chat, not the raw @c.us (#583 R1).
       // The ids already in that chat are read first, on every attempt, so the recovery below can tell
-      // the forwarded copy from an earlier send with the same whole-second timestamp. A failed read
-      // never blocks the forward; it only leaves the copy unidentified.
+      // the forwarded copy from an earlier send with the same whole-second timestamp. Only messages
+      // WhatsApp Web already holds are read, so this never pages the chat's history in ahead of the
+      // send. A failed read never blocks the forward; it only leaves the copy unidentified.
       let resolvedTo = toChatId;
       let before = undefined as Set<string> | undefined;
       await this.sendResolved(toChatId, async to => {
         resolvedTo = to;
         before = undefined;
         try {
-          before = new Set((await this.recentOwnMessages(to)).map(m => toMessageResult(m).id));
+          before = new Set((await this.loadedOwnMessages(to)).map(m => toMessageResult(m).id));
         } catch (error) {
           this.host.logger.warn(`Could not read the destination chat before forwarding: ${String(error)}`);
         }
@@ -656,7 +657,7 @@ export class WwebjsMessaging {
       try {
         if (before) {
           const known = before;
-          const fresh = (await this.recentOwnMessages(resolvedTo)).filter(m => {
+          const fresh = (await this.loadedOwnMessages(resolvedTo)).filter(m => {
             const id = toMessageResult(m).id;
             return id !== '' && !known.has(id);
           });
@@ -679,10 +680,14 @@ export class WwebjsMessaging {
     }
   }
 
-  /** The last few messages this account sent to a chat, in the order whatsapp-web.js returns them. */
-  private async recentOwnMessages(chatId: string): Promise<Message[]> {
+  /**
+   * The messages this account sent to a chat that WhatsApp Web already holds, forwarded copy included
+   * once the send returns. No `limit`: with one, whatsapp-web.js loads earlier history until it has
+   * that many, which in a chat this account rarely writes to walks the whole history.
+   */
+  private async loadedOwnMessages(chatId: string): Promise<Message[]> {
     const chat = await this.client().getChatById(chatId);
-    return (await chat?.fetchMessages({ limit: 5, fromMe: true })) ?? [];
+    return (await chat?.fetchMessages({ fromMe: true })) ?? [];
   }
 
   async reactToMessage(chatId: string, messageId: string, emoji: string): Promise<void> {

@@ -2145,6 +2145,57 @@ describe('InfraDataController.importData status_updates + runtime reconciliation
     expect(await storedChatStates()).toEqual([{ sessionId: 'session-a', chatId: 'c@s.whatsapp.net' }]);
   });
 
+  // The revoked-content and lid-mapping scrubs have already run on the target too, so rows restored
+  // from an archive taken before them are cleaned by the import itself.
+  it('clears restored revoked messages and drops restored lid mappings whose phone is not a number', async () => {
+    await seedSession('s1');
+    const dump = await build().exportData();
+    const at = dump.tables.sessions[0].updatedAt;
+    const message = (id: string, chatId: string, type: string) => ({
+      id,
+      sessionId: 's1',
+      waMessageId: `W-${id}`,
+      chatId,
+      chatName: null,
+      author: null,
+      from: chatId,
+      to: 'me@c.us',
+      body: 'hello',
+      type,
+      direction: MessageDirection.INCOMING,
+      timestamp: 1,
+      metadata: { quote: { body: 'quoted' }, reactions: [{ emoji: 'x' }] },
+      status: MessageStatus.DELIVERED,
+      createdAt: at,
+      mediaPath: `media/s1/${id}.jpg`,
+      mediaMimetype: 'image/jpeg',
+    });
+    const lid = (id: string, phone: string) => ({ lid: id, phone, sessionId: 's1', updatedAt: at });
+
+    const res = await build().importData({
+      tables: {
+        ...dump.tables,
+        messages: [message('revoked', 'c@c.us', 'revoked'), message('kept', '120363@broadcast', 'image')],
+        lidMappings: [lid('1', 'status'), lid('2', '120363'), lid('3', '628123')],
+      },
+    });
+
+    expect(res.imported).toBe(true);
+    expect(await ds.query('SELECT id, body, metadata, "mediaPath", "mediaMimetype" FROM messages ORDER BY id')).toEqual(
+      [
+        {
+          id: 'kept',
+          body: 'hello',
+          metadata: JSON.stringify({ quote: { body: 'quoted' }, reactions: [{ emoji: 'x' }] }),
+          mediaPath: 'media/s1/kept.jpg',
+          mediaMimetype: 'image/jpeg',
+        },
+        { id: 'revoked', body: '', metadata: null, mediaPath: null, mediaMimetype: null },
+      ],
+    );
+    expect(await ds.query('SELECT lid, phone FROM lid_mappings')).toEqual([{ lid: '3', phone: '628123' }]);
+  });
+
   it('exports and restores automation_rules, which the session wipe would otherwise cascade away', async () => {
     await seedSession('s1');
     const ruleRepo = ds.getRepository(AutomationRule);

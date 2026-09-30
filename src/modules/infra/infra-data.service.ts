@@ -13,6 +13,8 @@ import { ChatStateStoreService } from '../../engine/adapters/baileys-chat-state-
 import { SessionOwnershipService } from '../session/session-ownership.service';
 import { ScopeBindingService } from '../integration/scope-binding.service';
 import { ReKeyChatStatesBySessionId1786500000000 } from '../../database/migrations/1786500000000-ReKeyChatStatesBySessionId';
+import { ScrubRevokedMessageContent1786900000000 } from '../../database/migrations/1786900000000-ScrubRevokedMessageContent';
+import { ScrubNonPhoneLidMappings1786950000000 } from '../../database/migrations/1786950000000-ScrubNonPhoneLidMappings';
 import { Session as SessionEntity, SessionStatus } from '../session/entities/session.entity';
 import { In } from 'typeorm';
 import { DateUtils } from 'typeorm/util/DateUtils';
@@ -840,6 +842,17 @@ export class InfraDataService {
             }
           } catch (error) {
             warnings.push(`Failed to re-key chat states: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+
+        // The same holds for the 0.24.0 scrubs: an archive taken before them restores revoked messages
+        // with their media, quote and reactions, and lid mappings with a broadcast id as the phone.
+        if (warnings.length === 0) {
+          try {
+            await ScrubRevokedMessageContent1786900000000.scrub(queryRunner);
+            await ScrubNonPhoneLidMappings1786950000000.scrub(queryRunner);
+          } catch (error) {
+            warnings.push(`Failed to clean restored rows: ${error instanceof Error ? error.message : String(error)}`);
           }
         }
 

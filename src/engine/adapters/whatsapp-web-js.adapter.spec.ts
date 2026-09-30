@@ -1069,6 +1069,9 @@ describe('WhatsAppWebJsAdapter.forwardMessage (returns the real sent id, not a s
     expect(forward).toHaveBeenCalledWith('dest@c.us');
     expect(result.id).toBe('REAL_FWD');
     expect(result.id).not.toMatch(/^fwd_/);
+    // No limit on either read: with one, whatsapp-web.js pages earlier history in until it has that
+    // many own messages, which in a chat this account rarely writes to walks the whole history.
+    expect(destChat.fetchMessages.mock.calls).toEqual([[{ fromMe: true }], [{ fromMe: true }]]);
   });
 
   it('returns an explicit-unknown id (empty, not a real/synthetic id) when the sent copy cannot be identified', async () => {
