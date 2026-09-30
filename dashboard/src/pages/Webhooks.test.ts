@@ -14,6 +14,13 @@ let createCalls = 0;
 let updateCalls = 0;
 let createBody: Record<string, unknown> | undefined;
 let updateBody: Record<string, unknown> | undefined;
+// Test deliveries, recorded by path; each answers only once `releaseRequests` runs.
+let testCalls: string[] = [];
+let heldRequests: Promise<void> = Promise.resolve();
+let releaseRequests: () => void = () => {};
+function holdRequests(): void {
+  heldRequests = new Promise<void>(resolve => (releaseRequests = resolve));
+}
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -34,6 +41,10 @@ function installFetchStub(): void {
       updateCalls++;
       updateBody = JSON.parse(String(init.body));
       return new Promise<Response>(() => {});
+    }
+    if (init?.method === 'POST' && /^\/api\/sessions\/sess-1\/webhooks\/[^/]+\/test$/.test(path)) {
+      testCalls.push(path);
+      return heldRequests.then(() => jsonResponse({ success: true, statusCode: 200 }));
     }
     if (path === '/api/webhooks') {
       if (webhooksStatus === 403) {
@@ -75,6 +86,9 @@ afterEach(() => {
   updateCalls = 0;
   createBody = undefined;
   updateBody = undefined;
+  testCalls = [];
+  releaseRequests();
+  heldRequests = Promise.resolve();
   window.sessionStorage.setItem('openwa_user_role', 'viewer');
 });
 
@@ -455,4 +469,33 @@ test('more than 20 filter conditions keep Save disabled', async () => {
   fireEvent.change(fields[fields.length - 1], { target: { value: 'fromMe' } });
   assert.equal(save.disabled, true);
   screen.getByText('Give every filter condition a value, and use at most 20 conditions.');
+});
+
+test('a test in flight on one webhook is not ended by a test on another', async () => {
+  const { screen, fireEvent, waitFor } = rtl;
+  webhooksStatus = 200;
+  webhookList = ['w1', 'w2'].map(id => ({
+    id,
+    sessionId: 'sess-1',
+    url: `https://example.test/${id}`,
+    events: ['message.received'],
+    active: true,
+  }));
+  holdRequests();
+  renderWebhooks();
+  await screen.findByText('https://example.test/w2');
+  const [first, second] = screen.getAllByTitle<HTMLButtonElement>('Test');
+
+  fireEvent.click(first);
+  fireEvent.click(second);
+  await waitFor(() => assert.equal(testCalls.length, 2));
+  assert.equal(first.disabled, true, 'the first test is still in flight');
+  assert.equal(second.disabled, true);
+
+  fireEvent.click(first);
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(testCalls.length, 2);
+  releaseRequests();
+  await waitFor(() => assert.equal(first.disabled, false));
+  assert.equal(second.disabled, false);
 });

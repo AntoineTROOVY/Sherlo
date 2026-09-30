@@ -220,7 +220,9 @@ export function Webhooks() {
   }>({ url: '', events: ['message.received'], sessionId: '', filters: null });
   const [newAuth, setNewAuth] = useState(emptyNewAuth);
   const [editAuth, setEditAuth] = useState(emptyEditAuth);
-  const [testingId, setTestingId] = useState<string | null>(null);
+  // Webhooks whose test delivery is in flight. One id per webhook, so testing another neither ends this
+  // one's spinner nor lets a second click send a duplicate delivery.
+  const [testingIds, setTestingIds] = useState<ReadonlySet<string>>(new Set());
   const toast = useToast();
 
   // Single source for the contact/group autocomplete in whichever modal is open.
@@ -304,7 +306,7 @@ export function Webhooks() {
   };
 
   const handleTest = async (sessionId: string, id: string) => {
-    setTestingId(id);
+    setTestingIds(current => new Set(current).add(id));
     try {
       const result = await webhookApi.test(sessionId, id);
       if (result.success) {
@@ -319,7 +321,11 @@ export function Webhooks() {
         }),
       );
     } finally {
-      setTestingId(null);
+      setTestingIds(current => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -706,9 +712,9 @@ export function Webhooks() {
                           className="icon-btn"
                           title={t('webhooks.actions.test')}
                           onClick={() => handleTest(webhook.sessionId, webhook.id)}
-                          disabled={testingId === webhook.id}
+                          disabled={testingIds.has(webhook.id)}
                         >
-                          {testingId === webhook.id ? (
+                          {testingIds.has(webhook.id) ? (
                             <Loader2 size={16} className="animate-spin" />
                           ) : (
                             <Play size={16} />
