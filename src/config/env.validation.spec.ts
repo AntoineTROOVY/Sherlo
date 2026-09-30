@@ -226,6 +226,21 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ MESSAGE_RETENTION_DAYS: '36501' })).toThrow(/MESSAGE_RETENTION_DAYS.*36500/);
   });
 
+  // A "keep forever" row of nines binds on SQLite as a truncated year that sorts after today, so the
+  // prune would delete every row. Each retention window shares the message-retention cap.
+  it.each([
+    'AUDIT_RETENTION_DAYS',
+    'CHAT_MEDIA_ARCHIVE_TTL_DAYS',
+    'WEBHOOK_FAILURE_RETENTION_DAYS',
+    'WEBHOOK_OUTBOX_RETENTION_DAYS',
+    'INGRESS_RETENTION_DAYS',
+    'INGRESS_DEDUP_RETENTION_DAYS',
+  ])('rejects a %s above 36500 days', key => {
+    expect(() => validateEnv({ [key]: '9999999' })).toThrow(new RegExp(`${key} must be at most 36500`));
+    expect(() => validateEnv({ [key]: '36501' })).toThrow(new RegExp(`${key} must be at most 36500`));
+    expect(() => validateEnv({ [key]: '36500' })).not.toThrow();
+  });
+
   it('rejects a non-positive / non-integer WEBHOOK_MAX_PAYLOAD_BYTES (0 would reject every dispatch)', () => {
     expect(() => validateEnv({ WEBHOOK_MAX_PAYLOAD_BYTES: '0' })).toThrow(/WEBHOOK_MAX_PAYLOAD_BYTES/);
     expect(() => validateEnv({ WEBHOOK_MAX_PAYLOAD_BYTES: 'abc' })).toThrow(/WEBHOOK_MAX_PAYLOAD_BYTES/);

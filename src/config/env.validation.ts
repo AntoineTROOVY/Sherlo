@@ -262,11 +262,24 @@ export function validateEnv(config: EnvConfig): EnvConfig {
   ]) {
     checkInt(key);
   }
-  // A window past about a century gives a cutoff SQLite compares as a later date, deleting every
-  // message. Keep in step with MAX_MESSAGE_RETENTION_DAYS in message-retention.service.ts.
-  const messageRetentionDays = str('MESSAGE_RETENTION_DAYS');
-  if (messageRetentionDays !== undefined && Number(messageRetentionDays) > 36500) {
-    errors.push(`MESSAGE_RETENTION_DAYS must be at most 36500 (got "${messageRetentionDays}")`);
+  // TypeORM binds a Date on SQLite with its year cut to the last 4 digits, so a cutoff before about
+  // year -2000 (roughly 1.48M days back) can bind as a year that sorts after today and the prune
+  // deletes every row. A "keep forever" row of nines is such a value. 36500 is a conservative cap
+  // well inside the safe range. Keep in step with MAX_MESSAGE_RETENTION_DAYS in
+  // message-retention.service.ts.
+  for (const key of [
+    'MESSAGE_RETENTION_DAYS',
+    'AUDIT_RETENTION_DAYS',
+    'CHAT_MEDIA_ARCHIVE_TTL_DAYS',
+    'WEBHOOK_FAILURE_RETENTION_DAYS',
+    'WEBHOOK_OUTBOX_RETENTION_DAYS',
+    'INGRESS_RETENTION_DAYS',
+    'INGRESS_DEDUP_RETENTION_DAYS',
+  ]) {
+    const days = str(key);
+    if (days !== undefined && Number(days) > 36500) {
+      errors.push(`${key} must be at most 36500 (got "${days}")`);
+    }
   }
 
   // BAILEYS_WA_VERSION: optional version pin for the Baileys engine (e.g. 2.3000.1045340097 or 2,3000,1045340097)
