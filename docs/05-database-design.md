@@ -598,12 +598,12 @@ CREATE UNIQUE INDEX "IDX_api_keys_keyHash" ON api_keys("keyHash");
 
 ### 5.3.6 audit_logs
 
-Consolidated audit trail for API-key, session, message, and webhook events. This is the **only** audit table — there are no separate `session_logs`, `webhook_logs`, or `api_key_logs` tables. Lives on the **main** (always-SQLite) connection.
+Consolidated audit trail for API-key, session, send-pacing, rate-limit, queue-dashboard, integration-instance and infrastructure events. This is the **only** audit table — there are no separate `session_logs`, `webhook_logs`, or `api_key_logs` tables. Lives on the **main** (always-SQLite) connection.
 
 ```sql
 CREATE TABLE audit_logs (
     id VARCHAR PRIMARY KEY,
-    action VARCHAR(50) NOT NULL,                   -- e.g. session_created, message_sent, webhook_failed
+    action VARCHAR(50) NOT NULL,                   -- e.g. session_created, api_key_auth_failed, infra_config_saved
     severity VARCHAR(10) NOT NULL DEFAULT 'info',  -- info | warn | error
     "apiKeyId" VARCHAR(36),
     "apiKeyName" VARCHAR(100),
