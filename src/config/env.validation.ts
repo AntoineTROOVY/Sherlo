@@ -114,9 +114,9 @@ export function validateEnv(config: EnvConfig): EnvConfig {
   //
   // Unset stays legal because it is the standard Node default for a plain `node dist/main` outside
   // any packaged runtime — refusing it would break local runs. The packaged runtimes all set it (the
-  // runtime image carries `ENV NODE_ENV=production`, the chart sets it, and both compose files set it
-  // via `${NODE_ENV:-production}` and a hardcoded `development`); only a hand-rolled deployment that
-  // strips it still takes the permissive branch of every hardening listed above.
+  // runtime image carries `ENV NODE_ENV=production`, the chart sets it, and both compose files forward
+  // it with a default, `${NODE_ENV:-production}` and `${NODE_ENV:-development}`); only a hand-rolled
+  // deployment that strips it still takes the permissive branch of every hardening listed above.
   //
   // Checked RAW rather than through `str()`: the readers compare `process.env.NODE_ENV` verbatim, so
   // a padded ' production ' that only matches after trimming would validate clean here and still take
