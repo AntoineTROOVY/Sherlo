@@ -2340,7 +2340,7 @@ The rendered text is bounded the same way, by `TEMPLATE_RENDER_MAX_CHARS` (defau
 }
 ```
 
-**Errors:** `400` session not active, duplicate `batchId`, or DTO/nested validation failure (unknown nested field rejected) · `401` missing/invalid API key · `403` key role below OPERATOR · `413` base64 media over the media cap (see §6.3) · `500` engine error
+**Errors:** `400` session not active, duplicate `batchId`, a `batchId` of `.` or `..`, too many batches already in progress (`BULK_MAX_CONCURRENT_BATCHES`, default 50; retryable, retry shortly), or DTO/nested validation failure (unknown nested field rejected) · `401` missing/invalid API key · `403` key role below OPERATOR · `413` base64 media over the media cap (see §6.3) · `500` engine error
 
 #### POST /api/sessions/:sessionId/messages/batch/:batchId/cancel
 
@@ -2367,7 +2367,7 @@ Cancel a running (pending/processing) bulk batch. No request body.
 }
 ```
 
-**Errors:** `400` batch already completed or cancelled · `401` missing/invalid API key · `403` key role below OPERATOR · `404` batch not found
+**Errors:** `400` batch already completed, cancelled or failed · `401` missing/invalid API key · `403` key role below OPERATOR · `404` batch not found
 
 ### 6.4.3 Contacts
 
