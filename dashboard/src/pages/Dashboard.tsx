@@ -14,6 +14,7 @@ import {
   useStatsOverviewQuery,
 } from '../hooks/queries';
 import { PageHeader } from '../components/PageHeader';
+import { isSessionStarted } from '../utils/sessionActions';
 import './Dashboard.css';
 
 // recharts is heavy (~116 kB gzip); load the analytics section on demand so it never bloats the
@@ -179,7 +180,7 @@ export function Dashboard() {
                     {t('dashboard.view')}
                   </button>
                   {/* Stopping a session is an operator write; a read-only key would only collect a 403. */}
-                  {canWrite && ['ready', 'initializing', 'qr_ready'].includes(session.status) && (
+                  {canWrite && isSessionStarted(session) && (
                     <button className="btn-sm danger" onClick={() => handleDisconnect(session.id)}>
                       {t('dashboard.disconnect')}
                     </button>

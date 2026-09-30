@@ -171,6 +171,23 @@ test('a failed stop is reported, not swallowed', async () => {
   );
 });
 
+// Stop needs a live engine, which the gateway reports as engineLoaded: a status cannot tell a session
+// reconnecting with its engine from a stopped one.
+test('Disconnect is offered exactly where the gateway holds an engine', async () => {
+  webhooksStatus = 200;
+  window.sessionStorage.setItem('openwa_user_role', 'operator');
+  sessionList = [{ ...READY_SESSION, status: 'disconnected', engineLoaded: true }];
+  renderDashboard();
+  await rtl.screen.findByRole('button', { name: 'Disconnect' });
+
+  rtl.cleanup();
+  queryClient?.clear();
+  sessionList = [{ ...READY_SESSION, status: 'initializing', engineLoaded: false }];
+  renderDashboard();
+  await rtl.screen.findByText('Main');
+  assert.ok(!rtl.screen.queryByRole('button', { name: 'Disconnect' }), 'a session with no engine offered Disconnect');
+});
+
 test('a failed background refetch of the sessions keeps the cached page', async () => {
   webhooksStatus = 200;
   sessionList = [READY_SESSION];
