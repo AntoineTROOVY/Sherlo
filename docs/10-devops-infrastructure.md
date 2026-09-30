@@ -126,14 +126,14 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
 
   redis:
     image: redis:7-alpine
     volumes:
       - redis-data:/data
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
 
   # No separate dashboard service: the `app` image bundles the dashboard SPA and serves it
   # from the same port (2785) via NestJS. Open http://localhost:2785 for the UI.
@@ -621,7 +621,7 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=30d'
     ports:
-      - '9090:9090'
+      - '127.0.0.1:9090:9090'
     restart: unless-stopped
 
   grafana:
@@ -631,10 +631,10 @@ services:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
       - grafana-data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?set GRAFANA_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
     ports:
-      - '3001:3000'
+      - '127.0.0.1:3001:3000'
     depends_on:
       - prometheus
       - loki
@@ -647,7 +647,7 @@ services:
       - loki-data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     ports:
-      - '3100:3100'
+      - '127.0.0.1:3100:3100'
     restart: unless-stopped
 
   promtail:
@@ -666,7 +666,7 @@ services:
     volumes:
       - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
     ports:
-      - '9093:9093'
+      - '127.0.0.1:9093:9093'
     restart: unless-stopped
 
   node-exporter:
@@ -679,7 +679,7 @@ services:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
     ports:
-      - '9100:9100'
+      - '127.0.0.1:9100:9100'
     restart: unless-stopped
 
 volumes:
