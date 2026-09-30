@@ -97,3 +97,9 @@ test('a chat marked unread (count -1) shows an unread badge without a number', (
     ],
   );
 });
+
+test('a channel search with no match says so instead of showing a blank list', () => {
+  const channel = { id: '1@newsletter', name: 'News' } as Channel;
+  const { container } = renderSidebar('channels', [], { all: [channel], shown: [] });
+  assert.equal(container.querySelector('.chats-list-empty')?.textContent, t('chats.empty'));
+});

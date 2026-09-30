@@ -229,6 +229,11 @@ function ChatSidebar({
             <div className="chats-list-empty">
               <span>{t('chats.channels.empty')}</span>
             </div>
+          ) : channelsTab.channels.length === 0 ? (
+            // Subscribed, but the search matches none of them.
+            <div className="chats-list-empty">
+              <span>{t('chats.empty')}</span>
+            </div>
           ) : (
             channelsTab.channels.map(ch => (
               <div
