@@ -196,7 +196,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A storage export fails with `500` when a listed file cannot be read, instead of reporting success with a partial archive, and a failed export no longer leaves its partial archive in `data/exports`.
 - A storage import skips directory and link entries and strips a leading `./` from entry names, so an archive built with `tar -C media .` no longer writes empty files over media.
 - A storage import that aborts partway is recorded in the audit log.
-- Ingress routes answer `415` for a body that is not JSON or form-encoded, instead of accepting it as empty and dropping later deliveries as duplicates.
+- Ingress routes answer `415` for a body whose `Content-Type` is not `application/json` or `application/x-www-form-urlencoded`, instead of accepting it as empty and dropping later deliveries as duplicates.
 - Deleting or disabling a session-wide (wildcard) integration instance no longer silences enabled instances bound to specific sessions until a restart.
 - Plugin install from a URL accepts single-label and underscore hosts, so a host listed in `SSRF_ALLOWED_HOSTS` is no longer refused with `400`.
 - The plugin catalog offers a final release as an update over an installed prerelease of the same version.
@@ -377,7 +377,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An engine credential path set through `PUT /api/plugins/:id/config` (`sessionDataPath` for whatsapp-web.js, `baileys.authDir` for Baileys) is no longer used; before upgrading, move those session folders to `SESSION_DATA_PATH` or `BAILEYS_AUTH_DIR`, or point the variable at them, or the sessions need a new link.
 - whatsapp-web.js: a session whose stored proxy URL is not a supported proxy URL now ends `failed` at start instead of running without the proxy; fix or clear it with `PATCH /api/sessions/:sessionId/proxy`.
 - Baileys: with `STORE_EPHEMERAL_MESSAGES=false`, product, poll, contact, live-location, order and event messages received in a disappearing chat no longer produce `message.received` events or stored rows.
-- ⚠️ **Breaking (API).** Ingress deliveries whose body is not JSON or form-encoded now get `415` instead of being accepted with an empty body.
+- ⚠️ **Breaking (API).** Ingress deliveries whose `Content-Type` is not `application/json` or `application/x-www-form-urlencoded`, including JSON sent as `text/plain` or an `application/*+json` type, now get `415` instead of being accepted with an empty body.
 - ⚠️ **Breaking (API).** With `WEBHOOK_SSRF_PROTECT=false`, webhook create and update now refuse a URL without an `http://` or `https://` scheme, such as `example.com/hook`, with `400`.
 
 ### Security
