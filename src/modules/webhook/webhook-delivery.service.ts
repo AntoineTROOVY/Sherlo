@@ -148,9 +148,9 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
     private readonly webhookQueue?: Queue<WebhookJobData>,
   ) {
     this.queueEnabled = configService.get<boolean>('queue.enabled', false);
-    // Bound fan-out: cap how many matching webhooks are delivered CONCURRENTLY for one event. Without
-    // it, an event matching N webhooks opens N outbound sockets at once. Default 16
-    // (WEBHOOK_DISPATCH_CONCURRENCY).
+    // Bound fan-out: cap how many webhook deliveries run CONCURRENTLY in this process. Every event and
+    // session shares this one pool, so an event matching N webhooks cannot open N outbound sockets at
+    // once. Default 16 (WEBHOOK_DISPATCH_CONCURRENCY).
     const dispatchConcurrency = this.configService.get<number>('webhook.dispatchConcurrency', 16);
     this.dispatchMaxQueued = this.configService.get<number>('webhook.dispatchMaxQueued', 1000);
     this.dispatchLimiter = new ConcurrencyLimiter(dispatchConcurrency, this.dispatchMaxQueued);
