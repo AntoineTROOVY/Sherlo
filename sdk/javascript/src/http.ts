@@ -188,12 +188,14 @@ async function send<T>(
   // Auth and JSON content-type WIN over caller-supplied defaults/per-request headers — the SDK only
   // ever sends a JSON body, and this matches the Python and PHP SDKs (which force JSON) and the
   // documented "JSON headers win" contract. Header names are case-insensitive and fetch joins duplicates,
-  // so drop a caller's copy in any case before adding ours; putting ours last is not enough.
-  const headers: Record<string, string> = {};
-  for (const [name, value] of Object.entries({ ...config.defaultHeaders, ...options.headers })) {
+  // so merge by lowercased name (a per-request header replaces a default in any case) and drop a
+  // caller's copy of ours before adding them; putting ours last is not enough.
+  const merged = new Map<string, [string, string]>();
+  for (const [name, value] of [...Object.entries(config.defaultHeaders), ...Object.entries(options.headers ?? {})]) {
     const lower = name.toLowerCase();
-    if (lower !== 'content-type' && lower !== 'x-api-key') headers[name] = value;
+    if (lower !== 'content-type' && lower !== 'x-api-key') merged.set(lower, [name, value]);
   }
+  const headers: Record<string, string> = Object.fromEntries(merged.values());
   headers['Content-Type'] = 'application/json';
   headers['X-API-Key'] = config.apiKey;
 
