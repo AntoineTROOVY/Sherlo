@@ -141,6 +141,14 @@ describe('EventsGateway connection auth + subscribe re-validation', () => {
     await gateway.handleConnection(asSocket(sock));
     expect(sock.disconnect).toHaveBeenCalled();
     expect(sock.emit).toHaveBeenCalled();
+    expect(auditService.logWarn).toHaveBeenCalledWith(
+      AuditAction.API_KEY_AUTH_FAILED,
+      expect.objectContaining({
+        apiKey: expect.objectContaining({ allowedChats: ['123@g.us'] }) as unknown,
+        ipAddress: '203.0.113.5',
+        metadata: { surface: 'websocket' },
+      }),
+    );
   });
 
   it('refuses a subscribe once the key has gained allowedChats after connect', async () => {
@@ -156,6 +164,14 @@ describe('EventsGateway connection auth + subscribe re-validation', () => {
     expect(sock.disconnect).toHaveBeenCalled();
     expect(sessionRoomJoins(sock)).toEqual([]);
     expect(unauthorizedEmits(sock)).toHaveLength(1);
+    expect(auditService.logWarn).toHaveBeenCalledWith(
+      AuditAction.API_KEY_AUTH_FAILED,
+      expect.objectContaining({
+        apiKey: expect.objectContaining({ allowedChats: ['123@g.us'] }) as unknown,
+        ipAddress: '203.0.113.5',
+        metadata: { surface: 'websocket' },
+      }),
+    );
   });
 
   it('re-validates on subscribe and disconnects a key revoked after connect', async () => {
@@ -170,6 +186,11 @@ describe('EventsGateway connection auth + subscribe re-validation', () => {
     expect(sock.disconnect).toHaveBeenCalled();
     expect(res.code).toBe('UNAUTHORIZED');
     expect(unauthorizedEmits(sock)).toHaveLength(1);
+    expect(auditService.logWarn).toHaveBeenCalledWith(AuditAction.API_KEY_AUTH_FAILED, {
+      ipAddress: '203.0.113.5',
+      metadata: { surface: 'websocket' },
+      errorMessage: 'API key revoked',
+    });
   });
 
   it('allows subscribe when the key still re-validates', async () => {
