@@ -267,8 +267,8 @@ export class IngressReconcilerService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Rebuild the dispatch job from the persisted row. `method` is the one request field the row does
-   * not persist — dispatchWebhookForInstance defaults it to 'POST' (the same tolerance RedriveService
+   * Rebuild the dispatch job from the persisted row. A row written before the method was persisted
+   * has none, and dispatchWebhookForInstance defaults it to 'POST' (the same tolerance RedriveService
    * applies to legacy DLQ rows). providerConversationId is re-derived from the CURRENT manifest route
    * so the replay joins the same per-conversation ordering lane as live deliveries instead of
    * degrading to the per-instance lane; a hot-swapped/missing route just yields no key.
@@ -277,14 +277,16 @@ export class IngressReconcilerService implements OnModuleInit, OnModuleDestroy {
     const route = this.loader
       .getPlugin(row.pluginId)
       ?.manifest.ingress?.find(candidate => candidate.route === row.route);
+    const { method, ...payload } = row.payload;
     return {
       pluginId: row.pluginId,
       instanceId: row.instanceId,
       route: row.route,
+      method,
       deliveryId: row.providerDeliveryId,
       sessionId: row.sessionId ?? undefined,
-      providerConversationId: extractConversationId(route?.conversationId, row.payload.headers, row.payload.rawBody),
-      payload: row.payload,
+      providerConversationId: extractConversationId(route?.conversationId, payload.headers, payload.rawBody),
+      payload,
     };
   }
 

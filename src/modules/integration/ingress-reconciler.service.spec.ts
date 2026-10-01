@@ -104,6 +104,22 @@ describe('IngressReconcilerService.sweep', () => {
     expect(event.lastDispatchAt).toBeInstanceOf(Date);
   });
 
+  it('replays the persisted HTTP method, and carries it into the dead-letter row', async () => {
+    await insertEvent({
+      payload: { headers: {}, query: {}, body: '{}', rawBody: '{}', method: 'PUT' },
+      dispatchAttempts: 4,
+    });
+    enqueue.mockResolvedValue({ outcome: 'failed', error: 'sandbox 5xx' });
+
+    await service.sweep(OPTS);
+
+    const [data] = enqueuedJobs()[0];
+    expect(data.method).toBe('PUT');
+    expect(data.payload).toEqual({ headers: {}, query: {}, body: '{}', rawBody: '{}' });
+    const [dlq] = await failures.find({ where: { deliveryId: 'd-1' } });
+    expect((dlq.payload as { method?: string }).method).toBe('PUT');
+  });
+
   it('retires the row payload once the replay is dispatched (the job data already carried it)', async () => {
     const id = await insertEvent();
 
