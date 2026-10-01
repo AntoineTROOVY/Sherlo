@@ -5276,7 +5276,7 @@ Get application settings (environment-derived; `general`/`api`/`notifications` g
 }
 ```
 
-Notes: raw return of an in-memory `Settings` object built once in the controller constructor from `ConfigService` (snapshotted at construction, not re-read per request). `api.rateLimitWindow` is in ms. `enableDocs` reflects the `ENABLE_SWAGGER` gate (enabled by default outside production; disabled by default in production unless explicitly enabled). Only `notifications.*` is currently hardcoded (`emailEnabled: false`, `notificationEmail: ''`, `webhookAlerts: true`).
+Notes: raw return of an in-memory `Settings` object built once in the controller constructor from the environment (snapshotted at construction, not re-read per request). `general.apiBaseUrl` reads `BASE_URL` (default `http://localhost:<PORT>`) and `general.debugMode` mirrors `DATABASE_LOGGING`. `api.rateLimitWindow` is in ms. `enableDocs` reflects the `ENABLE_SWAGGER` gate (enabled by default outside production; disabled by default in production unless explicitly enabled). `general.autoReconnect` (always `true`) and `notifications.*` (`emailEnabled: false`, `notificationEmail: ''`, `webhookAlerts: true`) are hardcoded.
 
 **Errors:** `401` — missing/invalid `X-API-Key` · `403` — API key lacks the ADMIN role, or the key is session-restricted.
 
