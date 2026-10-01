@@ -181,12 +181,24 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap 
    * a batch that finalized in between must keep its real status, progress and results. Returns
    * whether the row was still unfinished and is now FAILED. Without `messages` (the run failed
    * before it could read the row) the stored payloads are left as they are.
+   *
+   * `withRunState` is for the run's own failure path only: that run holds the progress, results and
+   * currentIndex of what it sent, newer than the row. A reap must not write them back, since what it
+   * read can be older than a progress write the batch's still-running node made since.
    */
-  private async failOrphanedBatch(batch: Pick<MessageBatch, 'id'> & Partial<MessageBatch>): Promise<boolean> {
+  private async failOrphanedBatch(
+    batch: Pick<MessageBatch, 'id'> & Partial<MessageBatch>,
+    withRunState = false,
+  ): Promise<boolean> {
     const set: QueryDeepPartialEntity<MessageBatch> = { status: BatchStatus.FAILED, completedAt: new Date() };
     if (batch.messages) {
       this.stripBatchMediaPayloads(batch.messages);
       set.messages = batch.messages as QueryDeepPartialEntity<MessageBatch>['messages'];
+    }
+    if (withRunState) {
+      if (batch.progress) set.progress = batch.progress;
+      if (batch.results) set.results = batch.results;
+      if (batch.currentIndex !== undefined) set.currentIndex = batch.currentIndex;
     }
     const failed = await this.batchRepository.update(
       { id: batch.id, status: In([BatchStatus.PENDING, BatchStatus.PROCESSING]) },
@@ -432,8 +444,9 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap 
       // A throw here (a DB error on the pickup read, the start transition or a progress write) would
       // leave the row PENDING or PROCESSING, and nothing else moves it on while this process lives:
       // the reapers run only at boot and on a session takeover. Best effort, since the database that
-      // just failed may fail again.
-      await this.failOrphanedBatch(batch ?? { id: batchDbId }).catch((failError: unknown) => {
+      // just failed may fail again. The row gets what this run sent, so delivered items are not
+      // reported as pending.
+      await this.failOrphanedBatch(batch ?? { id: batchDbId }, true).catch((failError: unknown) => {
         this.logger.error(`Could not mark batch ${batchDbId} FAILED after its run threw: ${String(failError)}`);
       });
       throw error;

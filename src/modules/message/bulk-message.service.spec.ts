@@ -434,6 +434,25 @@ describe('BulkMessageService.processBatch', () => {
     expect(inFlightMarkers().has('b1')).toBe(false);
   });
 
+  // Only this run knows what it sent: a FAILED written without that would report delivered items as
+  // pending, and a re-issue of the unsent items would send them again.
+  it('records what the run sent when a progress write throws after a send', async () => {
+    repo.findOne.mockResolvedValue(makeBatch(3));
+    repo.update
+      .mockResolvedValueOnce({ affected: 1 }) // start transition
+      .mockRejectedValueOnce(new Error('database unavailable')); // progress write after item 0 was sent
+
+    await expect(runProcessBatch()).rejects.toThrow('database unavailable');
+
+    expect(engine.sendTextMessage).toHaveBeenCalledTimes(1);
+    const [criteria, partial] = (repo.update.mock.calls as Array<[unknown, Partial<MessageBatch>]>).at(-1)!;
+    expect(criteria).toEqual({ id: 'b1', status: In([BatchStatus.PENDING, BatchStatus.PROCESSING]) });
+    expect(partial.status).toBe(BatchStatus.FAILED);
+    expect(partial.results?.[0].status).toBe(BatchMessageStatus.SENT);
+    expect(partial.progress).toMatchObject({ sent: 1, pending: 2 });
+    expect(partial.currentIndex).toBe(1);
+  });
+
   it('still rethrows the run error when failing the batch throws too', async () => {
     repo.findOne.mockRejectedValueOnce(new Error('database unavailable'));
     repo.update.mockRejectedValueOnce(new Error('still unavailable'));
