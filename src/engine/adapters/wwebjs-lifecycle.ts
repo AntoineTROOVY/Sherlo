@@ -614,7 +614,8 @@ export class WwebjsLifecycle {
 
     this.client.on('authenticated', () => {
       // Only the first authentication starts the reconcile window. Ignore a re-fired 'authenticated'
-      // while already AUTHENTICATING (so it can't restart the 90s deadline), once READY/FAILED, or any
+      // while already AUTHENTICATING (so it can't restart the 90s deadline), once READY/FAILED, at
+      // ACTION_REQUIRED (a re-inject must not clear it, which only stop then start does), or any
       // time after the adapter is finished — teardown, or a reported disconnect the lifecycle has not
       // replaced the engine for yet (#982). The initial status is DISCONNECTED too, so "finished" is
       // carried by the flags, never by the status alone.
@@ -624,6 +625,7 @@ export class WwebjsLifecycle {
         this.disconnectReported ||
         this.status === EngineStatus.AUTHENTICATING ||
         this.status === EngineStatus.READY ||
+        this.status === EngineStatus.ACTION_REQUIRED ||
         this.status === EngineStatus.FAILED
       ) {
         return;

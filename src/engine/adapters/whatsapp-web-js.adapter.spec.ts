@@ -7533,6 +7533,34 @@ describe('WhatsAppWebJsAdapter honest outcomes (no phantom success)', () => {
       }
     });
 
+    // A page navigation re-runs the inject, which fires 'authenticated' and then 'ready' again.
+    it('stays ACTION_REQUIRED through a re-inject and arms no readiness deadline', async () => {
+      jest.useFakeTimers();
+      try {
+        const { adapter, evaluate, client } = promoteToReady();
+
+        (client as EventEmitter).emit('authenticated');
+        await jest.advanceTimersByTimeAsync(2100);
+        for (let i = 0; i < 5; i++) {
+          evaluate.mockResolvedValueOnce({ modalPresent: true, dismissed: true } satisfies ModalProbe);
+          await jest.advanceTimersByTimeAsync(5100);
+        }
+        expect(adapter.getStatus()).toBe(EngineStatus.ACTION_REQUIRED);
+        const { reconcile: deadline } = adapter as unknown as { reconcile: { scheduleReadyReconcile: () => void } };
+        const reconcile = jest.spyOn(deadline, 'scheduleReadyReconcile');
+
+        (client as EventEmitter).emit('authenticated');
+        expect(adapter.getStatus()).toBe(EngineStatus.ACTION_REQUIRED);
+        (client as EventEmitter).emit('ready');
+        await jest.advanceTimersByTimeAsync(0);
+
+        expect(adapter.getStatus()).toBe(EngineStatus.ACTION_REQUIRED);
+        expect(reconcile).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     // ── Dialog diagnostics (#1072 follow-up) ─────────────────────────────────────
     // When the probe finds nothing to click, the watcher asks the page what dialogs ARE visible,
     // so a modal whose title or button label the detector does not recognise lands in the logs
