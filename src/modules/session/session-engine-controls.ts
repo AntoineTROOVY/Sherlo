@@ -175,6 +175,10 @@ export class SessionEngineControls {
       throw new BadRequestException('Session is already starting');
     }
     this.initializingSessions.add(id);
+    // A stop mark already set when this start began is stale (a start is how one is cleared). One set
+    // while it waits below comes from a retirement that saw this start in flight, stopOrphanEngines
+    // above all, which writes nothing else this start could read and counts on it aborting.
+    const markedAtEntry = this.stoppingSessions.has(id);
 
     try {
       const session = await this.requireSession(id);
@@ -219,7 +223,11 @@ export class SessionEngineControls {
       // again, so a refused start does not leave a false "already starting" mark behind (briefly held).
       await this.fences.awaitPendingTeardown(session.name);
 
-      // A fresh start intentionally (re-)creates the engine — clear any stale stop/delete mark.
+      // A fresh start intentionally (re-)creates the engine — clear any stale stop/delete mark, but
+      // yield to one set after this start began, leaving it in place.
+      if (this.stoppingSessions.has(id) && !markedAtEntry) {
+        throw new SessionStoppedException(`Session ${id} was stopped`);
+      }
       this.stoppingSessions.delete(id);
 
       // Cancel any reconnect timer a prior failed executeReconnect left pending, BEFORE the awaited

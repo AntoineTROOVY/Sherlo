@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
 import { BadRequestException } from '@nestjs/common';
+import { SessionStoppedException } from './session-engine-controls';
 import { ConfigService } from '@nestjs/config';
 import { SessionService } from './session.service';
 import { SessionEngineLifecycle, type ReconnectState } from './session-engine-lifecycle.service';
@@ -52,6 +53,21 @@ const makeEngine = (): Record<string, jest.Mock> => ({
   logout: jest.fn().mockResolvedValue(undefined),
   getQRCode: jest.fn().mockReturnValue(null),
 });
+
+/** A promise the test settles by hand. */
+const deferred = <T = void>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
+const flush = async (): Promise<void> => {
+  for (let i = 0; i < 5; i++) await new Promise(resolve => setImmediate(resolve));
+};
 
 interface Internals {
   engines: EngineRegistry;
@@ -133,6 +149,38 @@ describe('SessionEngineLifecycle races', () => {
       config['sessions.maxConcurrent'] = 1;
       const timer = setTimeout(() => undefined, 60_000);
       internals.reconnectStates.set(ID, { attempts: 1, timer, maxAttempts: 5, baseDelay: 5000 });
+
+      await lifecycle.start(ID);
+
+      expect(internals.engines.has(ID)).toBe(true);
+    });
+  });
+
+  describe('stopOrphanEngines against a start still reading its row', () => {
+    it('retires the start instead of letting it clear the stop mark', async () => {
+      const read = deferred<Session>();
+      repository.findOne.mockReturnValueOnce(read.promise);
+
+      const starting = lifecycle.start(ID);
+      const outcome = starting.then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      await flush();
+      await expect(lifecycle.stopOrphanEngines([ID])).resolves.toEqual({
+        stopped: [],
+        notRunning: [ID],
+        failed: [],
+      });
+      read.resolve(session());
+
+      expect(await outcome).toBeInstanceOf(SessionStoppedException);
+      expect(engineFactory.create).not.toHaveBeenCalled();
+      expect(internals.engines.has(ID)).toBe(false);
+    });
+
+    it('still clears a stop mark left from before the start began', async () => {
+      await lifecycle.stopOrphanEngines([ID]);
 
       await lifecycle.start(ID);
 
