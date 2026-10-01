@@ -732,9 +732,11 @@ the tag string and `package.json` disagree.
 
 ```mermaid
 flowchart TB
-    A[push tag v*] --> B[lint / test / test-postgres / dashboard / scripts-smoke / chart]
+    A[push tag v*] --> B[lint / test / dashboard / scripts-smoke / chart]
+    A --> T[test-postgres]
     B --> C[build]
     C --> D[docker: multi-arch build, staging tag only]
+    T --> D
     D --> E[boot-smoke: run the image on amd64 + arm64]
     D --> F[image-scan: Trivy, CRITICAL/HIGH, fixable only]
     E --> G[promote: apply X.Y.Z, X.Y, latest to GHCR + Docker Hub]
