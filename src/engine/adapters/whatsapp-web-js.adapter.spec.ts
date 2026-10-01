@@ -6703,7 +6703,8 @@ describe('WhatsAppWebJsAdapter group join + settings + own profile', () => {
 
     // The nine write routes that previously threw a bare Error('Chat is not a group') for a
     // non-group id (surfacing as an opaque 500) now share this guard: unknown id, 1:1 id and
-    // status id are all GroupNotFoundError (404), like the guarded settings writes above.
+    // status id are all GroupNotFoundError (404), like the guarded settings writes above. The
+    // membership-request approve/reject writes went straight to the page and answered 500 the same way.
     it.each([
       ['addParticipants', (a: WhatsAppWebJsAdapter) => a.addParticipants('628111@c.us', ['628222@c.us'])],
       ['removeParticipants', (a: WhatsAppWebJsAdapter) => a.removeParticipants('628111@c.us', ['628222@c.us'])],
@@ -6714,6 +6715,16 @@ describe('WhatsAppWebJsAdapter group join + settings + own profile', () => {
       ['setGroupDescription', (a: WhatsAppWebJsAdapter) => a.setGroupDescription('628111@c.us', 'New description')],
       ['getGroupInviteCode', (a: WhatsAppWebJsAdapter) => a.getGroupInviteCode('628111@c.us')],
       ['revokeGroupInviteCode', (a: WhatsAppWebJsAdapter) => a.revokeGroupInviteCode('628111@c.us')],
+      ['approveGroupMembershipRequests', (a: WhatsAppWebJsAdapter) => a.approveGroupMembershipRequests('628111@c.us')],
+      ['rejectGroupMembershipRequests', (a: WhatsAppWebJsAdapter) => a.rejectGroupMembershipRequests('628111@c.us')],
+      [
+        'approveGroupMembershipRequests (named)',
+        (a: WhatsAppWebJsAdapter) => a.approveGroupMembershipRequests('628111@c.us', ['628222@c.us']),
+      ],
+      [
+        'rejectGroupMembershipRequests (named)',
+        (a: WhatsAppWebJsAdapter) => a.rejectGroupMembershipRequests('628111@c.us', ['628222@c.us']),
+      ],
     ])('%s answers 404 (GroupNotFoundError) when the id is not a group', async (_name, call) => {
       const getChatById = jest.fn().mockResolvedValue({ isGroup: false });
       await expect(call(readyAdapter({ getChatById }))).rejects.toBeInstanceOf(GroupNotFoundError);
