@@ -433,11 +433,11 @@ export class BaileysMessaging {
     // link is that token behind one of the library's two exported prefixes. Note the audio prefix
     // WhatsApp itself uses is `/voice/`, which is also what whatsapp-web.js calls the same thing.
     //
-    // timeoutMs is passed so the library can retire its own pending query, and the call is ALSO
-    // wrapped: baileys' query() swallows its timeout, so an unanswered request would otherwise
-    // resolve to nothing and be indistinguishable from a refusal.
+    // No timeoutMs is passed: given one, baileys' query() arms its own timer before ours and rejects
+    // with a raw 408 Boom, which answers 500. Without it the library's wait resolves nothing after its
+    // own 60 s, so the wrap below is the deadline that answers, with a 503.
     const token = await this.confirmed(
-      this.sock().createCallLink(type, { startTime: Math.floor(startTime / 1000) }, this.queryBudgetMs),
+      this.sock().createCallLink(type, { startTime: Math.floor(startTime / 1000) }),
       'the call link',
     );
     if (!token) {

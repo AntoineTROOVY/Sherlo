@@ -63,7 +63,7 @@ describe('BaileysMessaging.createCallLink', () => {
 
     expect(link).toBe('https://call.whatsapp.com/video/TOKEN123');
     // Baileys takes the start time in SECONDS, and its own type is 'audio' | 'video'.
-    expect(createCallLink).toHaveBeenCalledWith('video', { startTime: START_S }, expect.any(Number));
+    expect(createCallLink).toHaveBeenCalledWith('video', { startTime: START_S });
   });
 
   it("uses WhatsApp's /voice/ prefix for an audio link", async () => {
@@ -71,7 +71,7 @@ describe('BaileysMessaging.createCallLink', () => {
     const link = await makeMessaging({ createCallLink }).createCallLink('audio', START_MS);
 
     expect(link).toBe('https://call.whatsapp.com/voice/TOKEN456');
-    expect(createCallLink).toHaveBeenCalledWith('audio', { startTime: START_S }, expect.any(Number));
+    expect(createCallLink).toHaveBeenCalledWith('audio', { startTime: START_S });
   });
 
   // The failure that would otherwise be silent: a prefix with nothing after it is a dead link that
@@ -85,6 +85,22 @@ describe('BaileysMessaging.createCallLink', () => {
 
   it('reports an unanswered query rather than hanging on a silent socket', async () => {
     const createCallLink = jest.fn(() => new Promise<never>(() => undefined));
+    await expect(makeMessaging({ createCallLink }, 15).createCallLink('video', START_MS)).rejects.toBeInstanceOf(
+      EngineTransportError,
+    );
+  });
+
+  it('answers 503 when the library would time the query out on its own', async () => {
+    // Baileys' query() given a timeoutMs arms its own timer first and rejects with a raw 408 Boom,
+    // which is not an HTTP error; without one, its wait resolves nothing and the deadline answers.
+    const createCallLink = jest.fn(
+      (_type: string, _event: unknown, timeoutMs?: number) =>
+        new Promise<never>((_resolve, reject) => {
+          if (timeoutMs) {
+            setTimeout(() => reject(Object.assign(new Error('Timed Out'), { output: { statusCode: 408 } })), timeoutMs);
+          }
+        }),
+    );
     await expect(makeMessaging({ createCallLink }, 15).createCallLink('video', START_MS)).rejects.toBeInstanceOf(
       EngineTransportError,
     );
