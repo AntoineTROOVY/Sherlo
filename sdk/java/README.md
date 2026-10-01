@@ -86,8 +86,11 @@ and PHP SDKs:
 `profile` · `calls` · `media`,
 plus `client.auth()`.
 
-Operator-only modules (`docker`, `metrics`, `infra`, `plugins`, `mcp`) are
-intentionally not exposed; all user-facing resources are.
+Deliberately not exposed, matching `docs/18-sdk-design.md`: `auth`/api-keys,
+`audit`, `settings`, `stats`, `automation`, `infra`, `plugins`, the
+`integration` management routes, `metrics`, `mcp`, `ingress` and `docker`.
+Everything else the gateway publishes is exposed; see
+[the SDK overview](../README.md#coverage).
 
 `UpdateWebhookRequest` omits null fields, so `filters(null)` leaves a
 webhook's filters unchanged. To remove every filter, pass
