@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
@@ -211,6 +211,15 @@ export class SendPacingService {
     const dayStart = startOfUtcDay(new Date());
     const ageDays = Math.floor((dayStart.getTime() - startOfUtcDay(session.createdAt).getTime()) / DAY_MS);
     const allowance = this.allowanceForAge(config.coldSchedule, ageDays);
+    // A batch larger than a whole day's allowance cannot pass on any day of this rung, so a 429 with a
+    // retry hint would send a client that honours it round the same refusal every day. Nothing is
+    // reserved; the caller has to split the request.
+    if (coldCount > allowance) {
+      throw new BadRequestException(
+        `Reaching ${coldCount} new contact(s) exceeds the daily allowance of ${allowance} new ` +
+          `conversation(s) for a session ${ageDays} day(s) old; split the request into batches of at most ${allowance}`,
+      );
+    }
     // Both sources of the day's reachouts: cold chat messages (persisted rows) and prior group adds
     // (the in-memory tally). Group adds persist nothing, so without the tally they would not count
     // against themselves and the cap would reset every request.

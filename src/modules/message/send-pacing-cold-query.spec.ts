@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { HttpException } from '@nestjs/common';
 import { SEND_PACING_LIMITED, SendPacingService } from './send-pacing.service';
 import { Message, MessageDirection } from './entities/message.entity';
 import { Session } from '../session/entities/session.entity';
@@ -237,9 +238,22 @@ describe('group reachouts against a real database', () => {
   // The cost is per stranger, not per call — otherwise one request adding two hundred numbers would
   // cost exactly as much as adding one, which is the abuse the rule exists to bound.
   it('charges the batch per new contact, not per call', async () => {
-    await expect(reachout('s1', ['a@c.us', 'b@c.us', 'c@c.us', 'd@c.us'])).rejects.toMatchObject({
-      status: 429,
-    });
+    await reachout('s1', ['a@c.us', 'b@c.us']);
+    await expect(reachout('s1', ['c@c.us', 'd@c.us'])).rejects.toMatchObject({ status: 429 });
+  });
+
+  // Waiting cannot help a batch larger than a whole day's allowance, so a 429 with a retry hint would
+  // send a client that honours it round the same refusal every day. Refuse it as a request to split.
+  it('answers 400 without a retry hint for a batch larger than the whole allowance', async () => {
+    const error = await service.assertReachoutAllowed('s1', ['a@c.us', 'b@c.us', 'c@c.us', 'd@c.us']).then(
+      () => null,
+      (e: HttpException) => e,
+    );
+    expect(error?.getStatus()).toBe(400);
+    expect(JSON.stringify(error?.getResponse())).toContain('batches of at most 3');
+    expect(JSON.stringify(error?.getResponse())).not.toContain('retryAfterSeconds');
+    // Nothing was reserved: a batch that fits is still allowed.
+    await expect(reachout('s1', ['a@c.us', 'b@c.us', 'c@c.us'])).resolves.toBeUndefined();
   });
 
   it('does not charge for contacts the account already knows', async () => {
