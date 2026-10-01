@@ -805,8 +805,11 @@ export function Chats() {
   // A cross-session hit switches session, which asynchronously reloads the chats list — so the
   // target chat may not be available at click time. pendingHitRef carries the intent across that
   // async gap: the chat-select effect picks it up once the list lands, and the scroll effect runs
-  // once the messages have rendered.
-  const pendingHitRef = useRef<{ sessionId: string; chatId: string; waMessageId: string } | null>(null);
+  // once the messages have rendered. `opened` marks a hit whose chat has been opened, so the user
+  // leaving that chat before its thread renders drops the hit instead of being sent back into it.
+  const pendingHitRef = useRef<{ sessionId: string; chatId: string; waMessageId: string; opened?: boolean } | null>(
+    null,
+  );
   // Bumped with every hit, so a hit in the chat already open still re-runs the scroll effect, where
   // every other state it sets is unchanged and React skips the render.
   const [hitSeq, setHitSeq] = useState(0);
@@ -831,7 +834,8 @@ export function Chats() {
         }
         setSessions(ready);
       }
-      pendingHitRef.current = { sessionId: hit.sessionId, chatId: hit.chatId, waMessageId: hit.waMessageId };
+      const pending = { sessionId: hit.sessionId, chatId: hit.chatId, waMessageId: hit.waMessageId };
+      pendingHitRef.current = pending;
       setHitSeq(n => n + 1);
       if (hit.sessionId !== selectedSessionId) {
         // Switching session triggers loadChats; the effect below selects the chat once the list lands.
@@ -844,16 +848,12 @@ export function Chats() {
             // hit's message-highlight is intentionally dropped here since that pane has no per-message scroll target.
             switchTab('channels');
             pendingHitRef.current = null;
-          } else if (chat.kind === 'status') {
-            setActiveTab('status');
-            setActiveChat(chat);
-            setActiveChannel(null);
-            setActiveStatusContactId(null);
           } else {
-            setActiveTab('chats');
+            setActiveTab(chat.kind === 'status' ? 'status' : 'chats');
             setActiveChat(chat);
             setActiveChannel(null);
             setActiveStatusContactId(null);
+            pendingHitRef.current = { ...pending, opened: true };
           }
         } else {
           pendingHitRef.current = null;
@@ -871,7 +871,7 @@ export function Chats() {
   useEffect(() => {
     const pending = pendingHitRef.current;
     if (!pending) return;
-    if (pending.sessionId !== selectedSessionId) {
+    if (pending.sessionId !== selectedSessionId || (pending.opened && activeChat?.id !== pending.chatId)) {
       pendingHitRef.current = null;
       return;
     }
@@ -882,16 +882,12 @@ export function Chats() {
     } else if (chat.kind === 'channel') {
       switchTab('channels');
       pendingHitRef.current = null;
-    } else if (chat.kind === 'status') {
-      setActiveTab('status');
-      setActiveChat(chat);
-      setActiveChannel(null);
-      setActiveStatusContactId(null);
     } else {
-      setActiveTab('chats');
+      setActiveTab(chat.kind === 'status' ? 'status' : 'chats');
       setActiveChat(chat);
       setActiveChannel(null);
       setActiveStatusContactId(null);
+      pendingHitRef.current = { ...pending, opened: true };
     }
   }, [chats, loadingChats, activeChat, selectedSessionId, switchTab]);
 

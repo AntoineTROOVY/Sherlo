@@ -2007,6 +2007,22 @@ test("a search hit whose chat the other session's list lacks does not open it la
   }
 });
 
+// The hit's thread can take seconds to load, or fail; until it renders the hit is still pending.
+test("leaving a search hit's chat before its thread loads does not reopen it", async () => {
+  const { screen, fireEvent, within, waitFor } = rtl;
+  searchHits = [{ ...THIRD_SESSION_HIT, sessionId: SESSION.id, chatId: CHAT.id, waMessageId: DB_MESSAGE.waMessageId! }];
+  firstPageGate = new Promise<void>(() => {});
+  const { container } = renderChats();
+  await screen.findByText('Carol');
+
+  await clickSearchHit(container);
+  await waitFor(() => assert.ok(container.querySelector('.room-header'), "the hit's chat did not open"));
+  await within(container.querySelector('.room-header') as HTMLElement).findByText('Alice');
+  fireEvent.click(within(container.querySelector('.chats-sidebar') as HTMLElement).getByText('Carol'));
+  await flush();
+  await within(container.querySelector('.room-header') as HTMLElement).findByText('Carol');
+});
+
 test('a second search hit in the chat already open scrolls to it at once', async () => {
   const { screen, fireEvent, within, waitFor } = rtl;
   searchHits = [{ ...THIRD_SESSION_HIT, sessionId: SESSION.id, chatId: CHAT.id, waMessageId: DB_MESSAGE.waMessageId! }];
