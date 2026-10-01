@@ -260,6 +260,21 @@ const check = (id, ok, detail) => results.push({ id, ok, detail });
   );
 }
 
+// The kubelet injects Docker-link variables for every Service in the namespace unless the pod opts
+// out, so a Service named `redis` or `database` sets REDIS_PORT or DATABASE_PORT to tcp://<ip>:<port>
+// and boot validation refuses it. The app reads no service-link variable.
+{
+  const sts = byKind(render(), 'StatefulSet')[0] ?? '';
+  const links = /^\s*enableServiceLinks:\s*(\S+)/m.exec(sts)?.[1];
+  check(
+    'no-service-link-env',
+    links === 'false',
+    links === 'false'
+      ? 'enableServiceLinks: false, so no Service in the namespace can set REDIS_PORT or DATABASE_PORT'
+      : `${nameOf(sts) ?? 'StatefulSet'}: enableServiceLinks is ${links ?? 'unset (defaults to true)'}, so a Service named redis or database injects REDIS_PORT or DATABASE_PORT`,
+  );
+}
+
 const failed = results.filter(r => !r.ok);
 if (failed.length) {
   console.error('\n✖ Chart behaviour check failed:');
