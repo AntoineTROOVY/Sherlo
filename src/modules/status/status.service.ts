@@ -158,7 +158,9 @@ export class StatusService {
       () => new NotFoundException(`Session ${sessionId} not found or not connected`),
     );
     const gated = await this.gate(sessionId, 'status-image', {
-      media: { mimetype: mimetype ?? 'image/jpeg', data: base64 || url || '' },
+      // A URL with no declared type keeps the placeholder the engines read as "undeclared", so the
+      // fetched Content-Type labels the bytes (as on the chat path); the route default is for base64.
+      media: { mimetype: mimetype ?? (base64 ? 'image/jpeg' : 'application/octet-stream'), data: base64 || url || '' },
       options,
     });
     return this.recordedPost(sessionId, () => engine.postImageStatus(this.guardGatedMedia(gated.media), gated.options));
@@ -181,7 +183,7 @@ export class StatusService {
       () => new NotFoundException(`Session ${sessionId} not found or not connected`),
     );
     const gated = await this.gate(sessionId, 'status-video', {
-      media: { mimetype: mimetype ?? 'video/mp4', data: base64 || url || '' },
+      media: { mimetype: mimetype ?? (base64 ? 'video/mp4' : 'application/octet-stream'), data: base64 || url || '' },
       options,
     });
     return this.recordedPost(sessionId, () => engine.postVideoStatus(this.guardGatedMedia(gated.media), gated.options));
