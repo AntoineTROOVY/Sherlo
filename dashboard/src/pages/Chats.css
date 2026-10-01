@@ -1487,7 +1487,8 @@
   object-fit: cover;
 }
 
-/* Status viewer: shown in place of the image while a status media blob fails to load. */
+/* Shown in place of media that cannot be shown: a status media blob that fails to load, or a
+   channel post whose media has no URL. */
 .chats-page .status-media-placeholder {
   display: block;
   font-size: 0.85rem;

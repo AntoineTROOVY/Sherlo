@@ -1180,7 +1180,13 @@ export function Chats() {
                   ) : (
                     (channelMessages.data ?? []).map(m => (
                       <div key={m.id} className="message-bubble incoming">
-                        {m.hasMedia && m.mediaUrl && <img className="channel-media" src={m.mediaUrl} alt="" />}
+                        {/* whatsapp-web.js flags a post's media but gives no URL for it. */}
+                        {m.hasMedia &&
+                          (m.mediaUrl ? (
+                            <img className="channel-media" src={m.mediaUrl} alt="" />
+                          ) : (
+                            <span className="status-media-placeholder">{t('chats.status.mediaUnavailable')}</span>
+                          ))}
                         {m.body && <MessageBody text={stripMentionDelimiters(m.body)} className="message-text" />}
                         <span className="message-time">{formatChatTime(m.timestamp)}</span>
                       </div>

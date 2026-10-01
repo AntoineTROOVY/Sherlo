@@ -2196,6 +2196,26 @@ test('the media viewer saves an image under its file name, not its caption', asy
   assert.equal(links[0].download, 'photo.png');
 });
 
+// whatsapp-web.js reports that a channel post has media but gives no URL for it.
+test('a channel post with media and no URL says the media is unavailable', async () => {
+  const { screen, fireEvent, within, waitFor } = rtl;
+  engineType = 'whatsapp-web.js';
+  window.sessionStorage.setItem('openwa_engine_type', engineType);
+  channels = [{ id: '120363000000000001@newsletter', name: 'News' }];
+  channelPosts = [{ id: 'post-1', body: '', timestamp: 1_700_000_000, hasMedia: true }];
+  const { container } = renderChats();
+  await screen.findByText('Alice');
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Channels' }));
+  fireEvent.click(await screen.findByText('News'));
+  const bubble = await waitFor(() => {
+    const found = container.querySelector('.channel-room .message-bubble');
+    assert.ok(found, 'the post did not render');
+    return found;
+  });
+  assert.ok(within(bubble as HTMLElement).queryByText('Media unavailable'), 'the media post rendered empty');
+});
+
 test('a channel post or status caption carrying mention delimiters renders them as nothing, not as a mention', async () => {
   const { screen, fireEvent, waitFor } = rtl;
   // Only resolveMentions may place the delimiters; raw text carrying them is stripped before render.
