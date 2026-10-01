@@ -28,8 +28,9 @@ function installFetchStub(): void {
         resolve(
           new Response(
             JSON.stringify({
-              hits: texts.map((text, i) => ({
-                messageId: `${q}-${offset}-${i}`,
+              // A hit's id follows its text, so a page that repeats a text repeats the message.
+              hits: texts.map(text => ({
+                messageId: `${q}-${text}`,
                 sessionId: 'sess-1',
                 chatId: 'chat-1@c.us',
                 timestamp: 1_767_225_600,
@@ -173,6 +174,30 @@ test('a mouse click on "more" keeps the results open and appends the next page',
   await new Promise(resolve => setTimeout(resolve, 200));
   assert.ok(screen.queryByRole('listbox'), 'the results closed after "more"');
   assert.equal(screen.getAllByRole('option').length, 40);
+});
+
+test('"more" does not repeat a hit that a newly indexed message pushed onto the next page', async () => {
+  const { screen, fireEvent, act, waitFor } = rtl;
+  rtl.render(createElement(GlobalSearch, { onHit: () => undefined }));
+  const input = screen.getByRole('textbox');
+  input.focus();
+  await typeAndWaitForRequest(input, 'refund');
+  await act(async () => pending.get('refund')!(page(0), 40));
+  fireEvent.click(await screen.findByRole('button', { name: more40 }));
+  await waitFor(() => assert.deepEqual(offsets, ['0', '20']));
+  // A match indexed in between shifted every hit down by one, so offset 20 starts with the old 20th.
+  await act(async () => pending.get('refund')!(page(19), 41));
+  await waitFor(() => assert.ok(screen.queryByText('refund 38')));
+  assert.equal(screen.getAllByText('refund 19').length, 1, 'the shifted hit is listed twice');
+  assert.equal(screen.getAllByRole('option').length, 39);
+  // The next page starts after the 40 rows the server has sent, not after the 39 listed, and the last
+  // row it returns ends the list: the dropped repeat must not keep "more" up for a match never fetched.
+  fireEvent.click(screen.getByRole('button', { name: /39/ }));
+  await waitFor(() => assert.deepEqual(offsets, ['0', '20', '40']));
+  await act(async () => pending.get('refund')!(['refund 39'], 41));
+  await waitFor(() => assert.ok(screen.queryByText('refund 39')));
+  assert.equal(screen.getAllByRole('option').length, 40);
+  assert.equal(screen.queryByRole('button', { name: /41/ }), null, '"more" stayed up after the last page');
 });
 
 test('a failed "more" keeps the results already shown and offers the button again', async () => {
