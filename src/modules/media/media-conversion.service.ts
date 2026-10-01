@@ -26,7 +26,10 @@ export interface ConvertedMedia {
 @Injectable()
 export class MediaConversionService {
   private readonly logger = createLogger('MediaConversionService');
-  /** Result of the binary probe. Cached because it cannot change without a restart. */
+  /**
+   * Result of the binary probe. Only a successful probe is kept: a failure can be a timeout or a
+   * transient spawn error on a loaded host, so the next request probes again.
+   */
   private binaryAvailable?: Promise<boolean>;
   /**
    * Bounds concurrent ffmpeg processes (the rate limiter caps admission per second, not how many
@@ -176,13 +179,16 @@ export class MediaConversionService {
   }
 
   /**
-   * Probe once per process. The promise itself is memoised rather than its result, so concurrent
+   * Probe until a probe succeeds. The promise itself is memoised rather than its result, so concurrent
    * first requests share one probe instead of each spawning their own.
    */
   private probeOnce(): Promise<boolean> {
     this.binaryAvailable ??= probeFfmpeg(this.configService.get<string>('mediaConversion.ffmpegPath', 'ffmpeg')).then(
       available => {
-        if (!available) this.logger.warn('Media conversion is enabled but ffmpeg could not be run');
+        if (!available) {
+          this.binaryAvailable = undefined;
+          this.logger.warn('Media conversion is enabled but ffmpeg could not be run');
+        }
         return available;
       },
     );

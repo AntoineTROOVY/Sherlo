@@ -109,6 +109,17 @@ describe('MediaConversionService', () => {
 
       expect(probeFfmpeg).toHaveBeenCalledTimes(1);
     });
+
+    // A probe that timed out on a loaded host, or hit EAGAIN, says nothing lasting about the binary.
+    it('probes again after a failed probe instead of reporting unavailable until restart', async () => {
+      probeFfmpeg.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+      const service = makeService(config());
+
+      await expect(service.isAvailable()).resolves.toBe(false);
+      await expect(service.isAvailable()).resolves.toBe(true);
+      await expect(service.isAvailable()).resolves.toBe(true);
+      expect(probeFfmpeg).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('resolving the caller’s media', () => {
