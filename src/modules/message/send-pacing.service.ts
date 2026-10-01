@@ -71,6 +71,30 @@ interface BreakerState {
   openedAt: number | null;
 }
 
+/**
+ * Sends admitted in a short window, per session. A send's row is written by the caller after the
+ * check returns (after the plugin gate), so a burst of parallel requests would otherwise all read the
+ * same persisted count and all pass. Each cap is judged by the larger of the persisted count and the
+ * count it read when the window opened plus what was admitted since, so nothing is counted twice.
+ */
+interface AdmissionWindow {
+  openedAt: number;
+  dayStartMs: number;
+  sentBase: number;
+  sent: number;
+  /** Null until the window admits its first cold send. */
+  coldBase: number | null;
+  /** Cold chats admitted, folded the way the cold count folds dialects: one contact is one reachout. */
+  coldChats: Set<string>;
+}
+
+/**
+ * How long admitted sends are held against the caps before only their rows count. It only has to
+ * outlast the gap between the check and the row insert; a gated send that never writes a row (a
+ * plugin veto) is over-counted for at most this long.
+ */
+const ADMISSION_WINDOW_MS = 10_000;
+
 /** Refusals suppressed since the last audited one, per session. */
 interface RefusalSample {
   count: number;
@@ -115,6 +139,8 @@ const MAX_REFUSAL_KEYS = 1000;
  * writes no row itself but is counted through the OUTGOING row its own-send echo persists
  * (MessageProjector.handleOwnSendEcho) shortly after the send returns. Deliberate, and documented in
  * .env.example and docs/06 so the number an operator reads is the number they get.
+ * Because the row lands only after the check returns, sends admitted in the last few seconds are
+ * also held in memory (see AdmissionWindow), or a parallel burst would pass against one stale count.
  * The breaker, by contrast, is in memory on purpose: it describes live conditions, and a restart
  * clearing it is the correct behaviour.
  */
@@ -133,6 +159,7 @@ export class SendPacingService {
    * chat half is counted from the messages table and is.
    */
   private readonly groupReachoutTally = new Map<string, { dayStartMs: number; count: number }>();
+  private readonly admissions = new Map<string, AdmissionWindow>();
   private readonly refusalSamples = new Map<string, RefusalSample>();
 
   constructor(
@@ -153,14 +180,83 @@ export class SendPacingService {
    *
    * When the feature is off this returns before doing anything at all — no query, no map lookup — so
    * a deployment that has not opted in behaves exactly as it did before the governor existed.
+   *
+   * `hold: false` judges the send without holding it in the admission window, for a gated send that
+   * never writes a row (an edit): holding it would charge the caps for a message that is never sent.
    */
-  async assertSendAllowed(sessionId: string, chatId?: string): Promise<void> {
+  async assertSendAllowed(sessionId: string, chatId?: string, opts: { hold?: boolean } = {}): Promise<void> {
     const config = resolveSendPacingConfig(this.configService);
     if (!config.enabled) return;
 
     this.assertBreakerClosed(sessionId, config);
-    await this.assertUnderDailyCap(sessionId, config);
-    await this.assertUnderColdCap(sessionId, chatId, config);
+    const session = await this.sessionRepository.findOne({ where: { id: sessionId } });
+    // No row means the send is about to fail on its own for a better reason than pacing; let it.
+    if (!session) return;
+
+    const dayStart = startOfUtcDay(new Date());
+    // Age from createdAt, NOT connectedAt: connectedAt is overwritten on every connect, so a session
+    // that reconnects would look one day old forever and never leave the first rung of the ramp.
+    const ageDays = Math.floor((dayStart.getTime() - startOfUtcDay(session.createdAt).getTime()) / DAY_MS);
+    const allowance = this.allowanceForAge(config.warmupSchedule, ageDays);
+    const sentToday = await this.messageRepository.count({
+      where: { sessionId, direction: MessageDirection.OUTGOING, createdAt: MoreThanOrEqual(dayStart) },
+    });
+    // The overall cap is the cheaper check and bounds everything, so it settles before the cold probe.
+    this.assertUnderDailyCap(sessionId, dayStart, ageDays, allowance, sentToday);
+    const cold = await this.readColdReachouts(sessionId, chatId, dayStart, ageDays, config);
+
+    // Judged again, and admitted, with no await from here on: a concurrent request admitted while this
+    // one was reading must count, and this one must count for the next.
+    this.assertUnderDailyCap(sessionId, dayStart, ageDays, allowance, sentToday);
+    // A status post (no chatId) never writes a row and never has, so it is not held either.
+    if (!chatId) return;
+    // A chat already admitted cold in this window is the same reachout again, not a new one.
+    if (cold && !this.admissionWindow(sessionId, dayStart)?.coldChats.has(coldChatKey(chatId))) {
+      this.assertUnderColdCap(sessionId, dayStart, ageDays, cold);
+    }
+    if (opts.hold !== false) {
+      this.admit(sessionId, dayStart, sentToday, cold ? { chatId, coldToday: cold.coldToday } : undefined);
+    }
+  }
+
+  /** Cold chat reachouts today: the persisted count, or more when the admission window holds more. */
+  private chatReachoutsToday(sessionId: string, dayStart: Date, persisted: number): number {
+    const window = this.admissionWindow(sessionId, dayStart);
+    return Math.max(persisted, window && window.coldBase !== null ? window.coldBase + window.coldChats.size : 0);
+  }
+
+  /** The current admission window for this session, or undefined once it lapsed or the day rolled. */
+  private admissionWindow(sessionId: string, dayStart: Date): AdmissionWindow | undefined {
+    const window = this.admissions.get(sessionId);
+    if (!window) return undefined;
+    if (window.dayStartMs === dayStart.getTime() && Date.now() - window.openedAt < ADMISSION_WINDOW_MS) return window;
+    this.admissions.delete(sessionId);
+    return undefined;
+  }
+
+  private admit(
+    sessionId: string,
+    dayStart: Date,
+    sentToday: number,
+    cold: { chatId: string; coldToday: number } | undefined,
+  ): void {
+    let window = this.admissionWindow(sessionId, dayStart);
+    if (!window) {
+      window = {
+        openedAt: Date.now(),
+        dayStartMs: dayStart.getTime(),
+        sentBase: sentToday,
+        sent: 0,
+        coldBase: null,
+        coldChats: new Set(),
+      };
+      this.admissions.set(sessionId, window);
+    }
+    window.sent += 1;
+    if (cold) {
+      window.coldBase ??= cold.coldToday;
+      window.coldChats.add(coldChatKey(cold.chatId));
+    }
   }
 
   /**
@@ -220,16 +316,18 @@ export class SendPacingService {
           `conversation(s) for a session ${ageDays} day(s) old; split the request into batches of at most ${allowance}`,
       );
     }
-    // Both sources of the day's reachouts: cold chat messages (persisted rows) and prior group adds
+    // Both sources of the day's reachouts: cold chat messages (persisted rows, or the sends just
+    // admitted when those are more) and prior group adds
     // (the in-memory tally). Group adds persist nothing, so without the tally they would not count
     // against themselves and the cap would reset every request.
-    const usedToday =
-      (await this.countColdReachoutsToday(sessionId, dayStart)) + this.groupReachoutsToday(sessionId, dayStart);
+    const coldChats = await this.countColdReachoutsToday(sessionId, dayStart);
     // The UTC day rolled over while counting: check again against the new day, so the batch is
     // reserved on (and judged by) the day it actually runs in.
     if (startOfUtcDay(new Date()).getTime() !== dayStart.getTime()) {
       return this.assertReachoutAllowed(sessionId, contactIds);
     }
+    const usedToday =
+      this.chatReachoutsToday(sessionId, dayStart, coldChats) + this.groupReachoutsToday(sessionId, dayStart);
     if (usedToday + coldCount <= allowance) {
       // Reserved now, with no await between the check and the charge: a concurrent request must
       // see this batch as spent. The caller refunds it (refundGroupReachouts) if the engine call
@@ -348,20 +446,15 @@ export class SendPacingService {
     });
   }
 
-  private async assertUnderDailyCap(sessionId: string, config: SendPacingConfig): Promise<void> {
-    const session = await this.sessionRepository.findOne({ where: { id: sessionId } });
-    // No row means the send is about to fail on its own for a better reason than pacing; let it.
-    if (!session) return;
-
-    const dayStart = startOfUtcDay(new Date());
-    // Age from createdAt, NOT connectedAt: connectedAt is overwritten on every connect, so a session
-    // that reconnects would look one day old forever and never leave the first rung of the ramp.
-    const ageDays = Math.floor((dayStart.getTime() - startOfUtcDay(session.createdAt).getTime()) / DAY_MS);
-    const allowance = this.allowanceForAge(config.warmupSchedule, ageDays);
-
-    const sentToday = await this.messageRepository.count({
-      where: { sessionId, direction: MessageDirection.OUTGOING, createdAt: MoreThanOrEqual(dayStart) },
-    });
+  private assertUnderDailyCap(
+    sessionId: string,
+    dayStart: Date,
+    ageDays: number,
+    allowance: number,
+    persisted: number,
+  ): void {
+    const window = this.admissionWindow(sessionId, dayStart);
+    const sentToday = Math.max(persisted, window ? window.sentBase + window.sent : 0);
     if (sentToday < allowance) return;
 
     this.refuse('daily_cap', sessionId, secondsUntilNextUtcDay(), {
@@ -406,7 +499,7 @@ export class SendPacingService {
   }
 
   /**
-   * Refuse a cold reachout once the day's allowance for them is spent.
+   * Read what the cold-reachout rule needs for this send, or null when the rule does not apply.
    *
    * "Cold" means this account has no history with the chat in EITHER direction: answering someone
    * who wrote to you first is not a reachout, and counting it as one would throttle exactly the
@@ -416,12 +509,14 @@ export class SendPacingService {
    * The cheap probe runs first and settles most sends in one indexed lookup; the aggregate that
    * counts the day's cold reachouts only runs when this send is itself cold.
    */
-  private async assertUnderColdCap(
+  private async readColdReachouts(
     sessionId: string,
     chatId: string | undefined,
+    dayStart: Date,
+    ageDays: number,
     config: SendPacingConfig,
-  ): Promise<void> {
-    if (!chatId || config.coldSchedule.length === 0) return;
+  ): Promise<{ allowance: number; coldToday: number } | null> {
+    if (!chatId || config.coldSchedule.length === 0) return null;
 
     // Any row at all, either direction, any time: one message from them, or one from us last month,
     // and this is an existing relationship rather than a reachout. Probed under both user-id
@@ -430,18 +525,25 @@ export class SendPacingService {
     const hasHistory = await this.messageRepository.exists({
       where: dialectVariants(chatId).map(id => ({ sessionId, chatId: id })),
     });
-    if (hasHistory) return;
+    if (hasHistory) return null;
 
-    const session = await this.sessionRepository.findOne({ where: { id: sessionId } });
-    if (!session) return;
+    return {
+      allowance: this.allowanceForAge(config.coldSchedule, ageDays),
+      coldToday: await this.countColdReachoutsToday(sessionId, dayStart),
+    };
+  }
 
-    const dayStart = startOfUtcDay(new Date());
-    const ageDays = Math.floor((dayStart.getTime() - startOfUtcDay(session.createdAt).getTime()) / DAY_MS);
-    const allowance = this.allowanceForAge(config.coldSchedule, ageDays);
+  /** Refuse a cold reachout once the day's allowance for them is spent. */
+  private assertUnderColdCap(
+    sessionId: string,
+    dayStart: Date,
+    ageDays: number,
+    { allowance, coldToday: persisted }: { allowance: number; coldToday: number },
+  ): void {
     // Group adds share this budget: a day spent adding strangers to groups must leave fewer cold
-    // chat reachouts, so fold the in-memory group tally in alongside the persisted chat count.
+    // chat reachouts, so fold the in-memory group tally in alongside the chat count.
     const coldToday =
-      (await this.countColdReachoutsToday(sessionId, dayStart)) + this.groupReachoutsToday(sessionId, dayStart);
+      this.chatReachoutsToday(sessionId, dayStart, persisted) + this.groupReachoutsToday(sessionId, dayStart);
     if (coldToday < allowance) return;
 
     this.refuse('cold_daily_cap', sessionId, secondsUntilNextUtcDay(), {
@@ -535,6 +637,11 @@ const DAY_MS = 86_400_000;
  */
 const DIALECT_PAIR = (alias: string): string =>
   `REPLACE(${alias}."chatId", '@s.whatsapp.net', '@c.us'), REPLACE(${alias}."chatId", '@c.us', '@s.whatsapp.net')`;
+
+/** A chat id folded the way countColdReachoutsToday folds it, so the window counts contacts alike. */
+function coldChatKey(chatId: string): string {
+  return chatId.replace('@s.whatsapp.net', '@c.us');
+}
 
 function dialectVariants(chatId: string): string[] {
   const lower = chatId.toLowerCase();

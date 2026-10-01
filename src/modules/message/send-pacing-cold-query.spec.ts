@@ -76,7 +76,7 @@ describe('cold-reachout counting against a real database', () => {
     await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeUndefined();
 
     await addMessage('new-3@c.us', TODAY);
-    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).rejects.toMatchObject({ status: 429 });
+    await expect(service.assertSendAllowed('s1', 'stranger-2@c.us')).rejects.toMatchObject({ status: 429 });
   });
 
   // The direction asymmetry is the whole point: someone writing to us first makes the chat warm,
@@ -109,7 +109,7 @@ describe('cold-reachout counting against a real database', () => {
     await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeUndefined();
 
     await addMessage('cold-3@c.us', TODAY);
-    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).rejects.toMatchObject({ status: 429 });
+    await expect(service.assertSendAllowed('s1', 'stranger-2@c.us')).rejects.toMatchObject({ status: 429 });
   });
 
   it("does not count another session's reachouts", async () => {
@@ -169,7 +169,7 @@ describe('cold-reachout counting against a real database', () => {
     await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeUndefined();
 
     await addMessage('cold-3@c.us', TODAY);
-    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).rejects.toMatchObject({ status: 429 });
+    await expect(service.assertSendAllowed('s1', 'stranger-2@c.us')).rejects.toMatchObject({ status: 429 });
   });
 
   it("forgets yesterday's reachouts when the UTC day rolls over", async () => {
@@ -454,5 +454,120 @@ describe('group reachouts against a real database', () => {
       });
       expect(addParticipants).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+// A send's row is written by the caller after the check returns (after the plugin gate), so the
+// persisted count alone cannot see sends that passed the check moments earlier. A burst of parallel
+// requests must still be held to the cap, not each judged against the same stale count.
+describe('concurrent sends against a real database', () => {
+  let ds: DataSource;
+  const NOW = new Date('2026-08-03T12:00:00.000Z');
+
+  const build = (warmupSchedule: number[], coldSchedule: number[]): SendPacingService =>
+    new SendPacingService(ds.getRepository(Message), ds.getRepository(Session), {
+      get: (key: string) =>
+        key === 'sendPacing'
+          ? { ...computeSendPacingConfig({}), enabled: true, warmupSchedule, coldSchedule }
+          : undefined,
+    } as unknown as ConfigService);
+
+  // Check, then persist the row the way a send path does; resolves true when the send went out.
+  const send = async (service: SendPacingService, chatId: string, i: number): Promise<boolean> => {
+    try {
+      await service.assertSendAllowed('s1', chatId);
+    } catch {
+      return false;
+    }
+    await ds.query(
+      `INSERT INTO "messages" ("id","sessionId","chatId","from","to","type","direction","createdAt")
+       VALUES (?,?,?,'a','b','text','outgoing',?)`,
+      [`m${i}`, 's1', chatId, new Date().toISOString()],
+    );
+    return true;
+  };
+
+  beforeEach(async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] }).setSystemTime(NOW);
+    ds = new DataSource({
+      type: 'better-sqlite3',
+      database: ':memory:',
+      entities: [Message, Session],
+      synchronize: true,
+    });
+    await ds.initialize();
+    await ds.getRepository(Session).save({ name: 'bot', id: 's1', createdAt: NOW });
+  });
+
+  afterEach(async () => {
+    jest.useRealTimers();
+    await ds.destroy();
+  });
+
+  it('admits exactly the daily allowance from a parallel burst', async () => {
+    const service = build([20], []);
+    await ds.query(
+      `INSERT INTO "messages" ("id","sessionId","chatId","from","to","type","direction","createdAt")
+       VALUES ('seed','s1','known@c.us','a','b','text','incoming',?)`,
+      [new Date(NOW.getTime() - 60_000).toISOString()],
+    );
+
+    const sent = await Promise.all(Array.from({ length: 100 }, (_, i) => send(service, 'known@c.us', i)));
+
+    expect(sent.filter(Boolean)).toHaveLength(20);
+  });
+
+  it('admits exactly the cold allowance from a parallel burst to strangers', async () => {
+    const service = build([10_000], [5]);
+
+    const sent = await Promise.all(Array.from({ length: 100 }, (_, i) => send(service, `6281${i}@c.us`, i)));
+
+    expect(sent.filter(Boolean)).toHaveLength(5);
+  });
+
+  it('charges parallel sends to one stranger as a single reachout', async () => {
+    const service = build([10_000], [2]);
+
+    const sent = await Promise.all(Array.from({ length: 3 }, (_, i) => send(service, 'lead@c.us', i)));
+
+    expect(sent).toEqual([true, true, true]);
+    expect(await send(service, 'second@c.us', 9)).toBe(true);
+  });
+
+  it('judges an edit against the cap without holding it, since an edit writes no row', async () => {
+    const service = build([20], []);
+    await ds.query(
+      `INSERT INTO "messages" ("id","sessionId","chatId","from","to","type","direction","createdAt")
+       VALUES ('seed','s1','known@c.us','a','b','text','outgoing',?)`,
+      [new Date(NOW.getTime() - 60_000).toISOString()],
+    );
+    for (let i = 0; i < 30; i++) await service.assertSendAllowed('s1', 'known@c.us', { hold: false });
+
+    expect(await send(service, 'known@c.us', 1)).toBe(true);
+  });
+
+  it('charges a group add for a cold send admitted but not yet persisted', async () => {
+    const service = build([10_000], [1]);
+    await service.assertSendAllowed('s1', 'stranger@c.us');
+
+    await expect(service.assertReachoutAllowed('s1', ['other@c.us'])).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('still admits sequential sends up to the allowance, each counted once', async () => {
+    const service = build([5], []);
+    const sent: boolean[] = [];
+    for (let i = 0; i < 7; i++) sent.push(await send(service, 'known@c.us', i));
+
+    expect(sent).toEqual([true, true, true, true, true, false, false]);
+  });
+
+  it('judges by the persisted rows alone once the hold has lapsed', async () => {
+    const service = build([5], []);
+    // A gated send that never writes a row (a plugin veto) is held only briefly.
+    await service.assertSendAllowed('s1', 'known@c.us');
+    for (let i = 0; i < 4; i++) await send(service, 'known@c.us', i);
+    jest.setSystemTime(NOW.getTime() + 60_000);
+
+    expect(await send(service, 'known@c.us', 9)).toBe(true);
   });
 });
