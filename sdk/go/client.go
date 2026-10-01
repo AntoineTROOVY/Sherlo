@@ -1,4 +1,5 @@
-// Package openwa is the official Go client for the OpenWA WhatsApp API Gateway.
+// Package openwa is the official Go client for OpenWA, the open-source WhatsApp API Gateway (not
+// affiliated with WhatsApp or Meta).
 //
 // The single entry point is New, which returns a *Client whose exported fields
 // are the domain services:
