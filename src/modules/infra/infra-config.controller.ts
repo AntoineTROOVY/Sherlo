@@ -172,7 +172,10 @@ export class InfraConfigController {
         s3Bucket: effective('S3_BUCKET') || '',
         s3Region: effective('S3_REGION') || '',
         s3Endpoint: effective('S3_ENDPOINT') || '',
-        s3CredentialsSet: Boolean(effective('S3_ACCESS_KEY_ID') && effective('S3_SECRET_ACCESS_KEY')),
+        s3CredentialsSet: Boolean(
+          (effective('S3_ACCESS_KEY_ID') || effective('S3_ACCESS_KEY')) &&
+          (effective('S3_SECRET_ACCESS_KEY') || effective('S3_SECRET_KEY')),
+        ),
       },
       engine: {
         type: effective('ENGINE_TYPE') || 'whatsapp-web.js',
@@ -324,8 +327,9 @@ export class InfraConfigController {
         postgresBuiltIn: bootValue('POSTGRES_BUILTIN'),
         databaseHost: bootValue('DATABASE_HOST'),
         storageType: bootValue('STORAGE_TYPE'),
-        s3AccessKey: bootValue('S3_ACCESS_KEY_ID'),
-        s3SecretKey: bootValue('S3_SECRET_ACCESS_KEY'),
+        // The same canonical-with-legacy fallback main.ts and storage.service apply.
+        s3AccessKey: bootValue('S3_ACCESS_KEY_ID') || bootValue('S3_ACCESS_KEY'),
+        s3SecretKey: bootValue('S3_SECRET_ACCESS_KEY') || bootValue('S3_SECRET_KEY'),
         s3Endpoint: bootValue('S3_ENDPOINT'),
         minioBuiltIn: bootValue('MINIO_BUILTIN'),
         redisPassword: bootValue('REDIS_PASSWORD'),

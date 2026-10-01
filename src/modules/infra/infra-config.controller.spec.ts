@@ -941,6 +941,8 @@ describe('InfraConfigController.saveConfig built-in/external mode flips and the 
       'STORAGE_TYPE',
       'S3_ACCESS_KEY_ID',
       'S3_SECRET_ACCESS_KEY',
+      'S3_ACCESS_KEY',
+      'S3_SECRET_KEY',
       'S3_ENDPOINT',
       'MINIO_BUILTIN',
       'REDIS_PASSWORD',
@@ -996,6 +998,17 @@ describe('InfraConfigController.saveConfig built-in/external mode flips and the 
         'DATABASE_TYPE=postgres\nPOSTGRES_BUILTIN=false\nDATABASE_HOST=db.example.com\nDATABASE_PASSWORD=Str0ngSaved!\n',
         /DATABASE_PASSWORD/,
       );
+    });
+
+    it('accepts external S3 credentials supplied under the legacy names boot still reads', () => {
+      // main.ts and storage.service fall back to S3_ACCESS_KEY / S3_SECRET_KEY when the canonical
+      // names are unset, so a deployment configured that way boots and must be able to save.
+      process.env.STORAGE_TYPE = 's3';
+      process.env.S3_ENDPOINT = 'https://s3.example.com';
+      process.env.S3_ACCESS_KEY = 'AKIAEXAMPLESTRONG1';
+      process.env.S3_SECRET_KEY = 'Sup3rSecretS3Key!';
+      const env = written({ queue: { enabled: false } });
+      expect(env).toContain('QUEUE_ENABLED=false');
     });
 
     // The cases above delete every guard key from process.env, which cannot happen in production:
@@ -1103,6 +1116,21 @@ describe('InfraConfigController.getConfig (#226)', () => {
     // Secrets are never present on the returned object.
     expect(JSON.stringify(cfg)).not.toContain('secret');
     expect(JSON.stringify(cfg)).not.toContain('"ak"');
+  });
+
+  it('reports S3 credentials set under the legacy names the runtime still reads', () => {
+    recordPinnedEnvKeys({ S3_ACCESS_KEY: 'ak', S3_SECRET_KEY: 'sk' });
+    process.env.S3_ACCESS_KEY = 'ak';
+    process.env.S3_SECRET_KEY = 'sk';
+    try {
+      expect(
+        new InfraConfigController({} as never, {} as never, {} as never).getConfig().storage.s3CredentialsSet,
+      ).toBe(true);
+    } finally {
+      delete process.env.S3_ACCESS_KEY;
+      delete process.env.S3_SECRET_KEY;
+      recordPinnedEnvKeys({});
+    }
   });
 });
 
