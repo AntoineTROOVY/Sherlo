@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   Database,
@@ -13,7 +14,7 @@ import {
   Download,
   Upload,
 } from 'lucide-react';
-import { API_BASE_URL } from '../services/api';
+import { API_BASE_URL, type SavedConfig } from '../services/api';
 import { copyToClipboard } from '../utils/clipboard';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useInfraStatusQuery, useInfraConfigQuery, useEnginesQuery, useCurrentEngineQuery } from '../hooks/queries';
@@ -48,6 +49,13 @@ export function Infrastructure() {
   const currentEngine = currentEngineData?.engineType ?? '';
 
   const configForm = useInfraConfigForm(infraStatus, savedConfig);
+  const queryClient = useQueryClient();
+  // The saved config as the page first read it. A save refetches the saved config (so the pending-restart
+  // notes see it), but until a restart the database still running is the one read here.
+  const loadedConfig = useRef<SavedConfig | undefined>(undefined);
+  useEffect(() => {
+    if (savedConfig && !loadedConfig.current) loadedConfig.current = savedConfig;
+  }, [savedConfig]);
   const restartFlow = useRestartFlow();
   const dataBackup = useDataBackup();
 
@@ -61,15 +69,16 @@ export function Infrastructure() {
       // empty-database / orphaned-media data move before it happens. A switch is: changing type;
       // flipping built-in↔external (different physical backend); OR retargeting an external Postgres
       // to a different host/port/database (also a different, empty DB). Host/port/db aren't all in
-      // /status, so compare the edited form against the still-cached saved config. A key with nothing
-      // saved reads '', and runs on the same fallback the form was seeded with.
+      // /status, so compare the edited form against the saved config as the page loaded it. A key with
+      // nothing saved reads '', and runs on the same fallback the form was seeded with.
+      const loaded = loadedConfig.current;
       const dbExternalRetarget =
         configForm.dbConfig.type === 'postgres' &&
         !configForm.dbConfig.builtIn &&
-        !!savedConfig &&
-        (configForm.dbConfig.host !== (savedConfig.database.host || infraStatus?.database.host || 'localhost') ||
-          configForm.dbConfig.port !== (savedConfig.database.port || '5432') ||
-          configForm.dbConfig.database !== (savedConfig.database.database || 'openwa'));
+        !!loaded &&
+        (configForm.dbConfig.host !== (loaded.database.host || infraStatus?.database.host || 'localhost') ||
+          configForm.dbConfig.port !== (loaded.database.port || '5432') ||
+          configForm.dbConfig.database !== (loaded.database.database || 'openwa'));
       const dbSwitch =
         !!infraStatus &&
         (configForm.dbConfig.type !== infraStatus.database.type ||
@@ -90,6 +99,8 @@ export function Infrastructure() {
         infraStatus?.storage.type === 's3' && infraStatus.storage.builtIn && 'minio',
       ].filter((p): p is string => typeof p === 'string');
       restartFlow.open({ profiles, running, dbSwitch, storageSwitch });
+      // The form is seeded once, so the refetch keeps any edit in progress.
+      void queryClient.invalidateQueries({ queryKey: ['infra', 'config'] });
     },
   });
 

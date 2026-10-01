@@ -590,6 +590,49 @@ test('the pending-restart note survives a successful save', async () => {
   assert.ok(screen.queryByText(PENDING_RESTART_NOTE), 'the pending-restart note must not vanish once a save succeeds');
 });
 
+test('a change saved and left for a later restart shows the pending-restart note', async () => {
+  const { screen, waitFor, fireEvent, within } = rtl;
+  resetFetchCalls();
+  // Running and saved agree, so no note yet: the drift comes only from this save.
+  const { container } = renderInfrastructure();
+
+  await screen.findByText('Database Configuration');
+  await awaitConfigHydrated(container);
+  assert.ok(!screen.queryByText(PENDING_RESTART_NOTE), 'no note before anything is saved');
+
+  fireEvent.click(container.querySelector<HTMLInputElement>('input[name="dbType"]')!);
+  // From here on the gateway reports what the save just wrote.
+  overrides = { saved: { ...SAVED_CONFIG, database: { ...SAVED_CONFIG.database, type: 'sqlite' } } };
+  fireEvent.click(screen.getByRole('button', { name: 'Save Configuration' }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Restart Later' }));
+
+  await waitFor(() => assert.ok(screen.queryByText(PENDING_RESTART_NOTE), 'expected the pending-restart note'));
+});
+
+test('a second save before the restart still warns of the database switch the first one saved', async () => {
+  const { screen, waitFor, fireEvent, within } = rtl;
+  resetFetchCalls();
+  const { container } = renderInfrastructure();
+
+  await screen.findByText('Database Configuration');
+  await awaitConfigHydrated(container);
+  fireEvent.change(fieldInput(container, 'Host'), { target: { value: 'new-db-host' } });
+  overrides = { saved: { ...SAVED_CONFIG, database: { ...SAVED_CONFIG.database, host: 'new-db-host' } } };
+  fireEvent.click(screen.getByRole('button', { name: 'Save Configuration' }));
+  let dialog = await screen.findByRole('dialog');
+  within(dialog).getByText(DB_SWITCH_WARNING, { exact: false });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Restart Later' }));
+  // The refetched saved config now names the new host; the running database is still the old one.
+  await waitFor(() =>
+    assert.equal(fetchCalls.filter(c => c.method === 'GET' && c.path === '/api/infra/config').length, 2),
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: 'Save Configuration' }));
+  dialog = await screen.findByRole('dialog');
+  within(dialog).getByText(DB_SWITCH_WARNING, { exact: false });
+});
+
 /** The pin note rendered inside a text field's form group, or null. */
 function fieldPinNote(container: HTMLElement, labelText: string): string | null {
   return fieldInput(container, labelText).closest('.form-group')?.querySelector('.env-pin-note')?.textContent ?? null;
