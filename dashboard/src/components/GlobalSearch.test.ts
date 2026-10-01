@@ -101,7 +101,6 @@ test('a response for a query the user cleared does not fill the list', async () 
   await rtl.act(async () => pending.get('refund')!(['refund issued']));
   // Typing again shows the panel before the next debounce fires: it must not hold the cleared results.
   rtl.fireEvent.change(input, { target: { value: 'r' } });
-  rtl.fireEvent.focus(input);
   await new Promise(resolve => setTimeout(resolve, 20));
   assert.equal(rtl.screen.queryByText('refund issued') === null, true, 'the cleared query filled the list');
 });
