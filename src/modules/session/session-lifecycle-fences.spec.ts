@@ -133,11 +133,11 @@ describe('SessionLifecycleFences', () => {
         fences.trackPendingCredentialTeardown('main', new Promise<void>(() => undefined));
         const waiting = fences.awaitPendingTeardown('main');
         jest.advanceTimersByTime(10_001);
+        await expect(waiting).rejects.toBeInstanceOf(ConflictException);
         await expect(waiting).rejects.toMatchObject({
           status: 409,
           response: { code: 'SESSION_NAME_TEARDOWN_PENDING' },
         });
-        expect(ConflictException).toBeDefined();
         // Fail closed: the entry survives so a retry after settlement can proceed.
         expect(pendingTeardowns.has('main')).toBe(true);
       } finally {
