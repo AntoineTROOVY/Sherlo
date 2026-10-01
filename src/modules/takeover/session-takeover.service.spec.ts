@@ -6,6 +6,7 @@ import type { SessionService } from '../session/session.service';
 import type { SessionOwnershipService } from '../session/session-ownership.service';
 import type { ConfigService } from '@nestjs/config';
 import type { ShutdownService } from '../../common/services/shutdown.service';
+import type { EngineRegistry } from '../../engine/engine-registry.service';
 
 /**
  * The sweep is the retry that boot auto-start never had: both live incidents (a container recreate
@@ -27,7 +28,7 @@ describe('SessionTakeoverService', () => {
 
   const build = (
     rows: Session[],
-    opts: { autoStart?: boolean; startImpl?: jest.Mock } = {},
+    opts: { autoStart?: boolean; startImpl?: jest.Mock; maxConcurrent?: number; activeIds?: string[] } = {},
   ): {
     svc: SessionTakeoverService;
     start: jest.Mock;
@@ -40,6 +41,7 @@ describe('SessionTakeoverService', () => {
         ({
           features: { autoStartSessions: opts.autoStart ?? true },
           'session.takeoverSweepMs': 30_000,
+          'sessions.maxConcurrent': opts.maxConcurrent,
         })[key as 'features'] ?? def,
     } as unknown as ConfigService;
     const svc = new SessionTakeoverService(
@@ -49,6 +51,8 @@ describe('SessionTakeoverService', () => {
         leaseTtlMs: 60_000,
       } as unknown as SessionOwnershipService,
       config,
+      undefined,
+      { activeIds: () => opts.activeIds ?? [] } as unknown as EngineRegistry,
     );
     return { svc, start, markLapsedDisconnected };
   };
@@ -143,6 +147,25 @@ describe('SessionTakeoverService', () => {
     await sweep;
 
     expect(start.mock.calls).toEqual([['id-raced'], ['id-ours']]);
+  });
+
+  // A start the cap refuses still claims the lapsed lease first, and the refusal then releases it to
+  // nobody: no peer adopts a row without a holder, so the session would stay down. A node at its cap
+  // leaves the lease alone for a peer with room.
+  it('adopts nothing while this node is at MAX_CONCURRENT_SESSIONS', async () => {
+    const { svc, start } = build([lapsed({ name: 'a' })], { maxConcurrent: 1, activeIds: ['busy'] });
+
+    await svc.sweep();
+
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it('adopts while this node is still below MAX_CONCURRENT_SESSIONS', async () => {
+    const { svc, start } = build([lapsed({ name: 'a' })], { maxConcurrent: 2, activeIds: ['busy'] });
+
+    await svc.sweep();
+
+    expect(start).toHaveBeenCalledWith('id-a');
   });
 
   it('a session stopped after the sweep read it is logged as skipped, not as a lost claim race', async () => {

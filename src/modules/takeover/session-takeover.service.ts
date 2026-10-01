@@ -7,6 +7,8 @@ import { SessionOwnershipService } from '../session/session-ownership.service';
 import { ShutdownService } from '../../common/services/shutdown.service';
 import { SessionService } from '../session/session.service';
 import { SessionStoppedException } from '../session/session-engine-controls';
+import { resolveMaxConcurrentSessions } from '../session/session-engine-lifecycle.service';
+import { EngineRegistry } from '../../engine/engine-registry.service';
 
 /**
  * Statuses worth adopting from a lapsed node. They all mean "an engine was (or should be) running".
@@ -85,6 +87,8 @@ export class SessionTakeoverService implements OnApplicationBootstrap, OnModuleD
     // source session-engine-lifecycle and the liveness watchdog already consult.
     @Optional()
     private readonly shutdownService?: ShutdownService,
+    @Optional()
+    private readonly engines?: EngineRegistry,
   ) {}
 
   /** True once EITHER the drain has begun or Nest has torn this module down. */
@@ -159,6 +163,15 @@ export class SessionTakeoverService implements OnApplicationBootstrap, OnModuleD
       // stagger, so the loop spans a large part of the sweep interval and shutdown can begin partway
       // through. Everything already adopted is left to the normal teardown; nothing further starts.
       if (this.stopping) return;
+      // start() claims the lapsed lease before the cap check refuses the launch, and that refusal
+      // releases the claim to nobody: a row with no holder is never adopted again, by this node or a
+      // peer. A node at its cap therefore leaves the lease where it is, for a peer with room.
+      if (!this.hasStartCapacity()) {
+        this.logger.debug('Takeover paused: this node is at MAX_CONCURRENT_SESSIONS', {
+          pending: eligible.length - i,
+        });
+        return;
+      }
       try {
         await this.sessionService.start(session.id);
         this.logger.log(`Adopted session ${session.name} from lapsed node ${session.nodeId ?? '?'}`, {
@@ -184,6 +197,12 @@ export class SessionTakeoverService implements OnApplicationBootstrap, OnModuleD
         await new Promise(resolve => setTimeout(resolve, TAKEOVER_START_STAGGER_MS));
       }
     }
+  }
+
+  /** The same count the start path's MAX_CONCURRENT_SESSIONS check uses. */
+  private hasStartCapacity(): boolean {
+    const max = resolveMaxConcurrentSessions(this.configService);
+    return max === null || !this.engines || this.engines.activeIds().length < max;
   }
 
   private isEligible(session: Session): boolean {
