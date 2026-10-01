@@ -994,8 +994,8 @@ Returns HTTP `200`, matching the OpenAPI contract.
 > **`success: false` is a real outcome on the Baileys engine.** The read receipt is sent against the
 > newest message the chat received, so a chat the session has received no message in (one holding
 > only the account's own sends included) is reported as declined rather than marked read. The
-> whatsapp-web.js engine reads the chat from the page and needs no local history, so it never
-> produces this outcome.
+> whatsapp-web.js engine reads the chat from the page and needs no local history, but it still
+> answers `success: false` for a chat the page cannot find or when the page declines the read.
 
 **Errors:** `400` validation, or session not started · `401` · `403` · `404` session not found · `409` the session is not connected (engine exists but is not `ready`) · `503` WhatsApp did not answer within the request budget, or the engine’s browser page died — the change may or may not have been applied
 
