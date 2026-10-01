@@ -100,6 +100,7 @@ function resetFetchCalls(): void {
   startFailure = null;
   startGate = null;
   startResult = null;
+  createFailure = null;
   stopFailure = null;
   forceKillFailure = null;
   qrGate = null;
@@ -132,6 +133,8 @@ let startFailure: { status: number; message: string; leaves?: Partial<Session> }
 // When set, a successful POST .../start answers with the session's row merged with `answer`, and applies
 // `leaves` (by default `answer` itself) to the row the page reads back, instead of answering a stopped row.
 let startResult: { answer: Partial<Session>; leaves?: Partial<Session> } | null = null;
+// When set, the next POST /api/sessions answers with this error. Spent by that one create.
+let createFailure: { status: number; message: string } | null = null;
 // When set, POST .../stop answers with this error.
 let stopFailure: { status: number; message: string } | null = null;
 // When set, POST .../force-kill answers with this status and body.
@@ -193,6 +196,11 @@ function installFetchStub(): void {
     }
 
     if (method === 'POST' && path === '/api/sessions') {
+      if (createFailure) {
+        const { status, message } = createFailure;
+        createFailure = null;
+        return Promise.resolve(jsonResponse({ message }, status));
+      }
       if (afterMutation) setImmediate(afterMutation);
       const payload = body as { name?: string; proxyUrl?: string; proxyType?: string } | undefined;
       const name = payload?.name ?? 'unnamed';
@@ -431,6 +439,50 @@ test('creating a session issues POST /api/sessions with the entered name', async
   });
 
   await screen.findByText('backup-bot');
+});
+
+test('a create that succeeds after a refused one clears the refusal from the page', async () => {
+  const { screen, fireEvent, waitFor, within } = rtl;
+  resetFetchCalls();
+  createFailure = { status: 409, message: 'Session name already in use' };
+  renderSessions();
+
+  await screen.findByText('new-device');
+  fireEvent.click(screen.getByRole('button', { name: 'New Session' }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.change(within(dialog).getByPlaceholderText('e.g., marketing-bot'), { target: { value: 'retry-bot' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
+  // The refusal shows twice: in its toast and in the page banner.
+  await waitFor(() => assert.equal(screen.getAllByText('Session name already in use').length, 2));
+  const banner = screen.getAllByText('Session name already in use').find(el => !el.closest('.toast'));
+  assert.ok(banner, 'expected the refusal in the page banner');
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
+  await screen.findByText('retry-bot');
+  assert.equal(banner.isConnected, false, 'the refused create left its banner after the retry succeeded');
+});
+
+test('a refused and then successful create leave a failed list read in the banner', async () => {
+  const { screen, fireEvent, within } = rtl;
+  resetFetchCalls();
+  sessionListFailures = 1;
+  createFailure = { status: 409, message: 'Session name already in use' };
+  // No connect, so the recovery effect does not re-read the list behind the test's back.
+  holdConnect();
+  renderSessions();
+
+  await screen.findByText('gateway unavailable');
+  fireEvent.click(screen.getByRole('button', { name: 'New Session' }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.change(within(dialog).getByPlaceholderText('e.g., marketing-bot'), { target: { value: 'retry-bot' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
+  // The refusal is reported by its toast; the banner keeps the read failure, which still describes the list.
+  await screen.findAllByText('Session name already in use');
+  assert.ok(screen.queryByText('gateway unavailable'), 'the refused create replaced the failed read banner');
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
+  await screen.findByText('retry-bot');
+  assert.ok(screen.queryByText('gateway unavailable'), 'the create cleared the failed read banner');
 });
 
 test('Enter in the name field follows the same gate as the Create button', async () => {

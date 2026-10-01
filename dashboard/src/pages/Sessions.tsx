@@ -222,9 +222,16 @@ export function Sessions() {
       // setState would otherwise drop a row). Then invalidate the prefix so stats/groups/chats refresh.
       rowWrites.current += 1;
       updateSessions(current => [...current, newSession]);
+      // A refused earlier attempt left its message in the banner; nothing re-reads the list after a
+      // create, so clear it here. A failed list read keeps its banner.
+      if (!listReadFailed.current) setError(null);
       void invalidateSessionQueries(queryClient, queryKeys.sessions);
     },
-    onFailed: msg => setError(msg),
+    // The hook's toast reports the refusal; a failed list read keeps the banner, since it still
+    // describes the list on screen.
+    onFailed: msg => {
+      if (!listReadFailed.current) setError(msg);
+    },
   });
 
   // Reconcile the LOCAL view with an authoritative Session response. The previous handlers discarded
