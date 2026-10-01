@@ -47,10 +47,10 @@ export class BuiltInFtsProvider implements SearchProvider, OnModuleInit {
   constructor(@InjectDataSource('data') private readonly dataSource: DataSource) {}
 
   /**
-   * Self-heals the FTS schema at bootstrap so search works under DATABASE_SYNCHRONIZE=true (the dev
-   * compose and the zero-config first-boot default), where TypeORM creates the `messages` table from
-   * the entity but NEVER runs migrations — so the migration that establishes `messages_fts` /
-   * `body_ts` is skipped and search would 501 on a fresh SQLite box. This re-applies the same
+   * Self-heals the FTS schema at bootstrap so search works under an opted-in DATABASE_SYNCHRONIZE=true
+   * on SQLite (docker-compose.dev.yml sets it; the default is migrations), where TypeORM creates the
+   * `messages` table from the entity but NEVER runs migrations — so the migration that establishes
+   * `messages_fts` is skipped and search would 501 on a fresh SQLite box. This re-applies the same
    * idempotent DDL as the migration (1782400000000-AddMessagesFts); `IF NOT EXISTS` / `IF NOT` guards
    * make it a no-op once the schema exists, and on Postgres no DDL is issued at all when the catalog
    * already holds the column and index, so migrations-based deployments take no table lock. Probes the
@@ -138,9 +138,10 @@ export class BuiltInFtsProvider implements SearchProvider, OnModuleInit {
    *     and Postgres reads the catalog and issues no DDL, because `ALTER TABLE ... IF NOT EXISTS`
    *     still queues for ACCESS EXCLUSIVE on `messages` before it finds the column, stalling every
    *     message read and write behind any open transaction.
-   *   - synchronize-based deployments (dev compose / zero-config first boot): migrations are skipped,
-   *     so this is what actually brings the index up at boot. Without it search 501s on every fresh
-   *     SQLite box, contradicting docs/26's "zero-config, on by default" promise.
+   *   - synchronize-based SQLite deployments (DATABASE_SYNCHRONIZE=true, e.g. the dev compose):
+   *     migrations are skipped, so this is what actually brings the index up at boot. Without it
+   *     search 501s on every such box. Postgres refuses synchronize at boot, so the Postgres
+   *     branch only repairs a schema whose FTS migration objects are missing.
    * Returns true when the index is usable, false when the SQLite build lacks FTS5 (no schema left
    * behind — the route 501s cleanly via ensureFts).
    */
