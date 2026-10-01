@@ -449,6 +449,27 @@ test('a successful save opens the restart modal', async () => {
   within(dialog).getByRole('button', { name: 'Restart Later' });
 });
 
+const DB_SWITCH_WARNING = 'The new database starts empty.';
+
+test('an external Postgres on the default host, port and name does not warn of a switch on save', async () => {
+  const { screen, fireEvent, within } = rtl;
+  resetFetchCalls();
+  // Nothing saved for the three keys (the environment supplies them, or they are left at the defaults):
+  // /config reports '', while the form shows the host from /status and the defaults 5432 and openwa.
+  overrides = {
+    saved: { ...SAVED_CONFIG, database: { ...SAVED_CONFIG.database, host: '', port: '', database: '' } },
+  };
+  const { container } = renderInfrastructure();
+
+  await screen.findByText('Database Configuration');
+  await awaitConfigHydrated(container);
+  fireEvent.click(screen.getByRole('button', { name: 'Save Configuration' }));
+
+  const dialog = await screen.findByRole('dialog');
+  within(dialog).getByText('Configuration saved');
+  assert.ok(!within(dialog).queryByText(DB_SWITCH_WARNING, { exact: false }), 'an unchanged database is no switch');
+});
+
 const STATUS_LOAD_ERROR = "Couldn't load the current infrastructure status. Refresh to try again.";
 
 test('a failed first /status read shows the status error card and no form', async () => {

@@ -61,14 +61,15 @@ export function Infrastructure() {
       // empty-database / orphaned-media data move before it happens. A switch is: changing type;
       // flipping built-in↔external (different physical backend); OR retargeting an external Postgres
       // to a different host/port/database (also a different, empty DB). Host/port/db aren't all in
-      // /status, so compare the edited form against the still-cached saved config.
+      // /status, so compare the edited form against the still-cached saved config. A key with nothing
+      // saved reads '', and runs on the same fallback the form was seeded with.
       const dbExternalRetarget =
         configForm.dbConfig.type === 'postgres' &&
         !configForm.dbConfig.builtIn &&
         !!savedConfig &&
-        (configForm.dbConfig.host !== savedConfig.database.host ||
-          configForm.dbConfig.port !== savedConfig.database.port ||
-          configForm.dbConfig.database !== savedConfig.database.database);
+        (configForm.dbConfig.host !== (savedConfig.database.host || infraStatus?.database.host || 'localhost') ||
+          configForm.dbConfig.port !== (savedConfig.database.port || '5432') ||
+          configForm.dbConfig.database !== (savedConfig.database.database || 'openwa'));
       const dbSwitch =
         !!infraStatus &&
         (configForm.dbConfig.type !== infraStatus.database.type ||
