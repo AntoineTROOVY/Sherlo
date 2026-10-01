@@ -223,6 +223,13 @@ export interface IngressSignatureSpec {
   dedupHeader?: string;
 }
 
+const INGRESS_SIGNATURE_SCHEMES: readonly IngressSignatureSpec['scheme'][] = [
+  'hmac-sha256',
+  'shared-secret',
+  'standard-webhooks',
+  'none',
+];
+
 /** Provider webhook-verification challenge (e.g. a GET handshake on route registration). */
 export interface IngressChallengeSpec {
   method: 'GET';
@@ -368,6 +375,28 @@ export function validateIngressManifest(manifest: PluginManifest, allowUnsignedI
       throw new Error(
         `Plugin ${manifest.id}: ingress route '${String(r.route)}' must be a single URL path segment ` +
           `(no '/', '\\', '?', '#', '%', control character or lone surrogate, and not '.' or '..')`,
+      );
+    }
+    // The verifier treats any scheme it does not know as hmac-sha256, so a typo would load and then
+    // reject every delivery as a signature mismatch, with nothing pointing back at the manifest.
+    const signature: Partial<IngressSignatureSpec> | undefined =
+      r.signature && typeof r.signature === 'object' ? r.signature : undefined;
+    if (!signature?.scheme || !INGRESS_SIGNATURE_SCHEMES.includes(signature.scheme)) {
+      throw new Error(
+        `Plugin ${manifest.id}: route '${r.route}' signature.scheme must be one of ` +
+          `${INGRESS_SIGNATURE_SCHEMES.join(', ')} (got '${String(signature?.scheme)}')`,
+      );
+    }
+    // Only hmac-sha256 reads `encoding`; the other schemes ignore it, so a stray value there still loads.
+    if (
+      signature.scheme === 'hmac-sha256' &&
+      signature.encoding !== undefined &&
+      signature.encoding !== 'hex' &&
+      signature.encoding !== 'base64'
+    ) {
+      throw new Error(
+        `Plugin ${manifest.id}: route '${r.route}' signature.encoding must be 'hex' or 'base64' ` +
+          `(got '${String(signature.encoding)}')`,
       );
     }
     if (r.signature.scheme === 'none' && !allowUnsignedIngress) {
