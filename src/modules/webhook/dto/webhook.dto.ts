@@ -407,7 +407,7 @@ export class WebhookDeliveryFailureDto {
   })
   lastStatusCode?: number | null;
 
-  @ApiProperty({ example: 'connect ECONNREFUSED 10.0.0.1:443' })
+  @ApiProperty({ example: 'fetch failed' })
   lastError!: string;
 
   @ApiProperty({ type: String, format: 'date-time', description: 'When the failure was first recorded.' })
