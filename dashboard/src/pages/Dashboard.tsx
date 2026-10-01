@@ -37,7 +37,7 @@ export function Dashboard() {
   // GET /webhooks is OPERATOR-only and /stats/overview ADMIN-only. A key without the role is not sent
   // them, since the gateway audits every refusal as a failed authentication; their cards show the
   // unavailable placeholder.
-  const { data: webhooks, isError: webhooksFailed } = useWebhooksQuery(canWrite);
+  const { data: webhooks } = useWebhooksQuery(canWrite);
   const { data: overview } = useStatsOverviewQuery(isAdmin);
   const stopMutation = useStopSessionMutation();
   const unavailable = '—';
@@ -51,9 +51,9 @@ export function Dashboard() {
       ? sessionsError.message
       : t('dashboard.loadError')
     : null;
-  // A viewer is not sent the webhook read, and a failed read is not zero webhooks either.
+  // A viewer is not sent the webhook read, and a pending or failed read is not zero webhooks either.
   // A failed background refetch keeps the cached list, which still counts.
-  const webhookCount = !canWrite || (webhooksFailed && !webhooks) ? unavailable : (webhooks ?? []).length;
+  const webhookCount = !canWrite || !webhooks ? unavailable : webhooks.length;
 
   const handleDisconnect = async (id: string) => {
     try {

@@ -16,6 +16,7 @@ let webhookList: unknown[] = [];
 let sessionList: unknown[] = [];
 let stopStatus = 200;
 let sessionsStatus = 200;
+let holdWebhooks = false;
 const requested: string[] = [];
 
 function jsonResponse(data: unknown, status = 200): Response {
@@ -49,6 +50,7 @@ function installFetchStub(): void {
       );
     }
     if (path === '/api/webhooks') {
+      if (holdWebhooks) return new Promise<Response>(() => {});
       return webhooksStatus === 200
         ? Promise.resolve(jsonResponse(webhookList))
         : Promise.resolve(jsonResponse({ message: 'Insufficient permissions. Required: operator' }, webhooksStatus));
@@ -93,6 +95,7 @@ afterEach(() => {
   sessionList = [];
   stopStatus = 200;
   sessionsStatus = 200;
+  holdWebhooks = false;
   requested.length = 0;
   window.sessionStorage.setItem('openwa_user_role', 'viewer');
 });
@@ -146,7 +149,18 @@ test('a successful empty webhook read still counts zero', async () => {
   window.sessionStorage.setItem('openwa_user_role', 'operator');
   renderDashboard();
   await rtl.screen.findByText('Webhooks Configured');
-  await rtl.waitFor(() => assert.equal(statValue('Webhooks Configured'), '0'));
+  await rtl.waitFor(() => assert.equal(queryClient!.getQueryState(['webhooks'])?.status, 'success'));
+  assert.equal(statValue('Webhooks Configured'), '0');
+});
+
+test('a webhook read still in flight shows the placeholder, not zero webhooks', async () => {
+  holdWebhooks = true;
+  window.sessionStorage.setItem('openwa_user_role', 'operator');
+  renderDashboard();
+  await rtl.screen.findByText('Webhooks Configured');
+  await rtl.waitFor(() => assert.ok(requested.includes('/api/webhooks')));
+  assert.equal(statValue('Webhooks Configured'), statValue('Messages Today'));
+  assert.notEqual(statValue('Webhooks Configured'), '0');
 });
 
 test('a read-only key is offered no Disconnect', async () => {
