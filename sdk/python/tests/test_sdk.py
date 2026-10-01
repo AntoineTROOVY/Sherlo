@@ -139,6 +139,11 @@ class TestClientCore:
         assert "chatId=a%40c.us" in url
         assert "limit=10" in url
 
+    def test_build_url_escapes_a_literal_percent_in_a_query_value(self):
+        # httpx before 0.27.1 sent "%41" unescaped, so the gateway decoded it to "A".
+        assert build_url("http://x", "/api/search", {"q": "%41"}).endswith("q=%2541")
+        assert build_url("http://x", "/api/search", {"q": "50%"}).endswith("q=50%25")
+
     def test_build_url_omits_none_valued_params(self):
         # The behaviour a caller depends on: a None never reaches the wire as the literal "None".
         # Tested here because build_url is what implements it — the typed resource signatures
