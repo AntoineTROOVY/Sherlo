@@ -91,7 +91,7 @@ CallLinkType = Literal["audio", "video"]
 class CreateCallLinkRequest(TypedDict):
     """Body for :meth:`CallsResource.create_link`.
 
-    ``start_time`` is absolute epoch MILLISECONDS; a link for right now is the current timestamp
+    ``startTime`` is absolute epoch MILLISECONDS; a link for right now is the current timestamp
     rather than an omitted field.
     """
 
