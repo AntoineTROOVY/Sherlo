@@ -149,11 +149,13 @@ EOF
 # cp walked the tree (Chromium cache and LevelDB churn, the Baileys store's temp files and consumed
 # keys, media retention and plugin storage writes) is a torn copy, not a failed backup. With a label
 # the copy is engine auth state and goes in ENGINE-STATE-NOTE; without one it is only logged. Every
-# other cp error stays fatal.
+# other cp error stays fatal. cp runs in the C locale so the error text matched here is the one it
+# prints, and grep reads a here-string: piped from printf, a grep -q that stops at the first fatal line
+# breaks the pipe once the errors outgrow its buffer, and pipefail then reads a failure as benign.
 copy_live_tree() {
   local err
-  if ! err="$(cp -pRH "$1" "$2" 2>&1)"; then
-    if printf '%s\n' "$err" | grep -qv 'No such file or directory'; then
+  if ! err="$(LC_ALL=C cp -pRH "$1" "$2" 2>&1)"; then
+    if grep -qv 'No such file or directory' <<<"$err"; then
       printf '%s\n' "$err" >&2
       exit 1
     fi

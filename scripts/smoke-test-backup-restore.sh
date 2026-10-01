@@ -45,7 +45,7 @@
 #   (ac) a missing Baileys auth dir is reported when data/.env.generated selects the Baileys engine
 #   (ad) a file an engine deletes during the sessions/ or baileys/ copy is noted instead of failing the
 #       backup, a file the app deletes during the media or plugin copies is logged, and any other cp
-#       error still fails it
+#       error still fails it, however long its output and whatever the host's locale
 #
 # Usage: ./scripts/smoke-test-backup-restore.sh
 # Requires: bash, tar, node (restore.sh path resolution). sqlite3 is optional (see (c) and (k)).
@@ -1280,11 +1280,24 @@ printf 'profile\n' >"$AD/data/sessions/session-s1/Preferences"
 printf '{}' >"$AD/data/baileys/s1/creds.json"
 printf 'jpeg\n' >"$AD/data/media/status.jpg"
 printf '{}' >"$AD/data/plugins/registry.json"
+# SHIM_CP_LINES repeats the error past a pipe buffer, the size of a real tree's worth of failures. Without
+# LC_ALL=C the vanished-file text comes out translated, as cp prints it on a localized host.
 cat >"$AD/shim/cp" <<SHIM
 #!/bin/sh
 $(command -v cp) "\$@" || exit
+msg="\$SHIM_CP_ERROR"
+if [ "\${LC_ALL:-}" != C ] && [ "\$msg" = 'No such file or directory' ]; then
+  msg='Datei oder Verzeichnis nicht gefunden'
+fi
 case "\$3" in
-  */sessions | */baileys | */media | */plugin-*) echo "cp: cannot stat '\$2/gone': \$SHIM_CP_ERROR" >&2; exit 1 ;;
+  */sessions | */baileys | */media | */plugin-*)
+    i=0
+    while [ "\$i" -lt "\${SHIM_CP_LINES:-1}" ]; do
+      echo "cp: cannot stat '\$2/gone\$i': \$msg" >&2
+      i=\$((i + 1))
+    done
+    exit 1
+    ;;
 esac
 SHIM
 chmod +x "$AD/shim/cp"
@@ -1306,12 +1319,13 @@ for tree in media plugins; do
   fi
 done
 set +e
-OUT_AD="$(cd "$AD" && SHIM_CP_ERROR='Permission denied' PATH="$AD/shim:$PATH" BACKUP_DIR="$AD/out2" "$BACKUP" 2>&1)"
+OUT_AD="$(cd "$AD" && SHIM_CP_ERROR='Permission denied' SHIM_CP_LINES=20000 PATH="$AD/shim:$PATH" \
+  BACKUP_DIR="$AD/out2" "$BACKUP" 2>&1)"
 RC_AD=$?
 set -e
-if [ "$RC_AD" -eq 0 ] || ! printf '%s' "$OUT_AD" | grep -q 'Permission denied' ||
+if [ "$RC_AD" -eq 0 ] || ! grep -q 'Permission denied' <<<"$OUT_AD" ||
   [ -n "$(ls "$AD"/out2/openwa-backup-*.tar.gz 2>/dev/null)" ]; then
-  fail "(ad) a cp error other than a vanished file did not fail the backup: $OUT_AD"
+  fail "(ad) a cp error other than a vanished file did not fail the backup: $(tail -n 5 <<<"$OUT_AD")"
 fi
 pass "(ad) a vanished engine file is noted, a vanished media or plugin file logged, other cp errors fatal"
 
