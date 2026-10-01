@@ -31,6 +31,7 @@ Each runbook follows this format:
 - SSH access to server
 - Docker CLI access
 - Database access
+- An OPERATOR (or ADMIN) API key, to start sessions and send the test message
 
 **Steps:**
 
@@ -186,6 +187,7 @@ curl -X POST http://localhost:2785/api/sessions/{sessionId}/messages/send-text \
 
 - SSH access
 - Docker CLI
+- An OPERATOR (or ADMIN) API key, to start sessions after the restart
 
 **Steps:**
 
@@ -353,6 +355,7 @@ curl -H "X-API-Key: $ADMIN_API_KEY" \
 - Scheduled maintenance window
 - Backup verified
 - User notification sent
+- An OPERATOR (or ADMIN) API key, to stop and start sessions around the backup
 
 **Steps:**
 
@@ -438,6 +441,7 @@ curl -H "X-API-Key: $API_KEY" \
 - Release notes reviewed
 - Breaking changes identified
 - Rollback plan ready
+- An ADMIN API key for step 3; an OPERATOR key covers the stop, start and send steps
 
 **Steps:**
 
@@ -458,7 +462,7 @@ docker exec -e BACKUP_DIR=/app/data/backups -e TMPDIR=/app/data/backups openwa-a
 docker cp openwa-api:/app/data/backups/. "$BACKUP_DIR"/
 
 # 3. Export the Data DB as JSON alongside the archive (admin key)
-curl -H "X-API-Key: $API_KEY" \
+curl -H "X-API-Key: $ADMIN_API_KEY" \
   http://localhost:2785/api/infra/export-data > "$BACKUP_DIR/export-data.json"
 
 # Started with docker-compose.dev.yml (the README Quick Start)? Add `-f docker-compose.dev.yml`
@@ -635,6 +639,7 @@ backed-up database, so a restore of that archive keeps the session stopped too.
 
 - Sufficient disk space
 - Backup storage accessible
+- An OPERATOR (or ADMIN) API key, to stop and start sessions for a consistent engine-state copy
 
 **Steps:**
 
