@@ -32,8 +32,8 @@ function leaseParam(at: Date): string | Date {
  * running owner keeps extending it. That makes recovery automatic and bounded by the TTL instead of
  * conditional on a clean shutdown.
  *
- * NOTE: this establishes ownership. It does not yet route a request to the owning node, nor fence
- * every lifecycle path — see the horizontal-scaling documentation for what remains.
+ * NOTE: this establishes ownership. Forwarding a request to the owning node is SessionProxyInterceptor's
+ * job (opt-in via NODE_URL); see the horizontal-scaling documentation for what remains.
  */
 @Injectable()
 export class SessionOwnershipService {
