@@ -4920,7 +4920,7 @@ Same shape as the read DTO **plus** an `apiKey` field carrying the full plaintex
 {
   "id": "3f2a1c9e-1b2d-4a5f-9c8e-aa11bb22cc33",
   "name": "Production Bot",
-  "keyPrefix": "owa_k1_a1b2c",
+  "keyPrefix": "owa_k1_01234",
   "role": "operator",
   "allowedIps": ["192.168.1.1", "10.0.0.0/8"],
   "allowedSessions": ["session-uuid-1"],
