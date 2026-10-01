@@ -55,7 +55,7 @@ export class ProductDto {
       'Price rendered for display. Synthesized by the gateway from price + currency, so an ' +
       'unrecognised currency code falls back to a plain "CODE amount" pair, and a product with no ' +
       'currency shows the bare amount. Present only when price is.',
-    example: 'IDR 85,000.00',
+    example: 'IDR 85,000',
   })
   priceFormatted?: string;
 
