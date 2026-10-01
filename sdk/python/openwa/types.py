@@ -252,8 +252,8 @@ class SessionResponse(TypedDict):
     # node runs, those routes act only when request routing (NODE_URL on every node) forwards them;
     # without it, other nodes answer 409 to start and stop and 400 to logout and force-kill. Not
     # derivable from status: 'disconnected' covers both a session mid automatic-reconnect (engine
-    # present) and one stopped with no engine. Absent from a gateway that predates the field (the
-    # TypedDict is total=False).
+    # present) and one stopped with no engine. Always sent by current gateways; a gateway that
+    # predates the field omits it, so read it with .get("engineLoaded") against one.
     engineLoaded: bool
 
 
@@ -450,7 +450,6 @@ class EditMessageRequest(TypedDict):
 
 class SendTemplateRequest(TypedDict):
     # chatId required; provide exactly one of templateId / templateName.
-    # Modeled total=False (callers pass plain dicts); the backend validates.
     chatId: Jid
     templateId: NotRequired[str]
     templateName: NotRequired[str]
@@ -1245,8 +1244,7 @@ class TemplateRecord(TypedDict, total=False):
 
 
 class CreateTemplateRequest(TypedDict):
-    # name + body required; header/footer optional. Modeled total=False
-    # (callers pass plain dicts); the backend validates the required fields.
+    # name + body required; header/footer optional.
     name: str
     body: str
     header: NotRequired[str]
@@ -1367,8 +1365,7 @@ class ProductMessageResponse(TypedDict):
     timestamp: int
 
 
-# chatId + productId required; body optional. Modeled total=False for 3.9 compat
-# (callers pass plain dicts); the backend validates the required fields.
+# chatId + productId required; body optional.
 class SendProductRequest(TypedDict):
     chatId: Jid
     productId: str
