@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { chmod, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { FfmpegConversionError, probeFfmpeg, runFfmpeg } from './ffmpeg';
@@ -56,6 +56,10 @@ esac
 `,
     );
     await chmod(stubPath, 0o755);
+  });
+
+  afterAll(async () => {
+    await rm(workDir, { recursive: true, force: true });
   });
 
   /** Encoder arguments that put the stub into a given mode. */
