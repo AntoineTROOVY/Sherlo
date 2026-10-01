@@ -150,10 +150,13 @@ curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions/{sessionId}/qr
 
 # Save the QR as a PNG to open or scan. There is no raw QR string: the `session.qr`
-# webhook/WebSocket event carries the same PNG data URL as this endpoint.
-curl -s -H "X-API-Key: $API_KEY" \
+# webhook/WebSocket event carries the same PNG data URL as this endpoint. When no QR is
+# available (not started, already authenticated, not ready yet) the server's message is
+# printed and qr.png is not written.
+QR=$(curl -s -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions/{sessionId}/qr \
-  | jq -r .qrCode | sed 's#^data:image/png;base64,##' | base64 -d > qr.png
+  | jq -er '.qrCode // error(.message)') \
+  && printf '%s' "${QR#data:image/png;base64,}" | base64 -d > qr.png
 ```
 
 **Verification:**
