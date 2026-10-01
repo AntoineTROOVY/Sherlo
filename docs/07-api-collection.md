@@ -1610,7 +1610,7 @@ curl -X PUT "$BASE/api/plugins/chat-flow/config" \
 
 #### PUT /api/plugins/:id/config/:sessionId
 
-Set (or clear with `{}`) a per-session plugin config override. The override is stored under the session UUID and resolved against the UUID carried by each event, so an id that is not a live session's UUID never takes effect.
+Set a per-session plugin config override, or clear it by sending `{ "config": {} }`. The override is stored under the session UUID and resolved against the UUID carried by each event, so an id that is not a live session's UUID never takes effect.
 
 ```bash
 curl -X PUT "$BASE/api/plugins/chat-flow/config/$SESSION_ID" \
