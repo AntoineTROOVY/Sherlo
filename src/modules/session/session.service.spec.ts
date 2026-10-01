@@ -227,7 +227,8 @@ describe('SessionService', () => {
     auditService = { logWarn: jest.fn().mockResolvedValue(null), logInfo: jest.fn().mockResolvedValue(null) };
 
     hookManager = {
-      execute: jest.fn().mockResolvedValue({ continue: true, data: {} }),
+      // With no handlers registered the real HookManager hands the payload back unchanged.
+      execute: jest.fn().mockImplementation((_e: string, data: unknown) => Promise.resolve({ continue: true, data })),
     };
 
     configService = {
@@ -5105,10 +5106,6 @@ describe('SessionService', () => {
       // UNIQUE(sessionId, waMessageId) index dedups against the REST send path, which persists
       // API-originated sends itself (see the unique-race test below).
       const callbacks = await startAndCaptureCallbacks();
-      // Pass the message through the hook chain untouched (the default mock replaces data with {}).
-      (hookManager.execute as jest.Mock).mockImplementation((_e: string, data: unknown) =>
-        Promise.resolve({ continue: true, data }),
-      );
       (messageRepository.insert as jest.Mock).mockClear();
 
       callbacks.onMessageCreate!(makeMessage({ id: 'wa-out-2', from: 'me@c.us', to: 'peer@c.us', fromMe: true }));
@@ -5165,9 +5162,6 @@ describe('SessionService', () => {
       // is today's contract and stays; only storage honors the opt-out.
       process.env.STORE_EPHEMERAL_MESSAGES = 'false';
       const callbacks = await startAndCaptureCallbacks();
-      (hookManager.execute as jest.Mock).mockImplementation((_e: string, data: unknown) =>
-        Promise.resolve({ continue: true, data }),
-      );
       (messageRepository.insert as jest.Mock).mockClear();
 
       callbacks.onMessageCreate!(
@@ -5185,9 +5179,6 @@ describe('SessionService', () => {
       // attaches none and the enrichment around it is best-effort. Without the marker the dashboard
       // renders an empty bubble and the by-type stats filter would skip the row.
       const callbacks = await startAndCaptureCallbacks();
-      (hookManager.execute as jest.Mock).mockImplementation((_e: string, data: unknown) =>
-        Promise.resolve({ continue: true, data }),
-      );
       (messageRepository.create as jest.Mock).mockClear();
 
       callbacks.onMessageCreate!(
@@ -5202,9 +5193,6 @@ describe('SessionService', () => {
 
     it('passes a Baileys-style omitted marker through unchanged', async () => {
       const callbacks = await startAndCaptureCallbacks();
-      (hookManager.execute as jest.Mock).mockImplementation((_e: string, data: unknown) =>
-        Promise.resolve({ continue: true, data }),
-      );
       (messageRepository.create as jest.Mock).mockClear();
       const marker = { mimetype: 'image/png', omitted: true, sizeBytes: 1234 };
 
@@ -5228,10 +5216,6 @@ describe('SessionService', () => {
 
     it('persists the group participant as author (the stable sender id attribution keys on)', async () => {
       const callbacks = await startAndCaptureCallbacks();
-      // Pass the message through the hook chain untouched (the default mock replaces data with {}).
-      (hookManager.execute as jest.Mock).mockImplementation((_e: string, data: unknown) =>
-        Promise.resolve({ continue: true, data }),
-      );
 
       callbacks.onMessage!(
         makeMessage({
@@ -5823,9 +5807,9 @@ describe('SessionService', () => {
         ([ev]: unknown[]) => ev === 'message:persisted',
       );
       expect(persistedCalls).toHaveLength(0);
-      // Fail-open: webhook still dispatched so the inbound message is not silently dropped. (The
-      // payload is `{}` here because the hook mock returns `data: {}`; the point is that dispatch
-      // fired at all on a transient DB error — only the message:persisted hook is gated on `persisted`.)
+      // Fail-open: webhook still dispatched so the inbound message is not silently dropped. The point
+      // is that dispatch fired at all on a transient DB error; only the message:persisted hook is
+      // gated on `persisted`.
       expect(webhookService.dispatch).toHaveBeenCalledWith('sess-uuid-1', 'message.received', expect.anything());
     });
 
@@ -5888,17 +5872,9 @@ describe('SessionService', () => {
       expect(messageRepository.insert).not.toHaveBeenCalled();
     });
 
-    // The default hookManager mock returns an empty `data: {}`; echo the message through so the
-    // engine-set fields (isLidSender) survive the hook and reach the inline-resolution branch.
-    const echoHook = () =>
-      (hookManager.execute as jest.Mock).mockImplementation((_event: string, data: unknown) =>
-        Promise.resolve({ continue: true, data }),
-      );
-
     it('attaches senderPhone inline for an @lid sender when RESOLVE_LID_TO_PHONE is on (#263)', async () => {
       process.env.RESOLVE_LID_TO_PHONE = 'true';
       try {
-        echoHook();
         mockEngine.resolveContactPhone.mockResolvedValue('628111222333');
         const callbacks = await startAndCaptureCallbacks();
 
@@ -5923,7 +5899,6 @@ describe('SessionService', () => {
       // if resolvePhone regressed to null for @c.us, senderPhone would be null here.
       process.env.RESOLVE_LID_TO_PHONE = 'true';
       try {
-        echoHook();
         const store = new BaileysSessionStore();
         store.addLidMappings([{ lid: '111@lid', pn: '628111222333@s.whatsapp.net' }]);
         mockEngine.resolveContactPhone.mockImplementation((id: string) => Promise.resolve(store.resolvePhone(id)));
@@ -5946,7 +5921,6 @@ describe('SessionService', () => {
 
     it('does not resolve senderPhone when RESOLVE_LID_TO_PHONE is unset (default off)', async () => {
       delete process.env.RESOLVE_LID_TO_PHONE;
-      echoHook();
       const callbacks = await startAndCaptureCallbacks();
 
       callbacks.onMessage!(makeMessage({ from: '111@lid', chatId: '111@lid', isLidSender: true }));
@@ -5961,7 +5935,6 @@ describe('SessionService', () => {
     it('does not resolve for a normal (non-lid) sender even when the flag is on', async () => {
       process.env.RESOLVE_LID_TO_PHONE = 'true';
       try {
-        echoHook();
         const callbacks = await startAndCaptureCallbacks();
 
         callbacks.onMessage!(makeMessage({ from: 'peer@c.us', chatId: 'peer@c.us' })); // no isLidSender
@@ -5976,7 +5949,6 @@ describe('SessionService', () => {
     it('caches @lid resolution so the same sender is queried only once (#263)', async () => {
       process.env.RESOLVE_LID_TO_PHONE = 'true';
       try {
-        echoHook();
         mockEngine.resolveContactPhone.mockResolvedValue('628111222333');
         const callbacks = await startAndCaptureCallbacks();
 
