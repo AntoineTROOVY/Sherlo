@@ -6877,8 +6877,9 @@ not claim is a `404`.
 
 **Auth:** **none** — `@Public` by design, because a provider cannot present an API key. What
 authenticates a delivery is the per-instance HMAC signature over the exact raw body bytes (the body
-is read raw, never DTO-bound, so the signed bytes reach the verifier unchanged). A `GET` here is
-the provider's verification handshake and answers only when its `verifyToken` matches.
+is read raw, never DTO-bound, so the signed bytes reach the verifier unchanged). A `GET` on a route
+that declares `challenge` is the provider's verification handshake and answers only when its
+`verifyToken` matches; any other request, a `GET` included, is a signed delivery.
 
 **Response** — the primary success path is `202`: the delivery is persisted and queued for async
 plugin processing. `200` means the `GET` verification-challenge echo, or a route whose declared
@@ -6889,7 +6890,7 @@ first delivery, and is not enqueued again. The ack is rendered from the retry, s
 an ack body is the retry's time and `{rawBody}` is the retry's body. A retry still passes the checks
 that run before dedup: while a `session-alive` route's bound session is down it gets the `503`.
 
-**Errors:** `401` signature verification failed (missing, stale, or wrong secret) · `403` `GET` verification challenge failed (`verifyToken` mismatch) · `404` unknown pluginId/instanceId, or no such claimed route · `413` body over the route's `maxBodyBytes` · `415` a body in a content type no parser reads (only `application/json` and `application/x-www-form-urlencoded` are read) · `429` rate limit: the per-instance bucket (`INGRESS_INSTANCE_LIMIT`, counted only for deliveries that pass signature verification) or the per-client-IP bucket (`INGRESS_IP_LIMIT`), both per `INGRESS_INSTANCE_TTL`; the global per-IP tiers skip this route, so these two are its bounds, and `Retry-After-instance` / `Retry-After-ingress-ip` names the one that shed the request, alongside a plain `Retry-After` carrying the same delay · `503` a route declaring a `session-alive` preflight whose bound session is not connected: the delivery is not persisted, so the provider's retry is treated as a new delivery, and `Retry-After` carries the delay
+**Errors:** `401` signature verification failed (missing, stale, or wrong secret) · `403` `GET` verification challenge failed on a route that declares `challenge` (`verifyToken` mismatch) · `404` unknown pluginId/instanceId, or no such claimed route · `413` body over the route's `maxBodyBytes` · `415` a body in a content type no parser reads (only `application/json` and `application/x-www-form-urlencoded` are read) · `429` rate limit: the per-instance bucket (`INGRESS_INSTANCE_LIMIT`, counted only for deliveries that pass signature verification) or the per-client-IP bucket (`INGRESS_IP_LIMIT`), both per `INGRESS_INSTANCE_TTL`; the global per-IP tiers skip this route, so these two are its bounds, and `Retry-After-instance` / `Retry-After-ingress-ip` names the one that shed the request, alongside a plain `Retry-After` carrying the same delay · `503` a route declaring a `session-alive` preflight whose bound session is not connected: the delivery is not persisted, so the provider's retry is treated as a new delivery, and `Retry-After` carries the delay
 
 ## 6.5 Real-time API (WebSocket)
 
