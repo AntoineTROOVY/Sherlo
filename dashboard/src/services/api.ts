@@ -973,17 +973,26 @@ export interface ProfilePictureResponse {
 export const contactApi = {
   // The route caps a response at 1000 contacts; walk the pages so an address book past that is complete.
   // No item cap: the status recipient picker needs every contact, and the server's short page ends the walk.
-  list: async (sessionId: string) =>
-    (
-      await fetchAllPages(
-        async (limit, offset) => {
+  list: async (sessionId: string) => {
+    let lastError: unknown;
+    const { items, throttled } = await fetchAllPages(
+      async (limit, offset) => {
+        try {
           const data = await request<Contact[]>(`/sessions/${sessionId}/contacts?limit=${limit}&offset=${offset}`);
           // The route answers a bare array with no total: a short page is the last one.
           return { data, total: data.length < limit ? offset + data.length : Infinity };
-        },
-        { pageSize: 1000, maxItems: Infinity },
-      )
-    ).items,
+        } catch (err) {
+          lastError = err;
+          throw err;
+        }
+      },
+      { pageSize: 1000, maxItems: Infinity },
+    );
+    // A page still throttled after the retries would leave the picker silently short; fail the whole
+    // load with that page's 429, as a throttled first page already does.
+    if (throttled) throw lastError;
+    return items;
+  },
   checkNumber: (sessionId: string, number: string) =>
     request<CheckNumberResponse>(`/sessions/${sessionId}/contacts/check/${encodeURIComponent(number)}`),
   // Returns the contact/group profile picture URL. Both engines return null when the user hid their

@@ -103,3 +103,26 @@ test('the contact list is not cut off at 10,000 contacts', async () => {
 
   assert.equal((await contactApi.list('s1')).length, 11_005);
 });
+
+test('the contact list rejects instead of returning a partial list when a later page stays throttled', async () => {
+  const { contactApi } = await import('./api.ts');
+  globalThis.fetch = ((input: RequestInfo | URL) => {
+    if (!String(input).includes('offset=0')) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ statusCode: 429, message: 'Too Many Requests' }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    }
+    const contacts = Array.from({ length: 1000 }, (_, i) => ({ id: `${i}@c.us`, name: null }));
+    return Promise.resolve(
+      new Response(JSON.stringify(contacts), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+  }) as typeof fetch;
+
+  await assert.rejects(
+    contactApi.list('s1'),
+    (err: Error & { status?: number }) => err.status === 429 && err.message === 'Too Many Requests',
+  );
+});
