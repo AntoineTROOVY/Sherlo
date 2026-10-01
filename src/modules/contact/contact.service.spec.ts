@@ -136,8 +136,7 @@ describe('ContactService', () => {
 
   describe('block/unblock reject ids that do not name a person', () => {
     // whatsapp-web.js's Contact.block()/unblock() return false for a group id (nothing blocked,
-    // answered 200 "blocked"); Baileys hands the id to updateBlockStatus whose Boom for an
-    // unresolvable jid surfaces as an opaque 500. Both engines share this 400 guard.
+    // answered 200 "blocked"). Both engines share this 400 guard.
     it.each([
       ['blockContact', (svc: ContactService) => svc.blockContact('s1', '120363000000000000@g.us')],
       ['unblockContact', (svc: ContactService) => svc.unblockContact('s1', '120363000000000000@g.us')],
