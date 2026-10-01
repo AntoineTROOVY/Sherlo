@@ -260,7 +260,9 @@ export interface InfraImportDataResult {
   /**
    * True when an engine may still be writing into the restored tables, from any of three causes:
    * orphans deliberately left running (`force`), a `stopOrphans` teardown that failed, or sessions
-   * held by another node, which this request has no channel to stop. Restart to reconcile.
+   * held by another node, which this request has no channel to stop. Restart to reconcile those.
+   * Also true when the post-commit plugin binding re-sync failed; a restart does not repair that
+   * one, so its notice names the manual check instead.
    */
   restartRequired: boolean;
   /** Session ids with a running engine that the restored data no longer contains. */

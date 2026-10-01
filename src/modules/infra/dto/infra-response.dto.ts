@@ -504,8 +504,9 @@ export class InfraImportDataResponseDto {
   @ApiProperty({
     type: [String],
     description:
-      'Why the restore was rolled back (per-row failures, or a backup with no rows). Non-empty only when ' +
-      '`imported` is false; non-fatal messages are in `notices`.',
+      'Why the restore was rolled back (per-row failures, a failed session ownership restore, chat-state re-key ' +
+      'or restored-row cleanup, or a backup with no rows). Non-empty only when `imported` is false; non-fatal ' +
+      'messages are in `notices`.',
     example: [],
   })
   warnings!: string[];
@@ -516,8 +517,9 @@ export class InfraImportDataResponseDto {
   @ApiProperty({
     description:
       'True when an engine may still be writing into the restored tables (orphans left running by `force`, a ' +
-      'failed `stopOrphans` teardown, sessions held by another node, or plugin bindings not re-applied). Restart ' +
-      'to reconcile. Can be true even when `imported` is false.',
+      'failed `stopOrphans` teardown, sessions held by another node; restart to reconcile), or when plugin ' +
+      'instance bindings could not be re-synced after the commit (a restart does not repair this; follow the ' +
+      'manual check named in `notices`). Can be true even when `imported` is false.',
     example: false,
   })
   restartRequired!: boolean;
