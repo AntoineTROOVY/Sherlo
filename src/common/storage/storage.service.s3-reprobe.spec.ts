@@ -437,6 +437,8 @@ describe('StorageService S3 re-probe and recovery', () => {
       { Contents: [{ Key: 'media/p1.bin' }], NextContinuationToken: 'tok' },
       { Contents: [{ Key: 'media/p2.bin' }] },
     ];
+    const listCommand = ListObjectsV2Command as unknown as jest.Mock;
+    listCommand.mockClear();
     mockSend.mockImplementation((cmd: unknown) => {
       if (cmd instanceof ListObjectsV2Command) return Promise.resolve(pages.shift() ?? {});
       return Promise.resolve({});
@@ -445,10 +447,15 @@ describe('StorageService S3 re-probe and recovery', () => {
     await flush();
 
     fs.writeFileSync(path.join(localPath, 'local.bin'), 'x');
-    fs.writeFileSync(path.join(localPath, 'p2.bin'), 'stale-copy');
+    // The stale local copy shares a page-1 key, so p2.bin can only come from following the token.
+    fs.writeFileSync(path.join(localPath, 'p1.bin'), 'stale-copy');
 
     const seen: string[] = [];
     for await (const file of svc.iterateFiles()) seen.push(file);
     expect(seen.sort()).toEqual(['local.bin', 'p1.bin', 'p2.bin']);
+    expect(listCommand.mock.calls.map(([input]: [{ ContinuationToken?: string }]) => input.ContinuationToken)).toEqual([
+      undefined,
+      'tok',
+    ]);
   });
 });
