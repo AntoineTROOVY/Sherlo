@@ -75,6 +75,9 @@ export class BaileysCatalog {
    * Baileys' getCatalog returns products + cursor only; the catalog metadata our Catalog type
    * expects is synthesized from the first collection (the only named grouping the library
    * exposes). A business without collections has no catalog to describe — null.
+   *
+   * getCollections sends one limit (default 51) as both collection_limit and item_limit, so
+   * productCount counts at most 51 products. Raising it would also raise the collection count fetched.
    */
   async getCatalog(): Promise<Catalog | null> {
     this.host.ensureReady();
