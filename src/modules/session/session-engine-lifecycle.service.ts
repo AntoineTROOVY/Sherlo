@@ -814,13 +814,16 @@ export class SessionEngineLifecycle {
       metadata: { previousPhone, incomingPhone },
       errorMessage: reason,
     });
+    // Evicted before the logout, which can take up to its 10s deadline: every inbound callback is gated
+    // on the live engine, so the refused account's messages and history sync, which arrive right after
+    // the link opens, are dropped instead of stored and dispatched under this session. A start() racing
+    // the logout still waits for it: the logout registers its credential fence in this same tick.
+    this.engines.deleteIfLive(id, engine);
     // logout() wipes the wrong account's credentials and removes this device from that account.
     await this.teardownEngineSafely(id, engine, e => e.logout(), 'logout', sessionName);
     // Re-fence after the await, as handleEngineDisconnected does: a concurrent start() may have
-    // replaced the engine while logout ran. If this handler is now stale it must not delete the new
-    // engine or write FAILED over a fresh start.
-    if (!this.isLiveEngine(id, engine)) return;
-    this.engines.deleteIfLive(id, engine);
+    // registered an engine while logout ran. If so it must not get FAILED written over it.
+    if (this.engines.has(id)) return;
     // Fenced on ownership like every engine-driven terminal write: a lapsed lease must not park a
     // peer's session unrecoverably in FAILED. Defensively caught like handleEngineReady's row write.
     if (this.ownsSession(id)) {

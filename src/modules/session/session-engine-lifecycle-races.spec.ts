@@ -187,4 +187,45 @@ describe('SessionEngineLifecycle races', () => {
       expect(internals.engines.has(ID)).toBe(true);
     });
   });
+
+  describe('rejectRebind', () => {
+    const failedWrites = (): number =>
+      repository.update.mock.calls.filter(
+        ([, patch]) => (patch as { status?: unknown }).status === SessionStatus.FAILED,
+      ).length;
+
+    it("retires the refused account's engine before its logout runs", async () => {
+      const logout = deferred();
+      const engine = { ...makeEngine(), logout: jest.fn().mockReturnValue(logout.promise) };
+      internals.engines.set(ID, engine as never);
+
+      const rejecting = internals.rejectRebind(ID, engine, NAME, '628111', '628999');
+      await flush();
+
+      // Every inbound callback is gated on this, so nothing the refused account sends while the
+      // logout runs is stored or dispatched under this session.
+      expect(engine.logout).toHaveBeenCalledTimes(1);
+      expect(internals.engines.isLive(ID, engine as never)).toBe(false);
+
+      logout.resolve();
+      await rejecting;
+      expect(failedWrites()).toBe(1);
+    });
+
+    it('leaves a start that registered an engine during the logout alone', async () => {
+      const logout = deferred();
+      const engine = { ...makeEngine(), logout: jest.fn().mockReturnValue(logout.promise) };
+      const replacement = makeEngine();
+      internals.engines.set(ID, engine as never);
+
+      const rejecting = internals.rejectRebind(ID, engine, NAME, '628111', '628999');
+      await flush();
+      internals.engines.set(ID, replacement as never);
+      logout.resolve();
+      await rejecting;
+
+      expect(internals.engines.get(ID)).toBe(replacement);
+      expect(failedWrites()).toBe(0);
+    });
+  });
 });
