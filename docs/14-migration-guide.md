@@ -780,7 +780,8 @@ them on PostgreSQL, and on SQLite unless `DATABASE_SYNCHRONIZE=true` puts the da
 mode. The Main (auth/audit) connection runs its own `migrations-main/` chain at every boot. The chain is
 idempotent, so a `main.sqlite` that an earlier release built with synchronize is adopted in place (rows
 kept, missing columns added, the ledger written). `MAIN_DATABASE_SYNCHRONIZE=true` only adds a
-synchronize pass after the chain. Run the main chain by hand with `npm run migration:run:main`.
+synchronize pass after the chain. Run the main chain by hand with `npm run migration:run:main` on a
+source checkout, or `docker compose run --rm openwa-api npm run migration:run:main:prod` in the image.
 
 ### Upgrade Steps
 
@@ -845,7 +846,8 @@ docker compose run --rm openwa-api npm run migration:run:prod
 
 > [!WARNING]
 > Use `migration:run:prod` inside the production image. Plain `npm run migration:run` needs `ts-node` and
-> the TypeScript sources, both stripped by `npm ci --omit=dev` in the released image.
+> the TypeScript sources, both stripped by `npm ci --omit=dev` in the released image. The same holds for
+> the main chain: use `migration:run:main:prod`, not `migration:run:main`.
 
 ### Known Upgrade Hazards
 
