@@ -5360,7 +5360,7 @@ Aggregate infrastructure status (database, Redis, queue, storage, engine).
 
 ```json
 {
-  "database": { "connected": true, "type": "sqlite", "host": "", "builtIn": false },
+  "database": { "connected": true, "type": "sqlite", "host": "localhost", "builtIn": false },
   "redis": { "enabled": false, "connected": false, "host": "localhost", "port": 6379, "builtIn": false },
   "queue": {
     "enabled": false,
@@ -5379,7 +5379,7 @@ Aggregate infrastructure status (database, Redis, queue, storage, engine).
 }
 ```
 
-The `queue.webhooks` counters are live BullMQ job counts (`pending` = waiting + active + delayed; plus `completed`/`failed`), degrading to zeros when the queue is disabled or Redis is unreachable. `redis.connected` is a live probe.
+The `queue.webhooks` counters are live BullMQ job counts (`pending` = waiting + active + delayed; plus `completed`/`failed`), degrading to zeros when the queue is disabled or Redis is unreachable. `redis.connected` is a live probe. `database.host` is the configured `DATABASE_HOST` (default `localhost`) and is reported on SQLite too, so read `type`, not `host`, to tell the database apart.
 
 `builtIn` (on `database`/`redis`/`storage`) reports whether OpenWA's own bundled container is actually running _and_ backing this service, detected live from the labelled container; when Docker is unreachable it falls back to the saved `*_BUILTIN` intent from `data/.env.generated`. In S3 mode `storage` additionally carries `bucket` (when one is configured) and `s3Available` (re-probed, throttled, while false; once true it stays true until a restart, so a later outage does not clear it); in local mode neither key is present. `engine.webVersion`/`engine.webVersionSource` (`pinned` / `auto` / `native`) appear only on `whatsapp-web.js`; `webVersion` is `null` until the auto-resolve first succeeds. `engine.browserArgs` is the effective launch argument list: `PUPPETEER_ARGS` (or the four defaults shown) with `--lang=en-US` appended unless a `--lang` flag is already present.
 
