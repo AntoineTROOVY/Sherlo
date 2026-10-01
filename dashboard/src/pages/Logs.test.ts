@@ -363,3 +363,19 @@ test('a search padded with spaces still matches', async () => {
   await waitFor(() => assert.ok(!screen.queryByText('infra.restart'), 'the search did not filter'));
   assert.ok(screen.queryByText('session.stop'), 'the padded query matched nothing');
 });
+
+test('a failed read does not say that no logs exist', async () => {
+  const { screen } = rtl;
+  listFailure = 502;
+  try {
+    renderLogs();
+    await screen.findByRole('alert');
+    assert.ok(!screen.queryByText('No logs found'), 'a read that failed was reported as an empty history');
+    assert.ok(
+      !screen.queryByText(/Audit logs will appear here/),
+      'a read that failed was reported as an empty history',
+    );
+  } finally {
+    listFailure = null;
+  }
+});

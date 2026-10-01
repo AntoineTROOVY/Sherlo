@@ -192,6 +192,11 @@ export function Logs() {
             <div className="empty-table-state">
               <Loader2 className="animate-spin" size={32} />
             </div>
+          ) : logsError && logs.length === 0 ? (
+            // Nothing was read, so no "no logs" copy: the banner above reports the failure on its own.
+            <div className="empty-table-state">
+              <AlertCircle size={32} />
+            </div>
           ) : filteredLogs.length === 0 ? (
             <div className="empty-table-state">
               <FileText size={48} strokeWidth={1} />
