@@ -40,6 +40,7 @@ import { LabelNotFoundError } from '../../common/errors/label-not-found.error';
 import { SsrfBlockedError } from '../../common/security/ssrf-guard';
 import * as loadRemoteMediaModule from '../../common/media/load-remote-media';
 import { fetch as undiciFetch } from 'undici';
+import { lookup } from 'dns/promises';
 
 // Allowlisted hosts are PINNED to their DNS answer (ssrf-guard pins allowlisted hosts to their DNS answers), so the specs that exercise
 // the SSRF_ALLOWED_HOSTS escape-hatch need a deterministic resolver. Default answers are PUBLIC
@@ -633,7 +634,13 @@ describe('loadRemoteMedia — routes through the SSRF-pinned media fetch', () =>
   });
 
   it('honors the SSRF_ALLOWED_HOSTS escape-hatch for trusted internal media stores', async () => {
+    // 'minio' resolves to a private address, so only the allow-list can let it through.
+    jest.mocked(lookup).mockResolvedValueOnce([{ address: '10.0.0.5', family: 4 }] as never);
+    await expect(loadRemoteMedia('http://minio:9000/bucket/x.png', undefined)).rejects.toBeInstanceOf(SsrfBlockedError);
+    expect(undiciFetch).not.toHaveBeenCalled();
+
     process.env.SSRF_ALLOWED_HOSTS = 'minio';
+    jest.mocked(lookup).mockResolvedValueOnce([{ address: '10.0.0.5', family: 4 }] as never);
     (undiciFetch as jest.Mock).mockResolvedValue(fakeResponse([1], { 'content-type': 'image/png' }));
 
     const media = await loadRemoteMedia('http://minio:9000/bucket/x.png', undefined);
