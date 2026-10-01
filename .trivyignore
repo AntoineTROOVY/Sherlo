@@ -81,3 +81,21 @@ CVE-2026-95354
 CVE-2026-95355
 CVE-2026-95373
 CVE-2026-95380
+
+# CVE-2024-28757, CVE-2025-59375, CVE-2026-25210, CVE-2026-45186, CVE-2026-66046 and CVE-2026-93990:
+# libexpat1, fixed in Debian's 2.5.0-1+deb12u4.
+#
+# amd64 only, and temporary. bookworm-security publishes 2.5.0-1+deb12u4 for arm64, which the
+# Dockerfile's `apt-get upgrade` installs, but on 2026-10-01 it still served 2.5.0-1+deb12u3 for
+# amd64, so the amd64 image cannot install the fix yet. Each CVE needs attacker-supplied XML parsed by
+# expat. In the image the browser links it, but Blink parses web content's XML with the libxml2 the
+# browser bundles; fontconfig, Mesa and D-Bus use it on their local configuration files, and Node.js
+# does not link it.
+#
+# Drop all six once bookworm-security serves 2.5.0-1+deb12u4 for amd64.
+CVE-2024-28757
+CVE-2025-59375
+CVE-2026-25210
+CVE-2026-45186
+CVE-2026-66046
+CVE-2026-93990
