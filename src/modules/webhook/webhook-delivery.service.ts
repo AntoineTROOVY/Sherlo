@@ -537,10 +537,12 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
       };
 
       await this.webhookQueue!.add(`webhook-${webhook.id}`, jobData, {
-        // jobId = deliveryId gives BullMQ exactly-once enqueue semantics (same precedent as the
-        // ingress producer), so a crash between add() and the bookkeeping below cannot re-enqueue
-        // the same delivery. Safe for fan-out: deliveryId is minted per webhook per dispatch in
-        // dispatchWithLimit, so sibling subscriptions to one event never share a job id.
+        // jobId = deliveryId makes this add() idempotent within BullMQ (same precedent as the ingress
+        // producer). It does not dedup a crash replay: if the process dies before the outbox row is
+        // closed, the reconciler re-enqueues the event under a new deliveryId as a second job, with
+        // the same idempotency key, which is what receivers dedup on. Safe for fan-out: deliveryId is
+        // minted per webhook per dispatch in dispatchWithLimit, so sibling subscriptions to one event
+        // never share a job id.
         jobId: deliveryId,
         attempts: webhook.retryCount,
         backoff: {
