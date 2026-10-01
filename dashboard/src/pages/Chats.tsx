@@ -894,10 +894,11 @@ export function Chats() {
   // Best-effort scroll to the hit message. Runs as a layout effect (after useChatScrollPosition's
   // own restore on the same commit) so it overrides the bottom/saved jump with no visible flash.
   // Degrades silently to session+chat selection when the element isn't present — the message is
-  // still visible in the conversation.
+  // still visible in the conversation. Until the hit's session has its list on screen, the open chat
+  // still belongs to the session being left, even when it has the hit's chat id.
   useLayoutEffect(() => {
     const pending = pendingHitRef.current;
-    if (!pending || !activeChat || activeChat.id !== pending.chatId) return;
+    if (!pending || listedSessionRef.current !== pending.sessionId || activeChat?.id !== pending.chatId) return;
     if (loadingMessages || messages.length === 0) return;
     const container = messagesContainerRef.current;
     if (container) {

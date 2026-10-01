@@ -2023,6 +2023,39 @@ test("leaving a search hit's chat before its thread loads does not reopen it", a
   await within(container.querySelector('.room-header') as HTMLElement).findByText('Carol');
 });
 
+// Two sessions listing the same chat id, with the target session's thread still cached.
+test('a search hit in another session on the chat open in this one opens it there', async () => {
+  const { screen, fireEvent, within, waitFor } = rtl;
+  twoSessions = true;
+  chatsResponder = sessionId => Promise.resolve(jsonResponse(sessionId === SESSION.id ? [CHAT, CHAT_2] : [CHAT]));
+  searchHits = [
+    { ...THIRD_SESSION_HIT, sessionId: SESSION_2.id, chatId: CHAT.id, waMessageId: DB_MESSAGE.waMessageId! },
+  ];
+  try {
+    const { container } = renderChats();
+    const openAlice = async () => {
+      fireEvent.click(await screen.findByText('Alice'));
+      await within(container.querySelector('.room-messages') as HTMLElement).findByText('hello from alice');
+    };
+    await screen.findByText('Carol');
+    const select = container.querySelector('select.session-selector') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: SESSION_2.id } });
+    await waitFor(() => assert.equal(screen.queryByText('Carol'), null));
+    await openAlice();
+    fireEvent.change(select, { target: { value: SESSION.id } });
+    await screen.findByText('Carol');
+    await openAlice();
+
+    await clickSearchHit(container);
+    await waitFor(() => assert.equal(select.value, SESSION_2.id));
+    await flush();
+    await waitFor(() => assert.ok(container.querySelector('.room-header'), "the hit's chat did not open"));
+    await within(container.querySelector('.room-header') as HTMLElement).findByText('Alice');
+  } finally {
+    twoSessions = false;
+  }
+});
+
 test('a second search hit in the chat already open scrolls to it at once', async () => {
   const { screen, fireEvent, within, waitFor } = rtl;
   searchHits = [{ ...THIRD_SESSION_HIT, sessionId: SESSION.id, chatId: CHAT.id, waMessageId: DB_MESSAGE.waMessageId! }];
