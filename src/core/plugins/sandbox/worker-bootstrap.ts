@@ -137,10 +137,12 @@ async function handle(message: HostToWorkerMessage): Promise<void> {
   if (message.kind === 'config-change') {
     // Refresh the base config so later (non-hook) reads of ctx.config see the new value, then notify
     // the plugin (fire-and-forget — onConfigChange returns void, and an ack would race the next op).
+    // Called inside the chain so a synchronous throw is caught too: escaping here, it would reject the
+    // discarded handle() promise and the unhandled rejection would kill the worker.
     baseConfig = message.config;
-    void Promise.resolve(plugin?.onConfigChange?.(context, message.config)).catch(error =>
-      logger.error('onConfigChange threw', error),
-    );
+    void Promise.resolve()
+      .then(() => plugin?.onConfigChange?.(context, message.config))
+      .catch(error => logger.error('onConfigChange threw', error));
     return;
   }
 
