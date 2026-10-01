@@ -166,8 +166,8 @@
 }
 
 /* Mirrors .error-text, in warning rather than error: a restriction is WhatsApp limiting the account,
-   not the gateway failing. --warning is :root-only and inherited by both themes, the same way
-   --error is, so it needs no dark-mode override. */
+   not the gateway failing. Uses --warning-text, the AA-passing amber; App.css restates it as
+   --warning in both dark-theme blocks. */
 .sessions-page .info-value.restriction-text {
   color: var(--warning-text);
   font-weight: 500;
