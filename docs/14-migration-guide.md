@@ -930,11 +930,20 @@ if [ -f "$BACKUP_DIR/database.sql" ]; then
     # statements fail and its rows mix with theirs. This is the built-in PostgreSQL (the compose
     # `postgres` service, or the openwa-postgres container Dashboard > Infrastructure created, which
     # carries no compose labels, so step 1 left it running). docker start covers a leftover or
-    # dashboard-created container; compose creates the service only when none exists. For an external
-    # server, rename the database and load the dump as step 3 of 11 - Runbook: Restore from Backup
-    # shows. The upgraded database is kept under a _pre_restore_ name, and sed drops the pg_dump 17
-    # line PostgreSQL 16 rejects.
-    docker start openwa-postgres 2>/dev/null || docker compose --profile postgres up -d postgres
+    # dashboard-created container; compose creates the service only when none exists and .env points
+    # at it. For an external server the script stops: rename the database and load the dump as step 3
+    # of 11 - Runbook: Restore from Backup shows, then run steps 2-6 below by hand without this
+    # PostgreSQL block: nothing after step 1 is restored yet. The upgraded database is kept under a
+    # _pre_restore_ name, and sed drops the pg_dump 17 line PostgreSQL 16 rejects.
+    if ! docker start openwa-postgres 2>/dev/null; then
+        grep -qE '^DATABASE_HOST=(postgres|openwa-postgres)$' .env || {
+            echo "External PostgreSQL: rollback INCOMPLETE, nothing after step 1 has been restored."
+            echo "Load $BACKUP_DIR/database.sql by hand (11 - Runbook: Restore from Backup, step 3),"
+            echo "then run steps 2-6 of this script by hand without the PostgreSQL block."
+            exit 1
+        }
+        docker compose --profile postgres up -d postgres
+    fi
     docker exec openwa-postgres sh -c 'until pg_isready -q -U "$POSTGRES_USER"; do sleep 1; done'
     docker exec openwa-postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres \
       -c "ALTER DATABASE \"$POSTGRES_DB\" RENAME TO \"${POSTGRES_DB}_pre_restore_$(date +%Y%m%d%H%M%S)\"" \
