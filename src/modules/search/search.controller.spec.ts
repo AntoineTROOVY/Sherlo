@@ -51,10 +51,11 @@ describe('SearchController', () => {
     // `sessionIds` is not a field on SearchQueryDto, so it cannot be expressed in the query at all;
     // the global ValidationPipe (forbidNonWhitelisted) would reject it, and SearchService clobbers
     // any sessionIds at the provider boundary. The controller itself derives scope solely from the
-    // key — here there is no key → undefined.
-    const dto: SearchQueryDto = { q: 'hello' };
-    await ctrl.search(dto, undefined);
-    expect(search).toHaveBeenCalledWith(dto, undefined);
+    // key, even when a sessionIds value reaches it.
+    const dto = { q: 'hello', sessionIds: ['sneaky'] } as unknown as SearchQueryDto;
+    const apiKey = { allowedSessions: ['s1'] } as unknown as ApiKey;
+    await ctrl.search(dto, apiKey);
+    expect(search).toHaveBeenCalledWith(dto, ['s1']);
   });
 
   it('propagates 501 (NotImplementedException) from the service when no provider is active', async () => {
