@@ -499,7 +499,9 @@ curl -H "X-API-Key: $API_KEY" http://localhost:2785/api/health | jq '.version'
 # 11. Verify all sessions
 #     (they reconnect on their own only with AUTO_START_SESSIONS=true; otherwise POST
 #     /api/sessions/{sessionId}/start each one first). A session stopped in step 2 stays down,
-#     even with AUTO_START_SESSIONS=true, until that explicit start
+#     even with AUTO_START_SESSIONS=true, until that explicit start, but only when the old image
+#     was 0.24.0 or later: a stop made on 0.23.7 or earlier is not recorded, so with
+#     AUTO_START_SESSIONS=true that session starts on its own after the upgrade
 curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions
 
@@ -632,8 +634,9 @@ curl -H "X-API-Key: $API_KEY" http://localhost:2785/api/health
 it, so a restored session can need re-pairing; for a copy that is consistent by construction, stop
 the sessions first (`POST /api/sessions/:id/stop`), or stop the container and archive the volume.
 A stopped session stays down across restarts, even with `AUTO_START_SESSIONS=true`, so start each
-one again with `POST /api/sessions/:id/start` once the backup is copied. The stop is recorded in the
-backed-up database, so a restore of that archive keeps the session stopped too.
+one again with `POST /api/sessions/:id/start` once the backup is copied. From 0.24.0 the stop is
+recorded in the backed-up database, so a restore of that archive keeps the session stopped too; an
+archive taken on 0.23.7 or earlier records no stop.
 
 **Prerequisites:**
 
