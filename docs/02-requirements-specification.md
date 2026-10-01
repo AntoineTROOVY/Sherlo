@@ -441,15 +441,15 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Creating: POST /sessions
-    Creating --> WaitingQR: Generate QR
-    WaitingQR --> Scanning: User scans QR
-    WaitingQR --> Timeout: 60s timeout
-    Scanning --> Authenticating: QR scanned
+    [*] --> Created: POST /api/sessions
+    Created --> Initializing: POST /api/sessions/:sessionId/start
+    Initializing --> QrReady: QR issued (refreshes until scanned or stopped)
+    QrReady --> Authenticating: QR scanned or pairing code entered
+    QrReady --> Disconnected: POST /api/sessions/:sessionId/stop
     Authenticating --> Ready: Auth success
     Authenticating --> Failed: Auth failed
     Ready --> [*]
-    Timeout --> [*]
+    Disconnected --> [*]
     Failed --> [*]
 ```
 
