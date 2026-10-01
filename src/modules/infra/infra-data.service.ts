@@ -247,6 +247,8 @@ export interface InfraExportDataResult {
   omittedInlineMedia: { messages: number; messageBatches: number };
 }
 
+const EMPTY_ARCHIVE_WARNING = 'Backup contained no rows to restore; refused to replace existing data. Check the file.';
+
 /** Result of POST /infra/import-data; InfraImportDataResponseDto is the published contract. */
 export interface InfraImportDataResult {
   imported: boolean;
@@ -579,6 +581,22 @@ export class InfraDataService {
       if (badRow !== -1) {
         throw new BadRequestException(`tables.${table}[${badRow}] must be a row object`);
       }
+    }
+
+    // An archive with no rows is always refused (see the totalRestored check below), so refuse it here,
+    // before the orphan pre-flight: with no sessions in it every running engine reads as an orphan, and
+    // a stopOrphans retry would tear all of them down for a restore that was never going to happen.
+    if (TABLE_IMPORTERS.every(importer => !data.tables[importer.key]?.length)) {
+      return {
+        imported: false,
+        counts: Object.fromEntries(TABLE_IMPORTERS.map(importer => [importer.key, 0] as const)) as TableCounts,
+        warnings: [EMPTY_ARCHIVE_WARNING],
+        notices: [],
+        restartRequired: false,
+        orphanedEngines: [],
+        stoppedOrphanEngines: [],
+        failedOrphanEngines: [],
+      };
     }
 
     const importedSessionIds = new Set((data.tables.sessions ?? []).map(s => s.id));
@@ -958,7 +976,7 @@ export class InfraDataService {
           return {
             imported: false,
             counts,
-            warnings: ['Backup contained no rows to restore; refused to replace existing data. Check the file.'],
+            warnings: [EMPTY_ARCHIVE_WARNING],
             notices,
             ...engineStateAfterRollback,
           };

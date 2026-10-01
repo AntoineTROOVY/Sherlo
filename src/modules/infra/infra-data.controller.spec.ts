@@ -1399,7 +1399,10 @@ describe('InfraDataController.importData round-trips export-data (no silent mess
       });
     });
 
-    await expect(controller.importData({ tables: { messages: [] } })).rejects.toThrow(/database is locked/);
+    // One row, so the archive is not refused as empty before the transaction opens.
+    await expect(controller.importData({ tables: { messages: [{ id: 'm2' }] } as never })).rejects.toThrow(
+      /database is locked/,
+    );
     expect(rolledBack).toBe(true);
 
     jest.restoreAllMocks();
@@ -2446,6 +2449,24 @@ describe('InfraDataController.importData status_updates + runtime reconciliation
     expect(res.orphanedEngines).toEqual(['ghost']);
   });
 
+  it('refuses an archive with no rows before stopOrphans tears down any engine', async () => {
+    // With no sessions in the archive every running engine looks orphaned, and the teardown cannot be
+    // undone, yet a backup without rows is always refused. Nothing may be stopped for it.
+    await seedSession('s1');
+    const stopOrphanEngines = jest.fn().mockResolvedValue({ stopped: ['s1'], notRunning: [], failed: [] });
+    const controller = build({ sessionService: { getActiveSessionIds: () => ['s1'], stopOrphanEngines } });
+
+    const res = await controller.importData({ tables: { sessions: [], messages: [] }, stopOrphans: true });
+
+    expect(res.imported).toBe(false);
+    expect(res.warnings).toEqual([
+      'Backup contained no rows to restore; refused to replace existing data. Check the file.',
+    ]);
+    expect(stopOrphanEngines).not.toHaveBeenCalled();
+    expect(res.stoppedOrphanEngines).toEqual([]);
+    expect(await ds.getRepository(Session).count()).toBe(1);
+  });
+
   it('still reports the engines it already stopped when the import rolls back', async () => {
     // The pre-flight teardown runs BEFORE the transaction opens and cannot be rolled back with it.
     // An operator reading imported:false plus empty orphan arrays would conclude nothing happened,
@@ -2743,7 +2764,7 @@ describe('InfraDataController.importData rejects a malformed table value', () =>
   // archive) and an empty one (a table that legitimately has no rows).
   it.each([
     ['omits a table', { sessions: [{ id: 's1' }] }],
-    ['carries an empty table', { sessions: [], messages: [] }],
+    ['carries an empty table', { sessions: [{ id: 's1' }], messages: [] }],
   ])('does not reject an archive that %s', async (_label, tables) => {
     await expect(controller().importData({ tables } as never)).rejects.not.toThrow(/must be an array/);
   });
