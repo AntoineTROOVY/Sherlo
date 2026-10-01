@@ -772,7 +772,9 @@ describe('withSafeFetch followRedirects validates every hop over real sockets', 
   });
 
   afterEach(() => {
-    process.env.SSRF_ALLOWED_HOSTS = savedAllowedHosts;
+    // Assigning undefined to process.env stores the string 'undefined', an allowlist entry of its own.
+    if (savedAllowedHosts === undefined) delete process.env.SSRF_ALLOWED_HOSTS;
+    else process.env.SSRF_ALLOWED_HOSTS = savedAllowedHosts;
     (undiciFetch as unknown as jest.Mock).mockReset();
   });
 
