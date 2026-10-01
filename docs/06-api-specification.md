@@ -5912,6 +5912,7 @@ List all loaded plugins (built-in + installed), with secret config values redact
     "config": { "apiKey": "********" },
     "builtIn": false,
     "provides": ["message-hook"],
+    "ingressCapable": false,
     "sessionScoped": true,
     "activeSessions": ["*"],
     "loadedAt": "2026-06-25T00:00:00.000Z",
@@ -5920,7 +5921,7 @@ List all loaded plugins (built-in + installed), with secret config values redact
 ]
 ```
 
-`type` is one of `engine | storage | queue | auth | extension`; `status` is `installed | enabled | disabled | error`. `activeSessions: ["*"]` means all sessions. Optional fields: `configSchema`, `configUi`, `i18n`, `sessionConfig` (secrets redacted), `error`.
+`type` is one of `engine | storage | queue | auth | extension`; `status` is `installed | enabled | disabled | error`. `activeSessions: ["*"]` means all sessions. `ingressCapable` is `true` when the plugin declares an ingress route and the `webhook:ingress` permission. Optional fields: `configSchema`, `configUi`, `i18n`, `sessionConfig` (secrets redacted), `error`.
 
 **Errors:** `401` · `403`
 
@@ -6085,7 +6086,7 @@ Enable a plugin.
 **Response** `200`
 
 ```json
-{ "success": true, "message": "Plugin enabled successfully" }
+{ "success": true, "message": "Plugin chat-flow enabled successfully" }
 ```
 
 Enable failures are returned in-band as `{ "success": false, "message": "…" }` (still HTTP 200).
@@ -6109,7 +6110,7 @@ Disable a plugin.
 **Response** `200`
 
 ```json
-{ "success": true, "message": "Plugin disabled successfully" }
+{ "success": true, "message": "Plugin chat-flow disabled successfully" }
 ```
 
 The engine plugin `ENGINE_TYPE` selects (`baileys` or `whatsapp-web.js`) cannot be disabled at runtime:
@@ -6146,7 +6147,7 @@ Update a plugin's base configuration object.
 **Response** `200`
 
 ```json
-{ "success": true, "message": "Plugin configuration updated" }
+{ "success": true, "message": "Plugin chat-flow configuration updated" }
 ```
 
 Update failures are returned in-band as `{ "success": false, "message": "…" }` (HTTP 200).
@@ -6181,7 +6182,7 @@ Set (or clear) a plugin config override for a specific session.
 **Response** `200`
 
 ```json
-{ "success": true, "message": "Plugin configuration for session session-1 updated" }
+{ "success": true, "message": "Plugin chat-flow configuration for session session-1 updated" }
 ```
 
 **Errors:** `400` plugin is global (not session-scoped) / extra field · `401` · `403` · `404` unknown id
@@ -6261,7 +6262,7 @@ Uninstall a plugin: dispatch its `onUnload` lifecycle hook, delete its files, dr
 **Response** `200`
 
 ```json
-{ "success": true, "message": "Plugin uninstalled successfully" }
+{ "success": true, "message": "Plugin chat-flow uninstalled successfully" }
 ```
 
 Note: this DELETE returns `200` with a body (not the usual `204`).
