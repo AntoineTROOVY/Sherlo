@@ -362,8 +362,10 @@ export class WebhookResponseDto {
 }
 
 /**
- * A webhook delivery that exhausted its retries, or one not sent (attempts 0) that the outbox replays; the
- * shape `GET /webhooks/delivery-failures` serves. A later successful delivery removes the row.
+ * A webhook delivery that exhausted its retries, or one not sent (attempts 0); the shape
+ * `GET /webhooks/delivery-failures` serves. A shed or shutdown-refused delivery is replayed by the outbox
+ * sweep; one rejected before sending (an over-cap or unserializable payload) is recorded once and not
+ * replayed. A later successful delivery removes the row.
  */
 export class WebhookDeliveryFailureDto {
   @ApiProperty({ example: '0a941dac-a965-45e7-b318-74ae8be134f0' })
