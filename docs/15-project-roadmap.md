@@ -693,14 +693,17 @@ degrades the release notes to a bare `Release v<version>`.
 
 ### Verify, commit, tag
 
-Run the same gates the tag will run, so a failure costs a local minute rather than a released tag:
+Run the same gates the tag will run, so a failure costs a local minute rather than a released tag. The
+queue-on e2e suite skips when no Redis is reachable, while the tag runs it against a Redis service, so
+start one first (`docker run --rm -d -p 6379:6379 redis:7-alpine`, or set `QUEUE_TEST_REDIS_HOST` and
+`QUEUE_TEST_REDIS_PORT`) and check that jest reports no skipped suites:
 
 ```bash
 npm run check:versions && npm run openapi:check && npm run lint && npm run format:check
 npx tsc --noEmit -p tsconfig.json && npm run check:dockerignore
 npm run check:sdk-routes && npm run check:sdk-coverage && npm run check:sdk-events && npm run check:sdk-docs
 npm run check:contract-shapes
-npm run check:audit && (cd dashboard && npm audit --audit-level=high)
+CHECK_AUDIT_REQUIRED=1 npm run check:audit && (cd dashboard && npm audit --audit-level=high)
 npm run test:cov && npm run test:scripts && npm run test:docs && npm run test:e2e && npm run build && npm run test:engine-real
 cd dashboard && npm run lint && npm run format:check && npm run typecheck && npm run i18n:check && npm run build && npm run test:unit
 ```
