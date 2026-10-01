@@ -158,6 +158,12 @@ describe.each([
     expect(res.body).toEqual({ ok: true });
   });
 
+  it('lets Nest handle a mis-cased /api route, as routing matches it case-insensitively', async () => {
+    const res = await request(app.getHttpServer()).get('/API/ping');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true });
+  });
+
   it('returns a JSON 404 (not the SPA) for unknown /api routes', async () => {
     const res = await request(app.getHttpServer()).get('/api/does-not-exist');
     expect(res.status).toBe(404);

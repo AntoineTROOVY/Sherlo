@@ -121,14 +121,16 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
   if (dashboard.enabled && existsSync(join(dashboard.distDir, 'index.html'))) {
     const dashboardIndex = readFileSync(join(dashboard.distDir, 'index.html'), 'utf8');
     app.use((req: Request, res: Response, next: NextFunction) => {
+      // Lowercased because routing matches these prefixes case-insensitively.
+      const path = req.path.toLowerCase();
       const excluded =
-        req.path.startsWith('/api/') ||
-        req.path === '/api' ||
-        req.path.startsWith('/socket.io/') ||
-        req.path === '/socket.io' ||
-        req.path.startsWith('/mcp/') ||
-        req.path === '/mcp' ||
-        req.path.startsWith('/assets/');
+        path.startsWith('/api/') ||
+        path === '/api' ||
+        path.startsWith('/socket.io/') ||
+        path === '/socket.io' ||
+        path.startsWith('/mcp/') ||
+        path === '/mcp' ||
+        path.startsWith('/assets/');
       const documentRequest =
         req.method === 'GET' &&
         !excluded &&
