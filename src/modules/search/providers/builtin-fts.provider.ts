@@ -184,6 +184,21 @@ export class BuiltInFtsProvider implements SearchProvider, OnModuleInit {
     // were never added, and SQLite rejects the whole statement — so ordinary edits and deletes on
     // them fail, not merely searches. Reads `d."rowid"` rather than `d."id"`: same query plan,
     // without depending on the shadow table's column naming.
+    //
+    // A rowid-level gap check cannot see a renumbered table. TypeORM synchronize rebuilds `messages`
+    // on SQLite by copying the rows without their implicit rowid, so after any delete the survivors
+    // get new rowids and the index entries under them describe other messages. The triggers keep
+    // `docsize` in step with `messages`, so an index row with no message behind it only appears after
+    // such a rebuild, and any rebuild that renumbered a row leaves the old highest rowid behind. Drop
+    // the whole index then and let the gap repair below re-add every row.
+    const orphanRow: unknown[] = await this.dataSource.query(
+      `SELECT EXISTS(SELECT 1 FROM "messages_fts_docsize" d
+         WHERE NOT EXISTS (SELECT 1 FROM "messages" m WHERE m."rowid" = d."rowid")) AS orphan`,
+    );
+    if (Number((orphanRow as Array<{ orphan: number }>)[0]?.orphan)) {
+      this.logger.warn('FTS index holds rows the messages table no longer has; re-indexing every message');
+      await this.dataSource.query(`INSERT INTO "messages_fts"("messages_fts") VALUES ('delete-all')`);
+    }
     const gapRow: unknown[] = await this.dataSource.query(
       `SELECT EXISTS(SELECT 1 FROM "messages" m WHERE m."body" IS NOT NULL
          AND NOT EXISTS (SELECT 1 FROM "messages_fts_docsize" d WHERE d."rowid" = m."rowid")) AS missing`,
