@@ -52,10 +52,11 @@ export class SettingsController {
         // — otherwise the panel reports docs enabled in production where they are actually disabled.
         enableDocs: isSwaggerEnabled(process.env.ENABLE_SWAGGER, process.env.NODE_ENV),
       },
+      // Fixed placeholders: no notification feature exists, so nothing here may report one as on.
       notifications: {
         emailEnabled: false,
         notificationEmail: '',
-        webhookAlerts: true,
+        webhookAlerts: false,
       },
     };
   }

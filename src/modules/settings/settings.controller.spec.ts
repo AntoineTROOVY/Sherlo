@@ -37,6 +37,14 @@ describe('SettingsController', () => {
     }
   });
 
+  it('reports no notification feature as enabled, since none exists', () => {
+    expect(new SettingsController(configStub).get().notifications).toEqual({
+      emailEnabled: false,
+      notificationEmail: '',
+      webhookAlerts: false,
+    });
+  });
+
   it('reports enableDocs from the real ENABLE_SWAGGER gate, not a hardcoded true', () => {
     const prev = process.env.ENABLE_SWAGGER;
     try {

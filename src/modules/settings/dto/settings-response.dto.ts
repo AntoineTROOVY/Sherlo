@@ -39,10 +39,13 @@ export class SettingsApiDto {
   enableDocs!: boolean;
 }
 
+const NOTIFICATION_PLACEHOLDER =
+  'Fixed placeholder: no notification feature exists, and the value is not configurable.';
+
 export class SettingsNotificationsDto {
-  @ApiProperty({ example: false }) emailEnabled!: boolean;
-  @ApiProperty({ example: '' }) notificationEmail!: string;
-  @ApiProperty({ example: true }) webhookAlerts!: boolean;
+  @ApiProperty({ description: `Always false. ${NOTIFICATION_PLACEHOLDER}`, example: false }) emailEnabled!: boolean;
+  @ApiProperty({ description: `Always empty. ${NOTIFICATION_PLACEHOLDER}`, example: '' }) notificationEmail!: string;
+  @ApiProperty({ description: `Always false. ${NOTIFICATION_PLACEHOLDER}`, example: false }) webhookAlerts!: boolean;
 }
 
 export class SettingsResponseDto {
