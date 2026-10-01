@@ -328,35 +328,15 @@ describe('StatusService media validation and selection', () => {
     });
   });
 
-  // A URL's bytes come with the host's Content-Type, which the engines use unless the caller declared
-  // a type; octet-stream is the placeholder they read as "undeclared". Only base64 has nothing to go on.
-  it('defaults the mimetype for base64 only, and leaves an undeclared URL type to the fetched one', async () => {
-    const url = 'https://example.com/banner.png';
+  // The status adapters fetch a URL with no fallback type of their own, so a host serving a generic
+  // Content-Type would leave the bytes labelled octet-stream; the route default is the only label they get.
+  it('labels an untyped URL with the route default for its kind', async () => {
+    const url = 'https://example.com/banner';
     await service.postImageStatus('s1', { url }, { recipients: ['1@c.us'] });
     await service.postVideoStatus('s1', { url }, { recipients: ['1@c.us'] });
-    await service.postImageStatus('s1', { base64: 'QUJD' }, { recipients: ['1@c.us'] });
-    await service.postVideoStatus('s1', { base64: 'QUJD' }, { recipients: ['1@c.us'] });
 
-    expect(engine.postImageStatus).toHaveBeenNthCalledWith(
-      1,
-      { mimetype: 'application/octet-stream', data: url },
-      expect.anything(),
-    );
-    expect(engine.postImageStatus).toHaveBeenNthCalledWith(
-      2,
-      { mimetype: 'image/jpeg', data: 'QUJD' },
-      expect.anything(),
-    );
-    expect(engine.postVideoStatus).toHaveBeenNthCalledWith(
-      1,
-      { mimetype: 'application/octet-stream', data: url },
-      expect.anything(),
-    );
-    expect(engine.postVideoStatus).toHaveBeenNthCalledWith(
-      2,
-      { mimetype: 'video/mp4', data: 'QUJD' },
-      expect.anything(),
-    );
+    expect(engine.postImageStatus).toHaveBeenCalledWith({ mimetype: 'image/jpeg', data: url }, expect.anything());
+    expect(engine.postVideoStatus).toHaveBeenCalledWith({ mimetype: 'video/mp4', data: url }, expect.anything());
   });
 
   it('strips a data-URI prefix before handing base64 bytes to either engine path', async () => {
