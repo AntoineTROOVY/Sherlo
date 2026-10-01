@@ -435,7 +435,7 @@ src/
 │   ├── auth/                   # API-key auth: auth.service.ts, guards/, decorators/, entities/
 │   ├── queue/                  # BullMQ wiring + processors/
 │   ├── integration/            # Integration fabric (plugin instances, ingress, mappings)
-│   ├── automation/            # Autoreply rules (automation_rules, the 14th migration table)
+│   ├── automation/            # Autoreply rules (automation_rules, exported and restored with the other migration tables)
 │   ├── media/  chat-media/    # Inbound media handling + the optional chat-media archive
 │   ├── takeover/
 │   └── plugins/  mcp/  events/  infra/  docker/  settings/  metrics/  audit/  health/
