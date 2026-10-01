@@ -93,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An inbound message, or one the account sent outside the API, is inserted once more after a transient database error (a SQLite lock, a dropped connection, a PostgreSQL pool timeout or connection limit), instead of reaching webhooks with no stored row.
 - Messages in one chat are stored, emitted over the WebSocket and handed to webhook dispatch in arrival order, even when a plugin's `message:received` or `message:sent` handler is slower on an earlier one. Webhook deliveries themselves can still arrive out of order.
 - A delivery ack, reaction, edit or deletion that arrives before its message is stored is applied once the message is stored.
+- A message deleted for everyone before it is stored no longer goes out as `message.received` or `message.sent` with its deleted content after `message.revoked`; one deleted through `POST /api/sessions/:sessionId/messages/delete` in that window goes out as `revoked` with an empty body, and one edited in that window with the edited body, to automation rules too.
 - The lid-to-phone cache no longer keeps an empty reverse entry for every phone it evicted or re-mapped, so its memory stays within the cache bound.
 - Webhook custom header values with characters outside Latin-1 are rejected with `400`; they were accepted and made every delivery to that webhook fail.
 - The webhook outbox replay no longer delivers an event the webhook has since been unsubscribed from.
