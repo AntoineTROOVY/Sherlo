@@ -703,9 +703,8 @@ export interface BatchMessageResult {
 export type BatchMessageStatus = 'pending' | 'sent' | 'failed' | 'cancelled';
 
 /**
- * Response from `GET /messages/batch/:batchId` (batch status polling) and
- * `POST /messages/batch/:batchId/cancel`. Distinct from
- * {@link BulkMessageResponse} (the send-bulk acknowledgement).
+ * Response from `GET /messages/batch/:batchId` (batch status polling). Distinct from
+ * {@link BulkMessageResponse} (the send-bulk acknowledgement) and {@link BatchCancelResponse}.
  */
 export interface BatchStatusResponse {
   batchId: string;
@@ -714,6 +713,13 @@ export interface BatchStatusResponse {
   results: BatchMessageResult[];
   startedAt?: string | null;
   completedAt?: string | null;
+}
+
+/** Response from `POST /messages/batch/:batchId/cancel`: the batch state without per-recipient `results`. */
+export interface BatchCancelResponse {
+  batchId: string;
+  status: BatchLifecycleStatus;
+  progress: BatchProgress;
 }
 
 /** Lifecycle of a whole batch — the `status` of {@link BatchStatusResponse}. */
