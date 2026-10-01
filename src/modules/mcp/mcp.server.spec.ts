@@ -217,13 +217,6 @@ describe('auditMcpAuthFailure (MCP auth-failure audit trail, mirrors REST ApiKey
     expect(() => auditMcpAuthFailure(undefined, new UnauthorizedException('x'), reqContext)).not.toThrow();
   });
 
-  it('success path never reaches the catch (helper only invoked on thrown auth errors)', () => {
-    // Structural: auditMcpAuthFailure is only called from the tool handler's catch block, so a
-    // successful invokeTool returns a result without auditing. Assert the helper is a no-op on
-    // a non-401/403 throw to confirm the success-equivalent (no auth failure) is not audited.
-    auditMcpAuthFailure(auditService, new BadRequestException('not an auth failure'), reqContext);
-    expect(auditService.logWarn).not.toHaveBeenCalled();
-  });
 });
 
 describe('createKeyGate (every MCP request needs a valid key)', () => {
@@ -555,6 +548,21 @@ describe('mountMcpServer (raw-Express request-handling path)', () => {
         errorMessage: 'API key is invalid',
       }),
     );
+  });
+
+  it('runs the tool on a valid key without writing an auth-failure record', async () => {
+    const h = mount();
+    h.authService.validateApiKey.mockResolvedValue({ id: 'k1' });
+    await post(h, { jsonrpc: '2.0', id: 1 }, { 'x-api-key': 'good-key' });
+
+    const result = (await toolCallback()(
+      { sessionId: 's1', to: '123', text: 'hi' },
+      { requestInfo: { headers: { 'x-api-key': 'good-key' } } },
+    )) as { isError?: boolean };
+
+    expect(result.isError).toBeFalsy();
+    expect(h.tool.handler).toHaveBeenCalledTimes(1);
+    expect(h.auditService.logWarn).not.toHaveBeenCalled();
   });
 
   // One parser for every surface that reads Authorization, so a header the REST guard accepts is
