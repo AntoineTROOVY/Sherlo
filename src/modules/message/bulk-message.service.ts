@@ -6,6 +6,7 @@ import {
   NotFoundException,
   Optional,
   OnApplicationBootstrap,
+  OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
 import { createLogger } from '../../common/services/logger.service';
@@ -113,7 +114,7 @@ interface BatchExecutionState {
 const ENDED_ELSEWHERE = new Set<BatchStatus>([BatchStatus.FAILED, BatchStatus.COMPLETED]);
 
 @Injectable()
-export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap {
+export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = createLogger(BulkMessageService.name);
   private readonly processingBatches = new Map<string, boolean>(); // Track active batches for cancellation
   private inFlightBatches = 0; // count of batches currently in processBatch (memory bound, see cap above)
@@ -177,10 +178,29 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap 
   }
 
   /**
+   * Fail the batches this process holds on shutdown. Shutdown releases its sessions, and a node that
+   * starts a released session is not adopting it from a lapsed lease, so it never reaps a batch left
+   * PENDING or PROCESSING here: the row would stay unfinished until that node restarts. Runs before
+   * TypeORM closes the database (onApplicationShutdown). The row is read first so the FAILED write strips
+   * its stored media payloads, as every other terminal path does. The marker is cleared only once the
+   * row is FAILED, so a run stops at its next item and records what it sent under that status.
+   */
+  async onModuleDestroy(): Promise<void> {
+    for (const id of [...this.processingBatches.keys()]) {
+      try {
+        const row = await this.batchRepository.findOne({ where: { id } });
+        if (await this.failOrphanedBatch(row ?? { id })) this.processingBatches.set(id, false);
+      } catch (error) {
+        this.logger.error(`Could not mark batch ${id} FAILED on shutdown: ${String(error)}`);
+      }
+    }
+  }
+
+  /**
    * Guarded on the unfinished statuses in the UPDATE itself: the row was read before this write, and
    * a batch that finalized in between must keep its real status, progress and results. Returns
-   * whether the row was still unfinished and is now FAILED. Without `messages` (the run failed
-   * before it could read the row) the stored payloads are left as they are.
+   * whether the row was still unfinished and is now FAILED. Without `messages` (the row could not
+   * be read) the stored payloads are left as they are.
    *
    * `withRunState` is for the run's own failure path only: that run holds the progress, results and
    * currentIndex of what it sent, newer than the row. A reap must not write them back, since what it

@@ -453,6 +453,65 @@ describe('BulkMessageService.processBatch', () => {
     expect(partial.currentIndex).toBe(1);
   });
 
+  // Shutdown releases this node's sessions, and the node that starts one next does not adopt it from
+  // a lapsed lease, so it never reaps a batch left PROCESSING here.
+  it('fails a running batch on shutdown, and the run records what it sent under that FAILED', async () => {
+    repo.findOne
+      .mockResolvedValueOnce(makeBatch(3)) // pickup
+      .mockResolvedValueOnce(makeBatch(3)) // the shutdown read
+      .mockResolvedValueOnce({ status: BatchStatus.FAILED }); // re-read after the progress write missed
+    inFlightMarkers().set('b1', true);
+    engine.sendTextMessage.mockImplementationOnce(async () => {
+      await service.onModuleDestroy(); // the process shuts down while the first send is in flight
+      return { id: 'wa1', timestamp: 111 };
+    });
+    repo.update
+      .mockResolvedValueOnce({ affected: 1 }) // start transition
+      .mockResolvedValueOnce({ affected: 1 }) // the shutdown write: PROCESSING -> FAILED
+      .mockResolvedValueOnce({ affected: 0 }); // progress write at i=0: the row is FAILED now
+
+    await runProcessBatch();
+
+    expect(engine.sendTextMessage).toHaveBeenCalledTimes(1);
+    const calls = repo.update.mock.calls as Array<[unknown, Partial<MessageBatch>]>;
+    expect(calls[1]).toEqual([
+      { id: 'b1', status: In([BatchStatus.PENDING, BatchStatus.PROCESSING]) },
+      expect.objectContaining({ status: BatchStatus.FAILED }),
+    ]);
+    const [criteria, partial] = calls.at(-1)!;
+    expect(criteria).toEqual({ id: 'b1', status: BatchStatus.FAILED });
+    expect(partial.status).toBeUndefined();
+    expect(partial.results).toHaveLength(1);
+  });
+
+  it('strips the stored media payloads when it fails a batch on shutdown', async () => {
+    const batch = makeBatch(1);
+    batch.messages = [
+      { chatId: 'c0@c.us', type: 'image', content: { image: { base64: 'QkFTRTY0', mimetype: 'image/png' } } },
+    ];
+    repo.findOne.mockResolvedValueOnce(batch);
+    inFlightMarkers().set('b1', true);
+    repo.update.mockResolvedValueOnce({ affected: 1 });
+
+    await service.onModuleDestroy();
+
+    const [, partial] = (repo.update.mock.calls as Array<[unknown, Partial<MessageBatch>]>)[0];
+    expect(partial.status).toBe(BatchStatus.FAILED);
+    const img = (partial.messages![0].content as { image?: { base64?: unknown; mimetype?: string } }).image;
+    expect(img?.base64).toBeUndefined();
+    expect(img?.mimetype).toBe('image/png');
+    expect(inFlightMarkers().get('b1')).toBe(false);
+  });
+
+  it('leaves a batch alone on shutdown when it already ended', async () => {
+    inFlightMarkers().set('b1', true);
+    repo.update.mockResolvedValueOnce({ affected: 0 }); // the batch finished before the shutdown write
+
+    await service.onModuleDestroy();
+
+    expect(inFlightMarkers().get('b1')).toBe(true);
+  });
+
   it('still rethrows the run error when failing the batch throws too', async () => {
     repo.findOne.mockRejectedValueOnce(new Error('database unavailable'));
     repo.update.mockRejectedValueOnce(new Error('still unavailable'));
