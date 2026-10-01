@@ -72,27 +72,36 @@ describe('EngineFactory', () => {
     const pluginLoader = {
       getPlugin: jest.fn().mockReturnValue({ instance: pluginInstance }),
     } as unknown as PluginLoaderService;
+    // create() makes both auth dirs, so the bases live under a temp root rather than the default
+    // ./data/baileys of the checkout and a /var/data the suite may be able to write as root.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'openwa-factory-neutral-'));
+    try {
+      const factory = new EngineFactory(
+        buildConfigService({
+          'engine.sessionDataPath': path.join(tmp, 'sessions'),
+          'engine.baileys.authDir': path.join(tmp, 'baileys'),
+        }),
+        pluginLoader,
+        buildMessageStore(),
+        buildLidStore(),
+        buildChatStateStore(),
+      );
+      factory.create({ sessionId: 'sess-1', dbSessionId: 'db-1', proxyUrl: 'http://p', proxyType: 'http' });
 
-    const factory = new EngineFactory(
-      buildConfigService(),
-      pluginLoader,
-      buildMessageStore(),
-      buildLidStore(),
-      buildChatStateStore(),
-    );
-    factory.create({ sessionId: 'sess-1', dbSessionId: 'db-1', proxyUrl: 'http://p', proxyType: 'http' });
-
-    // Plain-object (not objectContaining) assertion: any browser key (headless/puppeteerArgs/
-    // executablePath) leaking into the per-call config would fail this exact match. The auth-dir
-    // bases are the deliberate exception, pinned below.
-    expect(createEngine).toHaveBeenCalledWith({
-      sessionId: 'sess-1',
-      dbSessionId: 'db-1',
-      proxyUrl: 'http://p',
-      proxyType: 'http',
-      sessionDataPath: '/var/data/sessions',
-      authDir: './data/baileys',
-    });
+      // Plain-object (not objectContaining) assertion: any browser key (headless/puppeteerArgs/
+      // executablePath) leaking into the per-call config would fail this exact match. The auth-dir
+      // bases are the deliberate exception, pinned below.
+      expect(createEngine).toHaveBeenCalledWith({
+        sessionId: 'sess-1',
+        dbSessionId: 'db-1',
+        proxyUrl: 'http://p',
+        proxyType: 'http',
+        sessionDataPath: path.join(tmp, 'sessions'),
+        authDir: path.join(tmp, 'baileys'),
+      });
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 
   // The adapters used to read these bases from the plugin config, which a PUT /api/plugins/:id/config
