@@ -1197,6 +1197,7 @@ multiple replicas against a shared session volume corrupt WhatsApp auth. Run exa
 instance per session-data volume (`replicas: 1`). Session claims and leases ship; the rest of the design
 that would be required to scale out is documented — as a future design sketch, not a shipped feature —
 in [13 - Horizontal Scaling Guide](./13-horizontal-scaling.md).
+
 ---
 
 <div align="center">
