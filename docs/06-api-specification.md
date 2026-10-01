@@ -6331,11 +6331,13 @@ Key facts:
   "id": 3,
   "method": "tools/call",
   "params": {
-    "name": "session_send_text",
-    "arguments": { "sessionId": "default", "to": "6281234567890", "text": "Hello from MCP" }
+    "name": "MessageSendText",
+    "arguments": { "sessionId": "default", "chatId": "6281234567890@c.us", "text": "Hello from MCP" }
   }
 }
 ```
+
+`MessageSendText` is a write tool: it is listed only with `MCP_READONLY=false` and needs an `OPERATOR` key.
 
 **Response** `200` — `text/event-stream`; the `data:` line of its `event: message` frame is this JSON-RPC 2.0 envelope
 
@@ -6343,7 +6345,7 @@ Key facts:
 {
   "jsonrpc": "2.0",
   "id": 3,
-  "result": { "content": [{ "type": "text", "text": "{\"success\":true,\"messageId\":\"…\"}" }] }
+  "result": { "content": [{ "type": "text", "text": "{\"messageId\":\"…\",\"timestamp\":1719312000}" }] }
 }
 ```
 
