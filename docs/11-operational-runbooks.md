@@ -726,8 +726,8 @@ OPENWA_DATA_DIR=/srv/openwa/data \
 
 ```bash
 # The archive MUST contain main.sqlite, the configured data store, and the auth directory for the
-# selected engine (sessions/ for whatsapp-web.js or baileys/ for Baileys).
-tar -tzf ./backups/openwa-backup-*.tar.gz
+# selected engine (sessions/ for whatsapp-web.js or baileys/ for Baileys). Lists the newest archive.
+tar -tzf "$(ls -t ./backups/openwa-backup-*.tar.gz | head -n 1)"
 ```
 
 > Backup archives contain API keys, provider credentials, WhatsApp auth state, and plugin secrets.
