@@ -12,13 +12,12 @@ import {
   SetGroupPictureDto,
   GROUP_PARTICIPANTS_MAX,
 } from './group.dto';
+import { GLOBAL_VALIDATION_OPTIONS } from '../../../config/app-validation';
 
-// Mirror the global ValidationPipe: whitelist + forbidNonWhitelisted from src/main.ts, AND the
-// enableImplicitConversion transform option from src/config/app-validation.ts. The transform
-// option has to be applied here too — without it a spec exercises a stricter pipe than the one
+// Built from the options the global ValidationPipe uses (src/config/app-validation.ts), including the
+// enableImplicitConversion transform option: without it a spec exercises a stricter pipe than the one
 // that actually runs, so a payload this file rejects can still be accepted in production.
-const PIPE_OPTS = { whitelist: true, forbidNonWhitelisted: true };
-const PIPE_TRANSFORM_OPTS = { enableImplicitConversion: true };
+const { transformOptions: PIPE_TRANSFORM_OPTS, ...PIPE_OPTS } = GLOBAL_VALIDATION_OPTIONS;
 
 function errorsFor<T extends object>(cls: new () => T, payload: unknown): Promise<ValidationError[]> {
   return validate(plainToInstance(cls, payload as object, PIPE_TRANSFORM_OPTS), PIPE_OPTS);
