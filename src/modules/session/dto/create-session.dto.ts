@@ -45,8 +45,9 @@ export class CreateSessionDto {
     description:
       'Optional per-session egress proxy URL (http/https/socks4/socks5; credentialed form ' +
       '"http://user:pass@host" allowed). Must be a REAL, REACHABLE proxy — an unreachable value ' +
-      'silently blocks the WhatsApp WebSocket (no QR is ever delivered) and the session start times ' +
-      'out (~30s → 504 Gateway Timeout). Leave unset unless your network cannot reach WhatsApp directly. ' +
+      'silently blocks the WhatsApp WebSocket (no QR is ever delivered). On whatsapp-web.js the session ' +
+      'start then times out (~30s → 504 Gateway Timeout); on Baileys the start succeeds and the session ' +
+      'keeps retrying the connection. Leave unset unless your network cannot reach WhatsApp directly. ' +
       'Setting it requires an ADMIN key (403 otherwise).',
   })
   @IsOptional()
