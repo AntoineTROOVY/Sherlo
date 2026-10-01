@@ -253,6 +253,23 @@ describe('resolveSafeFetchTarget', () => {
       else process.env.SSRF_DNS_TIMEOUT_MS = prev;
     }
   }, 1000);
+
+  it('falls back to the default deadline when SSRF_DNS_TIMEOUT_MS overflows a Node timer', async () => {
+    // Node clamps a delay above 2^31-1 ms to 1 ms, which would fail every lookup at once.
+    const prev = process.env.SSRF_DNS_TIMEOUT_MS;
+    process.env.SSRF_DNS_TIMEOUT_MS = '9999999999';
+    (dnsPromises.lookup as jest.Mock).mockReturnValueOnce(
+      new Promise(resolve => setTimeout(() => resolve([{ address: '93.184.216.34', family: 4 }]), 50)),
+    );
+    try {
+      await expect(resolveSafeFetchTarget('https://slow.example/hook')).resolves.toEqual([
+        { address: '93.184.216.34', family: 4 },
+      ]);
+    } finally {
+      if (prev === undefined) delete process.env.SSRF_DNS_TIMEOUT_MS;
+      else process.env.SSRF_DNS_TIMEOUT_MS = prev;
+    }
+  }, 1000);
 });
 
 describe('withSafeFetch (guarded + pinned fetch)', () => {

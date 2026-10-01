@@ -263,10 +263,13 @@ export function assertNoRedirect(response: { status: number; type?: string }, ur
 /** Default DNS resolution deadline (ms) — generous for healthy resolvers; bounds a hang. */
 const DEFAULT_DNS_TIMEOUT_MS = 10000;
 
+/** Node clamps a longer timer delay to 1 ms, which would fail every lookup at once. */
+const MAX_TIMER_MS = 2147483647;
+
 function resolveDnsTimeoutMs(): number {
   const raw = process.env.SSRF_DNS_TIMEOUT_MS;
   const n = raw !== undefined ? Number(raw) : NaN;
-  return Number.isInteger(n) && n > 0 ? n : DEFAULT_DNS_TIMEOUT_MS;
+  return Number.isInteger(n) && n > 0 && n <= MAX_TIMER_MS ? n : DEFAULT_DNS_TIMEOUT_MS;
 }
 
 /** Redirect hops followed on the guarded download path before the chain is refused. */
