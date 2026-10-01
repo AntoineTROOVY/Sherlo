@@ -313,7 +313,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Dependencies
 
 - `engine.io` 6.6.9 to 6.6.11, closing a high-severity denial-of-service advisory in the Socket.IO transport. It ships in the runtime tree.
-- `@grpc/grpc-js` 1.14.4 to 1.14.5, closing a high-severity advisory in which `getAuthContext` could report an unauthorized certificate as authorized. It reaches the runtime tree through `dockerode`.
+- `@grpc/grpc-js` 1.14.4 to 1.14.5, closing a high-severity advisory in which `getAuthContext` could report an unauthorized certificate as authorized, and a low-severity one in which method-handler error messages reached the client in status messages. It reaches the runtime tree through `dockerode`.
 - `brace-expansion` 5.0.9 to 5.0.12 via the overrides in both trees, with the root tree's `minimatch` 3, 5 and 9 copies pinned to the patched 1.1.21 and 2.1.7 lines, closing two high-severity and one moderate-severity denial-of-service advisories. The root copies ship in the runtime tree.
 - `multer` 2.3.0 to 2.4.0 via an override, closing a denial-of-service advisory in which aborted uploads leave orphaned disk writes. It ships in the runtime tree.
 - `qs` 6.15.2 to 6.16.0, closing two moderate-severity advisories, an array-limit bypass and a denial of service. It ships in the runtime tree.
