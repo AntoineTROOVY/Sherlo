@@ -6351,7 +6351,7 @@ describe('BaileysAdapter contact + chat reads', () => {
 
     it("asks Baileys' own mapping when the table has none, and records what it learns", async () => {
       const lidStore = makeLidStore();
-      const getPNForLID = jest.fn().mockResolvedValue('628222@s.whatsapp.net');
+      const getPNForLID = jest.fn().mockResolvedValue('628222:0@s.whatsapp.net');
       fakeSock.signalRepository = { lidMapping: { getLIDForPN: jest.fn(), getPNForLID } };
       const adapter = await readyWith(lidStore);
       expect(await adapter.resolveContactPhone('111@lid')).toBe('628222');
