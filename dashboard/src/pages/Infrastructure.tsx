@@ -159,7 +159,7 @@ export function Infrastructure() {
 
   // If the live infrastructure status can't be loaded, do NOT render the editable form: it would seed
   // from component defaults (sqlite/local/built-in:false) and a Save could flip a running backend to
-  // external+empty. Show an error + retry instead. (#488 review)
+  // external+empty. Show an error + retry instead. (#488)
   // Likewise without the saved config: the database, storage and engine detail fields hydrate only
   // from it, and a Save sends every one of them.
   // Keyed on missing data, not on the query's error flag: a failed background refetch keeps the last
