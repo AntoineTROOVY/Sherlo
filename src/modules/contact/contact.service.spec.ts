@@ -130,11 +130,15 @@ describe('ContactService', () => {
       .fn()
       .mockResolvedValueOnce('https://pps/1.jpg')
       .mockImplementationOnce(() => new Promise(() => undefined)); // never settles
-    const started = Date.now();
-    const out = await makeService({ getProfilePicture }).getProfilePictures('s1', ['a@c.us', 'b@c.us']);
-    expect(out).toEqual({ 'a@c.us': 'https://pps/1.jpg', 'b@c.us': null });
-    expect(Date.now() - started).toBeLessThan(12_000);
-  }, 15_000);
+    jest.useFakeTimers();
+    try {
+      const out = makeService({ getProfilePicture }).getProfilePictures('s1', ['a@c.us', 'b@c.us']);
+      await jest.advanceTimersByTimeAsync(8000);
+      await expect(out).resolves.toEqual({ 'a@c.us': 'https://pps/1.jpg', 'b@c.us': null });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 
   describe('block/unblock reject ids that do not name a person', () => {
     // whatsapp-web.js's Contact.block()/unblock() return false for a group id (nothing blocked,
