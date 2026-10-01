@@ -763,7 +763,8 @@ export class BaileysSessionStore {
       // whatsapp-web.js reports honestly from the Contact model.
       isMyContact: Boolean(c.name),
       isBlocked: false, // best-effort: blocklist state is not tracked in this slice
-      profilePicUrl: c.imgUrl ?? undefined,
+      // A `picture` notification stores the marker 'changed' or 'removed' in imgUrl, not a URL.
+      profilePicUrl: c.imgUrl && /^https?:\/\//i.test(c.imgUrl) ? c.imgUrl : undefined,
     };
   }
 

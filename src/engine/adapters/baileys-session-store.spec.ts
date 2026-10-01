@@ -90,6 +90,15 @@ describe('BaileysSessionStore', () => {
     expect(store.listContacts()).toHaveLength(1);
   });
 
+  it('reports no profilePicUrl for the picture-change markers Baileys stores in imgUrl', () => {
+    // A `picture` notification arrives as contacts.update with imgUrl 'changed' or 'removed', not a URL.
+    store.upsertContacts([{ id: '628111@s.whatsapp.net', notify: 'Al', imgUrl: 'http://p/x.jpg' }]);
+    store.upsertContacts([{ id: '628111@s.whatsapp.net', imgUrl: 'changed' }]);
+    store.upsertContacts([{ id: '628222@s.whatsapp.net', notify: 'Bo', imgUrl: 'removed' }]);
+    expect(store.findContact('628111@s.whatsapp.net')?.profilePicUrl).toBeUndefined();
+    expect(store.findContact('628222@s.whatsapp.net')?.profilePicUrl).toBeUndefined();
+  });
+
   it('does not let a later history-sync row wipe a saved name with undefined', () => {
     // Baileys history contacts always include `name: displayName || name || username || undefined`.
     // Spreading that onto an address-book upsert that already had a name used to clear it.
