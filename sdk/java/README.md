@@ -27,9 +27,12 @@ Java 17+, one runtime dependency ([Gson](https://github.com/google/gson)).
 implementation 'com.rmyndharis:openwa:0.5.0'
 ```
 
-This README describes `main`. The 0.5.0 release lacks `sessions.getProxy`,
-`sessions.updateProxy`, `messages.clickButton`, the `name` filter of
-`ListSessionsQuery`, `WebhookSignature.verify`, the `WebhookDelivery` types, the
+This README describes `main`. The 0.5.0 release lacks, among other additions,
+`sessions.getProxy`, `sessions.updateProxy`, `messages.clickButton`, the `name`
+filter of `ListSessionsQuery`, the `after` and `inlineMedia` filters of
+`ListMessagesQuery`, the `archived`, `pinned`, `muted` and `muteExpiration`
+fields of `ChatSummary`, the `order` and `product` fields of
+`ChatHistoryMessage`, `WebhookSignature.verify`, the `WebhookDelivery` types, the
 `code()`, `retryAfterSeconds()` and `headers()` error accessors, the `UNKNOWN`
 enum fallback and the refusal of an empty, `.` or `..` id or path segment; they
 ship with the next SDK release. See [the SDK overview](../README.md#coverage).
