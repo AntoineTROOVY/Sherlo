@@ -34,8 +34,9 @@ filter of `ListSessionsQuery`, the `after` and `inlineMedia` filters of
 fields of `ChatSummary`, the `order` and `product` fields of
 `ChatHistoryMessage`, `WebhookSignature.verify`, the `WebhookDelivery` types, the
 `code()`, `retryAfterSeconds()` and `headers()` error accessors, the `UNKNOWN`
-enum fallback and the refusal of an empty, `.` or `..` id or path segment; they
-ship with the next SDK release. See [the SDK overview](../README.md#coverage).
+enum fallback, the refusal of an empty, `.` or `..` id or path segment and the
+refusal of a raw request path that does not begin with `/`; they ship with the
+next SDK release. See [the SDK overview](../README.md#coverage).
 
 ## Quickstart
 
@@ -178,8 +179,9 @@ WebhookDelivery delivery =
 - **Empty and dot ids are refused.** An empty, `.` or `..` id throws
   `IllegalArgumentException` and nothing is sent, so a proxy that resolves dot
   segments cannot turn the call into one on the parent resource. The raw
-  `request*` methods refuse a `.` or `..` segment the same way but send an
-  empty one (a trailing slash) as written.
+  `request*` methods refuse a `.` or `..` segment the same way, and a path
+  that does not begin with `/`, but send an empty one (a trailing slash) as
+  written.
 
 ## Development
 

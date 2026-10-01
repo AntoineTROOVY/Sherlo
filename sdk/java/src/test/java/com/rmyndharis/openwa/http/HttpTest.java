@@ -43,6 +43,14 @@ class HttpTest {
     }
 
     @Test
+    void buildUrlRefusesPathWithoutLeadingSlash() {
+        // Appended to the base, these would change the host the request and its API key go to.
+        for (String path : new String[] {".evil.example/x", "@evil.example/x", "api/sessions", ""}) {
+            assertThrows(IllegalArgumentException.class, () -> Http.buildUrl("https://api.example.com", path, null, gson), path);
+        }
+    }
+
+    @Test
     void buildUrlStripsTrailingSlashAndPreservesPrefix() {
         assertEquals("http://h:2785/api/sessions", Http.buildUrl("http://h:2785/", "/api/sessions", null, gson));
         assertEquals("http://h/v1/api/sessions", Http.buildUrl("http://h/v1", "/api/sessions", null, gson));
