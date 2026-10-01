@@ -290,6 +290,7 @@ Get a single session by ID.
   "createdAt": "2026-06-20T11:30:00.000Z",
   "updatedAt": "2026-06-25T09:01:55.000Z",
   "lastError": null,
+  "restriction": null,
   "engineLoaded": true
 }
 ```
@@ -615,6 +616,7 @@ whichever proxy they go through.
   "createdAt": "2026-06-25T09:00:00.000Z",
   "updatedAt": "2026-06-25T09:00:00.000Z",
   "lastError": null,
+  "restriction": null,
   "engineLoaded": false
 }
 ```
@@ -651,6 +653,7 @@ No request body.
   "createdAt": "2026-06-20T11:30:00.000Z",
   "updatedAt": "2026-06-25T09:05:00.000Z",
   "lastError": null,
+  "restriction": null,
   "engineLoaded": true
 }
 ```
@@ -684,11 +687,12 @@ No request body.
   "status": "disconnected",
   "phone": "6281234567890",
   "pushName": "My Bot",
-  "connectedAt": null,
+  "connectedAt": "2026-06-25T08:14:02.000Z",
   "lastActive": "2026-06-25T09:01:55.000Z",
   "createdAt": "2026-06-20T11:30:00.000Z",
   "updatedAt": "2026-06-25T09:10:00.000Z",
   "lastError": null,
+  "restriction": null,
   "engineLoaded": false
 }
 ```
@@ -753,12 +757,13 @@ No request body.
   "name": "my-bot",
   "status": "disconnected",
   "phone": null,
-  "pushName": null,
-  "connectedAt": null,
+  "pushName": "My Bot",
+  "connectedAt": "2026-06-25T08:14:02.000Z",
   "lastActive": "2026-06-25T09:01:55.000Z",
   "createdAt": "2026-06-20T11:30:00.000Z",
   "updatedAt": "2026-06-25T09:11:00.000Z",
   "lastError": null,
+  "restriction": null,
   "engineLoaded": false
 }
 ```
@@ -792,11 +797,12 @@ No request body.
   "status": "disconnected",
   "phone": "6281234567890",
   "pushName": "My Bot",
-  "connectedAt": null,
+  "connectedAt": "2026-06-25T08:14:02.000Z",
   "lastActive": "2026-06-25T09:01:55.000Z",
   "createdAt": "2026-06-20T11:30:00.000Z",
   "updatedAt": "2026-06-25T09:12:00.000Z",
   "lastError": null,
+  "restriction": null,
   "engineLoaded": false
 }
 ```
