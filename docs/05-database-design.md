@@ -305,7 +305,7 @@ erDiagram
     }
 ```
 
-`messages` and `message_batches` reference `sessions.id` through a plain `sessionId` (`session_id` on `message_batches`) with no foreign key. Deleting a session through the API removes their rows explicitly; a raw `DELETE FROM sessions` leaves them behind.
+Only `webhooks`, `templates`, `automation_rules` and `baileys_stored_messages` declare an `ON DELETE CASCADE` foreign key to `sessions.id`. `messages`, `message_batches`, `chat_states`, `status_updates`, `webhook_outbox_events`, `webhook_delivery_failures` and `integration_delivery_failures` reference it through a plain `sessionId` (`session_id` on `message_batches`) with no foreign key. Deleting a session through the API removes their rows explicitly; a raw `DELETE FROM sessions` leaves them behind.
 
 ## 5.3 Table Specifications
 
