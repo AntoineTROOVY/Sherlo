@@ -16,7 +16,7 @@ import {
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiExtraModels, getSchemaPath } from '@nestjs/swagger';
 import { SessionService } from './session.service';
 import {
   CreateSessionDto,
@@ -680,7 +680,12 @@ export class SessionController {
   })
   @ApiParam({ name: 'sessionId', description: 'Session ID' })
   @ApiParam({ name: 'chatId', description: 'Chat ID as subscribed' })
-  @ApiResponse({ status: 200, description: 'Last reported presence, or null', type: ChatPresenceResponseDto })
+  @ApiExtraModels(ChatPresenceResponseDto)
+  @ApiResponse({
+    status: 200,
+    description: 'Last reported presence, or null',
+    schema: { nullable: true, allOf: [{ $ref: getSchemaPath(ChatPresenceResponseDto) }] },
+  })
   @ApiResponse({ status: 404, description: 'Session not found' })
   async getPresence(
     @Param('sessionId', ParseUUIDPipe) id: string,
