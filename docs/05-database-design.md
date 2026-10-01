@@ -161,6 +161,9 @@ curl -X POST 'http://localhost:2785/api/infra/import-data' \
   -d @backup.json
 ```
 
+> [!IMPORTANT]
+> The export leaves out webhook `secret` and custom `headers` and the `user:pass` of a session `proxyUrl`. Set them again after the import with `PUT /api/sessions/:sessionId/webhooks/:id` and `PATCH /api/sessions/:sessionId/proxy`, or webhooks deliver unsigned and an authenticated proxy fails the session's next start. The import is one request bounded by `BODY_SIZE_LIMIT` (`413` above it). Plugin instance secrets travel in plaintext, so treat the file as a secret. See [14 - Migration Guide: API-Based Migration](./14-migration-guide.md#api-based-migration-recommended-for-v02) for the full procedure.
+
 #### Cross-Database Date Portability
 
 To ensure date/time values work across both SQLite and PostgreSQL, OpenWA uses a `DateTransformer` together with `dateColumnType()`. On SQLite the column is `text` and dates are stored as ISO 8601 strings; on PostgreSQL the column is a native `timestamp` and the `Date` passes through to the driver:
