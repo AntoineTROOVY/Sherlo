@@ -65,6 +65,8 @@ let exportGrowsMidWalk = false;
 let listTotal: number | null = null;
 // When set, a request for the first on-screen page waits for it before answering.
 let firstPageGate: Promise<void> | null = null;
+// When set, the on-screen list read fails with this status.
+let listFailure: number | null = null;
 
 /** Row `i` of a table walked newest first; every row has its own id, as the gateway's rows do. */
 function exportRow(i: number): AuditLog {
@@ -91,6 +93,9 @@ function installFetchStub(): void {
         return Promise.resolve(jsonResponse({ data: [...Array(200).keys()].map(exportRow), total: 300 }));
       const shifted = [exportRow(-1), ...[...Array(300).keys()].map(exportRow)];
       return Promise.resolve(jsonResponse({ data: shifted.slice(offset), total: 301 }));
+    }
+    if (listFailure && !url.includes('limit=200')) {
+      return Promise.resolve(new Response(JSON.stringify({ message: 'Bad Gateway' }), { status: listFailure }));
     }
     // The gateway holds no error rows, so the server-side severity filter matches nothing.
     if (new URL(url, 'http://localhost').searchParams.get('severity') === 'error') {
@@ -330,4 +335,31 @@ test('the search matches errorMessage as well as action, whatever the case', asy
   fireEvent.change(screen.getByPlaceholderText('Search logs...'), { target: { value: 'Stop_Incomplete' } });
   await waitFor(() => assert.ok(!screen.queryByText('infra.restart'), 'the search did not filter'));
   assert.ok(screen.queryByText('session.stop'), 'the errorMessage match was hidden');
+});
+
+test('a search of only spaces filters nothing, on screen or in the export', async () => {
+  const { screen, fireEvent, waitFor } = rtl;
+  const { downloads, restore } = recordDownloads();
+  try {
+    renderLogs();
+    await screen.findByText('infra.restart');
+    fireEvent.change(screen.getByPlaceholderText('Search logs...'), { target: { value: ' ' } });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.ok(screen.queryByText('infra.restart'), 'a blank search hid the rows');
+    assert.ok(screen.queryByText('session.stop'), 'a blank search hid the rows');
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    await waitFor(() => assert.equal(downloads.length, 1));
+    assert.equal((await downloads[0].text()).split('\n').length, 1 + LOGS.length, 'a blank search narrowed the export');
+  } finally {
+    restore();
+  }
+});
+
+test('a search padded with spaces still matches', async () => {
+  const { screen, fireEvent, waitFor } = rtl;
+  renderLogs();
+  await screen.findByText('infra.restart');
+  fireEvent.change(screen.getByPlaceholderText('Search logs...'), { target: { value: ' session ' } });
+  await waitFor(() => assert.ok(!screen.queryByText('infra.restart'), 'the search did not filter'));
+  assert.ok(screen.queryByText('session.stop'), 'the padded query matched nothing');
 });
