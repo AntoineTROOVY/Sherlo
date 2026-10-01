@@ -144,18 +144,26 @@ function groupJsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
-function stubGroupGateway(groups: { id: string; name?: string }[], refuseFirstWith?: number): { textSends: string[] } {
+function stubGroupGateway(
+  groups: { id: string; name?: string }[],
+  refuseFirstWith?: number,
+): { textSends: string[]; imageBodies: { chatId: string; url?: string; caption?: string }[] } {
   const previousFetch = globalThis.fetch;
   restoreFetch = () => {
     globalThis.fetch = previousFetch;
   };
   const textSends: string[] = [];
+  const imageBodies: { chatId: string; url?: string; caption?: string }[] = [];
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
     if (url.endsWith('/sessions')) {
       return Promise.resolve(groupJsonResponse([{ id: 's1', name: 'Main', status: 'ready', phone: '15550000000' }]));
     }
     if (url.endsWith('/sessions/s1/groups')) return Promise.resolve(groupJsonResponse(groups));
+    if (url.endsWith('/messages/send-image')) {
+      imageBodies.push(JSON.parse(String(init?.body)) as { chatId: string; url?: string; caption?: string });
+      return Promise.resolve(groupJsonResponse({ messageId: 'img1', timestamp: 1 }, 201));
+    }
     if (url.endsWith('/messages/send-text')) {
       const { chatId } = JSON.parse(String(init?.body)) as { chatId: string };
       textSends.push(chatId);
@@ -166,7 +174,7 @@ function stubGroupGateway(groups: { id: string; name?: string }[], refuseFirstWi
     }
     return Promise.resolve(groupJsonResponse([]));
   }) as typeof fetch;
-  return { textSends };
+  return { textSends, imageBodies };
 }
 
 async function renderGroupsAsWriter(): Promise<void> {
@@ -269,6 +277,30 @@ test('an empty message or a media type with no file or URL keeps Send disabled',
 
   rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Image' }));
   assert.equal(sendMessageButton().disabled, true);
+});
+
+test('a group media send holds a URL or caption the gateway would refuse, and sends the URL trimmed', async () => {
+  const gateway = stubGroupGateway([{ id: 'g1@g.us', name: 'Family' }]);
+  await renderGroupsAsWriter();
+  rtl.fireEvent.click(await rtl.screen.findByRole('checkbox', { name: 'Family' }));
+  rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Image' }));
+  const mediaUrl = window.document.getElementById('mt-3')!;
+  const caption = window.document.getElementById('mt-14')!;
+
+  // Without a scheme the gateway reads the string as base64 and refuses it, once per group.
+  rtl.fireEvent.change(mediaUrl, { target: { value: 'cdn.example.com/a.jpg' } });
+  await rtl.screen.findByText('Use a full http:// or https:// address, like https://example.com/file.pdf.');
+  assert.equal(sendMessageButton().disabled, true);
+
+  rtl.fireEvent.change(mediaUrl, { target: { value: ' https://cdn.example.com/a.jpg' } });
+  rtl.fireEvent.change(caption, { target: { value: 'x'.repeat(1025) } });
+  assert.equal(sendMessageButton().disabled, true);
+  rtl.fireEvent.change(caption, { target: { value: 'x'.repeat(1024) } });
+  await rtl.waitFor(() => assert.equal(sendMessageButton().disabled, false));
+
+  rtl.fireEvent.click(sendMessageButton());
+  await rtl.waitFor(() => assert.equal(gateway.imageBodies.length, 1));
+  assert.equal(gateway.imageBodies[0].url, 'https://cdn.example.com/a.jpg');
 });
 
 test('a session that stops being ready is replaced by what the selector shows', async () => {
