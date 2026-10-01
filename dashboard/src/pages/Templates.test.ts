@@ -227,3 +227,11 @@ test('a search with no match says so instead of reporting an empty library', asy
   await screen.findByText('No templates match your search.');
   assert.equal(screen.queryByText('No templates saved') === null, true);
 });
+
+// Hebrew and Arabic flip the three-column grid. A physical left or right edge then lands on the
+// workspace's outer border instead of between the columns, and left-aligned text reads backwards.
+test('the workspace columns and list rows follow the text direction', () => {
+  const css = readFileSync(new URL('./Templates.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.doesNotMatch(css, /border-(left|right)\s*:/, 'a column divider uses a physical side');
+  assert.doesNotMatch(css, /text-align\s*:\s*(left|right)\b/, 'text is aligned to a physical side');
+});
