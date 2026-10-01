@@ -1406,12 +1406,48 @@ describe('WhatsAppWebJsAdapter channel-JID guard (#554 — wwebjs Channel lacks 
     // WA Web yields no code when the account is not an admin of the group. String(undefined)
     // turned that into the literal 'undefined', which the controller rendered as the link
     // "https://chat.whatsapp.com/undefined" and returned with a 200.
-    it.each([
-      ['getGroupInviteCode', 'getInviteCode', (a: WhatsAppWebJsAdapter) => a.getGroupInviteCode('g@g.us')],
-      ['revokeGroupInviteCode', 'revokeInvite', (a: WhatsAppWebJsAdapter) => a.revokeGroupInviteCode('g@g.us')],
-    ])('%s treats a missing code as a refusal, not the string "undefined"', async (_name, method, call) => {
-      const stub = jest.fn().mockResolvedValue(undefined);
-      await expect(call(readyAdapter(groupChat({ [method]: stub })))).rejects.toBeInstanceOf(EngineRefusedError);
+    it('getGroupInviteCode treats a missing code as a refusal, not the string "undefined"', async () => {
+      const getInviteCode = jest.fn().mockResolvedValue(undefined);
+      await expect(readyAdapter(groupChat({ getInviteCode })).getGroupInviteCode('g@g.us')).rejects.toBeInstanceOf(
+        EngineRefusedError,
+      );
+    });
+
+    describe('revokeGroupInviteCode', () => {
+      const globals = globalThis as unknown as { window?: unknown };
+      afterEach(() => delete globals.window);
+
+      // Runs the in-page function in Node against a stubbed WA Web module registry, the way the page would.
+      const revokeWith = (resetGroupInviteCode: jest.Mock): Promise<string> => {
+        globals.window = {
+          require: (m: string) =>
+            m === 'WAWebWidFactory' ? { createWid: (id: string) => ({ id }) } : { resetGroupInviteCode },
+        };
+        const evaluate = jest.fn(<T, A>(fn: (arg: A) => Promise<T>, arg: A) => fn(arg));
+        // What upstream's GroupChat.revokeInvite hands back for a refusal: the page error, its name lost.
+        const revokeInvite = jest.fn().mockRejectedValue(new Error('Evaluation failed: ServerStatusCodeError'));
+        return readyAdapter({ ...groupChat({ revokeInvite }), pupPage: { evaluate } }).revokeGroupInviteCode('g@g.us');
+      };
+
+      it('returns the new code', async () => {
+        await expect(revokeWith(jest.fn().mockResolvedValue({ code: 'NEW123' }))).resolves.toBe('NEW123');
+      });
+
+      // A non-admin revoke is refused by WA Web with ServerStatusCodeError, which used to reach the
+      // caller as a raw 500 while the route declares 403.
+      it('answers a non-admin refusal with EngineRefusedError (403)', async () => {
+        const refusal = Object.assign(new Error('403'), { name: 'ServerStatusCodeError' });
+        await expect(revokeWith(jest.fn().mockRejectedValue(refusal))).rejects.toBeInstanceOf(EngineRefusedError);
+      });
+
+      it('treats a missing code as a refusal, not the string "undefined"', async () => {
+        await expect(revokeWith(jest.fn().mockResolvedValue(undefined))).rejects.toBeInstanceOf(EngineRefusedError);
+      });
+
+      it('keeps any other page failure unchanged', async () => {
+        const failure = new TypeError('resetGroupInviteCode is not a function');
+        await expect(revokeWith(jest.fn().mockRejectedValue(failure))).rejects.toBe(failure);
+      });
     });
   });
 
