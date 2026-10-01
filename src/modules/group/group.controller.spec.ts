@@ -139,3 +139,16 @@ describe('GroupController route ordering', () => {
     expect(path).toBe('join-info');
   });
 });
+
+describe('GroupController OpenAPI responses', () => {
+  // Every engine-backed route resolves the engine first, and a session with no engine answers 400
+  // there before the not-ready 409 can happen, so a route documenting the 409 owes the 400 too.
+  it('declares the 400 for an unstarted session wherever it declares the engine-not-ready 409', () => {
+    const missing = Object.getOwnPropertyNames(GroupController.prototype).filter(name => {
+      const handler = Object.getOwnPropertyDescriptor(GroupController.prototype, name)!.value as object;
+      const responses = (Reflect.getMetadata('swagger/apiResponse', handler) ?? {}) as Record<string, unknown>;
+      return '409' in responses && !('400' in responses);
+    });
+    expect(missing).toEqual([]);
+  });
+});
