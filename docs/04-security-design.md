@@ -196,6 +196,8 @@ OpenWA serves plain HTTP on its port; terminate **TLS at your reverse proxy / lo
 
 **Hardening you can apply today:** set `API_KEY_PEPPER`; restrict the data volume and database to the app's user; and encrypt at the infrastructure layer (LUKS / cloud-provider encrypted volumes / an encrypted managed Postgres) rather than relying on application-level field encryption, which is not implemented.
 
+**Setting or changing `API_KEY_PEPPER` on an existing install invalidates every key, the admin key included.** No stored hash matches any more, minting a key needs a valid ADMIN key, and a key is seeded only into an empty `api_keys` table, so nothing can be re-issued through the API. Set the pepper before first boot. On a running install: stop the instance, set the pepper, empty the table in the main database (the `MAIN_DATABASE_NAME` path, `data/main.sqlite` by default; on a source install `sqlite3 data/main.sqlite "DELETE FROM api_keys"`, on the compose deployment `docker compose run --rm --no-deps openwa-api sqlite3 /app/data/main.sqlite "DELETE FROM api_keys"`), start the instance, take the new ADMIN key from the startup banner or `data/.api-key` (or set `API_MASTER_KEY` beforehand to choose it), then re-issue the other keys.
+
 ## 4.5 Input Validation
 
 ### Validation Rules
@@ -562,16 +564,16 @@ flowchart TB
 
 ### Secrets Inventory
 
-| Secret                                                                       | Storage                                                                                                                                                           | Rotation guidance                               |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| Database credentials                                                         | Environment variable                                                                                                                                              | 90 days                                         |
-| Redis password                                                               | Environment variable                                                                                                                                              | 90 days                                         |
-| API master key (`API_MASTER_KEY`)                                            | Environment variable (first-boot seed only)                                                                                                                       | Not via the env var; see the note below         |
-| API key pepper (`API_KEY_PEPPER`)                                            | Environment variable                                                                                                                                              | Rotating it invalidates all existing key hashes |
-| Webhook secrets and custom headers (`webhooks.secret`, `headers`)            | Database: **plaintext** (custom headers may carry receiver credentials); not in the webhook read DTOs, and omitted from `GET /api/infra/export-data` webhook rows | Per webhook                                     |
-| Bootstrap admin key file (`data/.api-key`, or `BOOTSTRAP_KEY_FILE`)          | File system: raw ADMIN key in **plaintext**, `0600`; removed when that key is revoked or deleted                                                                  | Delete it once the key is stored elsewhere      |
-| Plugin instance secrets (`plugin_instances.secret`, `verifyToken`, `config`) | Database: **plaintext**; `secret`, `verifyToken` and secret-marked config are masked on API reads, but `GET /api/infra/export-data` includes them verbatim        | Per instance (regenerate-secret)                |
-| Session auth state                                                           | File system (data volume) — **not encrypted**                                                                                                                     | Never (tied to the WA session)                  |
+| Secret                                                                       | Storage                                                                                                                                                           | Rotation guidance                                                  |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Database credentials                                                         | Environment variable                                                                                                                                              | 90 days                                                            |
+| Redis password                                                               | Environment variable                                                                                                                                              | 90 days                                                            |
+| API master key (`API_MASTER_KEY`)                                            | Environment variable (first-boot seed only)                                                                                                                       | Not via the env var; see the note below                            |
+| API key pepper (`API_KEY_PEPPER`)                                            | Environment variable                                                                                                                                              | Rotating it invalidates all existing key hashes (recovery in §4.4) |
+| Webhook secrets and custom headers (`webhooks.secret`, `headers`)            | Database: **plaintext** (custom headers may carry receiver credentials); not in the webhook read DTOs, and omitted from `GET /api/infra/export-data` webhook rows | Per webhook                                                        |
+| Bootstrap admin key file (`data/.api-key`, or `BOOTSTRAP_KEY_FILE`)          | File system: raw ADMIN key in **plaintext**, `0600`; removed when that key is revoked or deleted                                                                  | Delete it once the key is stored elsewhere                         |
+| Plugin instance secrets (`plugin_instances.secret`, `verifyToken`, `config`) | Database: **plaintext**; `secret`, `verifyToken` and secret-marked config are masked on API reads, but `GET /api/infra/export-data` includes them verbatim        | Per instance (regenerate-secret)                                   |
+| Session auth state                                                           | File system (data volume) — **not encrypted**                                                                                                                     | Never (tied to the WA session)                                     |
 
 > `API_MASTER_KEY` only seeds the first ADMIN key, and is read only while the key table is empty. Changing it later has no effect: the new value never authenticates and the seeded key stays valid. Rotate by minting a new ADMIN key with `POST /api/auth/api-keys` and revoking the seeded `Default Admin Key`.
 
@@ -643,7 +645,7 @@ const masterKey = getSecret('API_MASTER_KEY');
 
 ### Key Rotation Procedure
 
-> **Not applicable today.** OpenWA stores no encrypted-at-rest data (see §4.4), so there is no data-encryption key to rotate and no `rotateEncryptionKey()` in the codebase. The flow below is illustrative for if/when field-level encryption is added. To rotate the key seeded from `API_MASTER_KEY`, mint a new ADMIN key through the API-key endpoints (§4.2) and revoke the seeded one; editing the env var has no effect after first boot. Rotating `API_KEY_PEPPER` invalidates every existing key hash.
+> **Not applicable today.** OpenWA stores no encrypted-at-rest data (see §4.4), so there is no data-encryption key to rotate and no `rotateEncryptionKey()` in the codebase. The flow below is illustrative for if/when field-level encryption is added. To rotate the key seeded from `API_MASTER_KEY`, mint a new ADMIN key through the API-key endpoints (§4.2) and revoke the seeded one; editing the env var has no effect after first boot. Rotating `API_KEY_PEPPER` invalidates every existing key hash; see §4.4 for the recovery.
 
 ```mermaid
 flowchart TB
