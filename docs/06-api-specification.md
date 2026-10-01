@@ -22,7 +22,7 @@ X-API-Key: owa_k1_your-api-key-here
 
 > **Auth is header-only (never in a URL).** A query-parameter API key is **not** accepted anywhere. REST routes take the key via the `X-API-Key` header or `Authorization: Bearer <key>` (`X-API-Key` wins when both are sent); the WebSocket (Socket.IO) handshake — see §6.5 Real-time API — accepts it only via the handshake `auth.apiKey` field or the `X-API-Key` header. The former `?apiKey=` query fallback was **removed** (it leaked the credential into proxy/access logs). Never put the key in a URL.
 
-The metrics endpoint is the lone exception to the API-key scheme: it takes no API key and authenticates with `Authorization: Bearer <METRICS_TOKEN>` instead.
+Three kinds of route are public and take no API key. The metrics endpoint authenticates with `Authorization: Bearer <METRICS_TOKEN>` instead. The ingress routes (`/api/ingress/:pluginId/:instanceId/*`) verify each delivery with the route's own provider scheme (an HMAC signature or token; see §6.4.17). The health routes (`/api/health`, `/api/health/live`, `/api/health/ready`) and `GET /api/infra/health` take no credential at all.
 
 ### Common Headers
 
