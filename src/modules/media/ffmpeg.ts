@@ -190,6 +190,27 @@ export async function runFfmpeg(
   }
 }
 
+/** Process groups of the ffmpeg runs still in flight, so they can be killed when the gateway exits. */
+const runningGroups = new Set<number>();
+
+/**
+ * SIGKILL every ffmpeg process group still running. Each run is detached into its own group, so a
+ * Ctrl-C or a signal to the gateway's group no longer reaches it, and its timeout dies with this
+ * process. Registered on `exit`, which every shutdown path reaches; `process.kill` is synchronous, so
+ * it still runs there.
+ */
+export function killRunningConversions(): void {
+  for (const pid of runningGroups) {
+    try {
+      process.kill(-pid, 'SIGKILL');
+    } catch {
+      // Already gone.
+    }
+  }
+  runningGroups.clear();
+}
+process.on('exit', killRunningConversions);
+
 /** Spawn ffmpeg and resolve when it exits 0, else reject with whatever it wrote to stderr. */
 function execute(args: string[], options: FfmpegRunOptions): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -198,6 +219,8 @@ function execute(args: string[], options: FfmpegRunOptions): Promise<void> {
     // `detached` puts the child at the head of its own process group, so the timeout can kill
     // everything under it (see below).
     const child = spawn(options.ffmpegPath, args, { stdio: ['ignore', 'ignore', 'pipe'], detached: true });
+    const pid = child.pid;
+    if (pid !== undefined) runningGroups.add(pid);
 
     let stderr = '';
     let timedOut = false;
@@ -223,6 +246,7 @@ function execute(args: string[], options: FfmpegRunOptions): Promise<void> {
       // wrapper script) can still hold the inherited stderr, and the open pipe would keep this
       // process alive until that descendant exits.
       child.stderr.destroy();
+      if (pid !== undefined) runningGroups.delete(pid);
       // Reject as soon as the signal is sent rather than waiting for `close`. `close` fires when the
       // stdio pipes close, not when the process dies, so anything still holding the inherited stderr
       // keeps it pending — which would leave the timeout bounding nothing at all.
@@ -231,12 +255,14 @@ function execute(args: string[], options: FfmpegRunOptions): Promise<void> {
 
     child.on('error', err => {
       clearTimeout(timer);
+      if (pid !== undefined) runningGroups.delete(pid);
       // Spawn itself failed — almost always a missing binary, which is worth saying plainly.
       reject(new FfmpegConversionError(`Could not run ffmpeg: ${err instanceof Error ? err.message : String(err)}`));
     });
 
     child.on('close', code => {
       clearTimeout(timer);
+      if (pid !== undefined) runningGroups.delete(pid);
       // Already rejected by the timer; a late close has nothing left to report.
       if (timedOut) return;
       if (code !== 0) {

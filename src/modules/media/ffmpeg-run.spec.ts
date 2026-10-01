@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { chmod, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { FfmpegConversionError, probeFfmpeg, runFfmpeg } from './ffmpeg';
+import { FfmpegConversionError, killRunningConversions, probeFfmpeg, runFfmpeg } from './ffmpeg';
 
 // The real spawn, wrapped so a test can reach the child process it created.
 jest.mock('node:child_process', () => {
@@ -150,6 +150,38 @@ esac
       }
     };
     try {
+      for (let i = 0; i < 40 && alive(); i++) await new Promise(r => setTimeout(r, 50));
+      expect(alive()).toBe(false);
+    } finally {
+      if (alive()) process.kill(grandchild, 'SIGKILL');
+    }
+  }, 15_000);
+
+  // Each run sits in its own process group, so a signal to the gateway's group never reaches it and its
+  // timeout dies with the gateway. Whatever is still running has to be killed on the way out.
+  it('kills every running conversion group when the gateway exits', async () => {
+    expect(process.listeners('exit')).toContain(killRunningConversions);
+    const pidFile = `${stubPath}.pid`;
+    await rm(pidFile, { force: true });
+    const run = runFfmpeg(Buffer.from('input'), 'bin', 'ogg', mode('orphan'), options({ timeoutMs: 10_000 }));
+    const settled = run.catch((error: unknown) => error);
+
+    let grandchild = 0;
+    for (let i = 0; i < 40 && !grandchild; i++) {
+      await new Promise(r => setTimeout(r, 50));
+      grandchild = Number((await readFile(pidFile, 'utf8').catch(() => '')).trim());
+    }
+    const alive = (): boolean => {
+      try {
+        process.kill(grandchild, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    try {
+      killRunningConversions();
+      expect(await settled).toBeInstanceOf(FfmpegConversionError);
       for (let i = 0; i < 40 && alive(); i++) await new Promise(r => setTimeout(r, 50));
       expect(alive()).toBe(false);
     } finally {
