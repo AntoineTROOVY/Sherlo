@@ -46,6 +46,7 @@
 #   (ad) a file an engine deletes during the sessions/ or baileys/ copy is noted instead of failing the
 #       backup, a file the app deletes during the media or plugin copies is logged, and any other cp
 #       error still fails it, however long its output and whatever the host's locale
+#   (ae) the min-content check passes an archive whose listing outgrows a pipe buffer
 #
 # Usage: ./scripts/smoke-test-backup-restore.sh
 # Requires: bash, tar, node (restore.sh path resolution). sqlite3 is optional (see (c) and (k)).
@@ -1328,6 +1329,36 @@ if [ "$RC_AD" -eq 0 ] || ! grep -q 'Permission denied' <<<"$OUT_AD" ||
   fail "(ad) a cp error other than a vanished file did not fail the backup: $(tail -n 5 <<<"$OUT_AD")"
 fi
 pass "(ad) a vanished engine file is noted, a vanished media or plugin file logged, other cp errors fatal"
+
+echo ""
+echo "==> (ae) the min-content check passes an archive whose listing outgrows a pipe buffer"
+# A whatsapp-web.js profile alone lists thousands of members. A grep -q that matched a required member
+# early and stopped reading broke the pipe feeding it, and pipefail turned the match into "missing", so a
+# good archive was deleted. The shim tar pads the listing after the real members, past a pipe buffer.
+AE="$WORK/ae"
+mkdir -p "$AE/data" "$AE/shim"
+make_fixture "$AE/data/main.sqlite" "echo2-main"
+make_fixture "$AE/data/openwa.sqlite" "echo2-data"
+cat >"$AE/shim/tar" <<SHIM
+#!/bin/sh
+$(command -v tar) "\$@" || exit
+if [ "\$1" = -tzf ]; then
+  i=0
+  while [ "\$i" -lt 20000 ]; do
+    echo "./sessions/session-s1/Default/Cache/Cache_Data/padding-\$i"
+    i=\$((i + 1))
+  done
+fi
+SHIM
+chmod +x "$AE/shim/tar"
+set +e
+OUT_AE="$(cd "$AE" && PATH="$AE/shim:$PATH" BACKUP_DIR="$AE/out" "$BACKUP" 2>&1)"
+RC_AE=$?
+set -e
+if [ "$RC_AE" -ne 0 ] || [ -z "$(ls "$AE"/out/openwa-backup-*.tar.gz 2>/dev/null)" ]; then
+  fail "(ae) a long archive listing failed the min-content check: $(grep -v padding- <<<"$OUT_AE")"
+fi
+pass "(ae) the min-content check reads the whole listing"
 
 echo ""
 echo "All smoke tests passed!"

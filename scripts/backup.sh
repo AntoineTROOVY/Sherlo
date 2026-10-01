@@ -292,10 +292,12 @@ ARCHIVE_LIST="$(tar -tzf "$ARCHIVE")"
 
 # Min-content check on the finished archive: every configured database must be present. If not,
 # delete the defective archive and fail — leaving it on disk invites a restore into a fresh-empty
-# install (new API keys, new master key) reported as success.
+# install (new API keys, new master key) reported as success. grep reads a here-string, not a pipe: a
+# grep -q that matches early stops reading, and on a listing larger than the pipe buffer the broken pipe
+# made pipefail report a member that is there as missing.
 MISSING_MEMBERS=""
 for member in "${REQUIRED_MEMBERS[@]}"; do
-  if ! printf '%s\n' "$ARCHIVE_LIST" | grep -qxF "$member"; then
+  if ! grep -qxF "$member" <<<"$ARCHIVE_LIST"; then
     MISSING_MEMBERS="$MISSING_MEMBERS $member"
   fi
 done
