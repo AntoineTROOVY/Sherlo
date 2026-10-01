@@ -129,11 +129,12 @@ describe('LabelService label editing', () => {
   });
 
   it.each([
-    ['upsertLabel', (svc: LabelService) => svc.upsertLabel('s1', 'l1', {})],
+    ['upsertLabel', (svc: LabelService) => svc.upsertLabel('s1', 'l1', { name: 'VIP' })],
     ['deleteLabel', (svc: LabelService) => svc.deleteLabel('s1', 'l1')],
     ['getChatsByLabel', (svc: LabelService) => svc.getChatsByLabel('s1', 'l1')],
   ])('throws 400 for %s when the session is not started', (_name, call) => {
     const engines = new EngineRegistry();
     expect(() => call(new LabelService(engines))).toThrow(BadRequestException);
+    expect(() => call(new LabelService(engines))).toThrow('Session is not started');
   });
 });
