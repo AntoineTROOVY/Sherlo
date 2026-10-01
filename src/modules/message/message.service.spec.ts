@@ -4,7 +4,7 @@ import { FindOperator, In, Repository } from 'typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { MessageService, spendInlineMediaBudget } from './message.service';
 import { MessageSendService } from './message-send.service';
-import { Message, MessageDirection } from './entities/message.entity';
+import { Message } from './entities/message.entity';
 import { EngineRegistry } from '../../engine/engine-registry.service';
 import { MessageProjector } from '../session/message-projector.service';
 import type { IWhatsAppEngine } from '../../engine/interfaces/whatsapp-engine.interface';
@@ -693,26 +693,6 @@ describe('MessageService', () => {
       const { messages } = await service.getMessages('sess-1', { chatId: '6281316434311@c.us' });
 
       expect(messages.map(m => m.id)).toEqual(['m1']);
-    });
-  });
-
-  // ── saveIncomingMessage ───────────────────────────────────────────
-
-  describe('saveIncomingMessage', () => {
-    it('should save with INCOMING direction', async () => {
-      await service.saveIncomingMessage('sess-1', {
-        waMessageId: 'wa-in-1',
-        chatId: 'sender@c.us',
-        body: 'Hi there',
-        type: 'text',
-      });
-
-      expect(repository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sessionId: 'sess-1',
-          direction: MessageDirection.INCOMING,
-        }),
-      );
     });
   });
 
