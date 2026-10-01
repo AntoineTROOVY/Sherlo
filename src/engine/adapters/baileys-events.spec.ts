@@ -77,8 +77,16 @@ const normalizeMessageContent = (content: Record<string, unknown> | null | undef
   return current;
 };
 
+// Baileys' own picks for the node downloadMediaMessage fetches: unwrap, then the first content key.
+const extractMessageContent = (content: Record<string, unknown> | null | undefined): unknown =>
+  normalizeMessageContent(content);
+const getContentType = (content: Record<string, unknown> | undefined): string | undefined =>
+  Object.keys(content ?? {}).find(k => k === 'conversation' || k.endsWith('Message'));
+
 const libStub = {
   normalizeMessageContent,
+  extractMessageContent,
+  getContentType,
   downloadMediaMessage,
 } as unknown as Awaited<ReturnType<BaileysEventsHost['loadLib']>>;
 
@@ -486,6 +494,87 @@ describe('BaileysEvents.mapMessage', () => {
       data: buf.toString('base64'),
     });
     expect(downloadMediaMessage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('BaileysEvents inbound media source', () => {
+  const download = (message: Record<string, unknown>) =>
+    new BaileysEvents(makeHost()).mapMessage(
+      {
+        key: { id: 'wamid.src', remoteJid: '15550001111@s.whatsapp.net', fromMe: false },
+        messageTimestamp: 1_700_000_000,
+        message,
+      },
+      'imageMessage',
+    );
+
+  beforeEach(() => downloadMediaMessage.mockReset());
+
+  it.each([
+    ['a plain-http url', { url: 'http://127.0.0.1/latest/meta-data/' }],
+    ['a url outside whatsapp.net', { url: 'https://internal.example/x' }],
+    ['a whatsapp.net url on another port', { url: 'https://mmg.whatsapp.net:8080/x' }],
+    ['a directPath that rewrites the host', { url: 'https://mmg.whatsapp.net/x', directPath: '@internal.example/x' }],
+    ['a directPath under a foreign url host', { url: 'https://internal.example/x', directPath: '/v/t62/x' }],
+  ])('does not fetch media whose address is %s', async (_name, source) => {
+    const incoming = await download({ imageMessage: { mimetype: 'image/jpeg', fileLength: 7, ...source } });
+    expect(downloadMediaMessage).not.toHaveBeenCalled();
+    expect(incoming.media).toEqual({ mimetype: 'image/jpeg', filename: undefined, omitted: true, sizeBytes: 7 });
+  });
+
+  it('checks the node Baileys downloads, not the first media type this file looks for', async () => {
+    await download({
+      documentMessage: { mimetype: 'application/pdf', fileLength: 7, url: 'http://127.0.0.1/' },
+      imageMessage: { mimetype: 'image/jpeg', fileLength: 7, url: 'https://mmg.whatsapp.net/x' },
+    });
+    expect(downloadMediaMessage).not.toHaveBeenCalled();
+  });
+
+  it('still downloads media served from WhatsApp hosts', async () => {
+    const buf = Buffer.from('IMGDATA');
+    downloadMediaMessage.mockResolvedValueOnce(streamOf(buf));
+    const incoming = await download({
+      imageMessage: {
+        mimetype: 'image/jpeg',
+        fileLength: buf.byteLength,
+        url: 'https://mmg.whatsapp.net/v/t62/x.enc',
+        directPath: '/v/t62/x.enc',
+      },
+    });
+    expect(downloadMediaMessage).toHaveBeenCalledTimes(1);
+    expect(incoming.media).toEqual({ mimetype: 'image/jpeg', filename: undefined, data: buf.toString('base64') });
+  });
+
+  it('refuses a re-upload answer that points outside WhatsApp hosts', async () => {
+    downloadMediaMessage.mockImplementationOnce(
+      async (
+        _m: WAMessage,
+        _t: string,
+        _o: unknown,
+        ctx: { reuploadRequest: (m: WAMessage) => Promise<WAMessage> },
+      ) => {
+        await ctx.reuploadRequest(_m);
+        return streamOf(Buffer.from('x'));
+      },
+    );
+    const updateMediaMessage = jest.fn((m: WAMessage) =>
+      Promise.resolve({
+        ...m,
+        message: { imageMessage: { url: 'https://mmg.whatsapp.net', directPath: '@internal.example/x' } },
+      }),
+    );
+    const incoming = await new BaileysEvents(
+      makeHost({ getSocket: () => ({ updateMediaMessage }) as unknown as WASocket }),
+    ).mapMessage(
+      {
+        key: { id: 'wamid.re', remoteJid: '15550001111@s.whatsapp.net', fromMe: false },
+        messageTimestamp: 1_700_000_000,
+        message: { imageMessage: { mimetype: 'image/jpeg', fileLength: 1, url: 'https://mmg.whatsapp.net/x' } },
+      },
+      'imageMessage',
+    );
+    expect(updateMediaMessage).toHaveBeenCalledTimes(1);
+    expect(incoming.media).toEqual({ mimetype: 'image/jpeg', filename: undefined, omitted: true, sizeBytes: 1 });
   });
 });
 

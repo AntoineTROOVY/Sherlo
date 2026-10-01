@@ -116,6 +116,46 @@ export function differentWaIds(
   return !lidGap(x, y) && !lidGap(y, x);
 }
 
+/**
+ * Whether the media node Baileys' downloadMediaMessage would fetch is served from WhatsApp's media
+ * hosts. Baileys builds the address from the message as the sender composed it (`url`, or
+ * `https://<host of url>` + `directPath`) and fetches it with no host check of its own, so anything
+ * outside https://*.whatsapp.net on the default port is refused here. The node and the address are
+ * resolved exactly as rc14's downloadMediaMessage and downloadContentFromMessage resolve them.
+ */
+export function isWhatsAppMediaSource(
+  b: Pick<typeof BaileysLib, 'extractMessageContent' | 'getContentType'>,
+  message: WAMessage['message'],
+): boolean {
+  const content = b.extractMessageContent(message);
+  const type = content ? b.getContentType(content) : undefined;
+  const media: unknown = type ? content?.[type] : undefined;
+  // Baileys refuses a node like this itself, before any fetch.
+  if (!media || typeof media !== 'object') return true;
+  const node = media as { url?: string | null; directPath?: string | null; thumbnailDirectPath?: string | null };
+  const thumbnailOnly = 'thumbnailDirectPath' in media && !('url' in media);
+  const url = thumbnailOnly ? undefined : node.url;
+  const directPath = thumbnailOnly ? node.thumbnailDirectPath : node.directPath;
+  let host = 'mmg.whatsapp.net';
+  try {
+    if (url) host = new URL(url).host;
+  } catch {
+    // Baileys falls back to its default host for an unparsable url.
+  }
+  const target = directPath ? `https://${host}${directPath}` : url;
+  if (!target) return true;
+  try {
+    const parsed = new URL(target);
+    return (
+      parsed.protocol === 'https:' &&
+      parsed.port === '' &&
+      (parsed.hostname === 'whatsapp.net' || parsed.hostname.endsWith('.whatsapp.net'))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export interface BaileysEventsHost {
   /** Live socket handle for media re-upload requests (inbound media download). */
   getSocket(): WASocket;
@@ -1188,13 +1228,23 @@ export class BaileysEvents {
         return Buffer.alloc(0);
       }
       const b = await this.host.loadLib();
+      // The address comes from the sender, and so does a re-upload answer (encrypted with the
+      // sender's own media key): both are checked before Baileys fetches them.
+      const assertWhatsAppSource = (m: WAMessage): WAMessage => {
+        if (!isWhatsAppMediaSource(b, m.message)) {
+          throw new Error('Inbound media address is not a WhatsApp media host; not fetched');
+        }
+        return m;
+      };
+      assertWhatsAppSource(msg);
+      const sock = this.host.getSocket();
       stream = (await b.downloadMediaMessage(
         msg,
         'stream',
         dispatcher ? { options: { dispatcher } as RequestInit } : {},
         {
           logger: createSilentLogger(),
-          reuploadRequest: this.host.getSocket().updateMediaMessage,
+          reuploadRequest: async m => assertWhatsAppSource(await sock.updateMediaMessage(m)),
         },
       )) as AsyncIterable<Buffer> & { destroy?: () => void };
       if (timedOut) {
