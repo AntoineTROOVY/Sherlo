@@ -1468,17 +1468,17 @@ A media message also carries `media: { mimetype, filename?, data?, omitted?, siz
 
 ### HTTP Error Codes
 
-| Code | Meaning             | Common Cause                                                                               | Solution                                        |
-| ---- | ------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------- |
-| 400  | Bad Request         | Invalid parameters, or the session is not started                                          | Check request body/params; start the session    |
-| 401  | Unauthorized        | Missing/invalid API key                                                                    | Add X-API-Key header                            |
-| 403  | Forbidden           | Insufficient permissions                                                                   | Check API key permissions                       |
-| 404  | Not Found           | Invalid session/endpoint                                                                   | Verify session exists                           |
-| 409  | Conflict            | Session already exists, or the session is not ready (retryable)                            | Use a different session ID, or wait for `ready` |
-| 413  | Payload Too Large   | File too large                                                                             | Reduce file size                                |
-| 429  | Too Many Requests   | Rate limited                                                                               | Reduce request rate                             |
-| 500  | Internal Error      | Server error                                                                               | Check logs                                      |
-| 503  | Service Unavailable | The engine transport died during a read, or a media fetch through the session proxy failed | Retry; restart the session if it persists       |
+| Code | Meaning             | Common Cause                                                                               | Solution                                          |
+| ---- | ------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| 400  | Bad Request         | Invalid parameters, or the session is not started                                          | Check request body/params; start the session      |
+| 401  | Unauthorized        | Missing/invalid API key                                                                    | Add X-API-Key header                              |
+| 403  | Forbidden           | Insufficient permissions                                                                   | Check API key permissions                         |
+| 404  | Not Found           | Invalid session/endpoint                                                                   | Verify session exists                             |
+| 409  | Conflict            | Session name already exists, or the session is not ready (retryable)                       | Use a different session name, or wait for `ready` |
+| 413  | Payload Too Large   | File too large                                                                             | Reduce file size                                  |
+| 429  | Too Many Requests   | Rate limited                                                                               | Reduce request rate                               |
+| 500  | Internal Error      | Server error                                                                               | Check logs                                        |
+| 503  | Service Unavailable | The engine transport died during a read, or a media fetch through the session proxy failed | Retry; restart the session if it persists         |
 
 ### Error Body Shape
 
