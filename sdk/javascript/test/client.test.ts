@@ -339,6 +339,25 @@ describe('OpenWAClient', () => {
     await expect(c.sessions.list()).rejects.toBeInstanceOf(OpenWATimeoutError);
   });
 
+  it('reports a timeout, not the status, when a non-2xx response body stalls', async () => {
+    const stalledErrorFetch: FetchLike = async (_url, init) => {
+      const signal = init?.signal;
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          signal?.addEventListener('abort', () => {
+            const error = new Error('body aborted');
+            error.name = 'AbortError';
+            controller.error(error);
+          });
+        },
+      });
+      return new Response(body, { status: 500 });
+    };
+    const c = new OpenWAClient({ baseUrl: 'http://x', apiKey: 'k', timeoutMs: 5, fetch: stalledErrorFetch });
+
+    await expect(c.sessions.list()).rejects.toBeInstanceOf(OpenWATimeoutError);
+  });
+
   it('turns the timeout off for 0 or Infinity, and caps a delay setTimeout cannot hold', async () => {
     // setTimeout fires after 1 ms for a delay that is not finite or exceeds 2^31-1, which would
     // abort every request instead of waiting longer.

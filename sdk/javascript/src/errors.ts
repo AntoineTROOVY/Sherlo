@@ -66,7 +66,12 @@ export class OpenWAApiError extends OpenWAError {
       );
     }
     let body: unknown = undefined;
-    const text = await res.text().catch(() => '');
+    // An unreadable body leaves only the status to report, but an abort is the client timeout
+    // firing mid-read: rethrow it so the caller sees OpenWATimeoutError, not this status.
+    const text = await res.text().catch((err: unknown) => {
+      if (err instanceof Error && err.name === 'AbortError') throw err;
+      return '';
+    });
     if (text) {
       try {
         body = JSON.parse(text);
