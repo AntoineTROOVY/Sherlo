@@ -318,7 +318,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `multer` 2.3.0 to 2.4.0 via an override, closing a denial-of-service advisory in which aborted uploads leave orphaned disk writes. It ships in the runtime tree.
 - `qs` 6.15.2 to 6.16.0, closing two moderate-severity advisories, an array-limit bypass and a denial of service. It ships in the runtime tree.
 - `ip-address` 10.4.0 to 10.7.2 via an override, closing four moderate-severity advisories. It reaches the runtime tree through `socks` and `express-rate-limit`.
-- `hono` 4.13.0 to 4.13.11, closing three moderate-severity advisories. It reaches the runtime tree through `@modelcontextprotocol/sdk`.
+- `hono` 4.13.0 to 4.13.11, closing four moderate-severity advisories. It reaches the runtime tree through `@modelcontextprotocol/sdk`.
 - `js-yaml` 5.2.2 to 5.4.2 via an override, closing a moderate-severity CPU denial-of-service advisory. It reaches the runtime tree through `@nestjs/swagger`.
 - `fast-uri` 3.1.7 to 3.1.8 via an override, closing a moderate-severity host-normalization advisory. It reaches the runtime tree through `@modelcontextprotocol/sdk`.
 - `@humanfs/node` 0.16.7 to 0.16.8 in the dashboard tree, closing a moderate-severity advisory. Dev-only, so nothing that ships changes.
