@@ -247,8 +247,8 @@ docker compose restart openwa-api
 > this document assume a source install (`npm run start:dev`) or that dev bind mount.
 
 Proxy egress (if WhatsApp is blocked on your network) is configured **per session** via the
-`proxyUrl` field on `POST /api/sessions` — it is **not** an environment variable, and an
-unreachable proxy silently blocks the WhatsApp WebSocket (see the _No QR code appears, or `/start`
+`proxyUrl` field on `POST /api/sessions` or with `PATCH /api/sessions/:sessionId/proxy`, both of
+which need an ADMIN key — it is **not** an environment variable, and an unreachable proxy silently blocks the WhatsApp WebSocket (see the _No QR code appears, or `/start`
 returns `504`_ entry below).
 
 ### Issue: Linking asks for a passkey and never completes (both engines)
@@ -300,17 +300,21 @@ phone-number pairing example in `docs/examples/session-phone-number-pairing.md`.
 Chromium pinned to that proxy, the WhatsApp WebSocket can never connect, no QR is produced, and the
 auth poll times out.
 
-**Fix:** Don't set a proxy unless your network actually requires one. Recreate the session without
-`proxyUrl`, or set it to a real, reachable proxy server:
+**Fix:** Don't set a proxy unless your network actually requires one. Clear `proxyUrl` in place, or
+set it to a real, reachable proxy server the same way, with an ADMIN key. The change applies on the
+next start, so stop and start the session afterwards:
 
 ```bash
 # No proxy needed (the common case):
-curl -X POST "$BASE/api/sessions" -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
-  -d '{ "name": "my-bot" }'
+curl -X PATCH "$BASE/api/sessions/{sessionId}/proxy" -H "X-API-Key: $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" -d '{ "proxyUrl": null }'
+curl -X POST "$BASE/api/sessions/{sessionId}/stop" -H "X-API-Key: $API_KEY"
+curl -X POST "$BASE/api/sessions/{sessionId}/start" -H "X-API-Key: $API_KEY"
 ```
 
 > ℹ️ Proxy egress for the `whatsapp-web.js` engine is configured **per session** via the
-> `proxyUrl` field on `POST /api/sessions` — not via environment variables.
+> `proxyUrl` field on `POST /api/sessions` or `PATCH /api/sessions/:sessionId/proxy` (ADMIN key for
+> both) — not via environment variables.
 
 > ℹ️ A `504` whose body starts with `Engine initialization timed out after ...` is a **different**
 > failure with a different fix: initialization never finished at all. That happens when WhatsApp Web,
