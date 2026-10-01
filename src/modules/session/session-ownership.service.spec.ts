@@ -223,6 +223,24 @@ describe('SessionOwnershipService', () => {
       expect((await sessions.findOneByOrFail({ id: one.id })).nodeId).toBeNull();
       expect((await sessions.findOneByOrFail({ id: two.id })).nodeId).toBeNull();
     });
+
+    // Per-session bookkeeping must end with the claim, or create/delete churn grows it forever.
+    it('keeps no per-session state once a claim ends by release, shutdown or loss', async () => {
+      const [one, two, three] = [await seed(), await seed(), await seed()];
+      const nodeA = service('node-a');
+      const claimGen = (nodeA as unknown as { claimGen: Map<string, number> }).claimGen;
+      await nodeA.claim(one.id);
+      await nodeA.claim(two.id);
+      await nodeA.claim(three.id);
+
+      await nodeA.release(one.id);
+      await sessions.update({ id: two.id }, { nodeId: 'node-b', leaseExpiresAt: new Date(Date.now() + 60_000) });
+      await nodeA.renew();
+      expect([...claimGen.keys()]).toEqual([three.id]);
+
+      await nodeA.releaseAll();
+      expect(claimGen.size).toBe(0);
+    });
   });
 
   describe('releasing a lapsed foreign claim', () => {
