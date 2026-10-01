@@ -1114,7 +1114,7 @@ describe('WebhookDeliveryService', () => {
       await dispatchP;
       expect(destroyed).toBe(true);
       // The refused delivery keeps its pending outbox row, so the next start's sweep replays it.
-      expect(outboxService.close).not.toHaveBeenCalledWith('wh-b', expect.anything(), 'failed');
+      expect(outboxService.close).not.toHaveBeenCalledWith('wh-b', expect.anything(), expect.anything());
     });
 
     it('queued mode: parked enqueues drain to the queue on shutdown instead of dead-lettering', async () => {
