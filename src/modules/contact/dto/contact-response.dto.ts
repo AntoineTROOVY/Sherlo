@@ -36,8 +36,11 @@ export class ContactDto {
   isBlocked!: boolean;
 
   @ApiPropertyOptional({
-    description: 'Profile picture URL. Absent when the contact has none or their privacy settings hide it.',
-    example: 'https://pps.whatsapp.net/v/t61.24694-24/12345_678_910_n.jpg',
+    description:
+      'Not a usable URL. On Baileys it holds only the picture-change marker `changed` or `removed` from a ' +
+      'contact notification; whatsapp-web.js never sets it. Neither its value nor its absence says whether ' +
+      'the contact has a picture; fetch the URL from GET /contacts/{contactId}/profile-picture.',
+    example: 'changed',
   })
   profilePicUrl?: string;
 }
