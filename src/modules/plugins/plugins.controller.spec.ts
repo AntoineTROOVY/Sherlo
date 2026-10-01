@@ -50,3 +50,13 @@ describe('PluginsController authorization', () => {
     expect(reflector.get<boolean>(UNSCOPED_KEY, handler)).toBe(true);
   });
 });
+
+describe('PluginsController.install() OpenAPI responses', () => {
+  it('declares the 413 the upload size limit returns', () => {
+    const responses = Reflect.getMetadata(
+      'swagger/apiResponse',
+      Object.getOwnPropertyDescriptor(PluginsController.prototype, 'install')!.value as object,
+    ) as Record<string, unknown>;
+    expect(Object.keys(responses)).toContain('413');
+  });
+});
