@@ -108,3 +108,21 @@ test('an oversized pick also drops the earlier pick it was meant to replace', as
   // The input now reads "No file chosen", so nothing on screen shows the earlier image any more.
   assert.equal(post.disabled, true, 'the hidden earlier pick can still be posted');
 });
+
+test('a picked image is posted with its own type', async () => {
+  const { screen, fireEvent, waitFor } = rtl;
+  render();
+  fireEvent.click(screen.getByRole('button', { name: 'Image' }));
+  fireEvent.change(screen.getByLabelText('Status image'), {
+    target: { files: [new window.File(['x'], 'chart.png', { type: 'image/png' })] },
+  });
+  const post = screen.getByRole('button', { name: 'Post' }) as HTMLButtonElement;
+  await waitFor(() => assert.equal(post.disabled, false));
+  fireEvent.click(post);
+
+  await waitFor(() => assert.equal(posted.length, 1));
+  assert.deepEqual((posted[0] as { image: unknown }).image, {
+    base64: 'data:image/png;base64,eA==',
+    mimetype: 'image/png',
+  });
+});

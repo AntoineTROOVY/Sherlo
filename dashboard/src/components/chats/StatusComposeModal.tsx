@@ -150,7 +150,11 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
           font: composeFont === '' ? undefined : Number(composeFont),
         });
       } else {
-        const image = composeImageBase64 ? { base64: composeImageBase64 } : { url: composeImageUrl.trim() };
+        // The gateway drops the data URL's prefix and labels bare base64 image/jpeg unless told otherwise,
+        // so the picked file's type travels as `mimetype`. A file with no image type leaves the default.
+        const image = composeImageBase64
+          ? { base64: composeImageBase64, mimetype: /^data:(image\/[^;,]+)/.exec(composeImageBase64)?.[1] }
+          : { url: composeImageUrl.trim() };
         await sessionApi.postImageStatus(sessionId, image, recipients, composeCaption.trim() || undefined);
       }
       showSuccessToast(t('chats.status.posted'));
