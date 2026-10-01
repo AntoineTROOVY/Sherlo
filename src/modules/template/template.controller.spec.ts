@@ -1,5 +1,6 @@
 import { TemplateController } from './template.controller';
 import { TemplateService } from './template.service';
+import { CreateTemplateDto, UpdateTemplateDto } from './dto';
 
 describe('TemplateController', () => {
   const service = {
@@ -14,9 +15,9 @@ describe('TemplateController', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('create delegates with the session id and DTO', async () => {
-    const dto = { name: 'welcome', content: 'Hi {{name}}' };
+    const dto: CreateTemplateDto = { name: 'welcome', body: 'Hi {{name}}' };
     service.create.mockResolvedValue({ id: 't1' });
-    await controller.create('s1', dto as never);
+    await controller.create('s1', dto);
     expect(service.create).toHaveBeenCalledWith('s1', dto);
   });
 
@@ -33,9 +34,9 @@ describe('TemplateController', () => {
   });
 
   it('update delegates with session, id and DTO', async () => {
-    const dto = { content: 'bye' };
+    const dto: UpdateTemplateDto = { body: 'bye' };
     service.update.mockResolvedValue({ id: 't1' });
-    await controller.update('s1', 't1', dto as never);
+    await controller.update('s1', 't1', dto);
     expect(service.update).toHaveBeenCalledWith('s1', 't1', dto);
   });
 
