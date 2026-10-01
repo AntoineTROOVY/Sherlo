@@ -148,6 +148,21 @@ describe('ChatMediaArchiveService', () => {
       expect(files).toEqual([first]);
     });
 
+    it('keeps one file when two writers archive the same row concurrently', async () => {
+      // Both callers hold a snapshot read before either pointer landed, so the in-memory guard
+      // passes twice; the pointer write itself has to pick one winner.
+      const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64') });
+
+      const keys = await Promise.all([enabled().archive(row), enabled().archive(row)]);
+      const winner = keys.filter(k => k !== null);
+
+      expect(winner).toHaveLength(1);
+      expect((await repository.findOneByOrFail({ id: row.id })).mediaPath).toBe(winner[0]);
+      const files = [];
+      for await (const f of storageService.iterateFiles('')) files.push(f);
+      expect(files).toEqual(winner);
+    });
+
     it('skips media above the archive cap without touching the row', async () => {
       const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64') });
 

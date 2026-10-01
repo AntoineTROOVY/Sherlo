@@ -165,9 +165,11 @@ export class ChatMediaArchiveService implements OnModuleInit, OnModuleDestroy {
 
     try {
       // Conditional on the row not being revoked: a revoke that landed while the file was written
-      // cleared the row, and pointing it at the file would bring the deleted media back.
+      // cleared the row, and pointing it at the file would bring the deleted media back. And on no
+      // pointer yet: the other writer may have passed the snapshot guard above while this file was
+      // being written, and the first pointer wins so the losing file is deleted, not stranded.
       const result = await this.repository.update(
-        { id: row.id, type: Not('revoked') },
+        { id: row.id, type: Not('revoked'), mediaPath: IsNull() },
         { mediaPath: key, mediaMimetype: media.mimetype },
       );
       if (result.affected === 0) {
