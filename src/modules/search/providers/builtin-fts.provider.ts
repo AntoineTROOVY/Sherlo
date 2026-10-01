@@ -377,11 +377,11 @@ export class BuiltInFtsProvider implements SearchProvider, OnModuleInit {
     // (WhatsApp messageTimestamp — see the inbound mappers in the engine adapters). Bind ms→seconds
     // at the boundary, otherwise `seconds >= ms` is false for every modern row and dateFrom/dateTo
     // silently exclude all results.
-    if (q.dateFrom) {
+    if (q.dateFrom != null) {
       where.push(`${prefix}"timestamp" >= ${ph()}`);
       params.push(Math.floor(q.dateFrom / 1000));
     }
-    if (q.dateTo) {
+    if (q.dateTo != null) {
       where.push(`${prefix}"timestamp" <= ${ph()}`);
       params.push(Math.floor(q.dateTo / 1000));
     }

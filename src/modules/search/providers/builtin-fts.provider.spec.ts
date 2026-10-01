@@ -114,6 +114,8 @@ describe('BuiltInFtsProvider (sqlite)', () => {
     expect(await bodies({ type: 'image' })).toEqual(['hello picture']);
     expect(await bodies({ type: ['text', 'image'] })).toEqual(['hello again', 'hello picture', 'hello world']);
     expect(await bodies({ dateTo: 2000 })).toEqual(['hello picture', 'hello world']);
+    // Epoch 0 is a bound like any other, not "no bound": nothing is that old.
+    expect(await bodies({ dateTo: 0 })).toEqual([]);
 
     const combined = { chatId: 'c1', from: 'a@c.us', direction: MessageDirection.OUTGOING, type: 'text' as const };
     expect(await bodies({ ...combined, dateTo: 1000 })).toEqual(['hello world']);
