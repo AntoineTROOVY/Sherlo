@@ -502,4 +502,34 @@ describe('PluginLoaderService — sandbox log relay bounds', () => {
     expect(relayed).toContain('…[truncated]');
     expect(relayed.length).toBe('[p1] '.length + 8192 + '…[truncated]'.length);
   });
+
+  it('bounds a non-string worker log message like a string one', async () => {
+    // Plugin code can post to parentPort directly, so the message is untrusted and may not be a string.
+    const loader = makeLoader();
+    seed(loader, { builtIn: false, instance: null });
+    await loader.enablePlugin('p1');
+    const logSpy = jest.spyOn(loggerOf(loader), 'log').mockImplementation(() => undefined);
+
+    loader.capturedOnLog!('log', ['x'.repeat(6000), 'y'.repeat(6000)] as unknown as string);
+
+    const relayed = logSpy.mock.calls[0][0] as string;
+    expect(relayed.length).toBe('[p1] '.length + 8192 + '…[truncated]'.length);
+  });
+
+  it('replaces an oversized worker log meta with a size marker instead of relaying it', async () => {
+    const loader = makeLoader();
+    seed(loader, { builtIn: false, instance: null });
+    await loader.enablePlugin('p1');
+    const logSpy = jest.spyOn(loggerOf(loader), 'log').mockImplementation(() => undefined);
+
+    loader.capturedOnLog!('log', 'big', { data: 'x'.repeat(20000) });
+    loader.capturedOnLog!('log', 'small', { n: 1 });
+
+    expect(logSpy).toHaveBeenNthCalledWith(1, '[p1] big', {
+      metaTruncated: true,
+      metaLength: 20011,
+      pluginId: 'p1',
+    });
+    expect(logSpy).toHaveBeenNthCalledWith(2, '[p1] small', { n: 1, pluginId: 'p1' });
+  });
 });
