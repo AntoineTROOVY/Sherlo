@@ -310,7 +310,13 @@ public final class MessagesResource {
             BatchStatusResponse.class);
     }
 
-    /** Cancel a running batch. Requires an OPERATOR-level key. */
+    /**
+     * Cancel a running batch. Requires an OPERATOR-level key.
+     *
+     * <p>The server answers only {@code batchId}, {@code status} and {@code progress}, so
+     * {@code results}, {@code startedAt} and {@code completedAt} are always {@code null} here; call
+     * {@link #batchStatus} for the per-item results.
+     */
     public BatchStatusResponse cancelBatch(String sessionId, String batchId) {
         return client.request(
             HttpMethod.POST,
