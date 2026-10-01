@@ -277,5 +277,9 @@ describe('PluginStorageService per-plugin storage quota', () => {
     const configService = { get: (k: string) => (k === 'dataDir' ? dataDir : undefined) } as unknown as ConfigService;
     const storage = new PluginStorageService(configService).createPluginStorage('default-quota');
     await expect(storage.set('state', 'x'.repeat(1000))).resolves.toBeUndefined();
+    // One byte over 50 MiB once JSON-quoted; refused before anything is written.
+    await expect(storage.set('big', 'x'.repeat(50 * 1024 * 1024 - 1))).rejects.toThrow(
+      /storage quota exceeded.*max 52428800\)/,
+    );
   });
 });
