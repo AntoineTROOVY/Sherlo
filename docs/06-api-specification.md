@@ -1595,7 +1595,7 @@ Get the processing status and progress of a bulk batch.
 }
 ```
 
-`status` is one of `pending|processing|completed|cancelled|failed`; `results` holds one entry per recipient already attempted, with `status` `sent` or `failed`; a recipient not yet attempted, or dropped by a cancel, appears only in the `progress` counters. A failed result carries a sanitized `error { code, message }` (internals are not leaked).
+`status` is one of `pending|processing|completed|cancelled|failed`; `results` holds one entry per recipient attempted as of the last saved checkpoint, with `status` `sent` or `failed`. While the batch is `processing`, the row is saved after the first recipient, every 10th recipient after it and the last, so `results` and `progress` can trail the send loop by up to 9 recipients; a recipient not yet attempted, or dropped by a cancel, appears only in the `progress` counters. A failed result carries a sanitized `error { code, message }` (internals are not leaked).
 
 **Errors:** `401` missing/invalid API key · `404` batch not found for this session
 
