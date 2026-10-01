@@ -6765,7 +6765,7 @@ Create an instance of an ingress-capable plugin.
 
 ```json
 {
-  "id": "0e2f…",
+  "id": "chatwoot:chatwoot-prod-1",
   "pluginId": "chatwoot",
   "instanceId": "chatwoot-prod-1",
   "sessionScope": "8f3c2b1a-9d4e-4c7a-8b2f-1e6d5a4c3b2a",
