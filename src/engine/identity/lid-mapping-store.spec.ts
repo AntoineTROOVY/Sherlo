@@ -422,6 +422,79 @@ describe('LidMappingStoreService — deterministic preload + repository fallback
     expect(store.getCached('lid-writing')).toBe('620001'); // warmed back rather than blocked
   });
 
+  /** Hold the next upsert open until the returned commit() applies it, as the fake repo would. */
+  function holdNextUpsert(repo: ReturnType<typeof makeFakeRepo>): () => void {
+    const apply = repo.upsert.getMockImplementation() as (values: Partial<LidMapping>) => Promise<object>;
+    let commit: () => void = () => undefined;
+    repo.upsert.mockImplementationOnce(
+      (values: Partial<LidMapping>) => new Promise(resolve => (commit = () => resolve(apply(values)))),
+    );
+    return () => commit();
+  }
+
+  // The same window from the other side: the table still holds the OLD phone, so the read returns a
+  // row, and indexing it would leave the stale phone served as a cache hit after the write commits.
+  it('does not index a table row read while a newer write for that lid is in flight', async () => {
+    process.env.LID_MAPPING_CACHE_MAX = '1';
+    const repo = makeFakeRepo([{ lid: 'lid-moved', phone: '620001' }]);
+    const commit = holdNextUpsert(repo);
+    const store = new LidMappingStoreService(repo as unknown as Repository<LidMapping>);
+
+    const writing = store.remember('lid-moved', '620009'); // indexed; its upsert is held open
+    await store.remember('lid-other', '620002'); // cap 1: evicts lid-moved from the forward map
+
+    expect(store.getCached('lid-moved')).toBeUndefined(); // the query reads the uncommitted table
+    await new Promise(resolve => setImmediate(resolve));
+    commit();
+    await writing;
+
+    expect(store.getCached('lid-moved')).not.toBe('620001');
+    await new Promise(resolve => setImmediate(resolve));
+    expect(store.getCached('lid-moved')).toBe('620009');
+  });
+
+  it('does not index a table row read before a write that settled while the read was in flight', async () => {
+    process.env.LID_MAPPING_CACHE_MAX = '1';
+    const repo = makeFakeRepo([{ lid: 'lid-moved', phone: '620001' }]);
+    let answer: (row: LidMapping | null) => void = () => undefined;
+    repo.findOne.mockImplementationOnce(() => new Promise(resolve => (answer = resolve)));
+    const store = new LidMappingStoreService(repo as unknown as Repository<LidMapping>);
+
+    expect(store.getCached('lid-moved')).toBeUndefined(); // the query is now in flight
+    const before = { ...repo.rows[0] };
+    await store.remember('lid-moved', '620009'); // re-mapped and committed inside that window
+    await store.remember('lid-other', '620002'); // cap 1: evicts lid-moved from the forward map
+    answer(before); // the query had already run, so it answers with the old row
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(store.getCached('lid-moved')).not.toBe('620001');
+    await new Promise(resolve => setImmediate(resolve));
+    expect(store.getCached('lid-moved')).toBe('620009');
+  });
+
+  it('keeps a lid unsettled until the last of two overlapping writes commits', async () => {
+    process.env.LID_MAPPING_CACHE_MAX = '1';
+    const repo = makeFakeRepo();
+    const commitFirst = holdNextUpsert(repo);
+    const commitSecond = holdNextUpsert(repo);
+    const store = new LidMappingStoreService(repo as unknown as Repository<LidMapping>);
+
+    const first = store.remember('lid-busy', '620001');
+    const second = store.remember('lid-busy', '620009');
+    commitFirst();
+    await first; // the second write is still open
+    await store.remember('lid-other', '620002'); // cap 1: evicts lid-busy from the forward map
+
+    expect(store.getCached('lid-busy')).toBeUndefined(); // reads the first write's row
+    await new Promise(resolve => setImmediate(resolve));
+    commitSecond();
+    await second;
+
+    expect(store.getCached('lid-busy')).not.toBe('620001');
+    await new Promise(resolve => setImmediate(resolve));
+    expect(store.getCached('lid-busy')).toBe('620009');
+  });
+
   it('records no absence at all when the cap is disabled', async () => {
     // LID_MAPPING_CACHE_MAX=0 is documented as the legacy unbounded cache. An absence set that grows
     // on every lookup would be a new unbounded map the operator never asked for, and unlike the
