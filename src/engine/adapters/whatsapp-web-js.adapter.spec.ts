@@ -5651,7 +5651,7 @@ describe('WhatsAppWebJsAdapter createGroup (not available on this engine)', () =
   it('refuses before the engine is ready, like every other guarded method', async () => {
     const adapter = new WhatsAppWebJsAdapter({ sessionId: 's', sessionDataPath: './data/sessions', puppeteer: {} });
 
-    await expect(adapter.createGroup('team', ['628123456789@c.us'])).rejects.toBeDefined();
+    await expect(adapter.createGroup('team', ['628123456789@c.us'])).rejects.toBeInstanceOf(EngineNotReadyError);
   });
 });
 
