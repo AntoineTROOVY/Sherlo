@@ -271,8 +271,25 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
     // Resolve a lid actor to its phone through the persistent table so a phone filter matches a
     // lid-addressed sender (e.g. an unresolved @lid group participant). Absent store -> no resolution.
     const resolveLid = (jid: string): string | null => this.lidMappingStore?.resolveLid(jid) ?? null;
-    const subscribed = webhooks.filter(w => w.events.includes(event) || w.events.includes('*'));
-    const matching = subscribed.filter(w => evaluateFilters(w.filters, event, data, resolveLid));
+    // A row is judged on its own: one whose stored events or filters are malformed (e.g. restored from
+    // a hand-edited backup) is skipped, instead of throwing here and dropping the event for every
+    // other webhook of the session.
+    const subscribed = webhooks.filter(
+      w => Array.isArray(w.events) && (w.events.includes(event) || w.events.includes('*')),
+    );
+    const matching = subscribed.filter(w => {
+      try {
+        return evaluateFilters(w.filters, event, data, resolveLid);
+      } catch (error) {
+        this.logger.warn('Skipping webhook with malformed filters', {
+          webhookId: w.id,
+          event,
+          error: String(error),
+          action: 'webhook_filters_invalid',
+        });
+        return false;
+      }
+    });
     // A subscribed webhook that a filter drops leaves no trace otherwise: dispatch() awaits an empty
     // array and returns, and the delivery-failure table only records deliveries that were ATTEMPTED.
     // That is fine when the filter is doing its job, and indistinguishable from it when it is not —

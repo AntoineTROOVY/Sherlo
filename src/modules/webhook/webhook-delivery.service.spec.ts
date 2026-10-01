@@ -1357,6 +1357,22 @@ describe('WebhookDeliveryService', () => {
       lidStore.getCached.mockImplementation((lid: string) => (lid === '111' ? '628999' : null));
       expect(await deliveries(f, 'message.received', data)).toBe(1);
     });
+
+    it('skips only the webhook whose stored events or filters are malformed', async () => {
+      mockFetch.mockClear();
+      const healthy = createMockWebhook({ id: 'wh-ok', events: ['*'] });
+      const badEvents = createMockWebhook({ id: 'wh-bad-events', events: {} as unknown as string[] });
+      const badFilters = createMockWebhook({
+        id: 'wh-bad-filters',
+        events: ['*'],
+        filters: { conditions: [null] } as unknown as WebhookFilters,
+      });
+      (repository.find as jest.Mock).mockResolvedValue([badEvents, badFilters, healthy]);
+
+      await expect(service.dispatch('sess-1', 'message.received', { from: '111@c.us' })).resolves.toBeUndefined();
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ── custom-header sanitization ───────────────────────────────
