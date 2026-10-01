@@ -17,7 +17,9 @@ export class SettingsGeneralDto {
     description:
       'Always true: the engine auto-reconnects on a transient disconnect and there is no global off ' +
       'switch. Attempts are unlimited by default; cap them per session with config.maxReconnectAttempts ' +
-      '(0-20, PATCH /api/sessions/{sessionId}/config).',
+      '(0-20, PATCH /api/sessions/{sessionId}/config). The cap bounds every reconnect on whatsapp-web.js; ' +
+      'on Baileys it bounds only the reconnect after a logged-out close, and the engine retries a transient ' +
+      'drop itself with no cap.',
     example: true,
   })
   autoReconnect!: boolean;
