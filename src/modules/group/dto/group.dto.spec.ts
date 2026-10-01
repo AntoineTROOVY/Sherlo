@@ -39,6 +39,9 @@ describe('group DTO validation', () => {
     // A base64 that is only a data-URI prefix strips to nothing, so the url is what would be sent.
     const prefixOnly = { url: 'cdn/group.jpg', base64: 'data:image/jpeg;base64,', mimetype: 'image/jpeg' };
     expect((await errorsFor(SetGroupPictureDto, prefixOnly)).length).toBeGreaterThan(0);
+    // base64 wins when both are set, so a url alongside it must not switch off its type check.
+    const arrayBase64 = { url: 'https://a.example/x.jpg', base64: ['QUJD'], mimetype: 'image/jpeg' };
+    expect((await errorsFor(SetGroupPictureDto, arrayBase64)).some(e => e.property === 'base64')).toBe(true);
   });
 
   it('accepts a valid participants body (regression for #190)', async () => {
