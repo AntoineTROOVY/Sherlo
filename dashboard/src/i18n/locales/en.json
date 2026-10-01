@@ -905,7 +905,7 @@
     "redis": {
       "title": "Redis",
       "enable": "Enable Redis",
-      "enableDesc": "Required for caching, session storage, and BullMQ queues",
+      "enableDesc": "Used for caching, BullMQ queues, rate-limit counters, and multi-node WebSocket fan-out",
       "useBuiltIn": "Use Built-in Redis Container",
       "builtInDesc": "OpenWA will manage a Redis container for you",
       "queueTitle": "Enable BullMQ Queue System",
@@ -917,7 +917,7 @@
       "failed": "Failed",
       "viewBullMq": "View Bull MQ Dashboard",
       "disabledTitle": "Redis is Disabled",
-      "disabledDesc": "Enable Redis for caching, session storage, and BullMQ message queues.",
+      "disabledDesc": "Enable Redis for caching, BullMQ message queues, rate-limit counters, and multi-node WebSocket fan-out.",
       "passwordOptional": "(optional)",
       "bullMqUrlCopied": "Bull MQ dashboard URL copied",
       "bullMqUrlHint": "Open it with an ADMIN API key — a browser tab can't authenticate."

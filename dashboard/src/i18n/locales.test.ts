@@ -424,3 +424,12 @@ test('English migrations status describes migrations, not schema synchronize', (
   assert.doesNotMatch(status, /synchroni[sz]/i, `status names synchronize: "${status}"`);
   assert.match(status, /migrations/i, `status lost the migrations wording: "${status}"`);
 });
+
+// Session auth state lives on disk or in the database; Redis only backs the cache, the queues, the
+// rate-limit counters and the multi-node WebSocket fan-out.
+test('English Redis copy does not claim Redis stores sessions', () => {
+  for (const key of ['infrastructure.redis.enableDesc', 'infrastructure.redis.disabledDesc']) {
+    const copy = i18n.t(key, { lng: 'en' });
+    assert.doesNotMatch(copy, /session/i, `${key} claims session storage: "${copy}"`);
+  }
+});
