@@ -4712,9 +4712,14 @@ describe('SessionService', () => {
       enginesOf().set('sess-uuid-1', { marker: 'engine-B' }); // a newer engine now owns the id
       (repository.update as jest.Mock).mockClear();
       (webhookService.dispatch as jest.Mock).mockClear();
+      (repository.findOne as jest.Mock).mockClear();
 
       callbacks.onDisconnected?.('socket closed');
+      // Every side effect follows the handler's awaited reload; let it run before asserting.
+      await new Promise(resolve => setImmediate(resolve));
 
+      // Only the entry fences stop the reload itself; the post-reload fence is covered below.
+      expect(repository.findOne).not.toHaveBeenCalled();
       expect(repository.update).not.toHaveBeenCalled();
       expect(webhookService.dispatch).not.toHaveBeenCalled();
     });
