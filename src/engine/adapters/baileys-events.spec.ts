@@ -6,11 +6,11 @@ import type { WAMessage, WASocket } from '@whiskeysockets/baileys';
 
 /**
  * `downloadMediaMessage` is a jest mock, not a silent no-op: the real-download branch
- * (`baileys-events.ts:588-638`, reached whenever `isMediaType` is true and skipMediaDownload
+ * (`resolveInboundMedia` in baileys-events.ts, reached whenever `isMediaType` is true and skipMediaDownload
  * isn't set) calls `b.downloadMediaMessage(...)`, and this stub implements nothing else that
  * branch needs — so if a non-media contentType were ever misclassified as media (the exact
  * slip the Plan 2 mapper extraction could introduce), the call throws and that throw is caught
- * by baileys-events.ts:632-637, leaving `media` unset. An `incoming.media` assertion alone
+ * by its try/catch around `downloadInboundMediaCapped`, leaving `media` unset. An `incoming.media` assertion alone
  * can't tell "correctly not classified as media" from "misclassified, then crashed and got
  * swallowed" — asserting `downloadMediaMessage` was never called can.
  */
@@ -18,9 +18,9 @@ const downloadMediaMessage = jest.fn();
 
 /**
  * A fresh async-iterable stream of the given chunks — the shape `downloadMediaMessage(msg, 'stream', ...)`
- * resolves to (see `downloadInboundMediaCapped`, baileys-events.ts:491-525). Mirrors the identically-named
+ * resolves to (see `downloadInboundMediaCapped` in baileys-events.ts). Mirrors the identically-named
  * helper in `baileys.adapter.spec.ts`. Without this, the bare `jest.fn()` above resolves to `undefined`,
- * `for await` over it throws, and the real-download branch's own try/catch (baileys-events.ts:632-637)
+ * `for await` over it throws, and the real-download branch's own try/catch (in `resolveInboundMedia`)
  * swallows that throw before `media` is ever assigned — so that branch can never be exercised at all.
  */
 function streamOf(...chunks: Buffer[]): AsyncIterable<Buffer> & { destroy: () => void } {
@@ -474,7 +474,7 @@ describe('BaileysEvents.mapMessage', () => {
       },
       'imageMessage',
       // No skipMediaDownload here — this routes through the pre-download-gate + streaming-download
-      // branch (baileys-events.ts:588-638), not the omitted-marker branch every other media case in
+      // branch (`resolveInboundMedia`), not the omitted-marker branch every other media case in
       // this file exercises via `{ skipMediaDownload: true }`.
     );
 
