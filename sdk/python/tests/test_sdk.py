@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from typing import get_args
 
 import httpx
 import pytest
@@ -11,7 +12,7 @@ import pytest
 from openwa import OpenWAClient, OpenWAApiError, OpenWANotFoundError
 from openwa._http import build_url
 from openwa.errors import OpenWAServiceUnavailableError
-from openwa.types import WebhookFilters
+from openwa.types import WebhookDelivery, WebhookDeliveryEvent, WebhookEvent, WebhookFilters
 
 from conftest import MockBackend, make_client
 
@@ -654,6 +655,19 @@ class TestContacts:
 
 
 class TestWebhooks:
+    def test_delivery_event_excludes_the_subscription_wildcard(self):
+        # "*" only matches a subscription; a delivery names one concrete event, or "test".
+        assert set(get_args(WebhookEvent)) == set(get_args(WebhookDeliveryEvent)) | {"*"}
+        delivery: WebhookDelivery = {
+            "event": "*",  # type: ignore[typeddict-item]
+            "timestamp": "2026-02-02T10:00:00.000Z",
+            "sessionId": "s1",
+            "idempotencyKey": "k",
+            "deliveryId": "dlv_1",
+            "data": {},
+        }
+        assert delivery["event"] == "*"
+
     def test_crud_test(self):
         wh = {"id": "w1", "sessionId": "s", "url": "u", "events": ["*"], "active": True, "createdAt": "", "updatedAt": ""}
         backend = MockBackend()

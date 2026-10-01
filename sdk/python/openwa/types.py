@@ -73,6 +73,15 @@ WebhookEvent = Literal[
     "call.accepted", "call.rejected", "call.missed",
     "*",
 ]
+# The events a delivery can carry: WebhookEvent without the "*" subscription wildcard.
+WebhookDeliveryEvent = Literal[
+    "message.received", "message.sent", "message.ack", "message.failed", "message.revoked",
+    "message.reaction", "message.edited", "session.status", "session.qr", "session.authenticated",
+    "session.disconnected", "session.reconnect_loop", "session.restriction", "presence.update",
+    "group.join", "group.leave", "group.update", "group.join_request",
+    "call.received", "status.received",
+    "call.accepted", "call.rejected", "call.missed",
+]
 
 
 class SetOwnPresenceRequest(TypedDict):
@@ -943,7 +952,7 @@ class WebhookDelivery(TypedDict):
     :func:`openwa.verify_webhook_signature` before parsing it.
     """
 
-    event: WebhookEvent | Literal["test"]
+    event: WebhookDeliveryEvent | Literal["test"]
     timestamp: str
     sessionId: str
     idempotencyKey: str
