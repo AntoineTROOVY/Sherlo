@@ -17,7 +17,11 @@ from typing import Any, Mapping
 
 
 class OpenWAError(Exception):
-    """Base class for every error raised by the SDK."""
+    """Base class for errors the SDK raises for an API response or a timeout.
+
+    Connection failures surface as ``httpx.TransportError``; an invalid argument (a missing
+    ``base_url`` or ``api_key``, an empty or dot path segment) raises ``ValueError``.
+    """
 
 
 class OpenWAApiError(OpenWAError):
