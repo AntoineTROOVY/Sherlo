@@ -108,8 +108,9 @@ describe('LabelService label editing', () => {
     expect(upsertLabel).toHaveBeenCalledWith({ id: 'l1', name: 'VIP' });
   });
 
-  // Omitted fields must stay omitted rather than becoming undefined-valued keys: the adapter drops
-  // undefined before it reaches app-state, and sending an explicit blank would clear the field.
+  // Omitted fields must stay omitted rather than becoming undefined-valued keys. The service sends
+  // only the fields the caller set, and the adapter forwards them unchanged; the write replaces the
+  // whole label.
   it('passes through only the fields the caller set', async () => {
     const upsertLabel = jest.fn().mockResolvedValue(undefined);
     await makeService({ upsertLabel }).upsertLabel('s1', 'l1', { color: 3 });
