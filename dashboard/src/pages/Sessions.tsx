@@ -87,6 +87,8 @@ export function Sessions() {
   const [killConfirmId, setKillConfirmId] = useState<string | null>(null);
   const [unlinkConfirmId, setUnlinkConfirmId] = useState<string | null>(null);
   const [unlinkingId, setUnlinkingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [killingId, setKillingId] = useState<string | null>(null);
   // Sessions whose Start or Reconnect click is still being handled. A start can wait seconds before its
   // engine exists, and a second click in that window is refused as "already starting" while the first
   // one proceeds.
@@ -356,6 +358,10 @@ export function Sessions() {
   }, [isConnected, error, fetchSessions]);
 
   const handleDelete = async (id: string) => {
+    // The confirm modal stays open until the request answers, so a double-click would delete twice and
+    // report the second, failed delete after the first one's success.
+    if (deletingId) return;
+    setDeletingId(id);
     const session = sessions.find(s => s.id === id);
     try {
       await sessionApi.delete(id);
@@ -374,6 +380,7 @@ export function Sessions() {
       console.error('Failed to delete:', err);
       toast.error(t('sessions.delete.errorTitle'), msg);
     } finally {
+      setDeletingId(null);
       setDeleteConfirmId(null);
     }
   };
@@ -574,6 +581,9 @@ export function Sessions() {
   };
 
   const handleForceKill = async (id: string) => {
+    // Same double-click guard as handleDelete.
+    if (killingId) return;
+    setKillingId(id);
     try {
       const updated = await sessionApi.forceKill(id);
       await applySessionResponse(updated);
@@ -590,6 +600,7 @@ export function Sessions() {
       );
       await fetchSessions();
     } finally {
+      setKillingId(null);
       setKillConfirmId(null);
     }
   };
@@ -1122,7 +1133,11 @@ export function Sessions() {
               <button className="btn-secondary" onClick={() => setDeleteConfirmId(null)}>
                 {t('common.cancel')}
               </button>
-              <button className="btn-danger" onClick={() => handleDelete(deleteConfirmId)}>
+              <button
+                className="btn-danger"
+                onClick={() => handleDelete(deleteConfirmId)}
+                disabled={deletingId !== null}
+              >
                 {t('common.delete')}
               </button>
             </>
@@ -1151,7 +1166,11 @@ export function Sessions() {
               <button className="btn-secondary" onClick={() => setKillConfirmId(null)}>
                 {t('common.cancel')}
               </button>
-              <button className="btn-danger" onClick={() => handleForceKill(killConfirmId)}>
+              <button
+                className="btn-danger"
+                onClick={() => handleForceKill(killConfirmId)}
+                disabled={killingId !== null}
+              >
                 {t('sessions.forceKill.confirm')}
               </button>
             </>

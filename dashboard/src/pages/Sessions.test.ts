@@ -103,6 +103,7 @@ function resetFetchCalls(): void {
   createFailure = null;
   stopFailure = null;
   forceKillFailure = null;
+  confirmGate = null;
   qrGate = null;
   listGate = null;
   pairingGate = null;
@@ -139,6 +140,8 @@ let createFailure: { status: number; message: string } | null = null;
 let stopFailure: { status: number; message: string } | null = null;
 // When set, POST .../force-kill answers with this status and body.
 let forceKillFailure: { status: number; body: Record<string, unknown> } | null = null;
+// When set, DELETE /api/sessions/:id and POST .../force-kill answer only once this settles.
+let confirmGate: Promise<void> | null = null;
 // When set, POST .../start answers, whichever way it answers, only once this settles.
 let startGate: Promise<void> | null = null;
 // When set, GET .../qr for that one session answers only once `until` settles.
@@ -224,7 +227,7 @@ function installFetchStub(): void {
     }
     if (method === 'DELETE' && sessionIdMatch) {
       if (afterMutation) setImmediate(afterMutation);
-      return Promise.resolve(new Response(null, { status: 204 }));
+      return (confirmGate ?? Promise.resolve()).then(() => new Response(null, { status: 204 }));
     }
 
     const configMatch = path.match(/^\/api\/sessions\/([^/]+)\/config$/);
@@ -305,6 +308,7 @@ function installFetchStub(): void {
         return jsonResponse({ ...base, status: 'disconnected', engineLoaded: false });
       };
       if (isStart && startGate) return startGate.then(answer);
+      if (lifecycleMatch[2] === 'force-kill' && confirmGate) return confirmGate.then(answer);
       return Promise.resolve(answer());
     }
 
@@ -1948,5 +1952,35 @@ for (const [label, body, shown] of [
     assert.ok(alert.classList.contains('toast-error'), 'the force-kill failure was not shown as an error toast');
     within(alert).getByText('Force-Kill Failed');
     within(alert).getByText(shown);
+  });
+}
+
+// The confirm modal closes only once its request answers, so a second click on its button in that
+// window must not send the request again.
+for (const [label, cardButton, confirmButton, method, path] of [
+  ['a double-clicked Delete sends one delete', 'Delete', 'Delete', 'DELETE', '/api/sessions/sess-stale-1'],
+  [
+    'a double-clicked Kill Session sends one force-kill',
+    'Kill Stuck',
+    'Kill Session',
+    'POST',
+    '/api/sessions/sess-stale-1/force-kill',
+  ],
+] as const) {
+  test(label, async () => {
+    const { screen, fireEvent, within, waitFor } = rtl;
+    resetFetchCalls();
+    let release!: () => void;
+    confirmGate = new Promise<void>(resolve => (release = resolve));
+    renderSessions();
+
+    const card = (await screen.findByText('stale-engine')).closest('.session-card') as HTMLElement;
+    fireEvent.click(within(card).getByRole('button', { name: cardButton }));
+    const confirm = within(await screen.findByRole('dialog')).getByRole('button', { name: confirmButton });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    release();
+    await waitFor(() => assert.ok(!screen.queryByRole('dialog'), 'the confirm modal did not close'));
+    assert.equal(fetchCalls.filter(c => c.method === method && c.path === path).length, 1);
   });
 }
