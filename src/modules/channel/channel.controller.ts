@@ -25,7 +25,7 @@ export class ChannelController {
   @ApiOperation({ summary: 'Get all subscribed channels/newsletters' })
   @ApiParam({ name: 'sessionId', description: 'Session ID' })
   @ApiResponse({ status: 200, description: 'List of subscribed channels', type: [ChannelDto] })
-  @ApiResponse({ status: 400, description: 'Session not ready' })
+  @ApiResponse({ status: 400, description: 'Session not started' })
   @ApiResponse({
     status: 501,
     description: 'Not supported by the active engine: the Baileys adapter cannot list subscribed channels.',
@@ -57,6 +57,7 @@ export class ChannelController {
       'the account does not follow, because the lookup scans the subscribed-channel list; the Baileys ' +
       'engine resolves any channel by id.',
   })
+  @ApiResponse({ status: 400, description: 'Session not started' })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
   async findOne(@Param('sessionId') sessionId: string, @Param('channelId') channelId: string) {
     return this.channelService.getChannelById(sessionId, channelId);
@@ -77,6 +78,7 @@ export class ChannelController {
     status: 501,
     description: 'Not supported by the active engine: the Baileys adapter cannot read channel messages.',
   })
+  @ApiResponse({ status: 400, description: 'Session not started' })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
   @ApiResponse({ status: 404, description: CHANNEL_NOT_FOUND_404 })
   async getMessages(
@@ -271,6 +273,7 @@ export class ChannelController {
     status: 501,
     description: 'Not supported by the active engine: whatsapp-web.js cannot subscribe by invite code.',
   })
+  @ApiResponse({ status: 400, description: 'Session not started, or validation failed' })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
   @ApiResponse({ status: 404, description: CHANNEL_INVITE_NOT_FOUND_404 })
   @ApiResponse({ status: 403, description: ENGINE_REFUSED_403 })
@@ -288,6 +291,7 @@ export class ChannelController {
     status: 503,
     description: 'WhatsApp did not answer within the request budget — the operation may or may not have applied.',
   })
+  @ApiResponse({ status: 400, description: 'Session not started' })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
   @ApiResponse({ status: 403, description: ENGINE_REFUSED_403 })
   @ApiResponse({ status: 404, description: CHANNEL_NOT_FOUND_404 })

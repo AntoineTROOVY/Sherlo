@@ -66,3 +66,29 @@ describe('ChannelController.transferOwnership', () => {
     );
   });
 });
+
+describe('ChannelController OpenAPI 400 responses', () => {
+  // Every route resolves the engine through EngineRegistry.require, whose 400 is "Session is not
+  // started"; a session that is started but not ready answers 409 instead.
+  const described400 = (route: keyof ChannelController): string | undefined =>
+    (
+      Reflect.getMetadata(
+        'swagger/apiResponse',
+        Object.getOwnPropertyDescriptor(ChannelController.prototype, route)?.value as object,
+      ) as Record<string, { description?: string }>
+    )['400']?.description;
+
+  it.each(['findAll', 'findOne', 'getMessages', 'remove', 'unsubscribe'] as const)(
+    '%s declares the not-started 400',
+    route => {
+      expect(described400(route)).toBe('Session not started');
+    },
+  );
+
+  it.each(['create', 'mute', 'demoteAdmin', 'transferOwnership', 'subscribe'] as const)(
+    '%s declares the not-started or validation 400',
+    route => {
+      expect(described400(route)).toBe('Session not started, or validation failed');
+    },
+  );
+});
