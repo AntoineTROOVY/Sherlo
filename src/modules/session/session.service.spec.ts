@@ -8039,11 +8039,12 @@ describe('SessionService', () => {
       );
       Object.assign(service as unknown as Record<string, unknown>, { ownership });
     };
-    const live = new Date(Date.now() + 60_000);
+    // Evaluated per test: a lease computed at collection time can lapse before a slow run reaches it.
+    const live = (): Date => new Date(Date.now() + 60_000);
 
     it('is true for a session a peer node holds on a live lease, with no engine here', () => {
       withOwnership();
-      const row = createMockSession({ nodeId: 'node-b', leaseExpiresAt: live });
+      const row = createMockSession({ nodeId: 'node-b', leaseExpiresAt: live() });
       expect(service.isActive(row.id)).toBe(false);
       expect(service.engineLoaded(row)).toBe(true);
     });
@@ -8051,7 +8052,7 @@ describe('SessionService', () => {
     it('is false for a lapsed peer claim, and for this node’s own claim without an engine', () => {
       withOwnership();
       expect(service.engineLoaded(createMockSession({ nodeId: 'node-b', leaseExpiresAt: new Date(0) }))).toBe(false);
-      expect(service.engineLoaded(createMockSession({ nodeId: 'node-a', leaseExpiresAt: live }))).toBe(false);
+      expect(service.engineLoaded(createMockSession({ nodeId: 'node-a', leaseExpiresAt: live() }))).toBe(false);
     });
 
     it('is true for this process’s own engine', async () => {
