@@ -998,9 +998,9 @@ seen, so keep new renderers on that composition.
 > and still means "the process is alive". Alert on `openwa_stats_available == 0` for the degradation itself;
 > an alert written as `openwa_sessions_active == 0` would never fire for it, and one written with `absent()`
 > would. Because of the two caches, `openwa_stats_available` can keep reporting 1, and the series their last
-> values, for up to `STATS_CACHE_TTL_MS` + 5 s after the data database fails, so give an alert on it a `for:`
-> at least that long. `STATS_CACHE_TTL_MS=0` makes the signal live at the cost of a full overview query per
-> render.
+> values, for up to `STATS_CACHE_TTL_MS` + 5 s after the data database fails, so expect an alert on it to fire
+> up to that much later; a `for:` adds to that delay rather than offsetting it. `STATS_CACHE_TTL_MS=0` makes
+> the signal live at the cost of a full overview query per render.
 
 ### Grafana Dashboard Definition
 
