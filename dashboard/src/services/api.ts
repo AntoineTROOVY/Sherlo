@@ -972,6 +972,7 @@ export interface ProfilePictureResponse {
 
 export const contactApi = {
   // The route caps a response at 1000 contacts; walk the pages so an address book past that is complete.
+  // No item cap: the status recipient picker needs every contact, and the server's short page ends the walk.
   list: async (sessionId: string) =>
     (
       await fetchAllPages(
@@ -980,7 +981,7 @@ export const contactApi = {
           // The route answers a bare array with no total: a short page is the last one.
           return { data, total: data.length < limit ? offset + data.length : Infinity };
         },
-        { pageSize: 1000 },
+        { pageSize: 1000, maxItems: Infinity },
       )
     ).items,
   checkNumber: (sessionId: string, number: string) =>

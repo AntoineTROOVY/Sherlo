@@ -89,3 +89,17 @@ test('the contact list walks past the 1000 contacts one response carries', async
     '/sessions/s1/contacts?limit=1000&offset=1000',
   ]);
 });
+
+test('the contact list is not cut off at 10,000 contacts', async () => {
+  const { contactApi } = await import('./api.ts');
+  globalThis.fetch = ((input: RequestInfo | URL) => {
+    const offset = Number(new URL(String(input), 'http://x').searchParams.get('offset'));
+    const count = offset < 11_000 ? 1000 : 5;
+    const contacts = Array.from({ length: count }, (_, i) => ({ id: `${offset + i}@c.us`, name: null }));
+    return Promise.resolve(
+      new Response(JSON.stringify(contacts), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+  }) as typeof fetch;
+
+  assert.equal((await contactApi.list('s1')).length, 11_005);
+});
