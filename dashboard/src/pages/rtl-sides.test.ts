@@ -21,3 +21,7 @@ function physicalSides(file: string): string[] {
 test('the API keys stylesheet uses logical sides only', () => {
   assert.deepEqual(physicalSides('./ApiKeys.css'), []);
 });
+
+test('the chats stylesheet uses logical sides only', () => {
+  assert.deepEqual(physicalSides('./Chats.css'), []);
+});
