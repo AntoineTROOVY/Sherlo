@@ -306,14 +306,16 @@ export class InfraConfigController {
     // refused on EVERY save even though its boot passes the guard. A blank compose-forwarded
     // value counts as unset exactly like clearBlankEnv treats it at boot.
     //
-    // Only a HOST-supplied key may win. load-env also merges .env and data/.env.generated into
-    // process.env, so reading process.env alone would hand back the very file this save is
-    // replacing — the guard would then bless a flip by validating the OLD config (a built-in ->
-    // external switch keeping the bundled 'openwa' password would save cleanly and crash-loop the
-    // next production boot, the exact case this guard exists for). isOsProvidedEnv separates the
-    // two using the snapshot load-env takes before either file is loaded.
+    // Only a key from a layer ABOVE the file may win: the host, or the project .env, which load-env
+    // also loads ahead of data/.env.generated with override:false. load-env merges the generated
+    // file into process.env too, so reading process.env alone would hand back the very file this
+    // save is replacing: the guard would then bless a flip by validating the OLD config (a
+    // built-in -> external switch keeping the bundled 'openwa' password would save cleanly and
+    // crash-loop the next production boot, the exact case this guard exists for). isEnvPinned's
+    // snapshot is taken before that file loads; isOsProvidedEnv keeps the no-snapshot default of
+    // assuming an override.
     const bootValue = (key: string): string | undefined => {
-      const envValue = isOsProvidedEnv(key) ? process.env[key] : undefined;
+      const envValue = isEnvPinned(key) || isOsProvidedEnv(key) ? process.env[key] : undefined;
       if (envValue !== undefined && (envValue.trim() !== '' || !BLANK_SHADOWED_ENV_KEYS.includes(key))) {
         return envValue;
       }

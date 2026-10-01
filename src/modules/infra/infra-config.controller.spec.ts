@@ -1047,6 +1047,32 @@ describe('InfraConfigController.saveConfig built-in/external mode flips and the 
         );
         expect(env).toContain('DATABASE_HOST=db.example.com');
       });
+
+      it('honors a value from the project .env, which also outranks the saved file at boot', () => {
+        // load-env takes the host snapshot before ./.env loads, but ./.env still loads ahead of
+        // data/.env.generated with override:false, so its password is the one the next boot sees.
+        recordOsEnvKeys({});
+        recordPinnedEnvKeys({ DATABASE_PASSWORD: 'Sup3rSecret!' });
+        process.env.DATABASE_PASSWORD = 'Sup3rSecret!';
+        try {
+          const env = written(
+            {
+              database: {
+                type: 'postgres',
+                builtIn: false,
+                host: 'db.example.com',
+                username: 'app',
+                database: 'appdb',
+                password: '',
+              },
+            },
+            'DATABASE_TYPE=postgres\nPOSTGRES_BUILTIN=false\nDATABASE_HOST=db.example.com\n',
+          );
+          expect(env).toContain('DATABASE_HOST=db.example.com');
+        } finally {
+          recordPinnedEnvKeys({});
+        }
+      });
     });
   });
 });
