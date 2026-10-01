@@ -292,7 +292,7 @@ route instead. The volume and its media are kept either way.
 
 ### Redis Migration (Cache)
 
-Redis in OpenWA holds only **ephemeral** state: TTL-based cache entries, BullMQ jobs (see below), and — when `REDIS_ENABLED` — the rate-limit hit counters. Cache data automatically regenerates from the database.
+Redis in OpenWA holds only **ephemeral** state: TTL-based cache entries, BullMQ jobs (see below), and — when `REDIS_ENABLED` — the rate-limit hit counters. No request reads the cache, so there is nothing to migrate.
 
 **No migration API needed** - just change configuration:
 
@@ -320,15 +320,12 @@ REDIS_TLS=false          # true for a managed Redis that requires TLS
 > `REDIS_PASSWORD`, `REDIS_TLS`, `REDIS_CONNECT_TIMEOUT_MS` and `REDIS_CACHE_DB` in the `.env` next
 > to `docker-compose.yml`.
 
-| Scenario                  | Support | Notes                                      |
-| ------------------------- | ------- | ------------------------------------------ |
-| Built-in → External Redis | ✅      | Config change only                         |
-| External → Built-in Redis | ✅      | Config change only                         |
-| Enable → Disable Redis    | ✅      | Cache no-ops; reads fall through to the DB |
-| Disable → Enable Redis    | ✅      | Cache rebuilds automatically               |
-
-> [!TIP]
-> **Cache Warm-up**: After switching Redis instances, the cache will automatically rebuild as requests come in. No data migration is necessary.
+| Scenario                  | Support | Notes                              |
+| ------------------------- | ------- | ---------------------------------- |
+| Built-in → External Redis | ✅      | Config change only                 |
+| External → Built-in Redis | ✅      | Config change only                 |
+| Enable → Disable Redis    | ✅      | Cache no-ops (no request reads it) |
+| Disable → Enable Redis    | ✅      | Config change only                 |
 
 ### BullMQ Migration (Queue System)
 
@@ -372,7 +369,7 @@ docker compose up -d
 | ------------ | -------------------- | -------------------------------------------------------- |
 | **Database** | Export/Import JSON   | `/api/infra/export-data`, `/api/infra/import-data`       |
 | **Storage**  | Export/Import tar.gz | `/api/infra/storage/export`, `/api/infra/storage/import` |
-| **Redis**    | Config change only   | N/A (cache auto-rebuilds)                                |
+| **Redis**    | Config change only   | N/A (no request reads the cache)                         |
 | **BullMQ**   | Drain then config    | N/A (wait for empty queues)                              |
 
 ### Migration Script (Legacy)
