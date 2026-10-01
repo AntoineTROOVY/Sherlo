@@ -575,10 +575,12 @@ describe('LidMappingStoreService — deterministic preload + repository fallback
 });
 
 describe('LidMappingStoreService — deterministic persisted lookups (authorization path)', () => {
-  it('findPhoneForLid answers from the cache when warm', async () => {
+  it('findPhoneForLid falls back to the cache when the table has no row', async () => {
     const repo = makeFakeRepo([{ lid: '111', phone: '628999' }]);
     const store = await newStore(repo);
+    repo.rows.splice(0, 1); // the preload cached 111; the table no longer holds it
     expect(await store.findPhoneForLid('111@lid')).toBe('628999');
+    expect(repo.findOne).toHaveBeenCalledWith({ where: { lid: '111' } });
   });
 
   it('findPhoneForLid answers from the cache when the table read fails', async () => {
