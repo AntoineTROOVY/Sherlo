@@ -73,6 +73,9 @@ export function refusedStatusCode(error: unknown): number | undefined {
  * failures (dropped socket, timeout) propagate untouched: folding them in would report a dead
  * connection as a permissions problem.
  *
+ * WA codes 408 and 429 (timed out, rate limited) become EngineTransportError (503) instead: a
+ * throttled caller has not been refused, and a retry may succeed.
+ *
  * `notFound`, when given, takes WA code 404 (item-not-found) instead: a caller whose request names a
  * single resource maps it to that resource's not-found error rather than a permissions refusal.
  */
@@ -88,6 +91,9 @@ export async function mapServerRefusal<T>(
     const code = classify(error);
     if (code === 404 && notFound) {
       throw notFound();
+    }
+    if (code === 408 || code === 429) {
+      throw new EngineTransportError(`${operation} was rate-limited or timed out by WhatsApp (code ${code})`);
     }
     if (code !== undefined && code >= 400 && code < 500) {
       throw new EngineRefusedError(
@@ -221,12 +227,18 @@ export class BaileysGroups {
    * the one non-idempotent operation here, and 503 is a backpressure status the Go SDK retries three
    * times for POST (sdk/go/retry.go) — an OpenWA deadline abandons the call without cancelling it,
    * so a slow-but-succeeding create could be issued four times and leave duplicate groups. An
-   * unanswered query therefore still surfaces opaquely rather than as something retryable.
+   * unanswered query therefore still surfaces opaquely rather than as something retryable, and so
+   * does WA code 408: a server timeout does not say whether the group was created.
    */
   async createGroup(name: string, participants: string[]): Promise<Group> {
     this.host.ensureReady();
-    const metadata = await mapServerRefusal('Creating the group', () =>
-      this.sock().groupCreate(name, this.toEngineParticipants(participants)),
+    const metadata = await mapServerRefusal(
+      'Creating the group',
+      () => this.sock().groupCreate(name, this.toEngineParticipants(participants)),
+      error => {
+        const code = refusedStatusCode(error);
+        return code === 408 ? undefined : code;
+      },
     );
     return mapBaileysGroup(metadata, this.host.normalizedSelfJid(), jid => this.host.toNeutralJid(jid));
   }
@@ -370,6 +382,9 @@ export class BaileysGroups {
       // Baileys throws a Boom carrying the WA code for an invalid/expired/revoked invite — the
       // route's documented 404 (matching whatsapp-web.js), not a 500. Transport failures propagate.
       const code = refusedStatusCode(error);
+      if (code === 408 || code === 429) {
+        throw new EngineTransportError(`WhatsApp rate-limited or timed out the invite-info query (code ${code})`);
+      }
       if (code !== undefined && code >= 400 && code < 500) {
         throw new GroupNotFoundError(inviteCode);
       }
@@ -412,6 +427,9 @@ export class BaileysGroups {
       const code = refusedStatusCode(error);
       if (code === undefined || code < 400 || code >= 500) {
         throw error;
+      }
+      if (code === 408 || code === 429) {
+        throw new EngineTransportError(`WhatsApp rate-limited or timed out the group join (code ${code})`);
       }
       this.host.logger.warn('Group invite refused', { error: String(error) });
       jid = undefined;

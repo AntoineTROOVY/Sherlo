@@ -94,8 +94,13 @@ export class BaileysContacts {
       }
       // Only WhatsApp's own error answer (a numeric code: 404 item-not-found, 401 not-authorized) is
       // that verdict. A socket that closed mid-lookup carries none and must not read as "no picture".
-      if (refusedStatusCode(err) === undefined) {
+      const code = refusedStatusCode(err);
+      if (code === undefined) {
         throw new EngineTransportError('WhatsApp did not answer the profile picture lookup');
+      }
+      // A rate limit or server timeout (408/429) is not a verdict about the picture either.
+      if (code === 408 || code === 429) {
+        throw new EngineTransportError(`WhatsApp rate-limited or timed out the profile picture lookup (code ${code})`);
       }
       this.host.logger.debug('profilePictureUrl failed; no picture or hidden', {
         contactId,

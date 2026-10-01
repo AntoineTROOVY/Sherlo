@@ -69,6 +69,13 @@ describe('getGroupJoinInfo', () => {
       GroupNotFoundError,
     );
   });
+
+  it('reports a rate-limited lookup as retryable instead of a missing invite', async () => {
+    const groupGetInviteInfo = jest.fn().mockRejectedValue(new Boom('rate-overlimit', { data: 429 }));
+    await expect(groups({ groupGetInviteInfo }, 500).getGroupJoinInfo('CODE')).rejects.toBeInstanceOf(
+      EngineTransportError,
+    );
+  });
 });
 
 describe('createGroup', () => {
@@ -81,6 +88,12 @@ describe('createGroup', () => {
     // 503 is a backpressure status the Go SDK retries for POST; a deadline here could create
     // duplicate WhatsApp groups. The opaque failure is preferred over a retried side effect.
     const err = noAnswer();
+    const groupCreate = jest.fn().mockRejectedValue(err);
+    await expect(groups({ groupCreate }, 500).createGroup('G', [])).rejects.toBe(err);
+  });
+
+  it('lets a WA timeout propagate untouched, since the group may have been created', async () => {
+    const err = new Boom('timeout', { data: 408 });
     const groupCreate = jest.fn().mockRejectedValue(err);
     await expect(groups({ groupCreate }, 500).createGroup('G', [])).rejects.toBe(err);
   });

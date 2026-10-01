@@ -59,8 +59,9 @@ export class BaileysCatalog {
     } catch (error) {
       if (error instanceof EngineTransportError) {
         // Baileys' own "timed out waiting for message" warn is silent at the default
-        // BAILEYS_LOG_LEVEL, so without this line the 503 has no explanation anywhere.
-        this.host.logger.warn('Catalog query exceeded its budget', { budgetMs: this.budgetMs });
+        // BAILEYS_LOG_LEVEL, so without this line the 503 has no explanation anywhere. The message
+        // tells a spent budget apart from a rate limit WhatsApp answered.
+        this.host.logger.warn('Catalog query got no usable answer', { budgetMs: this.budgetMs, error: error.message });
       }
       throw error;
     }
