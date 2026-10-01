@@ -263,7 +263,20 @@ export class BaileysEvents {
    */
   private readonly editedWhileInFlight = new Map<string, { envelope: WAMessageKey; body: string }>();
 
+  /**
+   * Bumped by fenceStoredWrites when the account is unlinked. A message stores its copy only while the
+   * generation it arrived under is current: one still processing when the store is wiped (a media
+   * download outlives the socket, and the limiter queue is unbounded) must not recreate a row of the
+   * unlinked account afterwards.
+   */
+  private storeGeneration = 0;
+
   constructor(private readonly host: BaileysEventsHost) {}
+
+  /** Drop the store writes of every message that arrived before now; call before wiping the store. */
+  fenceStoredWrites(): void {
+    this.storeGeneration++;
+  }
 
   /** Whether a delete for everyone of this message was accepted (see deletedForEveryone). */
   wasDeletedForEveryone(messageId: string): boolean {
@@ -328,8 +341,9 @@ export class BaileysEvents {
       // and the message keeps its media either way. The catch below is the teardown path: the
       // limiter rejects only when it has been closed, since processInboundMessage handles its own
       // failures (a media download that fails emits the omitted marker rather than throwing).
+      const generation = this.storeGeneration;
       const processed = this.host.inboundLimiter
-        .run(() => this.processInboundMessage(msg))
+        .run(() => this.processInboundMessage(msg, { generation }))
         .catch((error: unknown) => {
           // Only one failure can actually land here today: the limiter closing, an orderly teardown.
           // Its queue is unbounded so it never sheds, and processInboundMessage swallows its own
@@ -344,7 +358,7 @@ export class BaileysEvents {
               : 'Inbound media download failed; emitting message without media',
             { msgId: msg.key?.id ?? 'unknown', ...(closed ? {} : { error: String(error) }) },
           );
-          return this.processInboundMessage(msg, { skipMedia: true });
+          return this.processInboundMessage(msg, { generation, skipMedia: true });
         });
       const id = msg.key.id;
       if (id) {
@@ -388,7 +402,10 @@ export class BaileysEvents {
     });
   }
 
-  private async processInboundMessage(msg: WAMessage, opts?: { skipMedia?: boolean }): Promise<void> {
+  private async processInboundMessage(
+    msg: WAMessage,
+    opts: { generation: number; skipMedia?: boolean },
+  ): Promise<void> {
     try {
       const b = await this.host.loadLib();
       const remoteJid = msg.key.remoteJid!;
@@ -584,7 +601,7 @@ export class BaileysEvents {
       // is kept, so the message is still recorded and still guards against a repeat delivery.
       const ownStatusPost = msg.key.fromMe === true && remoteJid === 'status@broadcast';
       const incoming = await this.mapMessage(msg, contentType, {
-        skipMediaDownload: opts?.skipMedia || ownStatusPost,
+        skipMediaDownload: opts.skipMedia || ownStatusPost,
       });
       // Stored before it is announced: whoever hears about this message may act on it at once (a quoted
       // reply, a reaction, a read receipt), and the store holds a read of an id until its write lands.
@@ -601,11 +618,13 @@ export class BaileysEvents {
         if (content) setBaileysText(content, editedBody);
         incoming.body = editedBody;
       }
-      void this.host.putStoredMessage(toStore)?.catch(err =>
-        this.host.logger.warn('Failed to persist message to store', {
-          error: err instanceof Error ? err.message : String(err),
-        }),
-      );
+      if (opts.generation === this.storeGeneration) {
+        void this.host.putStoredMessage(toStore)?.catch(err =>
+          this.host.logger.warn('Failed to persist message to store', {
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        );
+      }
       // Its delete was announced first and found nothing to clear, so announcing the message now, or
       // leaving its text as the chat preview, would publish what the sender took back. An edit announced
       // first found nothing to change either, so the message carries it here and in the preview.

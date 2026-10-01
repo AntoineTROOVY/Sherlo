@@ -578,6 +578,47 @@ describe('BaileysEvents inbound media source', () => {
   });
 });
 
+describe('BaileysEvents store writes across an unlink', () => {
+  // Holds every message's processing at its first await until released, the way a media download
+  // that outlives the socket would.
+  const held = () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => (release = resolve));
+    const putStoredMessage = jest.fn(() => Promise.resolve());
+    const events = new BaileysEvents(
+      makeHost({ loadLib: () => gate.then(() => libStub), putStoredMessage, getOnMessage: () => jest.fn() }),
+    );
+    events.handleMessagesUpsert({
+      type: 'notify',
+      messages: [
+        {
+          key: { id: 'wamid.unlink', remoteJid: '15550001111@s.whatsapp.net', fromMe: false },
+          messageTimestamp: 1_700_000_000,
+          message: { conversation: 'hi' },
+        },
+      ],
+    });
+    const settle = async () => {
+      release();
+      for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve));
+    };
+    return { events, putStoredMessage, settle };
+  };
+
+  it('stores a message whose processing finishes with the account still linked', async () => {
+    const { putStoredMessage, settle } = held();
+    await settle();
+    expect(putStoredMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not store a message still being processed when the account was unlinked', async () => {
+    const { events, putStoredMessage, settle } = held();
+    events.fenceStoredWrites();
+    await settle();
+    expect(putStoredMessage).not.toHaveBeenCalled();
+  });
+});
+
 describe('BaileysEvents record of messages deleted for everyone', () => {
   it('forgets the oldest id once it holds its limit', () => {
     const events = new BaileysEvents(makeHost());
