@@ -43,12 +43,14 @@ const webhookRegistry = new WebhookRegistry(send);
 const searchRegistry = new WorkerSearchRegistry(send);
 
 // A meta the structured clone cannot copy (a function, a fetch Response) makes postMessage throw. From
-// a timer that throw is uncaught and kills the worker, so the line goes out again without its meta.
+// a timer that throw is uncaught and kills the worker, so the line goes out again without its meta,
+// keeping only logger.error's reason, which is always a string.
 const sendLog = (level: PluginLogLevel, message: string, meta?: Record<string, unknown>): void => {
   try {
     send({ kind: 'log', level, message, meta });
   } catch {
-    send({ kind: 'log', level, message: String(message) });
+    const error = meta?.error;
+    send({ kind: 'log', level, message: String(message), meta: typeof error === 'string' ? { error } : undefined });
   }
 };
 
