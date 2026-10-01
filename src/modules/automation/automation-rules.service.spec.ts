@@ -246,6 +246,22 @@ describe('AutomationRulesService', () => {
       expect(sends.map(s => s.chatId)).toEqual(['628111@c.us', '628333@c.us']);
     });
 
+    it('cooldown: an edited cooldownSeconds governs a quiet period that is already running', async () => {
+      const rule = await service.create('sessA', { name: 'all', replyText: 'ack', cooldownSeconds: 300 });
+      const start = Date.now();
+      const now = jest.spyOn(Date, 'now').mockReturnValue(start);
+      try {
+        await service.evaluateInbound('sessA', inbound());
+        await service.update('sessA', rule.id, { cooldownSeconds: 1 });
+        now.mockReturnValue(start + 2_000);
+        await service.evaluateInbound('sessA', inbound({ id: 'wamid.2' }));
+      } finally {
+        now.mockRestore();
+      }
+
+      expect(sends).toHaveLength(2);
+    });
+
     it('cooldownSeconds 0 disables the quiet period', async () => {
       await service.create('sessA', { name: 'all', replyText: 'ack', cooldownSeconds: 0 });
 

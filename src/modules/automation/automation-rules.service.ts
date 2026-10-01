@@ -45,8 +45,12 @@ const OPT_IN_CHAT_KINDS: ReadonlySet<string> = new Set(['channel', 'broadcast', 
 export class AutomationRulesService {
   private readonly logger = createLogger('AutomationRulesService');
 
-  /** `${ruleId}:${chatId}` -> epoch ms until which the rule stays quiet in that chat. Per-process. */
-  private readonly cooldowns = new Map<string, number>();
+  /**
+   * `${ruleId}:${chatId}` -> when the rule last fired in that chat, and the expiry its cooldown at
+   * that time implied. The quiet period is judged against the rule's CURRENT cooldownSeconds, so an
+   * edit takes effect on a window already running; `until` only drives the sweep. Per-process.
+   */
+  private readonly cooldowns = new Map<string, { firedAt: number; until: number }>();
 
   private messagePort?: PluginMessagePort;
 
@@ -218,18 +222,18 @@ export class AutomationRulesService {
 
   private inCooldown(rule: AutomationRule, chatId: string): boolean {
     if (!rule.cooldownSeconds) return false;
-    const until = this.cooldowns.get(`${rule.id}:${chatId}`);
-    return until !== undefined && until > Date.now();
+    const entry = this.cooldowns.get(`${rule.id}:${chatId}`);
+    return entry !== undefined && entry.firedAt + rule.cooldownSeconds * 1000 > Date.now();
   }
 
   private enterCooldown(rule: AutomationRule, chatId: string): void {
     if (!rule.cooldownSeconds) return;
+    const now = Date.now();
     if (this.cooldowns.size >= COOLDOWN_SWEEP_THRESHOLD) {
-      const now = Date.now();
-      for (const [key, until] of this.cooldowns) {
+      for (const [key, { until }] of this.cooldowns) {
         if (until <= now) this.cooldowns.delete(key);
       }
     }
-    this.cooldowns.set(`${rule.id}:${chatId}`, Date.now() + rule.cooldownSeconds * 1000);
+    this.cooldowns.set(`${rule.id}:${chatId}`, { firedAt: now, until: now + rule.cooldownSeconds * 1000 });
   }
 }
