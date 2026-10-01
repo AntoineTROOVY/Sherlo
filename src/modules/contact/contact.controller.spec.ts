@@ -126,3 +126,30 @@ describe('ContactController', () => {
     expect(service[method]).toHaveBeenCalledWith('s1', 'c1');
   });
 });
+
+// Every route resolves the session's engine first, which answers 400 "Session is not started" for a
+// session with no running engine; clients generated from the OpenAPI contract need it declared.
+describe('ContactController OpenAPI error responses', () => {
+  const handler = (name: string) => Object.getOwnPropertyDescriptor(ContactController.prototype, name)?.value as object;
+  const routes = Object.getOwnPropertyNames(ContactController.prototype).filter(
+    name => name !== 'constructor' && Reflect.getMetadata('path', handler(name)) !== undefined,
+  );
+
+  it('covers every route', () => {
+    expect(routes).toHaveLength(11);
+  });
+
+  it.each(routes)('%s declares 400', method => {
+    const responses = Reflect.getMetadata('swagger/apiResponse', handler(method)) as Record<string, unknown>;
+    expect(Object.keys(responses)).toContain('400');
+  });
+
+  // A started session that is not ready answers 409, so the 400 must not describe it as "not ready".
+  it.each(routes)('%s describes its 400 as a session that is not started', method => {
+    const responses = Reflect.getMetadata('swagger/apiResponse', handler(method)) as Record<
+      string,
+      { description?: string }
+    >;
+    expect(responses['400']?.description).toMatch(/^Session is not started/);
+  });
+});
