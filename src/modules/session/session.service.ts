@@ -22,6 +22,7 @@ import {
   DataSource,
   FindManyOptions,
   FindOptionsWhere,
+  Raw,
 } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { setTimeout } from 'node:timers/promises';
@@ -439,24 +440,45 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
    * on the DTO rather than papered over by forcing a reconnect nobody asked for.
    */
   async updateConfig(id: string, dto: UpdateSessionConfigDto): Promise<SessionConfigResponseDto> {
-    const session = await this.findOne(id);
-    const config = { ...(session.config ?? {}) };
+    // Compare-and-swap on the stored text: the write lands only while the column still holds the blob
+    // this request merged into, so two overlapping PATCHes cannot both start from the same blob and
+    // have the later write drop the earlier one's keys. A request that lost the race reads again.
+    for (let attempt = 1; ; attempt++) {
+      // The raw text rather than the parsed entity, so the comparison is exact whatever wrote the row.
+      const row = await this.sessionRepository
+        .createQueryBuilder('session')
+        .select('session.config', 'config')
+        .where('session.id = :id', { id })
+        .getRawOne<{ config: string | null }>();
+      if (!row) {
+        throw new NotFoundException(`Session with id '${id}' not found`);
+      }
+      const stored = row.config;
+      const config = { ...((stored ? JSON.parse(stored) : null) as Record<string, unknown> | null) };
 
-    for (const key of ['autoRejectCalls', 'maxReconnectAttempts', 'reconnectBaseDelay'] as const) {
-      const value = dto[key];
-      if (value === undefined) continue;
-      if (value === null) {
-        delete config[key];
-      } else {
-        config[key] = value;
+      for (const key of ['autoRejectCalls', 'maxReconnectAttempts', 'reconnectBaseDelay'] as const) {
+        const value = dto[key];
+        if (value === undefined) continue;
+        if (value === null) {
+          delete config[key];
+        } else {
+          config[key] = value;
+        }
+      }
+
+      // update() with an explicit object rather than save() on an entity: only the config column is
+      // written, never the rest of the row from a snapshot taken before this await.
+      const { affected } = await this.sessionRepository.update(
+        { id, config: Raw(column => (stored === null ? `${column} IS NULL` : `${column} = :stored`), { stored }) },
+        { config: config as QueryDeepPartialEntity<Record<string, unknown>> },
+      );
+      if (affected !== 0) {
+        return this.projectConfig(config);
+      }
+      if (attempt >= 5) {
+        throw new ConflictException('Session config is being changed by other requests; retry');
       }
     }
-
-    // update() with an explicit object rather than save() on the loaded entity: the entity carries
-    // runtime-attached fields (lastError, restriction) that no column backs, and save() would try to
-    // write the whole row back from a snapshot taken before this await.
-    await this.sessionRepository.update(id, { config: config as QueryDeepPartialEntity<Record<string, unknown>> });
-    return this.projectConfig(config);
   }
 
   async getProxy(id: string): Promise<SessionProxyResponseDto> {

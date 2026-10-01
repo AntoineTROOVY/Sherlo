@@ -8911,6 +8911,16 @@ describe('SessionService', () => {
 
     beforeEach(() => {
       (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      // updateConfig reads the raw column text; serve it from whatever row findOne is mocked to hold.
+      const raw = {
+        select: () => raw,
+        where: () => raw,
+        getRawOne: async () => {
+          const row = (await (repository.findOne as jest.Mock)()) as Session | null;
+          return row ? { config: JSON.stringify(row.config) } : undefined;
+        },
+      };
+      repository.createQueryBuilder = jest.fn().mockReturnValue(raw);
     });
 
     it('reports the documented defaults for a session that has never been configured', async () => {
