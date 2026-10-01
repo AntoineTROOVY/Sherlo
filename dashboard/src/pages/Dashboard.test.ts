@@ -6,6 +6,7 @@
 import '../test-helpers/register-hooks.ts';
 import { test, before, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -243,4 +244,18 @@ test('an admin key loads the chart section', async () => {
   window.sessionStorage.setItem('openwa_user_role', 'admin');
   renderDashboard();
   await rtl.waitFor(() => assert.ok(requested.some(p => p.startsWith('/api/stats/messages'))));
+});
+
+// The session table renders `status-pill ${session.status}`, so every status needs its own colour.
+test('the status pill styles every session status and nothing else', () => {
+  const entity = readFileSync(
+    new URL('../../../src/modules/session/entities/session.entity.ts', import.meta.url),
+    'utf8',
+  );
+  const block = /export enum SessionStatus \{([^}]*)\}/.exec(entity)?.[1] ?? '';
+  const statuses = [...block.matchAll(/= '([a-z_]+)'/g)].map(m => m[1]).sort();
+  assert.ok(statuses.length > 0, 'SessionStatus was not found');
+  const css = readFileSync(new URL('./Dashboard.css', import.meta.url), 'utf8');
+  const styled = [...new Set([...css.matchAll(/\.dashboard \.status-pill\.([a-z_]+)/g)].map(m => m[1]))].sort();
+  assert.deepEqual(styled, statuses);
 });
