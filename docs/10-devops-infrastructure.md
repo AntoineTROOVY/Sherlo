@@ -531,8 +531,9 @@ export default () => ({
       .map(proxy => proxy.trim())
       .filter(Boolean),
   },
-  // Session data path and Puppeteer both live under `engine` — there is no top-level
-  // `session` or `puppeteer` key.
+  // Session data path and Puppeteer both live under `engine`; there is no top-level `puppeteer`
+  // key, and the top-level `session` (ownership leases) and `sessions` (concurrency cap) blocks do
+  // not hold the data path.
   engine: {
     type: process.env.ENGINE_TYPE || 'whatsapp-web.js',
     sessionDataPath: process.env.SESSION_DATA_PATH || './data/sessions',
