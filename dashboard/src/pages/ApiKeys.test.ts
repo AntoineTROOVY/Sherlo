@@ -202,6 +202,19 @@ test('the create modal stays open until the request settles and then shows the s
   await screen.findByText('owa_k1_new');
 });
 
+// The gateway counts an emoji, with or without its presentation selector, as one character.
+test('a name of two emoji keeps Create disabled', async () => {
+  const { screen, fireEvent } = rtl;
+  const create = await openCreate();
+  for (const name of ['\u{1F511}\u{1F511}', '\u2714\uFE0F\u2714\uFE0F']) {
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: name } });
+    assert.equal(create.disabled, true, `Create is enabled for ${name}`);
+    screen.getByText('Use at least 3 characters.');
+  }
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: '\u{1F511}\u{1F511}\u{1F511}' } });
+  assert.equal(create.disabled, false);
+});
+
 // A production gateway refuses a name over 100 characters with a bare "Bad Request".
 test('the key name cannot exceed the 100 characters the gateway takes', async () => {
   await openCreate();

@@ -36,6 +36,7 @@ import { Modal } from '../components/Modal';
 import { SessionScopePicker } from '../components/SessionScopePicker';
 import { useToast } from '../hooks/useToast';
 import { copyToClipboard } from '../utils/clipboard';
+import { captionLength } from '../utils/bulkMedia';
 import {
   apiKeyDraft,
   apiKeyPatch,
@@ -312,9 +313,10 @@ export function ApiKeys() {
   const newErrors = limitErrors(newKey.role, newKey.ips, newKey.chats);
   const editErrors =
     editDraft && editingKey ? limitErrors(editDraft.role, editDraft.ips, editDraft.chats, editingKey) : null;
-  // The gateway requires a name of at least 3 characters; the input stops at its 100-character limit.
-  const canCreate =
-    !createMutation.isPending && newKey.name.trim().length >= 3 && newErrors.ip === null && newErrors.chat === null;
+  // The gateway requires a name of at least 3 characters, counted the way its validator counts them
+  // (an emoji is one); the input stops at its 100-character limit.
+  const nameTooShort = captionLength(newKey.name.trim()) < 3;
+  const canCreate = !createMutation.isPending && !nameTooShort && newErrors.ip === null && newErrors.chat === null;
   const canSave = !updateMutation.isPending && editErrors?.ip === null && editErrors.chat === null;
 
   const handleRevoke = async (id: string) => {
@@ -572,7 +574,7 @@ export function ApiKeys() {
                 value={newKey.name}
                 onChange={e => setNewKey({ ...newKey, name: e.target.value })}
               />
-              {newKey.name.length > 0 && newKey.name.trim().length < 3 && (
+              {newKey.name.length > 0 && nameTooShort && (
                 <span className="key-field-hint">{t('apiKeys.nameTooShort')}</span>
               )}
               <label htmlFor="ak-2">{t('common.role')}</label>
