@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { In, IsNull, LessThan, MoreThan, Not, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { Message } from '../message/entities/message.entity';
 import { StorageService } from '../../common/storage/storage.service';
@@ -231,19 +231,25 @@ export class ChatMediaArchiveService implements OnModuleInit, OnModuleDestroy {
     // so rows whose delete keeps failing are stepped over instead of being re-selected ahead of every
     // newer row. A batch in which every delete fails ends the run: a missing file already counts as
     // deleted, so that means the store is down, and walking on would only repeat the failure.
+    //
+    // On SQLite the walk orders by `+id`: a bare `id` lets the planner satisfy ORDER BY from the
+    // primary-key autoindex and visit every row of the table, even with nothing to purge, and
+    // better-sqlite3 runs that scan on the event loop. The unary plus starts the plan from the
+    // createdAt range instead. Postgres rejects unary plus on a uuid and plans this well as it is.
+    const isSqlite = ['sqlite', 'better-sqlite3'].includes(this.repository.manager.connection.options.type);
     let after = this.purgeCursor;
     this.purgeCursor = undefined;
     for (let batch = 0; batch < PURGE_MAX_BATCHES_PER_RUN; batch++) {
-      const expired = await this.repository.find({
-        where: {
-          mediaPath: Not(IsNull()),
-          createdAt: LessThan(cutoff),
-          ...(after ? { id: MoreThan(after) } : {}),
-        },
-        select: { id: true, mediaPath: true },
-        order: { id: 'ASC' },
-        take: PURGE_BATCH_SIZE,
-      });
+      const qb = this.repository
+        .createQueryBuilder('m')
+        .select(['m.id', 'm.mediaPath'])
+        .where('m.mediaPath IS NOT NULL')
+        .andWhere('m.createdAt < :cutoff', { cutoff });
+      if (after) qb.andWhere('m.id > :after', { after });
+      const expired = await qb
+        .orderBy(isSqlite ? '+m.id' : 'm.id', 'ASC')
+        .limit(PURGE_BATCH_SIZE)
+        .getMany();
       if (expired.length === 0) break;
       after = expired[expired.length - 1].id;
 
