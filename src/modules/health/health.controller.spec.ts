@@ -18,7 +18,7 @@ describe('HealthController', () => {
   const logWarn = jest.fn().mockResolvedValue(null);
 
   const reqWith = (headers: Record<string, string> = {}, ip = '127.0.0.1'): Request =>
-    ({ headers, socket: { remoteAddress: ip } }) as unknown as Request;
+    ({ method: 'GET', path: '/api/health', headers, socket: { remoteAddress: ip } }) as unknown as Request;
 
   beforeEach(async () => {
     mainQuery.mockResolvedValue([{ '1': 1 }]);
@@ -112,8 +112,8 @@ describe('HealthController', () => {
       expect(result).not.toHaveProperty('version');
       expect(logWarn).toHaveBeenCalledWith(AuditAction.API_KEY_AUTH_FAILED, {
         ipAddress: '127.0.0.1',
-        method: undefined,
-        path: undefined,
+        method: 'GET',
+        path: '/api/health',
         errorMessage: 'Invalid API key',
       });
     });
