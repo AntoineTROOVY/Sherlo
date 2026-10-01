@@ -2,7 +2,14 @@ import { BadRequestException, ForbiddenException, UnauthorizedException } from '
 import { UnresolvedApiKeyException } from '../auth/auth.service';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { auditMcpAuthFailure, createIpThrottle, createKeyGate, mountMcpServer, resolveMcpReadOnly } from './mcp.server';
+import {
+  auditMcpAuthFailure,
+  createIpThrottle,
+  createKeyGate,
+  mountMcpServer,
+  resolveMcpReadOnly,
+  type MountMcpServerOptions,
+} from './mcp.server';
 import { KeyRateLimiter } from './mcp-rate-limit';
 import { AuditAction } from '../audit/entities/audit-log.entity';
 import type { AnyToolDescriptor } from '../../core/agent-tools/tool-descriptor';
@@ -365,9 +372,10 @@ describe('mountMcpServer (raw-Express request-handling path)', () => {
     authService: { validateApiKey: jest.Mock; hasPermission: jest.Mock };
     auditService: { logWarn: jest.Mock };
     adapter: { post: jest.Mock; get: jest.Mock; delete: jest.Mock };
+    registry: { list: jest.Mock };
   }
 
-  const mount = (): Harness => {
+  const mount = (options: MountMcpServerOptions = { readOnly: false }): Harness => {
     const tool = {
       name: 'MessageSendText',
       description: 'Send a text message (session-scoped write tool)',
@@ -393,13 +401,13 @@ describe('mountMcpServer (raw-Express request-handling path)', () => {
       authService as unknown as AuthService,
       new KeyRateLimiter(1000, 60_000),
       new KeyRateLimiter(1000, 60_000),
-      { readOnly: false },
+      options,
       auditService as unknown as AuditService,
     );
     // adapter.post received [express.json(...), createIpThrottle(...), mcpHandler]; the tests drive
     // the terminal handler directly with a pre-parsed body, as the file's middleware harness does.
     const routeHandler = routeHandlers[routeHandlers.length - 1] as Harness['routeHandler'];
-    return { routeHandler, tool, authService, auditService, adapter };
+    return { routeHandler, tool, authService, auditService, adapter, registry };
   };
 
   type ResMock = { on: jest.Mock; status: jest.Mock; json: jest.Mock; headersSent: boolean };
@@ -503,6 +511,22 @@ describe('mountMcpServer (raw-Express request-handling path)', () => {
     expect(mockHandleRequest).toHaveBeenCalledWith(req, res, body);
     expect(res.on).toHaveBeenCalledWith('close', expect.any(Function)); // per-request teardown wired
     expect(res.status).not.toHaveBeenCalled(); // no error fallback
+  });
+
+  it('builds a read-only catalogue on every request when MCP_READONLY is unset', async () => {
+    const prev = process.env.MCP_READONLY;
+    delete process.env.MCP_READONLY;
+    try {
+      const h = mount({});
+      expect(h.registry.list).toHaveBeenCalledWith({ readOnly: true });
+      h.registry.list.mockClear();
+      await post(h, { jsonrpc: '2.0', id: 1, method: 'tools/list' }, { 'x-api-key': 'good-key' });
+      expect(h.registry.list).toHaveBeenCalledTimes(1);
+      expect(h.registry.list).toHaveBeenLastCalledWith({ readOnly: true });
+    } finally {
+      if (prev === undefined) delete process.env.MCP_READONLY;
+      else process.env.MCP_READONLY = prev;
+    }
   });
 
   it('logs the tool count once at mount, not on every request', async () => {
