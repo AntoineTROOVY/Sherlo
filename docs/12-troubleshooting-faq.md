@@ -1017,18 +1017,16 @@ services:
   openwa-api:
     # The shipped compose already exposes this as mem_limit: ${OPENWA_MEM_LIMIT:-2g}
     mem_limit: 2g
-    environment:
-      # Optimize Puppeteer (whatsapp-web.js engine only)
-      - PUPPETEER_ARGS=--disable-dev-shm-usage,--disable-gpu,--no-sandbox
+    # Chromium already starts with --disable-dev-shm-usage and --disable-gpu by default, and
+    # PUPPETEER_ARGS replaces that list rather than adding to it.
 ```
 
 **Memory Optimization Tips:**
 
-| Optimization              | Impact                 | Trade-off               |
-| ------------------------- | ---------------------- | ----------------------- |
-| Reduce message history    | -20% RAM               | Less searchable history |
-| Headless Chrome flags     | -15% RAM (wwebjs only) | None                    |
-| Limit concurrent sessions | Linear                 | Fewer sessions          |
+| Optimization              | Impact   | Trade-off               |
+| ------------------------- | -------- | ----------------------- |
+| Reduce message history    | -20% RAM | Less searchable history |
+| Limit concurrent sessions | Linear   | Fewer sessions          |
 
 ### Issue: Slow API Response
 
