@@ -219,7 +219,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - whatsapp-web.js: a send whose retry to a lid address hits a dead browser page reports the session disconnected, as the first attempt does.
 - Baileys: with `STORE_EPHEMERAL_MESSAGES=false`, product, poll, contact, live-location, order and event messages in a disappearing chat are skipped like the chat's other messages instead of being stored and dispatched.
 - Baileys: deleting or editing a message from a contact known by both phone number and lid updates the chat preview in `GET /api/sessions/:sessionId/chats`.
-- Baileys: a send interrupted by a session stop or logout answers `409` instead of `500` and no longer counts toward the send breaker.
+- Baileys: a send whose socket a session stop or logout tears down before it reaches WhatsApp, during a media fetch, quote lookup or lid resolution, answers `409` instead of `500` and no longer counts toward the send breaker.
 - Baileys: link previews follow redirects, so bare-domain, `http://` and short links get one, and their titles and descriptions are no longer cut at an apostrophe or quote.
 - Dashboard Chats: reopening a chat after switching sessions or leaving the Chats page shows the messages that arrived meanwhile.
 - Dashboard Chats: a chat marked unread shows an unread badge in the sidebar and keeps it when a new message arrives.
