@@ -261,7 +261,7 @@ export class WwebjsLifecycle {
       this.host.logger.error(BACKPORT_MISSING_MESSAGE);
     }
 
-    // The other seven whatsapp-web.js patchers fail the same way and were equally silent about it.
+    // The other whatsapp-web.js patchers fail the same way and were equally silent about it.
     const unapplied = unappliedPatches('wwebjs');
     if (unapplied.length) {
       this.host.logger.error(unappliedPatchesMessage('wwebjs', unapplied));
