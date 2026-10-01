@@ -493,15 +493,6 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
     client.on('call', call => this.calls.handleIncomingCall(call));
   }
 
-  /**
-   * whatsapp-web.js exposes no way to observe another party's presence: WAWebPresenceChatAction
-   * offers only sendPresenceAvailable/sendPresenceUnavailable, which publish the ACCOUNT's own
-   * presence, and the library surfaces no presence event at all.
-   *
-   * Declared here inline rather than in a delegate on purpose. The parity gate reads method bodies
-   * off the prototype, so a throw hidden behind a delegate call is invisible to it and the
-   * `not-available` matrix row would go unverified; inline, the gate checks it.
-   */
   createChannel(name: string, description?: string): Promise<Channel> {
     return this.channels.createChannel(name, description);
   }
@@ -530,9 +521,6 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
    * whatsapp-web.js 1.34.7 can read labels and assign them, but cannot create, rename, recolour or
    * delete one — `index.d.ts` exposes getLabels / getLabelById / getChatLabels / getChatsByLabelId /
    * addOrRemoveLabels and nothing that edits the label itself.
-   *
-   * Inline rather than delegated so the parity gate, which reads bodies off the prototype, can
-   * verify the matrix row (see docs/29).
    */
   // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
   async upsertLabel(_label: LabelInput): Promise<void> {
@@ -544,6 +532,11 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
     throw new EngineNotSupportedError('deleteLabel');
   }
 
+  /**
+   * whatsapp-web.js exposes no way to observe another party's presence: WAWebPresenceChatAction
+   * offers only sendPresenceAvailable/sendPresenceUnavailable, which publish the ACCOUNT's own
+   * presence, and the library surfaces no presence event at all.
+   */
   // eslint-disable-next-line @typescript-eslint/require-await, @typescript-eslint/no-unused-vars
   async subscribeToPresence(_chatId: string): Promise<void> {
     throw new EngineNotSupportedError('subscribeToPresence');
@@ -735,7 +728,6 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
     return this.messaging.getChatHistory(chatId, limit, includeMedia, mediaMaxBytes, signal);
   }
 
-  // Delete Message
   starMessage(chatId: string, messageId: string, star: boolean): Promise<void> {
     return this.messaging.starMessage(chatId, messageId, star);
   }
@@ -871,7 +863,6 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
   }
 
   // ========== Status/Stories (Phase 3) ==========
-  // Note: These are stub implementations - whatsapp-web.js has limited Status API support
 
   getContactStatuses(): Promise<Status[]> {
     return this.statuses.getContactStatuses();
