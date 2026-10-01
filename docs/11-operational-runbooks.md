@@ -746,6 +746,7 @@ tar -tzf "$(ls -t ./backups/openwa-backup-*.tar.gz | head -n 1)"
 - Valid backup file
 - Sufficient disk space
 - SSH access
+- An OPERATOR (or ADMIN) API key from the restored installation, to start sessions after the restore
 
 **Steps:**
 
@@ -891,7 +892,10 @@ curl -s -X POST -H "X-API-Key: <an-existing-key>" http://localhost:2785/api/auth
 # Health check
 curl http://localhost:2785/api/health
 
-# Verify sessions
+# Verify sessions. They reconnect on their own only with AUTO_START_SESSIONS=true (the production
+# compose leaves it unset, so off), and a session that was stopped when the archive was taken (an
+# archive from 0.24.0 or later) stays down even then. Start each one:
+#   curl -X POST -H "X-API-Key: $API_KEY" http://localhost:2785/api/sessions/{sessionId}/start
 curl -H "X-API-Key: $API_KEY" \
   http://localhost:2785/api/sessions
 
