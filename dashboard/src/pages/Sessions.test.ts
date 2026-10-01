@@ -386,7 +386,7 @@ test('the session list renders, and action buttons gate on engineLoaded rather t
   within(staleCard).getByRole('button', { name: 'Stop' });
   within(staleCard).getByRole('button', { name: 'Unlink' });
   within(staleCard).getByRole('button', { name: 'Kill Stuck' });
-  assert.equal(within(staleCard).queryByRole('button', { name: 'Start' }), null);
+  assert.equal(within(staleCard).queryByRole('button', { name: 'Start' }) === null, true);
 
   const qrCard = screen.getByText('new-device').closest('.session-card') as HTMLElement;
   within(qrCard).getByRole('button', { name: 'Show QR' });
@@ -405,8 +405,8 @@ test('a linked session that is reconnecting keeps its identity rows, not the pai
   within(card).getByText('Starting...');
   // What must NOT be there: the pairing placeholder, which claims a QR is coming for an account that
   // is already linked.
-  assert.equal(within(card).queryByText('Preparing QR code...'), null);
-  assert.equal(card.querySelector('.qr-placeholder'), null);
+  assert.equal(within(card).queryByText('Preparing QR code...') === null, true);
+  assert.equal(card.querySelector('.qr-placeholder') === null, true);
   // What must be there: the number the operator needs to recognise the account.
   within(card).getByText('15550002222');
 });
@@ -567,9 +567,9 @@ test('an operator key is not offered proxy writes, in the create modal or the pr
 
     fireEvent.click(screen.getByRole('button', { name: 'New Session' }));
     const createDialog = await screen.findByRole('dialog');
-    assert.equal(createDialog.querySelector('#create-use-proxy'), null);
+    assert.equal(createDialog.querySelector('#create-use-proxy') === null, true);
     fireEvent.click(within(createDialog).getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => assert.equal(screen.queryByRole('dialog'), null));
+    await waitFor(() => assert.equal(screen.queryByRole('dialog') === null, true));
 
     const qrCard = screen.getByText('new-device').closest('.session-card') as HTMLElement;
     fireEvent.click(within(qrCard).getByRole('button', { name: 'Proxy' }));
@@ -577,7 +577,7 @@ test('an operator key is not offered proxy writes, in the create modal or the pr
     await waitFor(() => assert.ok(findFetchCall('GET', '/api/sessions/sess-qr-1/proxy')));
     const toggle = (await within(dialog).findByRole('checkbox')) as HTMLInputElement;
     assert.equal(toggle.disabled, true);
-    assert.equal(within(dialog).queryByRole('button', { name: 'Save' }), null);
+    assert.equal(within(dialog).queryByRole('button', { name: 'Save' }) === null, true);
   } finally {
     window.sessionStorage.setItem('openwa_user_role', 'admin');
   }
@@ -1531,7 +1531,7 @@ test('an unrestricted session shows no restriction row', async () => {
 
   const card = (await screen.findByText('stale-engine')).closest('.session-card') as HTMLElement;
 
-  assert.equal(within(card).queryByText('Restriction'), null);
+  assert.equal(within(card).queryByText('Restriction') === null, true);
 });
 
 // ── Live feed banner ─────────────────────────────────────────────────────────
@@ -1745,7 +1745,7 @@ test('a toggle answer that lands after its modal closed does not change another 
   fireEvent.click(await openDetailFor('new-device'));
   await waitFor(() => assert.ok(fetchCalls.some(c => c.method === 'PATCH')));
   fireEvent.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: 'Close' })[0]);
-  await waitFor(() => assert.equal(screen.queryByRole('dialog'), null));
+  await waitFor(() => assert.equal(screen.queryByRole('dialog') === null, true));
 
   const other = await openDetailFor('stale-engine');
   assert.equal(other.checked, false);
@@ -1815,7 +1815,7 @@ test('a failed toggle that lands after its modal closed does not revert another 
     fireEvent.click(await openDetailFor('new-device'));
     await waitFor(() => assert.ok(fetchCalls.some(c => c.method === 'PATCH')));
     fireEvent.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: 'Close' })[0]);
-    await waitFor(() => assert.equal(screen.queryByRole('dialog'), null));
+    await waitFor(() => assert.equal(screen.queryByRole('dialog') === null, true));
 
     // The second session has auto-reject on.
     sessionConfig = { autoRejectCalls: true, maxReconnectAttempts: null, reconnectBaseDelay: 5000 };
@@ -1847,7 +1847,7 @@ test('a proxy save that lands after its modal closed leaves another session prox
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
   await waitFor(() => assert.ok(findFetchCall('PATCH', '/api/sessions/sess-qr-1/proxy')));
   fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-  await waitFor(() => assert.equal(screen.queryByRole('dialog'), null));
+  await waitFor(() => assert.equal(screen.queryByRole('dialog') === null, true));
 
   const secondCard = screen.getByText('stale-engine').closest('.session-card') as HTMLElement;
   fireEvent.click(within(secondCard).getByRole('button', { name: 'Proxy' }));
@@ -1860,7 +1860,7 @@ test('a proxy save that lands after its modal closed leaves another session prox
   release();
   await screen.findByText('Proxy Saved');
   await new Promise(resolve => setTimeout(resolve, 50));
-  assert.equal(screen.getByRole('dialog'), dialog);
+  assert.equal(screen.getByRole('dialog') === dialog, true);
   within(dialog).getByText('stale-engine');
 });
 
@@ -1881,8 +1881,8 @@ test('a failed proxy read offers no Save, so it cannot clear a proxy nobody coul
 
   // No editable form and no Save: an "off" toggle here would read as "no proxy configured", and
   // saving from that state sends proxyUrl:null, destroying the stored URL and its credentials.
-  await waitFor(() => assert.equal(within(dialog).queryByRole('button', { name: 'Save' }), null));
-  assert.equal(within(dialog).queryByRole('checkbox'), null);
+  await waitFor(() => assert.equal(within(dialog).queryByRole('button', { name: 'Save' }) === null, true));
+  assert.equal(within(dialog).queryByRole('checkbox') === null, true);
   assert.equal(findFetchCall('PATCH', '/api/sessions/sess-qr-1/proxy'), undefined);
 });
 
@@ -1901,7 +1901,7 @@ test('saving without retyping the URL leaves the stored proxy and its credential
   // The URL field is deliberately empty: credentials are never sent back to render.
   fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-  await waitFor(() => assert.equal(screen.queryByRole('dialog'), null));
+  await waitFor(() => assert.equal(screen.queryByRole('dialog') === null, true));
   assert.equal(
     findFetchCall('PATCH', '/api/sessions/sess-qr-1/proxy'),
     undefined,

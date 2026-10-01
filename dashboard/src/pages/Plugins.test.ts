@@ -156,7 +156,7 @@ test('a per-session override the server rejects reports the failure, not "Saved"
   fireEvent.click(await screen.findByRole('button', { name: 'Save override' }));
 
   await screen.findByText(REJECTION);
-  assert.equal(screen.queryByText('Configuration Saved'), null);
+  assert.equal(screen.queryByText('Configuration Saved') === null, true);
 });
 
 test('clearing an override shows the Global values, so the next save does not pin the cleared ones back', async () => {
@@ -213,7 +213,7 @@ test('a catalog prefetch that fails after the Catalog tab opened shows the error
   failCatalog();
   const message = await screen.findByText(/catalog unreachable/);
   assert.ok(rtl.within(message).getByRole('button', { name: 'Refresh' }));
-  assert.equal(screen.queryByText('No plugins in the catalog.'), null);
+  assert.equal(screen.queryByText('No plugins in the catalog.') === null, true);
 });
 
 test('uninstalling a plugin reloads the catalog, whose installed flags it changed', async () => {
@@ -252,11 +252,11 @@ test('a config schema without properties opens the config modal and the Sessions
   pluginOverride = { configSchema: { type: 'object' } };
   renderPlugins();
   fireEvent.click(await screen.findByTitle('Configure'));
-  assert.equal(screen.queryByRole('button', { name: 'Save Configuration' }), null);
+  assert.equal(screen.queryByRole('button', { name: 'Save Configuration' }) === null, true);
   fireEvent.click(await screen.findByRole('button', { name: 'Sessions' }));
   // No declared field means nothing to override per session.
   await screen.findByText('Run for');
-  assert.equal(screen.queryByRole('combobox', { name: 'Select a session…' }), null);
+  assert.equal(screen.queryByRole('combobox', { name: 'Select a session…' }) === null, true);
 });
 
 test('a fractional value in a bounded number field does not block the override save', async () => {

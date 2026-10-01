@@ -130,8 +130,8 @@ test('a write key can delete a template from its row, and a read-only key cannot
 
   const readOnlyRow = (await screen.findByText('invoice-reminder')).closest('.template-list-row') as HTMLElement;
   assert.equal(
-    within(readOnlyRow).queryByRole('button', { name: 'Delete' }),
-    null,
+    within(readOnlyRow).queryByRole('button', { name: 'Delete' }) === null,
+    true,
     'a read-only key was offered the row delete',
   );
 });
@@ -163,8 +163,8 @@ test('a failed sessions read shows the error, not "no sessions available"', asyn
   const alert = await rtl.screen.findByRole('alert');
   rtl.within(alert).getByText('Failed to load data');
   rtl.within(alert).getByText('gateway restarting');
-  assert.equal(rtl.screen.queryByText('No sessions available'), null);
-  assert.equal(rtl.screen.queryByRole('option', { name: 'No sessions' }), null);
+  assert.equal(rtl.screen.queryByText('No sessions available') === null, true);
+  assert.equal(rtl.screen.queryByRole('option', { name: 'No sessions' }) === null, true);
 });
 
 // The full-page loader puts both classes on the page root itself, so its rule must be a compound
@@ -209,7 +209,7 @@ test('a selected session that disappears from the list is replaced by the first 
 
   await screen.findByText('support-greeting');
   assert.equal(select.value, 'sess-2');
-  assert.equal(screen.queryByText('invoice-reminder'), null);
+  assert.equal(screen.queryByText('invoice-reminder') === null, true);
   screen.getByText('Saved under support-bot');
   window.sessionStorage.setItem('openwa_user_role', 'viewer');
 });
@@ -225,5 +225,5 @@ test('a search with no match says so instead of reporting an empty library', asy
   await screen.findByText('invoice-reminder');
   fireEvent.change(screen.getByPlaceholderText('Search'), { target: { value: 'no-such-template' } });
   await screen.findByText('No templates match your search.');
-  assert.equal(screen.queryByText('No templates saved'), null);
+  assert.equal(screen.queryByText('No templates saved') === null, true);
 });
