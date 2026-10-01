@@ -381,9 +381,28 @@ describe('WhatsAppWebJsAdapter initialize() retry on a navigation-killed first i
     });
     const onError = jest.fn();
 
-    await expect(adapter.initialize({ onError })).rejects.toThrow(EXEC_CTX);
+    await expect(adapter.initialize({ onError })).resolves.toBeUndefined();
 
     expect(clientInitSpy).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  // The stop's destroy closes the browser, which rejects the pending launch. That rejection is the
+  // stop landing, not a start failure: no FAILED status, no onError, like the other teardown exits.
+  it('settles DISCONNECTED without onError when a stop closes the launching browser', async () => {
+    const adapter = newAdapter();
+    const states: EngineStatus[] = [];
+    clientInitSpy.mockImplementationOnce(async () => {
+      await adapter.disconnect();
+      throw new Error('Protocol error (Runtime.callFunctionOn): Target closed');
+    });
+    const onError = jest.fn();
+
+    await expect(adapter.initialize({ onError, onStateChanged: state => states.push(state) })).resolves.toBeUndefined();
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(states).not.toContain(EngineStatus.FAILED);
+    expect(adapter.getStatus()).toBe(EngineStatus.DISCONNECTED);
   });
 
   // A stop, delete or logout that lands while Chromium is still launching runs Client.destroy()

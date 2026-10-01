@@ -372,6 +372,12 @@ export class WwebjsLifecycle {
         await this.runInitAttempt(puppeteerArgs, authTimeoutMs, proxyAuthentication, versionPin);
       }
     } catch (error) {
+      // A stop, delete or force-kill closed the browser under the launch, which is what rejected it:
+      // settle like the other teardown exits instead of reporting the stop as a failed start.
+      if (this.tearingDown) {
+        if (this.status !== EngineStatus.DISCONNECTED) this.setStatus(EngineStatus.DISCONNECTED);
+        return;
+      }
       this.setStatus(EngineStatus.FAILED);
       const reason = error instanceof Error ? error.message : String(error);
       // What the dashboard renders as `lastError` is exactly this string and nothing else — the log
