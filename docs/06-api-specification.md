@@ -5184,7 +5184,7 @@ Get overall cross-session aggregate statistics (sessions by status + message tot
 }
 ```
 
-Notes: raw handler return (no envelope). `sessions.byStatus` is keyed by the stored `SessionStatus` values — lowercase, per §6.4.1 — with per-status counts; `sessions.active` counts only `ready`. `messages.sent`/`received` are all-time outgoing/incoming COUNTs; `failed` is the `FAILED`-status COUNT; `today.*` are the same counts since local midnight. Side effect: caches the `sessions` block via `CacheService`.
+Notes: raw handler return (no envelope). `sessions.byStatus` is keyed by the stored `SessionStatus` values — lowercase, per §6.4.1 — with per-status counts; `sessions.active` counts only `ready`. `messages.sent`/`received` are all-time outgoing/incoming COUNTs; `failed` is the `FAILED`-status COUNT; `today.*` are the same counts since local midnight.
 
 **Errors:** `401` — missing/invalid `X-API-Key` · `403` — key role below `ADMIN`, or the key is session-restricted.
 
