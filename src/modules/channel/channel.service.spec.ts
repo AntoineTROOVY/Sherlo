@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ChannelService } from './channel.service';
+import { ChannelNotFoundError } from '../../common/errors/channel-not-found.error';
 import { EngineRegistry } from '../../engine/engine-registry.service';
 import { IWhatsAppEngine } from '../../engine/interfaces/whatsapp-engine.interface';
 
@@ -108,4 +109,24 @@ describe('ChannelService', () => {
       expect(engineMethod).toHaveBeenCalledWith('ch1@newsletter', '628123456789@c.us');
     },
   );
+
+  // whatsapp-web.js resolves a non-channel id to an ordinary chat (creating one if needed) before
+  // these calls fail, so a chat id must be refused before it reaches the engine.
+  it.each(['deleteChannel', 'unsubscribeFromChannel'] as const)(
+    '%s refuses an id that is not a channel with 404 and never reaches the engine',
+    method => {
+      const engineCall = jest.fn().mockResolvedValue(undefined);
+      const svc = makeService({ [method]: engineCall });
+      for (const id of ['628123456789@c.us', '120363000000000000@g.us']) {
+        expect(() => svc[method]('s1', id)).toThrow(ChannelNotFoundError);
+      }
+      expect(engineCall).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['deleteChannel', 'unsubscribeFromChannel'] as const)('%s forwards a channel id', async method => {
+    const engineCall = jest.fn().mockResolvedValue(undefined);
+    await makeService({ [method]: engineCall })[method]('s1', '120363000000000000@newsletter');
+    expect(engineCall).toHaveBeenCalledWith('120363000000000000@newsletter');
+  });
 });
