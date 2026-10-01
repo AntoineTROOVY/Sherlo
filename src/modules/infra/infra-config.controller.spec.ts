@@ -30,6 +30,16 @@ import { SaveConfigDto } from './dto/save-config.dto';
 import { AuditAction } from '../audit/entities/audit-log.entity';
 import { recordOsEnvKeys, recordPinnedEnvKeys } from '../../config/env-precedence';
 
+// With no boot snapshot every process.env key counts as host-supplied, so a shell exporting the
+// CI Postgres or compose Redis settings would otherwise feed the save guard and the pin checks.
+// Scrub the infrastructure keys for the whole file; tests that need a host value set it themselves.
+const HOST_ENV = Object.keys(process.env).filter(k =>
+  /^(DATABASE_|POSTGRES_|REDIS_|STORAGE_|S3_|MINIO_|QUEUE_|PUPPETEER_|ENGINE_TYPE$|SESSION_DATA_PATH$)/.test(k),
+);
+const hostEnvSaved = HOST_ENV.map(k => [k, process.env[k]] as const);
+beforeAll(() => HOST_ENV.forEach(k => delete process.env[k]));
+afterAll(() => hostEnvSaved.forEach(([k, v]) => (process.env[k] = v)));
+
 describe('InfraConfigController.saveConfig SSL reject-unauthorized', () => {
   function writtenEnv(config: unknown): string {
     const spy = jest.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined);
@@ -1112,9 +1122,9 @@ describe('InfraConfigController.getConfig reflects environment-pinned values (#1
       if (v === undefined) delete process.env[k];
       else process.env[k] = v;
     }
-    // Restore the permissive snapshot the rest of the file assumes (no snapshot = isEnvPinned
-    // false everywhere, which is what the other describes rely on).
-    recordPinnedEnvKeys(process.env);
+    // Restore the permissive snapshot the rest of the file assumes (an empty one, like no snapshot,
+    // leaves isEnvPinned false everywhere, which is what the other describes rely on).
+    recordPinnedEnvKeys({});
   });
 
   it('reports host-provided engine/database/redis values over the first-run file defaults', () => {
@@ -1240,8 +1250,8 @@ describe('InfraConfigController.requestRestart constrains teardown to managed pr
         if (v === undefined) delete process.env[k];
         else process.env[k] = v;
       }
-      // Back to the no-snapshot default the rest of the file assumes.
-      recordPinnedEnvKeys(process.env);
+      // Back to the no-snapshot default the rest of the file assumes (an empty snapshot pins nothing).
+      recordPinnedEnvKeys({});
     });
 
     it('is never stopped, since the restarted app would still point at it', async () => {
