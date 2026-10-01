@@ -1,3 +1,4 @@
+import { PATH_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { PluginsController } from './plugins.controller';
 import { REQUIRED_ROLE_KEY, UNSCOPED_KEY } from '../auth/decorators/auth.decorators';
@@ -9,8 +10,12 @@ describe('PluginsController authorization', () => {
   // Plugin reads expose installed versions, non-secret config, and health/error text — privileged
   // inventory on par with the ADMIN-gated write routes and the infra controllers' convention. A
   // VIEWER/OPERATOR key (or a session-scoped key) must not be able to enumerate it via the raw API.
+  // Install, update and uninstall run third-party code on the host.
   const adminOnly = [
     'findAll',
+    'install',
+    'installFromUrl',
+    'catalog',
     'findOne',
     'healthCheck',
     'enable',
@@ -19,7 +24,17 @@ describe('PluginsController authorization', () => {
     'getConfigUi',
     'updateSessionConfig',
     'updateSessions',
+    'update',
+    'uninstall',
   ] as const;
+
+  it('lists every route handler, so a new route cannot skip the role check', () => {
+    const proto = PluginsController.prototype as unknown as Record<string, unknown>;
+    const routes = Object.getOwnPropertyNames(proto).filter(
+      name => name !== 'constructor' && Reflect.getMetadata(PATH_METADATA, proto[name] as object) !== undefined,
+    );
+    expect([...routes].sort()).toEqual([...adminOnly].sort());
+  });
 
   it.each(adminOnly)('%s requires the ADMIN role', method => {
     // Metadata lookup key, never invoked.
