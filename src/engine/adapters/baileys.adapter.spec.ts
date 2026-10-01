@@ -188,9 +188,16 @@ const fakeStore = {
 };
 
 // clearAllMocks keeps implementations: a store lookup one test taught to return a message must not
-// make a later fromMe delivery look like a re-delivered one (processInboundMessage drops those).
+// make a later fromMe delivery look like a re-delivered one (processInboundMessage drops those). The
+// same goes for the shared sock and library mocks: a lid mapping, a group listing or a content type one
+// describe set would otherwise leak into whichever describe runs next, so test order would decide results.
 beforeEach(() => {
   fakeStore.getMessage.mockReset();
+  fakeSock.signalRepository = undefined;
+  fakeSock.groupFetchAllParticipating.mockReset();
+  const baileys = jest.requireMock<Record<string, jest.Mock>>('@whiskeysockets/baileys');
+  baileys.getContentType.mockReset().mockReturnValue('conversation');
+  baileys.normalizeMessageContent.mockReset().mockImplementation((c: unknown) => c);
 });
 
 /** A fresh async-iterable stream of the given chunks (the shape `downloadMediaMessage('stream')` returns). */
