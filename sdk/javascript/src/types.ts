@@ -205,6 +205,7 @@ export interface CreateSessionRequest {
   name: string;
   config?: Record<string, unknown>;
   proxyUrl?: string;
+  /** @deprecated Ignored by the gateway; the `proxyUrl` scheme selects the protocol. */
   proxyType?: 'http' | 'https' | 'socks4' | 'socks5';
 }
 
