@@ -416,3 +416,11 @@ test('the Templates nav item reads the same as the page it opens in every locale
     assert.equal(i18n.t('nav.templates', { lng }), i18n.t('templates.title', { lng }), `${lng} nav.templates`);
   }
 });
+
+// Both databases apply their pending migrations at startup unless *_SYNCHRONIZE=true opts into
+// TypeORM synchronize, so the Infrastructure card must not name synchronize as the default.
+test('English migrations status describes migrations, not schema synchronize', () => {
+  const status = i18n.t('infrastructure.database.migrationsStatus', { lng: 'en' });
+  assert.doesNotMatch(status, /synchroni[sz]/i, `status names synchronize: "${status}"`);
+  assert.match(status, /migrations/i, `status lost the migrations wording: "${status}"`);
+});
