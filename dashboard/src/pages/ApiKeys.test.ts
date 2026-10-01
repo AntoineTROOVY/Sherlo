@@ -24,6 +24,8 @@ const billingBot = {
 };
 let keyList: Record<string, unknown>[] = [billingBot];
 let createBody: Record<string, unknown> | undefined;
+// When set, POST /auth/api-keys answers only once this settles.
+let createGate: Promise<void> | undefined;
 let updateBodies: Record<string, unknown>[] = [];
 let updateStatus = 200;
 
@@ -34,7 +36,8 @@ function installFetchStub(): void {
     if (path === '/api/sessions') return Promise.resolve(jsonResponse([]));
     if (init?.method === 'POST' && path === '/api/auth/api-keys') {
       createBody = JSON.parse(String(init.body));
-      return Promise.resolve(jsonResponse({ ...billingBot, id: 'key-new', apiKey: 'owa_k1_new' }, 201));
+      const created = jsonResponse({ ...billingBot, id: 'key-new', apiKey: 'owa_k1_new' }, 201);
+      return createGate ? createGate.then(() => created) : Promise.resolve(created);
     }
     if (init?.method === 'PUT' && path.startsWith('/api/auth/api-keys/')) {
       updateBodies.push(JSON.parse(String(init.body)));
@@ -76,6 +79,7 @@ afterEach(() => {
   listStatus = 200;
   keyList = [billingBot];
   createBody = undefined;
+  createGate = undefined;
   updateBodies = [];
   updateStatus = 200;
   window.sessionStorage.removeItem('openwa_api_key');
@@ -175,6 +179,27 @@ test('a create sends the IP allow-list, chats and expiry only when filled in', a
     allowedChats: ['6281234@c.us', '120363000@g.us'],
     expiresAt: new Date('2027-06-01T09:30').toISOString(),
   });
+});
+
+// The key exists once the request lands; a modal closed meanwhile would leave its one-time secret
+// unseen and pop it up on the next Create API Key click.
+test('the create modal stays open until the request settles and then shows the secret', async () => {
+  const { screen, fireEvent } = rtl;
+  let release = (): void => {};
+  createGate = new Promise(resolve => {
+    release = resolve;
+  });
+  const create = await openCreate();
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'crm-bot' } });
+  fireEvent.click(create);
+  const cancel = await screen.findByRole<HTMLButtonElement>('button', { name: 'Cancel' });
+  await rtl.waitFor(() => assert.equal(cancel.disabled, true, 'Cancel is live while the key is being created'));
+  assert.equal(screen.queryByRole('button', { name: 'Close' }), null, 'the close button is live mid-request');
+  fireEvent.keyDown(document, { key: 'Escape' });
+  fireEvent.mouseDown(document.querySelector('.modal-overlay') as HTMLElement);
+  screen.getByRole('dialog');
+  release();
+  await screen.findByText('owa_k1_new');
 });
 
 // A production gateway refuses a name over 100 characters with a bare "Bad Request".

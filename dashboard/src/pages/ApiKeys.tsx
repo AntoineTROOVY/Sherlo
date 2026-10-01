@@ -522,13 +522,16 @@ export function ApiKeys() {
       {showModal && (
         <Modal
           open
-          onClose={closeCreateModal}
+          // The key exists once the request lands, and its secret is shown only here, so the modal
+          // cannot be dismissed until the request settles.
+          onClose={createMutation.isPending ? () => {} : closeCreateModal}
+          hideCloseButton={createMutation.isPending}
           title={createdKey ? t('apiKeys.createdTitle') : t('apiKeys.modalTitle')}
           closeLabel={t('common.close')}
           footer={
             !createdKey ? (
               <>
-                <button className="btn-secondary" onClick={closeCreateModal}>
+                <button className="btn-secondary" onClick={closeCreateModal} disabled={createMutation.isPending}>
                   {t('common.cancel')}
                 </button>
                 <button className="btn-primary" onClick={handleCreate} disabled={!canCreate}>
