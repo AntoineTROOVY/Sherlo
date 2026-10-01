@@ -31,6 +31,16 @@ describe('CallController', () => {
     );
   });
 
+  // Baileys answers an unconfirmed link_create with EngineTransportError (503). The mint is not
+  // idempotent, so the contract must say a 503 can follow a link that was in fact created.
+  it('POST link declares the Baileys 503', () => {
+    const responses = (Reflect.getMetadata(
+      'swagger/apiResponse',
+      Object.getOwnPropertyDescriptor(CallController.prototype, 'createLink')?.value as object,
+    ) ?? {}) as Record<string, unknown>;
+    expect(Object.keys(responses)).toContain('503');
+  });
+
   it('POST :callId/reject returns the success envelope', async () => {
     const { controller, service } = build({ rejectCall: jest.fn().mockResolvedValue(undefined) });
     await expect(controller.reject('s1', 'CALL1')).resolves.toEqual({ success: true });
