@@ -898,7 +898,7 @@ src/database/migrations/           # data connection (pluggable)
 ├── 1785600000000-SlimIngressEventPayload.ts
 ├── 1785700000000-AddMessageMediaArchive.ts
 ├── 1785800000000-AddSessionOwnership.ts
-├── 1785900000000-AddAutomationRules.ts            # 14th migration table; FKs sessions ON DELETE CASCADE
+├── 1785900000000-AddAutomationRules.ts            # FKs sessions ON DELETE CASCADE
 ├── 1786000000000-AddSessionNodeUrl.ts
 ├── 1786100000000-AddMessageMediaPathIndex.ts   # partial index on messages.mediaPath (orphan sweep)
 ├── 1786200000000-AddWebhookOutboxEvents.ts   # webhook_outbox_events (durable outbound delivery record)
