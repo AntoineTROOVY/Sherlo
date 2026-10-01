@@ -10,6 +10,8 @@ export class CreateApiKeyDto {
   @ApiProperty({
     description: 'Friendly name for the API key',
     example: 'Production Bot',
+    minLength: 3,
+    maxLength: 100,
   })
   @IsString()
   @MinLength(3)
@@ -137,7 +139,7 @@ export class ValidateApiKeyResponseDto {
 }
 
 export class UpdateApiKeyDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ minLength: 3, maxLength: 100 })
   @IsOptional()
   @IsString()
   @MinLength(3)
