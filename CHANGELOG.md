@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The container no longer crash-loops at start when `/app/data` is a bind mount that refuses to change a symlink's owner, such as Docker Desktop file sharing: the entrypoint re-owns `/app/data` without touching or following symlinks, so a Chromium lock left by an unclean stop, under any session path, no longer stops it. Thanks @Nexiler for the report.
 - whatsapp-web.js: `GET /api/sessions/:sessionId/contacts`, `GET /api/sessions/:sessionId/chats` and `GET /api/sessions/:sessionId/groups` answer `503` instead of `500` when the read outruns the Puppeteer protocol timeout.
 - whatsapp-web.js: a forward no longer reports the id of another message sent to the same chat in the same second.
+- whatsapp-web.js: inbound media downloads work again on current WhatsApp Web builds, where media the page had not downloaded before arrived as the `omitted` marker and the media route answered `404` ([#1739](https://github.com/rmyndharis/OpenWA/issues/1739)). Thanks @orezraey for the report.
 - whatsapp-web.js: an inbound media download whose caller already gave up is skipped, so messages that arrive after a burst keep their media.
 - whatsapp-web.js: a document sent from a URL without a filename is named after the percent-decoded URL basename.
 - whatsapp-web.js: listing chats or groups on a large account no longer blocks the page long enough for the liveness watchdog to disconnect a healthy session ([#1501](https://github.com/rmyndharis/OpenWA/issues/1501)).
