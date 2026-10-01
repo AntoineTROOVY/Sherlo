@@ -914,7 +914,7 @@ communication:
 
 ### Evidence Collection
 
-- Capture the audit log (the `audit_logs` table / audit query API) and the application logs (`docker compose logs openwa`) — there is no `logs:export` script
+- Capture the audit log (the `audit_logs` table / audit query API) and the application logs (`docker compose logs openwa-api`) — there is no `logs:export` script
 - Database query logs
 - Network traffic captures
 - System metrics at incident time
