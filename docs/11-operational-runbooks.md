@@ -983,9 +983,12 @@ sudo truncate -s 0 "$(docker inspect --format='{{.LogPath}}' openwa-api)"
 find /backups -name "*.tar.gz" -mtime +30 -delete
 
 # D. Archived chat media: let the app expire it instead of deleting files, which leaves rows
-#    pointing at missing files. Set CHAT_MEDIA_ARCHIVE_TTL_DAYS (default 0, keep forever) and
-#    restart; expiry clears the file and the row's media columns. Under the production compose the
-#    media lives in the openwa_openwa-data volume, not in ./data in the checkout.
+#    pointing at missing files. Set CHAT_MEDIA_ARCHIVE_TTL_DAYS (default 0, keep forever) in .env and
+#    recreate the container with `docker compose up -d openwa-api`; a plain `docker compose restart`
+#    keeps the old environment. Sessions reconnect on their own only with AUTO_START_SESSIONS=true;
+#    otherwise POST /api/sessions/{sessionId}/start each one. Expiry clears the file and the row's
+#    media columns. Under the production compose the media lives in the openwa_openwa-data volume,
+#    not in ./data in the checkout.
 
 # 4. Verify
 df -h
