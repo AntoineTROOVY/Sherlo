@@ -1,5 +1,5 @@
-import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
+import { InjectQueue, OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { Job, Queue } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QUEUE_NAMES } from '../queue-names';
@@ -12,6 +12,9 @@ import { KeyedAsyncLock, orderingKeyFor } from '../../integration/ordering-lock'
 
 // BullMQ's failedReason for a job that stalled more than maxStalledCount (see WebhookProcessor).
 const STALL_EXHAUSTION_MESSAGE = 'job stalled more than allowable limit';
+
+// How long a delivery whose dead-letter row could not be written waits before it runs again.
+const REQUEUE_DELAY_MS = 60_000;
 
 export interface IngressJobData {
   pluginId: string;
@@ -53,6 +56,8 @@ export class IngressProcessor extends WorkerHost {
     @InjectRepository(IntegrationDeliveryFailure, 'data')
     private readonly failures: Repository<IntegrationDeliveryFailure>,
     private readonly hooks: HookManager,
+    @InjectQueue(QUEUE_NAMES.INGRESS)
+    private readonly ingressQueue: Queue<IngressJobData>,
   ) {
     super();
   }
@@ -75,7 +80,7 @@ export class IngressProcessor extends WorkerHost {
         action: 'ingress_dispatch_failed',
       });
 
-      if (isFinalAttempt) await this.deadLetter(d, job.attemptsMade + 1, errorMessage);
+      if (isFinalAttempt) await this.deadLetterOrRequeue(job, job.attemptsMade + 1, errorMessage);
 
       // Re-throw to trigger BullMQ's exponential backoff / retry.
       throw err;
@@ -93,28 +98,52 @@ export class IngressProcessor extends WorkerHost {
   async onWorkerFailed(job: Job<IngressJobData> | undefined, error: Error): Promise<void> {
     if (!job || error.message !== STALL_EXHAUSTION_MESSAGE) return;
     const d = job.data;
+    this.logger.error('Ingress job failed after stalling beyond the recovery limit', error.message, {
+      pluginId: d.pluginId,
+      instanceId: d.instanceId,
+      route: d.route,
+      deliveryId: d.deliveryId,
+      attemptsMade: job.attemptsMade,
+      action: 'ingress_stall_exhausted',
+    });
+    // Never rejects: an event listener's rejection would surface as an unhandled rejection.
+    await this.deadLetterOrRequeue(job, job.attemptsMade, error.message);
+  }
+
+  /**
+   * Dead-letter a job that has spent its attempts. That row is the only durable copy left, so when the
+   * data database refuses it too (an outage longer than the retry window fails dispatch and the write
+   * alike), the delivery goes back on the queue, which still works, and runs again once the database
+   * is back. A fresh job id, because the failed job keeps the original one until removeOnFail prunes it
+   * and BullMQ would resolve an add under that id to the existing job. Never rejects.
+   */
+  private async deadLetterOrRequeue(job: Job<IngressJobData>, attempts: number, errorMessage: string): Promise<void> {
+    const d = job.data;
     try {
-      this.logger.error('Ingress job failed after stalling beyond the recovery limit', error.message, {
-        pluginId: d.pluginId,
-        instanceId: d.instanceId,
-        route: d.route,
-        deliveryId: d.deliveryId,
-        attemptsMade: job.attemptsMade,
-        action: 'ingress_stall_exhausted',
-      });
-      await this.deadLetter(d, job.attemptsMade, error.message);
+      await this.deadLetter(d, attempts, errorMessage);
     } catch (err) {
-      // An event listener's rejection would surface as an unhandled rejection; log it instead.
-      this.logger.error(
-        'Could not dead-letter a stall-exhausted ingress job',
-        err instanceof Error ? err.message : String(err),
-        {
-          pluginId: d.pluginId,
-          instanceId: d.instanceId,
-          deliveryId: d.deliveryId,
-          action: 'ingress_stall_dlq_failed',
-        },
-      );
+      const meta = { jobId: job.id, pluginId: d.pluginId, instanceId: d.instanceId, deliveryId: d.deliveryId };
+      const reason = err instanceof Error ? err.message : String(err);
+      try {
+        await this.ingressQueue.add(job.name, d, {
+          // The base id, so a delivery re-queued through a long outage keeps one suffix, not a chain.
+          jobId: `${String(job.id).replace(/-requeued-\d+$/, '')}-requeued-${Date.now()}`,
+          attempts: job.opts.attempts,
+          backoff: job.opts.backoff,
+          delay: REQUEUE_DELAY_MS,
+        });
+        this.logger.error('Could not dead-letter a failed ingress job; re-queued it', reason, {
+          ...meta,
+          action: 'ingress_dlq_failed_requeued',
+        });
+      } catch (queueErr) {
+        // Only the failed BullMQ job is left; the job id lets an operator retry it before it is pruned.
+        this.logger.error('Could not dead-letter or re-queue a failed ingress job', reason, {
+          ...meta,
+          requeueError: queueErr instanceof Error ? queueErr.message : String(queueErr),
+          action: 'ingress_dlq_failed',
+        });
+      }
     }
   }
 
