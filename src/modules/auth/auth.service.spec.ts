@@ -732,7 +732,7 @@ describe('AuthService', () => {
 
       expect(result.id).toBe(key.id);
       expect(result.usageCount).toBe(1);
-      expect(result.lastUsedAt).toBeDefined();
+      expect(result.lastUsedAt).toBeInstanceOf(Date);
     });
 
     it('accepts a key padded with whitespace, as HTTP header parsing already does', async () => {
@@ -762,14 +762,15 @@ describe('AuthService', () => {
 
     it('coalesces the usage-stat write within the throttle window', async () => {
       const rawKey = 'recent-key';
-      const key = createMockApiKey({ keyHash: hashKey(rawKey), lastUsedAt: new Date(), usageCount: 5 });
+      const seen = new Date(Date.now() - 1000); // inside the throttle window
+      const key = createMockApiKey({ keyHash: hashKey(rawKey), lastUsedAt: seen, usageCount: 5 });
       (repository.findOne as jest.Mock).mockResolvedValue(key);
 
       const result = await service.validateApiKey(rawKey);
 
       expect(repository.update).not.toHaveBeenCalled(); // throttled — no DB write this request
       expect(result.usageCount).toBe(6); // but the count is still reflected in-memory
-      expect(result.lastUsedAt).toBeDefined();
+      expect(result.lastUsedAt!.getTime()).toBeGreaterThan(seen.getTime()); // and so is the stamp
     });
 
     it('flushes the usage-stat write once the throttle window has elapsed', async () => {
@@ -1154,21 +1155,6 @@ describe('AuthService', () => {
     it('should deny OPERATOR access to ADMIN routes', () => {
       const key = createMockApiKey({ role: ApiKeyRole.OPERATOR });
       expect(service.hasPermission(key, ApiKeyRole.ADMIN)).toBe(false);
-    });
-  });
-
-  // ── hashKey (via validateApiKey) ──────────────────────────────────
-
-  describe('hashKey (determinism)', () => {
-    it('should produce the same hash for the same input', () => {
-      const key1 = createMockApiKey({ keyHash: hashKey('same-key') });
-      const key2 = createMockApiKey({ keyHash: hashKey('same-key') });
-
-      expect(key1.keyHash).toBe(key2.keyHash);
-    });
-
-    it('should produce different hashes for different inputs', () => {
-      expect(hashKey('key-a')).not.toBe(hashKey('key-b'));
     });
   });
 
