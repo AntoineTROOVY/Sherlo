@@ -6699,7 +6699,7 @@ Create a rule. **Auth:** API key (OPERATOR)
 }
 ```
 
-`400`: invalid conditions (unknown field/operator, over-limit values) or over-limit text. `404` when no session has this id.
+`400`: invalid conditions (unknown field/operator, over-limit values) or over-limit text, or the session already holds `AUTOMATION_MAX_PER_SESSION` rules (default 32; `0` disables the cap). `404` when no session has this id.
 
 #### GET /api/sessions/:sessionId/automation-rules
 
