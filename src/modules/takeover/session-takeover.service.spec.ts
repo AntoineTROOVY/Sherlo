@@ -161,12 +161,21 @@ describe('SessionTakeoverService', () => {
     jest.useFakeTimers();
     const start = jest.fn().mockRejectedValueOnce(new Error('chromium died')).mockResolvedValueOnce({});
     const { svc } = build([lapsed({ name: 'boom' }), lapsed({ name: 'fine' })], { startImpl: start });
+    const logger = (svc as unknown as { logger: { warn: jest.Mock; debug: jest.Mock } }).logger;
+    const warn = jest.spyOn(logger, 'warn');
+    const debug = jest.spyOn(logger, 'debug');
 
     const sweep = svc.sweep();
     await jest.advanceTimersByTimeAsync(2000); // the inter-launch stagger
     await expect(sweep).resolves.toBeUndefined();
 
     expect(start).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      'Takeover start failed for session boom',
+      expect.objectContaining({ sessionId: 'id-boom', error: 'chromium died' }),
+    );
+    expect(debug).not.toHaveBeenCalled();
   });
 
   it('the AUTO_START_SESSIONS opt-out arms the sweep but starts nothing', async () => {
