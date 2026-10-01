@@ -18,7 +18,7 @@ import { ApiKey, ApiKeyRole } from './entities/api-key.entity';
 import { CreateApiKeyDto, UpdateApiKeyDto } from './dto';
 import { createLogger } from '../../common/services/logger.service';
 import { setRequestActor } from '../../common/services/request-context';
-import { readBootstrapKey, removeBootstrapKey, writeBootstrapKey } from './bootstrap-key-file';
+import { bootstrapKeyFilePath, readBootstrapKey, removeBootstrapKey, writeBootstrapKey } from './bootstrap-key-file';
 import { ApiKeyUsageTracker } from './api-key-usage-tracker.service';
 import { ActiveKeyIndex } from './active-key-index';
 import { apiKeyAuthorizationFingerprint, normalizeScopeList } from './api-key-authorization';
@@ -62,13 +62,14 @@ export function resolveSeedApiKey(): string {
  * The line to print for the API key in the startup banner. The full raw key is shown ONLY when it was
  * just created (first run, when the operator needs to capture it once). On every subsequent boot the
  * key is masked to a short non-secret fingerprint, so the live admin key is not re-written to the log
- * pipeline (Docker/Loki/CloudWatch) on each restart — it stays in `data/.api-key` (0600) and the
- * dashboard. A placeholder (e.g. "(check dashboard for keys)") is passed through unchanged.
+ * pipeline (Docker/Loki/CloudWatch) on each restart — it stays in `data/.api-key` (0600), or wherever
+ * `BOOTSTRAP_KEY_FILE` points; the dashboard only ever shows a key's prefix. A placeholder
+ * (e.g. "(check dashboard for keys)") is passed through unchanged.
  */
 export function bannerKeyLine(displayKey: string, isNewKey: boolean): string {
   if (isNewKey) return displayKey;
   if (displayKey.startsWith('(')) return displayKey;
-  return `${displayKey.slice(0, 8)}… (full key in data/.api-key or the dashboard)`;
+  return `${displayKey.slice(0, 8)}… (full key in ${bootstrapKeyFilePath()})`;
 }
 
 @Injectable()

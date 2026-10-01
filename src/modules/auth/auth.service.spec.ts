@@ -94,7 +94,19 @@ describe('bannerKeyLine (startup banner key masking)', () => {
     const line = bannerKeyLine(FULL, false);
     expect(line).not.toContain('0123456789abcdef'); // the secret tail must not appear
     expect(line.startsWith('owa_k1_0')).toBe(true); // a short fingerprint is fine
-    expect(line).toMatch(/data\/\.api-key|dashboard/); // points the operator to the real source
+    expect(line).toMatch(/data\/\.api-key/); // points the operator to the real source
+    expect(line).not.toContain('dashboard'); // the dashboard only ever shows a key's prefix
+  });
+
+  it('names the bootstrap key file BOOTSTRAP_KEY_FILE points at', () => {
+    const original = process.env.BOOTSTRAP_KEY_FILE;
+    process.env.BOOTSTRAP_KEY_FILE = '/run/secrets/openwa-key';
+    try {
+      expect(bannerKeyLine(FULL, false)).toContain('(full key in /run/secrets/openwa-key)');
+    } finally {
+      if (original === undefined) delete process.env.BOOTSTRAP_KEY_FILE;
+      else process.env.BOOTSTRAP_KEY_FILE = original;
+    }
   });
 
   it('passes a placeholder through unchanged', () => {
@@ -1110,7 +1122,7 @@ describe('AuthService', () => {
       await service.onModuleInit();
 
       expect(unlinkSpy).not.toHaveBeenCalled();
-      expect(bannerText()).toContain('(full key in data/.api-key');
+      expect(bannerText()).toMatch(/\(full key in \S*data\/\.api-key\)/);
     });
   });
 
