@@ -47,6 +47,7 @@
 #       backup, a file the app deletes during the media or plugin copies is logged, and any other cp
 #       error still fails it, however long its output and whatever the host's locale
 #   (ae) the min-content check passes an archive whose listing outgrows a pipe buffer
+#   (af) the online SQLite backup waits out a writer holding the database lock (skipped without sqlite3)
 #
 # Usage: ./scripts/smoke-test-backup-restore.sh
 # Requires: bash, tar, node (restore.sh path resolution). sqlite3 is optional (see (c) and (k)).
@@ -1359,6 +1360,46 @@ if [ "$RC_AE" -ne 0 ] || [ -z "$(ls "$AE"/out/openwa-backup-*.tar.gz 2>/dev/null
   fail "(ae) a long archive listing failed the min-content check: $(grep -v padding- <<<"$OUT_AE")"
 fi
 pass "(ae) the min-content check reads the whole listing"
+
+echo ""
+if [ "$HAS_SQLITE3" -eq 1 ]; then
+  echo "==> (af) the online SQLite backup waits out a writer holding the database lock"
+  # The app writes several times a second in rollback-journal mode. A bare .backup gave up on the first
+  # lock it met with 'database is locked', so on a busy gateway no online backup completed.
+  AF="$WORK/af"
+  mkdir -p "$AF/data"
+  make_fixture "$AF/data/main.sqlite" "foxtrot2-main"
+  make_fixture "$AF/data/openwa.sqlite" "foxtrot2-data"
+  {
+    echo 'BEGIN EXCLUSIVE;'
+    echo "INSERT INTO sentinel VALUES('foxtrot2-late');"
+    echo ".system touch '$AF/locked'"
+    sleep 2
+    echo 'COMMIT;'
+  } | sqlite3 "$AF/data/main.sqlite" &
+  WRITER_AF=$!
+  for _ in $(seq 1 100); do
+    [ -f "$AF/locked" ] && break
+    sleep 0.1
+  done
+  [ -f "$AF/locked" ] || fail "(af) the writer never took the database lock"
+  set +e
+  OUT_AF="$(cd "$AF" && BACKUP_DIR="$AF/out" "$BACKUP" 2>&1)"
+  RC_AF=$?
+  set -e
+  wait "$WRITER_AF"
+  if [ "$RC_AF" -ne 0 ]; then
+    fail "(af) the backup failed while a writer held the database lock: $OUT_AF"
+  fi
+  mkdir -p "$AF/extract"
+  tar -xzf "$(ls "$AF"/out/openwa-backup-*.tar.gz)" -C "$AF/extract"
+  if [ "$(sqlite3 "$AF/extract/main.sqlite" 'PRAGMA integrity_check;')" != ok ]; then
+    fail "(af) the snapshot taken after the writer let go is not a sound database"
+  fi
+  pass "(af) the online backup waits for the lock instead of failing"
+else
+  echo "SKIP: (af) sqlite3 not found on this host, so there is no database lock to wait on"
+fi
 
 echo ""
 echo "All smoke tests passed!"

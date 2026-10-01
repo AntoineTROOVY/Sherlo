@@ -179,7 +179,12 @@ backup_sqlite() {
     exit 1
   fi
   if command -v sqlite3 >/dev/null 2>&1; then
-    sqlite3 "$src" ".backup '$dest'"
+    # The app writes in rollback-journal mode, and a bare .backup gave up on the first lock it met and
+    # restarted after every outside write, so a busy gateway never got a backup. The read transaction
+    # lets the copy finish in one pass (app writes wait for it), the busy timeout waits out a commit,
+    # and -init /dev/null keeps the operator's sqlite3 rc file out of the run.
+    sqlite3 -init /dev/null -cmd ".timeout 30000" "$src" \
+      "BEGIN" "SELECT count(*) FROM sqlite_master" ".backup '$dest'" "COMMIT" >/dev/null
   else
     log "WARN: sqlite3 not found — plain-copying live database $src (the snapshot may be torn)"
     cp "$src" "$dest"
