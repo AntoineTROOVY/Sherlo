@@ -529,6 +529,59 @@ describe('BaileysSessionStore', () => {
       expect(store.getEphemeralExpiration('628111@s.whatsapp.net')).toBe(86400);
     });
 
+    it('drops a message-learned timer once chats.update turns disappearing messages off', () => {
+      // Baileys reports the EPHEMERAL_SETTING change as chats.update with ephemeralExpiration null; later
+      // messages carry no expiration, so only this update can retire the timer the cache learned.
+      store.recordMessage({
+        key: { remoteJid: '628111@s.whatsapp.net', fromMe: false, id: 'M1' },
+        message: { extendedTextMessage: { text: 'hi', contextInfo: { expiration: 86400 } } },
+        messageTimestamp: 100,
+      });
+      store.upsertChats([{ id: '628111@s.whatsapp.net', ephemeralSettingTimestamp: 200, ephemeralExpiration: null }]);
+      store.recordMessage({
+        key: { remoteJid: '628111@s.whatsapp.net', fromMe: false, id: 'M2' },
+        message: { conversation: 'later' },
+        messageTimestamp: 300,
+      });
+      expect(store.getEphemeralExpiration('628111@s.whatsapp.net')).toBeUndefined();
+      expect(store.getEphemeralExpiration('628111@c.us')).toBeUndefined();
+    });
+
+    it('takes a changed timer from chats.update over the one learned from messages', () => {
+      store.recordMessage({
+        key: { remoteJid: '628111@s.whatsapp.net', fromMe: false, id: 'M1' },
+        message: { extendedTextMessage: { text: 'hi', contextInfo: { expiration: 86400 } } },
+        messageTimestamp: 100,
+      });
+      store.upsertChats([{ id: '628111@s.whatsapp.net', ephemeralExpiration: 604800 }]);
+      expect(store.getEphemeralExpiration('628111@c.us')).toBe(604800);
+    });
+
+    it('applies a lid-keyed chats.update to the timer an own send cached under the phone twin', () => {
+      store.addLidMappings([{ lid: '111@lid', pn: '628111@s.whatsapp.net' }]);
+      store.upsertChats([{ id: '111@lid', ephemeralExpiration: 86400 }]);
+      store.recordMessage({
+        key: { remoteJid: '628111@s.whatsapp.net', fromMe: true, id: 'S1' },
+        message: { extendedTextMessage: { text: 'sent', contextInfo: { expiration: 86400 } } },
+        messageTimestamp: 100,
+      });
+      store.upsertChats([{ id: '111@lid', ephemeralExpiration: 604800 }]);
+      expect(store.getEphemeralExpiration('628111@c.us')).toBe(604800);
+      store.upsertChats([{ id: '111@lid', ephemeralExpiration: null }]);
+      expect(store.getEphemeralExpiration('628111@c.us')).toBeUndefined();
+      expect(store.getEphemeralExpiration('628111@s.whatsapp.net')).toBeUndefined();
+    });
+
+    it('keeps a message-learned timer when a chat update does not carry ephemeralExpiration', () => {
+      store.recordMessage({
+        key: { remoteJid: '628111@s.whatsapp.net', fromMe: false, id: 'M1' },
+        message: { extendedTextMessage: { text: 'hi', contextInfo: { expiration: 86400 } } },
+        messageTimestamp: 100,
+      });
+      store.upsertChats([{ id: '628111@s.whatsapp.net', unreadCount: 2 }]);
+      expect(store.getEphemeralExpiration('628111@s.whatsapp.net')).toBe(86400);
+    });
+
     it('prefers the message-learned timer over a stale Chat.ephemeralExpiration', () => {
       store.upsertChats([{ id: '628111@s.whatsapp.net', ephemeralExpiration: 604800 }]);
       store.recordMessage({
