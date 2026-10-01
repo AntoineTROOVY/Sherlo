@@ -59,11 +59,18 @@ const contentFor = (name: string): Buffer => {
 };
 
 /** An openFile that counts the file streams open at once and the files ever opened. */
-function trackingOpener(failing: Record<string, 'gone' | 'open' | 'read'> = {}, withSize = true) {
+function trackingOpener(failing: Record<string, 'gone' | 'bucket' | 'open' | 'read'> = {}, withSize = true) {
   const stats = { opened: 0, open: 0, maxOpen: 0 };
   const openFile = (name: string): Promise<ExportFileSource> => {
     if (failing[name] === 'gone')
       return Promise.reject(Object.assign(new Error(`ENOENT: ${name}`), { code: 'ENOENT' }));
+    if (failing[name] === 'bucket')
+      return Promise.reject(
+        Object.assign(new Error('The specified bucket does not exist'), {
+          name: 'NoSuchBucket',
+          $metadata: { httpStatusCode: 404 },
+        }),
+      );
     if (failing[name] === 'open') return Promise.reject(new Error(`SlowDown: ${name}`));
     const data = contentFor(name);
     stats.opened++;
@@ -140,6 +147,22 @@ describe('createExportStream streams one file at a time', () => {
 
     expect(error.message).toBe('SlowDown: media/file-c.bin');
     expect(stats.opened).toBe(2);
+  });
+
+  it('fails the output when the bucket itself is gone, not only one object', async () => {
+    const { stats, openFile } = trackingOpener({ 'media/file-c.bin': 'bucket' });
+    const logger = makeLogger();
+    const output = await createExportStream(() => Promise.resolve(files), openFile, logger as never);
+
+    const error = await new Promise<Error>(resolve => {
+      output.on('error', resolve);
+      output.resume();
+    });
+    await settle(20);
+
+    expect(error.name).toBe('NoSuchBucket');
+    expect(stats.opened).toBe(2);
+    expect(logger.warn).not.toHaveBeenCalledWith('Failed to export file: media/file-c.bin', expect.anything());
   });
 
   it('still exports a file whose size the backend did not report', async () => {

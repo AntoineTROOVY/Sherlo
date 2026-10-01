@@ -119,7 +119,11 @@ async function appendEntries(
     try {
       source = await openFile(file);
     } catch (error) {
-      if (!isMissingObjectError(error)) throw error;
+      // Only a per-object miss is skippable: ENOENT locally, NoSuchKey from S3 (openS3File returns it
+      // once the local fallback also misses). isMissingObjectError also counts any 404, which includes
+      // a bucket that is gone, and skipping that would report a partial archive as a finished export.
+      const { code, name } = error as { code?: string; name?: string };
+      if (code !== 'ENOENT' && name !== 'NoSuchKey') throw error;
       logger.warn(`Failed to export file: ${file}`, { error: String(error) });
       continue;
     }
