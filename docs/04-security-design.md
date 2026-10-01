@@ -242,8 +242,10 @@ export class SendTextMessageDto {
 // src/modules/webhook/dto/webhook.dto.ts
 export class CreateWebhookDto {
   // require_tld:false allows hostnames without a dot (e.g. http://localhost:3000); the SSRF
-  // guard still decides whether the host may actually be delivered to.
-  @IsUrl({ require_tld: false })
+  // guard still decides whether the host may actually be delivered to. The scheme is required
+  // and must be http(s); 2048 is the column width.
+  @IsUrl({ require_tld: false, require_protocol: true, protocols: ['http', 'https'] })
+  @MaxCodePoints(2048)
   url: string;
 
   @IsOptional()
