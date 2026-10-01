@@ -236,6 +236,10 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     'MESSAGE_REAPER_INTERVAL_MS',
     'WEBHOOK_RECONCILE_INTERVAL_MS',
     'INGRESS_RECONCILE_INTERVAL_MS',
+    // 0 = act on a row as soon as it is seen; the cap below keeps the cutoff inside the safe range.
+    'MESSAGE_REAPER_GRACE_MS',
+    'WEBHOOK_RECONCILE_GRACE_MS',
+    'INGRESS_RECONCILE_GRACE_MS',
   ]) {
     checkNonNegativeInt(key);
   }
@@ -285,6 +289,13 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     const days = str(key);
     if (days !== undefined && Number(days) > 36500) {
       errors.push(`${key} must be at most 36500 (got "${days}")`);
+    }
+  }
+  // The grace windows build the same kind of cutoff (now minus the grace), so they share the cap.
+  for (const key of ['MESSAGE_REAPER_GRACE_MS', 'WEBHOOK_RECONCILE_GRACE_MS', 'INGRESS_RECONCILE_GRACE_MS']) {
+    const raw = str(key);
+    if (raw !== undefined && DECIMAL_INTEGER.test(raw) && Number(raw) > 36500 * 86_400_000) {
+      errors.push(`${key} must be at most ${36500 * 86_400_000} ms, 36500 days (got "${raw}")`);
     }
   }
 

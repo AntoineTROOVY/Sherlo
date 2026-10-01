@@ -706,6 +706,20 @@ describe('validateEnv', () => {
     },
   );
 
+  // A huge grace builds a cutoff whose year SQLite binds in wrapped form, matching fresh rows.
+  it.each(['MESSAGE_REAPER_GRACE_MS', 'WEBHOOK_RECONCILE_GRACE_MS', 'INGRESS_RECONCILE_GRACE_MS'])(
+    'rejects a malformed or oversized %s',
+    key => {
+      expect(() => validateEnv({ [key]: '1h' })).toThrow(new RegExp(`${key} must be a non-negative integer`));
+      expect(() => validateEnv({ [key]: '-1' })).toThrow(new RegExp(`${key} must be a non-negative integer`));
+      expect(() => validateEnv({ [key]: '999999999999999' })).toThrow(
+        new RegExp(`${key} must be at most 3153600000000`),
+      );
+      expect(() => validateEnv({ [key]: '3153600000000' })).not.toThrow();
+      expect(() => validateEnv({ [key]: '0' })).not.toThrow();
+    },
+  );
+
   it('rejects a SESSION_LEASE_HEARTBEAT_MS above the Node timer ceiling even inside a longer lease', () => {
     const lease = { SESSION_LEASE_TTL_MS: '5000000000' };
     expect(() => validateEnv({ ...lease, SESSION_LEASE_HEARTBEAT_MS: '2147483648' })).toThrow(
