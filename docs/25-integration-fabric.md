@@ -120,10 +120,13 @@ Alongside this async pipeline, a route may additionally declare a `response` con
   into the plugin's **base** config with last-write-wins merging, so a sparse wildcard instance
   inherits keys a sibling projected, and hook dispatch resolves config without per-instance
   scoping. Run one enabled wildcard instance per plugin, or scope instances concretely, until the
-  projection is re-keyed per instance.
+  projection is re-keyed per instance. Capability calls are not confined to the dispatching instance's
+  scope either: separating tenants across instances of one plugin relies on the handler using the
+  delivery's `sessionId`.
 - **`conversation.send` capability** — a normalized outbound send authored by the plugin and translated
   host-side to the message service, so persistence and the message hook chain are preserved. It is gated
-  by a `conversation:send` permission and the instance's session scope.
+  by a `conversation:send` permission, the manifest's session scope and, for a session-scoped plugin, its
+  activated sessions.
 - **Identity, dedup, and DLQ tables** — see §25.5.
 - **Ingress queue** — a durable BullMQ queue that is a _sibling_ of the outbound webhook queue (its own
   worker, not the reordering webhook worker), with exponential-backoff retries and a dead-letter row on
@@ -196,8 +199,10 @@ Four tables live on the data connection, each created by a hand-authored dual-di
   persisted and enqueued payload, like the well-known signature headers, so the plugin's handler sees
   `[redacted]` in its place.
 - **Tenancy scoping.** Every durable ingress artifact — secret, dedup store, and dead-letter row — is
-  partitioned by instance, and downstream capability calls carry the instance's resolved session scope, so
-  a cross-tenant send is blocked host-side.
+  partitioned by instance. Downstream capability calls are limited to the sessions the plugin's manifest
+  allows and, for a session-scoped plugin (the default), to the sessions it is activated for (the union of
+  its instances' scopes plus any operator activation); they are not checked against the dispatching
+  instance's scope.
 - **Fail-closed by construction.** No request — including an empty-body request — is accepted by an
   authenticating scheme without the correct per-instance secret. HMAC and Standard Webhooks bind body
   integrity; `shared-secret` authenticates only the caller header and does not bind the body.
