@@ -6567,11 +6567,14 @@ describe('SessionService', () => {
         // The Baileys history sync includes the account's own group messages (with author = self);
         // those must land with author NULL to keep the column's "null on outgoing" contract.
         const callbacks = await startAndCaptureCallbacks();
-        const created: Array<Record<string, unknown>> = [];
-        (messageRepository.create as jest.Mock).mockImplementation((data: Record<string, unknown>) => {
-          created.push(data);
-          return { ...data };
-        });
+        const qb = {
+          insert: jest.fn().mockReturnThis(),
+          values: jest.fn().mockReturnThis(),
+          orIgnore: jest.fn().mockReturnThis(),
+          execute: jest.fn().mockResolvedValue({ identifiers: [] }),
+        };
+        (messageRepository.createQueryBuilder as jest.Mock) = jest.fn().mockReturnValue(qb);
+        (messageRepository.create as jest.Mock).mockImplementation((data: Record<string, unknown>) => ({ ...data }));
         (messageRepository.find as jest.Mock).mockResolvedValue([]); // nothing pre-seen
 
         const histMsg = (over: Partial<IncomingMessage>): IncomingMessage => ({
@@ -6593,7 +6596,9 @@ describe('SessionService', () => {
         ]);
         await flush();
 
-        const byId = new Map(created.map(r => [r.waMessageId as string, r]));
+        expect(qb.execute).toHaveBeenCalled();
+        const rows = (qb.values.mock.calls as unknown[][])[0][0] as Array<Record<string, unknown>>;
+        const byId = new Map(rows.map(r => [r.waMessageId as string, r]));
         expect(byId.get('h-in')?.author).toBe('628111@c.us');
         expect(byId.get('h-out')?.author).toBeUndefined();
       });
