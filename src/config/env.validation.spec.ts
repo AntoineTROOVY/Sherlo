@@ -198,6 +198,15 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ INFLIGHT_BODY_BUDGET_BYTES: '104857600' })).not.toThrow();
   });
 
+  it('rejects a BODY_SIZE_LIMIT that refuses every body or would silently fall back to the default', () => {
+    for (const value of ['0', '0kb', '0.5', '50M', '50MiB', '50 MiB', 'abc']) {
+      expect(() => validateEnv({ BODY_SIZE_LIMIT: value })).toThrow(/BODY_SIZE_LIMIT must be a positive size/);
+    }
+    for (const value of ['25mb', '1.5gb', '1048576', '50 MB']) {
+      expect(() => validateEnv({ BODY_SIZE_LIMIT: value })).not.toThrow();
+    }
+  });
+
   it('rejects a negative/non-integer webhook fan-out knob (0 is a documented escape hatch)', () => {
     expect(() => validateEnv({ WEBHOOK_MAX_PER_SESSION: '-1' })).toThrow(/WEBHOOK_MAX_PER_SESSION/);
     expect(() => validateEnv({ WEBHOOK_MAX_PER_SESSION: '1.5' })).toThrow(/WEBHOOK_MAX_PER_SESSION/);

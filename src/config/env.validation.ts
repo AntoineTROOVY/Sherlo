@@ -1,5 +1,7 @@
 import { resolve } from 'path';
 import { normalizeS3KeyPrefix } from '../common/storage/s3-key-prefix';
+import { resolveBodyLimit } from './bootstrap-security';
+import { parseBodyLimitBytes } from './inflight-body-budget';
 
 type EnvConfig = Record<string, unknown>;
 
@@ -396,6 +398,16 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     'INGRESS_WORKER_CONCURRENCY',
   ]) {
     checkPositiveInt(key);
+  }
+
+  // The body cap takes a unit string. A spelling the parser does not know (`50M`, `50MiB`) silently
+  // becomes the 25mb default, and a value that parses to 0 bytes refuses every request carrying a
+  // body, the same self-DoS INFLIGHT_BODY_BUDGET_BYTES is refused for above.
+  const bodyLimit = str('BODY_SIZE_LIMIT');
+  if (bodyLimit !== undefined && (resolveBodyLimit(bodyLimit) !== bodyLimit || parseBodyLimitBytes(bodyLimit) < 1)) {
+    errors.push(
+      `BODY_SIZE_LIMIT must be a positive size such as 25mb or 1048576 (units b, kb, mb, gb, tb, pb; got "${bodyLimit}")`,
+    );
   }
 
   // The ceiling matters for the same reason from the other side: the docs forbid 0, so an operator
