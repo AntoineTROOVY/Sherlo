@@ -52,14 +52,14 @@ describe('ContactController', () => {
   });
 
   it('getProfilePictures splits, trims and drops empty ids', async () => {
-    service.getProfilePictures.mockResolvedValue([null, 'https://pps/2.jpg']);
+    service.getProfilePictures.mockResolvedValue({ 'a@c.us': null, 'b@c.us': 'https://pps/2.jpg' });
     const out = await controller.getProfilePictures('s1', ' a@c.us , ,b@c.us ');
     expect(service.getProfilePictures).toHaveBeenCalledWith('s1', ['a@c.us', 'b@c.us']);
-    expect(out).toEqual({ pictures: [null, 'https://pps/2.jpg'] });
+    expect(out).toEqual({ pictures: { 'a@c.us': null, 'b@c.us': 'https://pps/2.jpg' } });
   });
 
   it('getProfilePictures defaults a missing ids param to an empty list', async () => {
-    service.getProfilePictures.mockResolvedValue([]);
+    service.getProfilePictures.mockResolvedValue({});
     await controller.getProfilePictures('s1');
     expect(service.getProfilePictures).toHaveBeenCalledWith('s1', []);
   });
