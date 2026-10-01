@@ -177,8 +177,9 @@ Collected here so they survive refactors of the code around them:
 - `session-engine-lifecycle.service.ts` (init deadline region): the do-not-reorder note — the
   ownership re-validation window between the status write and `initialize()` is _narrowed, not
   closed_; moving the re-validation after init reopens INV-2.
-- `session-engine-controls.ts` (start): `session.config` is clamped to trusted keys because the
-  row is client-writable; an unclamped spread would let a caller smuggle engine options.
+- `session-engine-controls.ts` (start): the reconnect knobs read from the client-writable
+  `session.config` are coerced and clamped by `resolveReconnectConfig`, so a poisoned value cannot
+  become a NaN delay (a zero-delay relaunch storm) or a NaN attempt cap that never trips.
 - `EngineRegistry`: identity-based `deleteIfLive` rather than `delete(id)` — see INV-3; every
   site that bypassed this in the past created the same phantom-callback bug. The eviction
   helpers go through it too: `evictAndForceDestroy`, the init-timeout branch, and `start()`'s catch.
