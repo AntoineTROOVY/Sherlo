@@ -628,14 +628,15 @@ describe('AuthService', () => {
       setupKeys([unscopedAdmin('admin-a'), scopedAdmin('admin-scoped')]);
 
       await expect(service.delete('admin-a')).rejects.toThrow(/last active admin/i);
-      expect(repository.remove).not.toHaveBeenCalled();
+      expect(committedWrites).toHaveLength(0); // the refused delete never landed
+      await expect(service.findOne('admin-a')).resolves.toBeDefined();
     });
 
     it('rejects revoking the last unscoped admin even while a session-scoped admin survives', async () => {
       setupKeys([unscopedAdmin('admin-a'), scopedAdmin('admin-scoped')]);
 
       await expect(service.revoke('admin-a')).rejects.toThrow(/last active admin/i);
-      expect(repository.save).not.toHaveBeenCalled();
+      expect(committedWrites).toHaveLength(0); // the refused write never landed
     });
 
     it('rejects demoting the last unscoped admin even while a session-scoped admin survives', async () => {
@@ -648,7 +649,7 @@ describe('AuthService', () => {
       setupKeys([unscopedAdmin('admin-a'), scopedAdmin('admin-scoped')]);
 
       await expect(service.update('admin-a', { allowedSessions: ['sess-9'] })).rejects.toThrow(/last active admin/i);
-      expect(repository.save).not.toHaveBeenCalled();
+      expect(committedWrites).toHaveLength(0); // the refused write never landed
     });
 
     it('treats an empty allowedSessions write as unscoped — not capability-stripping', async () => {
@@ -679,14 +680,15 @@ describe('AuthService', () => {
       setupKeys([unscopedAdmin('admin-a'), chatScopedAdmin('admin-chat')]);
 
       await expect(service.delete('admin-a')).rejects.toThrow(/last active admin/i);
-      expect(repository.remove).not.toHaveBeenCalled();
+      expect(committedWrites).toHaveLength(0); // the refused delete never landed
+      await expect(service.findOne('admin-a')).resolves.toBeDefined();
     });
 
     it('rejects scoping the last unscoped admin to chats — the same capability-stripping', async () => {
       setupKeys([unscopedAdmin('admin-a'), chatScopedAdmin('admin-chat')]);
 
       await expect(service.update('admin-a', { allowedChats: ['123@g.us'] })).rejects.toThrow(/last active admin/i);
-      expect(repository.save).not.toHaveBeenCalled();
+      expect(committedWrites).toHaveLength(0); // the refused write never landed
     });
 
     it('lets a chat-scoped admin be deleted — it never counted toward the invariant', async () => {
