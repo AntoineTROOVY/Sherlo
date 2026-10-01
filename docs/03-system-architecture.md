@@ -62,14 +62,18 @@ sequenceDiagram
     participant DB as Database
     participant WA as WhatsApp
 
-    Client->>API: Create Session
-    API->>SM: createSession()
-    SM->>DB: Save session config
+    Client->>API: POST /api/sessions
+    API->>SM: create()
+    SM->>DB: Save session (status created)
+    API-->>Client: Session
+    Client->>API: POST /api/sessions/:sessionId/start
+    API->>SM: start()
     SM->>Engine: Initialize
     Engine->>WA: Connect
     WA-->>Engine: QR Code
-    Engine-->>SM: QR Ready
-    SM-->>API: QR Code data
+    Engine-->>SM: QR Ready (status qr_ready)
+    API-->>Client: Session
+    Client->>API: GET /api/sessions/:sessionId/qr (or the session.qr event)
     API-->>Client: QR Code response
 ```
 
