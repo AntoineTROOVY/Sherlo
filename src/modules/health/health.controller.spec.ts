@@ -225,19 +225,47 @@ describe('HealthController', () => {
       expect(dataQuery).toHaveBeenCalledWith('SELECT 1');
     });
 
+    /** Runs readiness() and returns the 503 body it threw. */
+    const unavailableBody = async (pending: Promise<unknown> = controller.readiness()) => {
+      const err: unknown = await pending.catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(ServiceUnavailableException);
+      return (err as ServiceUnavailableException).getResponse();
+    };
+
     it('throws 503 when the data database is down', async () => {
       dataQuery.mockRejectedValue(new Error('connection refused'));
-      await expect(controller.readiness()).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(await unavailableBody()).toEqual({
+        status: 'error',
+        details: { mainDatabase: { status: 'up' }, dataDatabase: { status: 'down' } },
+      });
     });
 
     it('throws 503 when the main (auth/audit) database is down', async () => {
       mainQuery.mockRejectedValue(new Error('disk I/O error'));
-      await expect(controller.readiness()).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(await unavailableBody()).toEqual({
+        status: 'error',
+        details: { mainDatabase: { status: 'down' }, dataDatabase: { status: 'up' } },
+      });
+    });
+
+    it('reports a database whose probe hangs as down after 3 s instead of stalling', async () => {
+      jest.useFakeTimers();
+      try {
+        mainQuery.mockReturnValue(new Promise(() => {}));
+        const pending = unavailableBody();
+        await jest.advanceTimersByTimeAsync(3000);
+        expect(await pending).toEqual({
+          status: 'error',
+          details: { mainDatabase: { status: 'down' }, dataDatabase: { status: 'up' } },
+        });
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('throws 503 while draining, without even probing the DBs', async () => {
       isShuttingDown.mockReturnValue(true);
-      await expect(controller.readiness()).rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(await unavailableBody()).toEqual({ status: 'error', details: { shutdown: { status: 'draining' } } });
       expect(mainQuery).not.toHaveBeenCalled();
       expect(dataQuery).not.toHaveBeenCalled();
     });
