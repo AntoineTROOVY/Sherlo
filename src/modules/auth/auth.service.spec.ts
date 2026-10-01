@@ -5,7 +5,13 @@ jest.mock('fs', () => ({ __esModule: true, ...jest.requireActual<typeof import('
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, type QueryDeepPartialEntity } from 'typeorm';
-import { UnauthorizedException, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  UnauthorizedException,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { createHash, createHmac } from 'crypto';
 import * as fs from 'fs';
 import { AuthService, resolveSeedApiKey, bannerKeyLine, UnresolvedApiKeyException } from './auth.service';
@@ -295,6 +301,15 @@ describe('AuthService', () => {
       const expectedHash = hashKey(result.rawKey);
       expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ keyHash: expectedHash }));
     });
+
+    // ISO 8601 week, ordinal and basic forms pass @IsDateString but are an Invalid Date to `new Date`,
+    // which was stored as NaN and read back as an expiry that never arrives.
+    it.each(['2020-W01-1', '2026-274', '20261001T101010Z'])('refuses an unparseable expiresAt %s', async expiresAt => {
+      (repository.create as jest.Mock).mockImplementation((dto: Partial<ApiKey>) => ({ ...dto, id: 'uuid-new' }));
+
+      await expect(service.createApiKey({ name: 'tmp', expiresAt })).rejects.toThrow(BadRequestException);
+      expect(repository.save).not.toHaveBeenCalled();
+    });
   });
 
   // ── findAll / findOne ─────────────────────────────────────────────
@@ -384,6 +399,20 @@ describe('AuthService', () => {
       ).rejects.toThrow(/last active admin/i);
       expect(committedWrites).toHaveLength(0); // neither write landed
     });
+
+    it.each([ApiKeyRole.OPERATOR, ApiKeyRole.ADMIN])(
+      'refuses an unparseable expiresAt on a %s key without writing it',
+      async role => {
+        setupKeys([
+          createMockApiKey({ id: 'uuid-1', role }),
+          createMockApiKey({ id: 'uuid-2', role: ApiKeyRole.ADMIN }),
+        ]);
+
+        await expect(service.update('uuid-1', { expiresAt: '2026-W40-1' })).rejects.toThrow(BadRequestException);
+        expect(committedWrites).toHaveLength(0);
+        expect((await service.findOne('uuid-1')).expiresAt).toBeNull();
+      },
+    );
   });
 
   // ── delete / revoke ───────────────────────────────────────────────
@@ -850,6 +879,14 @@ describe('AuthService', () => {
       (repository.findOne as jest.Mock).mockResolvedValue(key);
 
       await expect(service.validateApiKey('expired')).rejects.toThrow('API key has expired');
+    });
+
+    it('refuses a key whose stored expiry does not parse as a date', async () => {
+      // Older releases stored an unparseable expiry as an Invalid Date; it must not mean "never expires".
+      const key = createMockApiKey({ expiresAt: new Date('2020-W01-1'), keyHash: hashKey('bad-expiry') });
+      (repository.findOne as jest.Mock).mockResolvedValue(key);
+
+      await expect(service.validateApiKey('bad-expiry')).rejects.toThrow('API key has expired');
     });
 
     it('answers 403, not 401, when the IP is not allowed', async () => {

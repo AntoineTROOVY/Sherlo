@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -209,7 +210,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       allowedIps: dto.allowedIps || null,
       allowedSessions: normalizeScopeList(dto.allowedSessions),
       allowedChats: normalizeChatAllowList(dto.allowedChats),
-      expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+      expiresAt: dto.expiresAt ? AuthService.parseExpiry(dto.expiresAt) : null,
     });
 
     const saved = await this.apiKeyRepository.save(apiKey);
@@ -246,7 +247,8 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       (dto.role !== undefined && dto.role !== ApiKeyRole.ADMIN) ||
       (normalizeScopeList(dto.allowedSessions)?.length ?? 0) > 0 ||
       (normalizeChatAllowList(dto.allowedChats)?.length ?? 0) > 0;
-    const setsExpiry = dto.expiresAt !== undefined && dto.expiresAt !== null;
+    const expiry = dto.expiresAt ? AuthService.parseExpiry(dto.expiresAt) : null;
+    const setsExpiry = expiry !== null;
     const removesOrSchedulesLastAdmin = stripsAdmin || setsExpiry;
 
     // Capture the authorization-relevant fields BEFORE applying the change. Only a change to role,
@@ -268,7 +270,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     if (dto.allowedIps !== undefined) patch.allowedIps = dto.allowedIps;
     if (dto.allowedSessions !== undefined) patch.allowedSessions = normalizeScopeList(dto.allowedSessions);
     if (dto.allowedChats !== undefined) patch.allowedChats = normalizeChatAllowList(dto.allowedChats);
-    if (dto.expiresAt !== undefined) patch.expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : null;
+    if (dto.expiresAt !== undefined) patch.expiresAt = expiry;
 
     let saved: ApiKey;
     if (removesOrSchedulesLastAdmin && apiKey.role === ApiKeyRole.ADMIN) {
@@ -280,7 +282,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       const result = await this.withLastAdminGuard(
         this.apiKeyRepository.createQueryBuilder().update(ApiKey).set(patch),
         id,
-        setsExpiry && !stripsAdmin ? new Date(dto.expiresAt as string) : undefined,
+        stripsAdmin ? undefined : (expiry ?? undefined),
       ).execute();
       await this.assertMutationApplied(id, result.affected);
       // The row's post-write state, for the eviction comparison below.
@@ -348,6 +350,17 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     this.evictActiveSockets(id, 'revoked');
     this.keyIndex?.refreshSoon();
     return saved;
+  }
+
+  /**
+   * @IsDateString accepts every ISO 8601 form, but `new Date` parses only some of them: a week
+   * ('2026-W40-1'), ordinal ('2026-274') or basic ('20261001T101010Z') date is an Invalid Date, which
+   * would be stored as NaN and never compare as expired. Refuse it instead.
+   */
+  private static parseExpiry(value: string): Date {
+    const at = new Date(value);
+    if (Number.isNaN(at.getTime())) throw new BadRequestException('expiresAt is not a parseable date');
+    return at;
   }
 
   /**
@@ -515,7 +528,9 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       throw new UnauthorizedException('API key is revoked');
     }
 
-    if (apiKey.expiresAt && apiKey.expiresAt < new Date()) {
+    // Negated so a stored expiry that hydrates to an Invalid Date (every comparison false) counts as
+    // expired rather than never expiring.
+    if (apiKey.expiresAt && !(apiKey.expiresAt >= new Date())) {
       throw new UnauthorizedException('API key has expired');
     }
 
