@@ -48,6 +48,8 @@
 #       error still fails it, however long its output and whatever the host's locale
 #   (ae) the min-content check passes an archive whose listing outgrows a pipe buffer
 #   (af) the online SQLite backup waits out a writer holding the database lock (skipped without sqlite3)
+#   (ag) quoted values, inline comments and `KEY=""` in ./.env resolve as dotenv reads them, and a line
+#       the scripts cannot parse ends the lookup at the default instead of reading data/.env.generated
 #
 # Usage: ./scripts/smoke-test-backup-restore.sh
 # Requires: bash, tar, node (restore.sh path resolution). sqlite3 is optional (see (c) and (k)).
@@ -1400,6 +1402,39 @@ if [ "$HAS_SQLITE3" -eq 1 ]; then
 else
   echo "SKIP: (af) sqlite3 not found on this host, so there is no database lock to wait on"
 fi
+
+echo ""
+echo "==> (ag) quoted, commented and empty-quoted ./.env values resolve as the app reads them"
+# dotenv strips a value's quotes and an unquoted value's comment, and a key it has set keeps
+# data/.env.generated from supplying it. The scripts skipped every such line and read the next layer,
+# so .env.example's commented PLUGINS_DIR line and a `DATABASE_NAME=""` resolved to values the app
+# never uses.
+AG="$WORK/ag"
+mkdir -p "$AG/data"
+cat >"$AG/.env" <<'ENV'
+PLUGINS_DIR=./data/plugins          # Plugin directory (default: ./data/plugins)
+DATABASE_NAME=""
+MAIN_DATABASE_NAME='./data/quoted main.sqlite'
+BAILEYS_AUTH_DIR=./data/bl#inline
+SESSION_DATA_PATH="./data/sess" # quoted, then a comment
+ENV
+printf 'DATABASE_NAME=./elsewhere/openwa.sqlite\nSESSION_DATA_PATH=./elsewhere/sess\n' >"$AG/data/.env.generated"
+resolve_ag() {
+  (cd "$AG" && DATA_DIR=./data && . "$REPO_ROOT/scripts/lib-env.sh" && openwa_resolve "$1" "$2") 2>>"$AG/err"
+}
+# A blank value and an unparsed line both resolve to the default, never to data/.env.generated.
+for check in 'PLUGINS_DIR|./data/plugins' 'DATABASE_NAME|DEFAULT' 'MAIN_DATABASE_NAME|./data/quoted main.sqlite' \
+  'BAILEYS_AUTH_DIR|./data/bl' 'SESSION_DATA_PATH|DEFAULT'; do
+  key="${check%%|*}"
+  got="$(resolve_ag "$key" DEFAULT)"
+  if [ "$got" != "${check#*|}" ]; then
+    fail "(ag) $key resolved to '$got', expected '${check#*|}'"
+  fi
+done
+if [ "$(grep -c 'do not parse' "$AG/err")" -ne 1 ] || ! grep -q 'sets SESSION_DATA_PATH in a form' "$AG/err"; then
+  fail "(ag) the parse warning did not name exactly the one unparsed line: $(cat "$AG/err")"
+fi
+pass "(ag) dotenv's quoted, commented and empty forms resolve like the app, and an unparsed line stops the lookup"
 
 echo ""
 echo "All smoke tests passed!"
