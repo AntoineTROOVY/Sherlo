@@ -273,10 +273,10 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     if (dto.expiresAt !== undefined) patch.expiresAt = expiry;
 
     let saved: ApiKey;
-    if (removesOrSchedulesLastAdmin && apiKey.role === ApiKeyRole.ADMIN) {
-      // The guard's predicate is the target's ROLE, not its usability snapshot: usability also
-      // depends on isActive/expiry/scope, which the guarded statement itself evaluates against live
-      // row state. A non-admin target genuinely cannot strand the system, so it stays lock-free.
+    if (removesOrSchedulesLastAdmin) {
+      // Guarded whatever role the pre-read saw: a concurrent promotion can make the target the last
+      // usable admin before this write lands, and only the statement itself sees the live row. On a
+      // row that is not a usable admin the guard passes, so non-admin keys are unaffected.
       // An expiry pushed later on a key that already expires cannot bring a lockout closer, so the
       // guard lets it through on its own; alongside a demotion or scoping it is guarded as usual.
       const result = await this.withLastAdminGuard(
@@ -305,16 +305,12 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
 
   async delete(id: string): Promise<void> {
     const apiKey = await this.findOne(id);
-    if (apiKey.role === ApiKeyRole.ADMIN) {
-      const result = await this.withLastAdminGuard(
-        this.apiKeyRepository.createQueryBuilder().delete().from(ApiKey),
-        id,
-      ).execute();
-      await this.assertMutationApplied(id, result.affected);
-    } else {
-      // A non-admin target cannot strand the system — no guard needed.
-      await this.apiKeyRepository.remove(apiKey);
-    }
+    // Guarded whatever role the pre-read saw, so the statement judges the live row (see update).
+    const result = await this.withLastAdminGuard(
+      this.apiKeyRepository.createQueryBuilder().delete().from(ApiKey),
+      id,
+    ).execute();
+    await this.assertMutationApplied(id, result.affected);
     // Drop any un-flushed usage accumulator so a deleted key leaves nothing behind in the Map.
     this.usageTracker.forget(id);
     this.removeBootstrapKeyFileIfMatching(apiKey);
@@ -328,19 +324,13 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
 
   async revoke(id: string): Promise<ApiKey> {
     const apiKey = await this.findOne(id);
-    let saved: ApiKey;
-    if (apiKey.role === ApiKeyRole.ADMIN) {
-      const result = await this.withLastAdminGuard(
-        this.apiKeyRepository.createQueryBuilder().update(ApiKey).set({ isActive: false }),
-        id,
-      ).execute();
-      await this.assertMutationApplied(id, result.affected);
-      saved = await this.findOne(id);
-    } else {
-      // A non-admin target cannot strand the system — no guard needed.
-      await this.applyUnguardedUpdate({ isActive: false }, id);
-      saved = await this.findOne(id);
-    }
+    // Guarded whatever role the pre-read saw, so the statement judges the live row (see update).
+    const result = await this.withLastAdminGuard(
+      this.apiKeyRepository.createQueryBuilder().update(ApiKey).set({ isActive: false }),
+      id,
+    ).execute();
+    await this.assertMutationApplied(id, result.affected);
+    const saved = await this.findOne(id);
     // A revoked key fails validation before its next flush, so its accumulator would orphan —
     // drop it here.
     this.usageTracker.forget(id);
@@ -450,7 +440,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Apply a single-row UPDATE with no last-admin guard — the caller has established the target
-   * cannot strand the system (non-admin target, or a non-stripping patch). The SET list is only
+   * cannot strand the system (a patch that neither strips nor expires a key). The SET list is only
    * the patch itself: saving the pre-read ENTITY instead would write every column from that
    * snapshot, resurrecting a revoke or demote that committed between the read and the write (a
    * rename writing isActive: true back over a concurrent false, for instance). There is no guard
