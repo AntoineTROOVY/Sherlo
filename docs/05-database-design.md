@@ -127,7 +127,7 @@ POSTGRES_SCHEMA=public   # Default behavior (historical)
 
 **Validation:**
 
-- Schema name is validated at boot as a legal Postgres identifier (letters, digits, underscores, max 63 chars)
+- Schema name is validated at boot as a lower-case Postgres identifier (a lower-case letter or underscore, then lower-case letters, digits or underscores, max 63 chars)
 - Reserved `pg_` prefix is rejected to prevent conflicts with system schemas
 - Invalid values cause fast boot failure rather than migration-time errors
 
