@@ -651,20 +651,18 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap 
     batch.currentIndex = i + 1;
     batch.results = results;
 
-    // Save progress periodically (every 10 messages or last message)
-    if (i % 10 === 0 || i === batch.messages.length - 1) {
-      // Honor a cancellation issued by ANY process (the in-memory Map only sees same-process
-      // cancels), and a reap that failed the batch after another node took the session over. The
-      // guard lives IN the UPDATE (not a read-then-write), so neither can be written over: zero
-      // affected rows stops the loop, and the row says which of the two it was.
-      const progressSaved = await this.batchRepository.update(
-        { id: batch.id, status: BatchStatus.PROCESSING },
-        { progress: batch.progress, results, currentIndex: batch.currentIndex },
-      );
-      if (!progressSaved.affected) {
-        await this.noteRowLeftProcessing(batch, state, `at index ${i}`);
-        return false;
-      }
+    // Save progress after every item: the row is what batch status, a cancel served by another
+    // process and the reapers read. Honor a cancellation issued by ANY process (the in-memory Map
+    // only sees same-process cancels), and a reap that failed the batch after another node took the
+    // session over. The guard lives IN the UPDATE (not a read-then-write), so neither can be written
+    // over: zero affected rows stops the loop, and the row says which of the two it was.
+    const progressSaved = await this.batchRepository.update(
+      { id: batch.id, status: BatchStatus.PROCESSING },
+      { progress: batch.progress, results, currentIndex: batch.currentIndex },
+    );
+    if (!progressSaved.affected) {
+      await this.noteRowLeftProcessing(batch, state, `at index ${i}`);
+      return false;
     }
 
     // Delay before next message (except for last)
@@ -734,8 +732,7 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap 
     batch.completedAt = new Date();
     batch.results = results;
     // The batch is terminal now (never resumed), so drop the base64 media payloads before persisting —
-    // otherwise the message_batches row retains multi-MB media forever. Intermediate (cadence) saves
-    // above keep the payload so a batch interrupted mid-run can still resume from currentIndex.
+    // otherwise the message_batches row retains multi-MB media forever.
     this.stripBatchMediaPayloads(batch.messages);
     const terminal = {
       status: batch.status,
