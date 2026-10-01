@@ -595,18 +595,18 @@ flowchart LR
         E --> F[Get Session]
         F --> G{Engine loaded?}
         G -->|No| H[400 Error]
-        G -->|Yes| G2{Engine ready?}
-        G2 -->|No| H2[409 Error]
-        G2 -->|Yes| K[Engine]
+        G -->|Yes| S[Store PENDING row]
+        S --> K[Engine send]
     end
 
     subgraph Execution["4. Execution"]
-        K --> L[WhatsApp]
+        K -->|Not ready| H2[409 Error\nrow marked FAILED, message:failed]
+        K -->|Accepted| L[WhatsApp]
     end
 
     subgraph Response["5. Response"]
         L --> M[Success]
-        M --> N[Store]
+        M --> N[Update row to SENT]
         N --> O[Response]
     end
 ```
