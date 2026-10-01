@@ -821,7 +821,9 @@ jobs:
   # This lives in its own `if: always()` job — not inside promote — because the failure path is
   # exactly when cleanup matters most: when boot-smoke or image-scan fails, promote is skipped and
   # the staging tag would otherwise leak. On the happy path the release tags share the staging
-  # version, so the step below keeps it (the deliberate retention documented above); on a failed
+  # version, so the step below does not run at all (the deliberate retention documented above): the
+  # package-versions API is eventually consistent, and a read that does not list the new release
+  # tags yet would count the staging tag alone and delete the version just published. On a failed
   # run the staging tag is alone and gets removed.
   cleanup-staging:
     name: Clean up the staging tag
@@ -833,6 +835,10 @@ jobs:
     needs: [docker, boot-smoke, image-scan, promote]
     steps:
       - name: Remove the staging tag (only when it is alone on its version)
+        # Never after a successful promote: the release tags share this version by construction, so
+        # a tag count of 1 there can only be a stale read. The count below still guards a promote
+        # that failed after attaching some release tags.
+        if: needs.promote.result != 'success'
         # Best-effort: a failed tidy-up must not turn an otherwise successful release red.
         continue-on-error: true
         env:
@@ -875,10 +881,9 @@ jobs:
     name: Verify published tags (anonymous)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # After cleanup-staging, not beside it: GHCR's package-versions API is eventually consistent, so
-    # that job can read a version whose release tags are not listed yet and delete the version the
-    # release just published. This check is the net for exactly that, so it has to run last. It is a
-    # best-effort job, so gate on promote rather than on its result.
+    # After cleanup-staging, not beside it: that job deletes registry versions, so this check has to
+    # see the registry after it, and run last. It is a best-effort job, so gate on promote rather
+    # than on its result.
     needs: [docker, promote, cleanup-staging]
     if: always() && needs.promote.result == 'success'
     # attestations: read for `gh attestation verify` below. GH_TOKEN is an API credential for the
