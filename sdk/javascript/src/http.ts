@@ -19,7 +19,7 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface RequestOptions {
   method: HttpMethod;
-  /** Full path beginning with `/`, e.g. `/api/sessions`. */
+  /** Full path beginning with `/`, e.g. `/api/sessions`; any other path is refused and nothing is sent. */
   path: string;
   /** Query parameters, serialized into the URL. */
   query?: object;
@@ -150,6 +150,11 @@ async function send<T>(
   options: RequestOptions,
   consume: (res: Response) => Promise<T>,
 ): Promise<T> {
+  // The path is appended to the base URL, so one without a leading `/` could move the host
+  // (`.example.net/x`, `@example.net/x`) and send the API key there.
+  if (!options.path.startsWith('/')) {
+    throw new TypeError(`OpenWA: path must begin with "/": ${JSON.stringify(options.path)}`);
+  }
   if (options.path.includes(BLANK_SEGMENT)) {
     throw new TypeError(`OpenWA: empty or dot path segment in ${JSON.stringify(options.path)}`);
   }

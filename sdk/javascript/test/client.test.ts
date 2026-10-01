@@ -105,6 +105,16 @@ describe('OpenWAClient', () => {
     expect(t.calls).toHaveLength(2);
   });
 
+  it('refuses a raw path that does not begin with a slash, so the request never leaves the base host', async () => {
+    const t = new MockTransport().passthrough({ status: 200, body: [] });
+    const c = client(t);
+    for (const path of ['.example.net/api/sessions', '@example.net/x', 'api/sessions', '']) {
+      await expect(c.request({ method: 'GET', path })).rejects.toThrow(TypeError);
+      await expect(c.requestBytes({ method: 'GET', path })).rejects.toThrow(TypeError);
+    }
+    expect(t.calls).toHaveLength(0);
+  });
+
   it('sends a raw path with a trailing slash, a double slash or only a slash as written', async () => {
     const t = new MockTransport().passthrough({ status: 200, body: [] });
     const c = client(t);
