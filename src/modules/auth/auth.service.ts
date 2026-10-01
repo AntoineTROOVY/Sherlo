@@ -158,7 +158,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       const byPrefix = await this.apiKeyRepository.findOne({ where: { keyPrefix: rawKey.substring(0, 12) } });
       if (byPrefix) {
         this.logger.warn(
-          'Bootstrap API key file does not match any stored key hash — API_KEY_PEPPER changed since the key was seeded? The key itself is still live, so the file is kept; restore the original pepper or rotate the key to repair.',
+          'Bootstrap API key file does not match any stored key hash — API_KEY_PEPPER changed since the key was seeded? The key itself is still live, so the file is kept; restore the original pepper, or clear the api_keys table and restart to seed a new admin key.',
           { keyPrefix: byPrefix.keyPrefix, action: 'bootstrap_key_pepper_mismatch' },
         );
         return null;
