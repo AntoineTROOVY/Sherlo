@@ -56,6 +56,12 @@ export interface ReconnectState extends ReconnectAttemptState {
   initInFlight?: boolean;
   /** The failure parked during that window, applied or dropped by executeReconnect once init settles. */
   parkedFailure?: { run: () => void; terminal: boolean };
+  /**
+   * How many attempts executeReconnect has started on this state. An attempt whose re-init fails compares
+   * it with its own number: a later attempt may be mid-teardown with nothing registered yet. A timer
+   * that READY cancelled never starts, so it does not count.
+   */
+  started?: number;
   /** When the session last reached READY; consumed by the next scheduleReconnect (see STABLE_READY_MS). */
   readyAt?: number;
   /**
@@ -1246,6 +1252,7 @@ export class SessionEngineLifecycle {
     // The engine this attempt registers, captured like start() does: the catch must reap this one, not
     // whatever a later attempt has registered by the time the init rejects.
     let mine: IWhatsAppEngine | undefined;
+    const attempt = (state.started = (state.started ?? 0) + 1);
     try {
       // Clean up old engine. Time-bound the teardown: a wedged Chromium (the common reconnect
       // trigger) makes destroy() hang, and a raw await here would stall the reconnect forever —
@@ -1343,10 +1350,12 @@ export class SessionEngineLifecycle {
       // start() sees the session as "already started". Only while it is still registered: otherwise the
       // init deadline has reaped it already, or a later attempt destroyed it as its old engine.
       if (mine && this.engines.isLive(id, mine)) this.evictAndForceDestroy(id, mine);
-      // A disconnect of this attempt's engine mid-init re-armed the same state, and a later attempt
-      // registered a replacement before this init rejected. That attempt owns the episode: arming
-      // another would destroy its engine as the old one, or kill it on the exhausted branch.
-      if (this.engines.has(id)) return;
+      // A disconnect of this attempt's engine mid-init re-armed the same state, so a later attempt that
+      // has started owns the episode, whether it has registered a replacement already or is still tearing
+      // this attempt's engine down (the teardown is often what made this init reject). Arming another
+      // would destroy its engine as the old one, or kill it on the exhausted branch. One still waiting on
+      // its timer needs no return: scheduleReconnect below keeps that timer.
+      if (this.engines.has(id) || state.started !== attempt) return;
       if (this.stoppingSessions.has(id)) {
         this.cancelReconnect(id);
         return;

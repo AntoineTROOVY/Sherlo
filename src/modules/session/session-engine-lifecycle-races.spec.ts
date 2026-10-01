@@ -75,6 +75,7 @@ interface Internals {
   logger: { warn: (...args: unknown[]) => void };
   executeReconnect(id: string, session: Session, state: ReconnectState): Promise<void>;
   scheduleReconnect(id: string, session: Session): void;
+  handleEngineReady(id: string, engine: unknown, phone: string, pushName: string): void;
   rejectRebind(id: string, engine: unknown, name: string, previous: string, incoming: string): Promise<void>;
 }
 
@@ -113,7 +114,12 @@ describe('SessionEngineLifecycle races', () => {
         MessageProjector,
         {
           provide: EventsGateway,
-          useValue: { emitSessionStatus: jest.fn(), emitSessionDisconnected: jest.fn(), emitQRCode: jest.fn() },
+          useValue: {
+            emitSessionStatus: jest.fn(),
+            emitSessionDisconnected: jest.fn(),
+            emitQRCode: jest.fn(),
+            emitSessionAuthenticated: jest.fn(),
+          },
         },
         { provide: WebhookService, useValue: { dispatch: jest.fn().mockResolvedValue(undefined) } },
         { provide: HookManager, useValue: { execute: jest.fn().mockResolvedValue({ continue: true, data: {} }) } },
@@ -263,6 +269,71 @@ describe('SessionEngineLifecycle races', () => {
         sessionId: ID,
         error: 'SQLITE_BUSY',
       });
+    });
+  });
+
+  describe('a reconnect attempt failing while the next one tears its engine down', () => {
+    it('leaves the episode to the later attempt instead of arming another over it', async () => {
+      const state: ReconnectState = { attempts: 1, timer: null, maxAttempts: 5, baseDelay: 5000 };
+      internals.reconnectStates.set(ID, state);
+      const initA = deferred();
+      const destroyA = deferred();
+      const engineA = {
+        ...makeEngine(),
+        initialize: jest.fn().mockReturnValue(initA.promise),
+        destroy: jest.fn().mockReturnValue(destroyA.promise),
+      };
+      const engineB = makeEngine();
+      engineFactory.create.mockReturnValueOnce(engineA).mockReturnValueOnce(engineB);
+
+      const attemptA = internals.executeReconnect(ID, session(), state);
+      await flush();
+      expect(internals.engines.get(ID)).toBe(engineA);
+
+      // Engine A drops mid-init: the next attempt is armed and fires, then waits on A's destroy.
+      internals.scheduleReconnect(ID, session());
+      clearTimeout(state.timer!);
+      state.timer = null;
+      const attemptB = internals.executeReconnect(ID, session(), state);
+      await flush();
+
+      // Closing A is what makes its pending initialize() reject, before B has registered anything.
+      initA.reject(new Error('Target closed'));
+      await attemptA;
+      expect(state.timer).toBeNull();
+
+      destroyA.resolve();
+      await attemptB;
+      await flush();
+
+      expect(internals.engines.get(ID)).toBe(engineB);
+      expect(state.timer).toBeNull();
+      expect(engineFactory.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-arms when the attempt armed after it was cancelled by a READY before it fired', async () => {
+      const state: ReconnectState = { attempts: 1, timer: null, maxAttempts: 5, baseDelay: 5000 };
+      internals.reconnectStates.set(ID, state);
+      const initA = deferred();
+      const engineA = { ...makeEngine(), initialize: jest.fn().mockReturnValue(initA.promise) };
+      engineFactory.create.mockReturnValueOnce(engineA);
+
+      const attemptA = internals.executeReconnect(ID, session(), state);
+      await flush();
+      expect(internals.engines.get(ID)).toBe(engineA);
+
+      // Engine A drops mid-init and arms the next attempt, then reaches READY, which cancels that timer.
+      internals.scheduleReconnect(ID, session());
+      expect(state.timer).not.toBeNull();
+      internals.handleEngineReady(ID, engineA, '628111', 'Push');
+      expect(state.timer).toBeNull();
+
+      // A's init still rejects afterwards: nothing else owns the episode, so A must arm a recovery.
+      initA.reject(new Error('Engine initialization timed out'));
+      await attemptA;
+
+      expect(internals.engines.has(ID)).toBe(false);
+      expect(state.timer).not.toBeNull();
     });
   });
 });
