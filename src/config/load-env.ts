@@ -57,7 +57,7 @@ export function loadEnvironment(): void {
   // 2. User-managed .env (does not override real process env)
   if (fs.existsSync(userEnvPath)) {
     console.log('[Bootstrap] Loading .env from:', userEnvPath);
-    dotenv.config({ path: userEnvPath, override: false });
+    dotenv.config({ path: userEnvPath, override: false, quiet: true });
   }
 
   // Snapshot the layers that will SHADOW the dashboard-saved file — process env plus the .env just
@@ -69,7 +69,7 @@ export function loadEnvironment(): void {
   // 3. Dashboard-saved config (does not override .env or process env)
   if (fs.existsSync(generatedEnvPath)) {
     console.log('[Bootstrap] Loading saved configuration from:', generatedEnvPath);
-    const { parsed = {} } = dotenv.config({ path: generatedEnvPath, override: false });
+    const { parsed = {} } = dotenv.config({ path: generatedEnvPath, override: false, quiet: true });
     // Compose forwards DATABASE_SSL*, and templates older than 0.18 set DATABASE_SSL=false in .env, so
     // a stale line can outrank TLS turned on in the dashboard. The override stands; the log names it.
     for (const key of ['DATABASE_SSL', 'DATABASE_SSL_REJECT_UNAUTHORIZED']) {
@@ -106,7 +106,7 @@ STORAGE_LOCAL_PATH=./data/media
 `;
     writeSecretFile(generatedEnvPath, minimalConfig);
     console.log('[Bootstrap] Created default configuration at:', generatedEnvPath);
-    dotenv.config({ path: generatedEnvPath, override: false });
+    dotenv.config({ path: generatedEnvPath, override: false, quiet: true });
   }
 }
 

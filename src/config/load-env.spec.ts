@@ -71,6 +71,24 @@ describe('loadEnvironment', () => {
     expect(workerConnectionOptions().host).toBe('host-from-process-env');
   });
 
+  // dotenv 17 prints an "injected env ... // tip: ..." line to stdout on every load unless told to be
+  // quiet. It bypasses the logger, so in production it lands as plain text in the JSON log stream.
+  it.each<[string, Record<string, string>]>([
+    [
+      'a saved configuration',
+      { '.env': 'REDIS_HOST=redis.internal\n', 'data/.env.generated': 'QUEUE_ENABLED=false\n' },
+    ],
+    ['a first run', { '.env': 'REDIS_HOST=redis.internal\n' }],
+  ])('keeps dotenv from printing its own load banner on %s', (_case, files) => {
+    delete process.env.DOTENV_CONFIG_QUIET;
+    makeTempCwd(files);
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    runLoader();
+
+    expect(log.mock.calls.map(args => args.join(' '))).not.toContainEqual(expect.stringContaining('injected env'));
+  });
+
   // Older .env templates shipped DATABASE_SSL=false, and compose forwards it, so it silently outranks
   // TLS turned on in the dashboard. The override stands, but the boot log names both values.
   it('warns when a pinned database TLS setting differs from the one saved in the dashboard', () => {
