@@ -6212,7 +6212,7 @@ describe('BaileysAdapter profile + block', () => {
     const adapter = await ready();
     expect(await adapter.getProfilePicture('628111@s.whatsapp.net')).toBe('https://pps/x.jpg');
     expect(fakeSock.profilePictureUrl).toHaveBeenCalledWith('628111@s.whatsapp.net', 'image');
-    fakeSock.profilePictureUrl.mockRejectedValueOnce(new Error('no picture'));
+    fakeSock.profilePictureUrl.mockRejectedValueOnce(new Boom('item-not-found', { data: 404 }));
     expect(await adapter.getProfilePicture('628222@s.whatsapp.net')).toBeNull();
   });
 
