@@ -4,6 +4,7 @@ import { ServiceUnavailableException, UnauthorizedException } from '@nestjs/comm
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { HealthController } from './health.controller';
+import { ReadinessResponseDto } from './dto/health-response.dto';
 import { ShutdownService } from '../../common/services/shutdown.service';
 import { AuthService } from '../auth/auth.service';
 import { AuditService } from '../audit/audit.service';
@@ -268,6 +269,17 @@ describe('HealthController', () => {
       expect(await unavailableBody()).toEqual({ status: 'error', details: { shutdown: { status: 'draining' } } });
       expect(mainQuery).not.toHaveBeenCalled();
       expect(dataQuery).not.toHaveBeenCalled();
+    });
+
+    // The draining 503 answers while every database is up, so the contract must not describe the
+    // status as a dependency outage only.
+    it('documents both 503 causes with the readiness body shape', () => {
+      const responses = Reflect.getMetadata(
+        'swagger/apiResponse',
+        Object.getOwnPropertyDescriptor(HealthController.prototype, 'readiness')?.value as object,
+      ) as Record<string, { description: string; type?: unknown }>;
+      expect(responses['503'].description).toContain('draining');
+      expect(responses['503'].type).toBe(ReadinessResponseDto);
     });
   });
 });
