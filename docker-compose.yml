@@ -66,7 +66,6 @@ services:
     # the openwa user the node/Chromium process keeps NO effective capabilities.
     # read_only rootfs (Chromium's profile lives on the writable /app/data volume;
     # HOME=/tmp + tmpfs absorb stray writes). no-new-privileges blocks setuid escalation.
-    # NOTE: requires a live single-session smoke (Chromium must launch) before merge.
     security_opt:
       - 'no-new-privileges:true'
     cap_drop:
