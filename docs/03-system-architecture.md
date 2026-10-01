@@ -1474,8 +1474,7 @@ There is **no** cache-manager / `CacheModuleOptions` / `redisStore` setup and **
 is unreachable — the service **fails open**: every read returns `null` and every write is a silent
 no-op, so the app keeps serving from its source of truth. In other words, "no cache configured" means
 **no cache** (recompute), not an in-process LRU. Cache is never the source of truth, and today no
-request path reads from it: the only consumers are the infra status probe (`isAvailable`) and a
-sessions-stats snapshot that `StatsService` writes and nothing reads back.
+request path reads from it: its only consumer is the infra status probe (`isAvailable`).
 
 ```typescript
 // src/common/cache/cache.service.ts
