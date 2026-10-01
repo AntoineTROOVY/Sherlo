@@ -15,6 +15,14 @@ export class FfmpegConversionError extends Error {
   }
 }
 
+/** ffmpeg could not be started at all: a host fault (missing binary, EAGAIN, EMFILE), not the input's. */
+export class FfmpegSpawnError extends FfmpegConversionError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FfmpegSpawnError';
+  }
+}
+
 export interface FfmpegRunOptions {
   /** Binary to execute. Resolved through PATH unless absolute. */
   ffmpegPath: string;
@@ -266,7 +274,7 @@ function execute(args: string[], options: FfmpegRunOptions): Promise<void> {
       clearTimeout(timer);
       if (pid !== undefined) runningGroups.delete(pid);
       // Spawn itself failed — almost always a missing binary, which is worth saying plainly.
-      reject(new FfmpegConversionError(`Could not run ffmpeg: ${err instanceof Error ? err.message : String(err)}`));
+      reject(new FfmpegSpawnError(`Could not run ffmpeg: ${err instanceof Error ? err.message : String(err)}`));
     });
 
     child.on('close', code => {

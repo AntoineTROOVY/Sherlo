@@ -10,7 +10,14 @@ import { loadRemoteMediaBuffer } from '../../common/media/load-remote-media';
 import { SsrfBlockedError, SSRF_BLOCKED_CLIENT_MESSAGE } from '../../common/security/ssrf-guard';
 import { ConcurrencyLimiter } from '../../common/utils/concurrency-limiter';
 import { assertBase64WithinMediaCap, stripBase64DataUri } from '../message/media-cap.util';
-import { FfmpegConversionError, probeFfmpeg, runFfmpeg, videoEncodeArgs, voiceEncodeArgs } from './ffmpeg';
+import {
+  FfmpegConversionError,
+  FfmpegSpawnError,
+  probeFfmpeg,
+  runFfmpeg,
+  videoEncodeArgs,
+  voiceEncodeArgs,
+} from './ffmpeg';
 import type { ConvertMediaDto } from './dto/convert-media.dto';
 
 /** What a conversion produced, in the same url-or-base64 vocabulary the send endpoints speak. */
@@ -95,6 +102,15 @@ export class MediaConversionService {
     } catch (error) {
       if (error instanceof Error && error.message === 'ConcurrencyLimiter queue full') {
         throw new ServiceUnavailableException('Media conversion is busy — retry shortly');
+      }
+      if (error instanceof FfmpegSpawnError) {
+        // The host could not start ffmpeg (a binary removed since the probe, or a process, memory or
+        // descriptor limit), which is no fault of the input. Probe again on the next call.
+        this.binaryAvailable = undefined;
+        this.logger.warn('Media conversion could not start ffmpeg', { reason: error.message });
+        throw new ServiceUnavailableException(
+          'Media conversion could not start the ffmpeg binary. Retry shortly, or check FFMPEG_PATH.',
+        );
       }
       if (error instanceof FfmpegConversionError) {
         // ffmpeg's stderr is about the caller's own bytes, so returning it is what makes a rejection

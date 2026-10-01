@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { chmod, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { FfmpegConversionError, killRunningConversions, probeFfmpeg, runFfmpeg } from './ffmpeg';
+import { FfmpegConversionError, FfmpegSpawnError, killRunningConversions, probeFfmpeg, runFfmpeg } from './ffmpeg';
 
 // The real spawn, wrapped so a test can reach the child process it created.
 jest.mock('node:child_process', () => {
@@ -231,7 +231,7 @@ esac
   it('says plainly when the binary cannot be executed at all', async () => {
     await expect(
       runFfmpeg(Buffer.from('input'), 'bin', 'ogg', [], options({ ffmpegPath: join(workDir, 'not-here') })),
-    ).rejects.toBeInstanceOf(FfmpegConversionError);
+    ).rejects.toBeInstanceOf(FfmpegSpawnError);
     await expect(
       runFfmpeg(Buffer.from('input'), 'bin', 'ogg', [], options({ ffmpegPath: join(workDir, 'not-here') })),
     ).rejects.toThrow(/Could not run ffmpeg/);
