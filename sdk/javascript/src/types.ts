@@ -775,11 +775,13 @@ export interface GroupParticipant {
   isSuperAdmin: boolean;
 }
 
-/** Item returned by `GET /sessions/:id/groups` (the slim list shape). */
+/** Item returned by `GET /sessions/:id/groups` (the slim list shape), and the `groups.create` response. */
 export interface GroupSummary {
   id: Jid;
   name: string;
+  /** Only in a `groups.create` response, never in `groups.list`; `groups.get` carries the participants. */
   participantsCount?: number;
+  /** Only in a `groups.create` response, never in `groups.list`; `groups.get` carries each participant's role. */
   isAdmin?: boolean;
   /** JID of the parent community, or null if standalone. */
   linkedParentJID?: string | null;
