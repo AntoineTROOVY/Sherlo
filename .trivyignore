@@ -32,7 +32,7 @@ CVE-2026-102278
 # entry once npm ships a bundle with undici >= 6.28.1.
 CVE-2026-19534
 
-# Chromium: no accepted advisory, and the two architectures are not scanned alike.
+# Chromium: the two architectures are not scanned alike.
 #
 # arm64 installs Debian's `chromium` and `chromium-sandbox` (Dockerfile, TARGETARCH branch) by choice;
 # Chrome for Testing publishes linux-arm64 builds only from 153 on, and the image has not moved arm64 to
