@@ -100,6 +100,8 @@ describe('group DTO validation', () => {
     expect(await errorsFor(GroupSettingsDto, {})).toHaveLength(0);
     expect(await errorsFor(GroupSettingsDto, { announce: true })).toHaveLength(0);
     expect(await errorsFor(GroupSettingsDto, { announce: false, locked: true, ephemeralSeconds: 0 })).toHaveLength(0);
+    expect(await errorsFor(GroupSettingsDto, { memberAddMode: 'admins' })).toHaveLength(0);
+    expect(await errorsFor(GroupSettingsDto, { memberAddMode: 'all' })).toHaveLength(0);
   });
 
   it('GroupSettingsDto rejects wrong field types and a negative timer', async () => {
@@ -107,12 +109,16 @@ describe('group DTO validation', () => {
     expect((await errorsFor(GroupSettingsDto, { locked: 1 })).length).toBeGreaterThan(0);
     expect((await errorsFor(GroupSettingsDto, { ephemeralSeconds: -1 })).length).toBeGreaterThan(0);
     expect((await errorsFor(GroupSettingsDto, { ephemeralSeconds: 1.5 })).length).toBeGreaterThan(0);
+    for (const memberAddMode of ['everyone', '', 1]) {
+      expect((await errorsFor(GroupSettingsDto, { memberAddMode })).length).toBeGreaterThan(0);
+    }
   });
 
   it('GroupSettingsDto rejects an explicit null (400) instead of applying it as a value', async () => {
     expect((await errorsFor(GroupSettingsDto, { announce: null })).length).toBeGreaterThan(0);
     expect((await errorsFor(GroupSettingsDto, { locked: null })).length).toBeGreaterThan(0);
     expect((await errorsFor(GroupSettingsDto, { ephemeralSeconds: null })).length).toBeGreaterThan(0);
+    expect((await errorsFor(GroupSettingsDto, { memberAddMode: null })).length).toBeGreaterThan(0);
   });
 
   it('GroupSettingsDto still rejects unknown properties (forbidNonWhitelisted intact)', async () => {
