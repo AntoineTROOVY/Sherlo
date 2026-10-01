@@ -264,8 +264,8 @@ describe('withSafeFetch (guarded + pinned fetch)', () => {
 
   it('pins the connection by passing a dispatcher to fetch for a hostname target', async () => {
     // The security property: for a DNS hostname the connection MUST go through a pinned dispatcher,
-    // else fetch re-resolves DNS independently and the rebind window reopens. Removing the pin
-    // (dispatcher = undefined) makes this fail.
+    // else fetch re-resolves DNS independently and the rebind window reopens. Dropping the dispatcher
+    // fails here; the real-socket test below fails if it stops dialling the vetted address.
     (dnsPromises.lookup as jest.Mock).mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
     (undiciFetch as jest.Mock).mockResolvedValue({ status: 200, type: 'basic' });
     const use = jest.fn(() => 'used');
@@ -833,6 +833,28 @@ describe('withSafeFetch followRedirects validates every hop over real sockets', 
     } finally {
       await new Promise<void>(resolve => target.close(() => resolve()));
       await new Promise<void>(resolve => redirector.close(() => resolve()));
+    }
+  });
+
+  it('connects a vetted hostname to the address it was vetted at, not a fresh resolution', async () => {
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'text/plain' });
+      res.end('PINNED');
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as AddressInfo).port;
+    // `.invalid` never resolves through real DNS, so the request can only reach the server through
+    // the address the guard vetted and pinned into the dispatcher.
+    process.env.SSRF_ALLOWED_HOSTS = 'pinned.invalid';
+    (dnsPromises.lookup as jest.Mock).mockResolvedValueOnce([{ address: '127.0.0.1', family: 4 }]);
+
+    try {
+      const body = await withSafeFetch(`http://pinned.invalid:${port}/`, {}, async response => await response.text(), {
+        guard: true,
+      });
+      expect(body).toBe('PINNED');
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()));
     }
   });
 
