@@ -249,3 +249,20 @@ test('a config schema without properties opens the config modal and the Sessions
   await screen.findByText('Run for');
   assert.equal(screen.queryByRole('combobox', { name: 'Select a session…' }), null);
 });
+
+test('a fractional value in a bounded number field does not block the override save', async () => {
+  const { screen, fireEvent, waitFor } = rtl;
+  pluginOverride = {
+    config: { threshold: 0.7 },
+    configSchema: { type: 'object', properties: { threshold: { type: 'number', title: 'Threshold', min: 0, max: 1 } } },
+  };
+  putReply = { success: true };
+  await openSessionOverride('Main');
+  const field = await screen.findByLabelText<HTMLInputElement>('Threshold');
+  assert.equal(field.value, '0.7');
+  fireEvent.change(field, { target: { value: '0.5' } });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Save override' }));
+  await waitFor(() => assert.equal(putBodies.length, 1));
+  assert.deepEqual(putBodies, [{ config: { threshold: 0.5 } }]);
+});

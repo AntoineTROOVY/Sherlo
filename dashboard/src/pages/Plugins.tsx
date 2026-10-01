@@ -221,6 +221,8 @@ function ConfigField({
         required={field.required}
         min={field.type === 'number' ? field.min : undefined}
         max={field.type === 'number' ? field.max : undefined}
+        // min/max are value bounds only; without step="any" the default step of 1 rejects 0.7.
+        step={field.type === 'number' ? 'any' : undefined}
         minLength={field.type !== 'number' ? field.min : undefined}
         maxLength={field.type !== 'number' ? field.max : undefined}
         pattern={field.type !== 'number' ? field.pattern : undefined}
