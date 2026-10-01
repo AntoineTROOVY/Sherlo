@@ -99,7 +99,12 @@ export class InfraEngineStatusDto {
   @ApiProperty({ example: './data/sessions' })
   sessionDataPath!: string;
 
-  @ApiProperty({ description: 'Extra Chromium arguments, as configured.', example: '' })
+  @ApiProperty({
+    description:
+      'Effective Chromium launch arguments: PUPPETEER_ARGS or the defaults, with --lang=en-US appended unless a ' +
+      '--lang flag is already present.',
+    example: '--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --lang=en-US',
+  })
   browserArgs!: string;
 
   @ApiPropertyOptional({
