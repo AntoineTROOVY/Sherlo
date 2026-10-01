@@ -394,8 +394,10 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap 
       throw new BadRequestException(`Batch '${batchId}' is already ${batch.status}`);
     }
 
-    // Signal cancellation
-    this.processingBatches.set(batch.id, false);
+    // Signal cancellation to this process's run of the batch. Only that run removes the marker, so a
+    // batch run elsewhere (or already finished here) must not get one: it would leak, and it would
+    // make a later takeover reap skip the batch.
+    if (this.processingBatches.has(batch.id)) this.processingBatches.set(batch.id, false);
 
     // Update status — guarded to the non-terminal statuses IN the UPDATE, so a batch that reached a
     // terminal state between the read above and this write is not relabelled CANCELLED after the

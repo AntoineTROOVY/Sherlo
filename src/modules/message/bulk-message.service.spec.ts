@@ -1548,6 +1548,26 @@ describe('BulkMessageService.cancelBatch', () => {
     );
   });
 
+  // Only the process running a batch removes its marker, and a marker makes the takeover reap skip
+  // the batch, so a cancel must not leave one behind for a batch this process is not running.
+  it('leaves no in-flight marker for a batch another process is running', async () => {
+    repo.findOne.mockResolvedValue(batchWithStatus(BatchStatus.PROCESSING));
+
+    await service.cancelBatch('s1', 'bx');
+
+    expect((service as unknown as { processingBatches: Map<string, boolean> }).processingBatches.has('b1')).toBe(false);
+  });
+
+  it('signals the run of a batch this process is running', async () => {
+    const markers = (service as unknown as { processingBatches: Map<string, boolean> }).processingBatches;
+    markers.set('b1', true);
+    repo.findOne.mockResolvedValue(batchWithStatus(BatchStatus.PROCESSING));
+
+    await service.cancelBatch('s1', 'bx');
+
+    expect(markers.get('b1')).toBe(false);
+  });
+
   it('rejects when the batch turns terminal between the read and the guarded write (no relabelling)', async () => {
     repo.findOne
       .mockResolvedValueOnce(batchWithStatus(BatchStatus.PROCESSING)) // upfront read — still running
