@@ -76,9 +76,9 @@ describe('AddTemplateNameUnique migration', () => {
     await runner.release();
   });
 
-  it('lifts the runtime statement_timeout for the migration transaction on Postgres', async () => {
-    // The runtime data pool's statement_timeout is inherited by the boot-migration connection; this
-    // dedup UPDATE / CREATE UNIQUE INDEX over templates must not be aborted mid-flight.
+  it('clears statement_timeout for the migration transaction on Postgres', async () => {
+    // The migration pool carries no runtime statement_timeout, but a role- or database-level default
+    // could still abort this dedup UPDATE / CREATE UNIQUE INDEX over templates mid-flight.
     const queries: string[] = [];
     const pgRunner = {
       dataSource: { options: { type: 'postgres' } },

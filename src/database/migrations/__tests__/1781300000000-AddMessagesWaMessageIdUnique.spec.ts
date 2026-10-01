@@ -65,9 +65,9 @@ describe('AddMessagesWaMessageIdUnique migration', () => {
     await runner.release();
   });
 
-  it('lifts the runtime statement_timeout for the migration transaction on Postgres', async () => {
-    // The runtime data pool carries a statement_timeout that is inherited by the boot-migration
-    // connection; this DELETE / CREATE UNIQUE INDEX over the hot messages table must not be aborted.
+  it('clears statement_timeout for the migration transaction on Postgres', async () => {
+    // The migration pool carries no runtime statement_timeout, but a role- or database-level default
+    // could still abort this DELETE / CREATE UNIQUE INDEX over the hot messages table mid-flight.
     const queries: string[] = [];
     const pgRunner = {
       dataSource: { options: { type: 'postgres' } },
