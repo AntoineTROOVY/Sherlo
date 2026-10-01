@@ -412,14 +412,17 @@ class TestSessions:
         client.sessions.list()
         assert backend.calls[-1].url == "http://localhost:2785/api/sessions"
         client.sessions.get("s1")
-        assert "/sessions/s1" in backend.calls[-1].url
+        assert backend.calls[-1].url == "http://localhost:2785/api/sessions/s1"
         client.sessions.create({"name": "n"})
         assert backend.calls[-1].body == {"name": "n"}
         client.sessions.start("s1")
         assert "/sessions/s1/start" in backend.calls[-1].url
+        # The mock answers any path under the generic /api/sessions prefix, so only the URL proves
+        # stop did not land on logout (which unlinks the device).
         client.sessions.stop("s1")
+        assert backend.calls[-1].url == "http://localhost:2785/api/sessions/s1/stop"
         client.sessions.logout("s1")
-        assert "/sessions/s1/logout" in backend.calls[-1].url
+        assert backend.calls[-1].url == "http://localhost:2785/api/sessions/s1/logout"
         client.sessions.force_kill("s1")
         assert "/sessions/s1/force-kill" in backend.calls[-1].url
         client.sessions.delete("s1")
@@ -767,7 +770,9 @@ class TestChatsAndHealth:
         client.chats.mark_read("s", {"chatId": "a@c.us"})
         assert "/chats/read" in backend.calls[-1].url
         client.chats.mark_unread("s", {"chatId": "a@c.us"})
+        assert backend.calls[-1].url == "http://localhost:2785/api/sessions/s/chats/unread"
         client.chats.delete("s", {"chatId": "a@c.us"})
+        assert backend.calls[-1].url == "http://localhost:2785/api/sessions/s/chats/delete"
         client.chats.send_state("s", {"chatId": "a@c.us", "state": "typing"})
         assert "/chats/typing" in backend.calls[-1].url
 
@@ -842,6 +847,7 @@ class TestChatsAndHealth:
         client.health.check()
         assert backend.calls[-1].url == "http://localhost:2785/api/health"
         client.health.live()
+        assert backend.calls[-1].url == "http://localhost:2785/api/health/live"
         assert client.health.ready()["details"]["mainDatabase"]["status"] == "up"
         client.auth()
         assert backend.calls[-1].method == "POST"
