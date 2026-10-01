@@ -248,8 +248,8 @@ docker compose restart openwa-api
 
 Proxy egress (if WhatsApp is blocked on your network) is configured **per session** via the
 `proxyUrl` field on `POST /api/sessions` or with `PATCH /api/sessions/:sessionId/proxy`, both of
-which need an ADMIN key — it is **not** an environment variable, and an unreachable proxy silently blocks the WhatsApp WebSocket (see the _No QR code appears, or `/start`
-returns `504`_ entry below).
+which need an ADMIN key. It is **not** an environment variable, and an unreachable proxy silently
+blocks the WhatsApp WebSocket (see the _No QR code appears, or `/start` returns `504`_ entry below).
 
 ### Issue: Linking asks for a passkey and never completes (both engines)
 
@@ -314,7 +314,7 @@ curl -X POST "$BASE/api/sessions/{sessionId}/start" -H "X-API-Key: $API_KEY"
 
 > ℹ️ Proxy egress for the `whatsapp-web.js` engine is configured **per session** via the
 > `proxyUrl` field on `POST /api/sessions` or `PATCH /api/sessions/:sessionId/proxy` (ADMIN key for
-> both) — not via environment variables.
+> both), not via environment variables.
 
 > ℹ️ A `504` whose body starts with `Engine initialization timed out after ...` is a **different**
 > failure with a different fix: initialization never finished at all. That happens when WhatsApp Web,
