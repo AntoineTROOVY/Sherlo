@@ -8,8 +8,8 @@ quadrantChart
     x-axis Low Impact --> High Impact
     y-axis Low Probability --> High Probability
 
-    quadrant-1 Monitor
-    quadrant-2 Critical
+    quadrant-1 Critical
+    quadrant-2 Monitor
     quadrant-3 Low Priority
     quadrant-4 Mitigate
 
@@ -19,6 +19,8 @@ quadrantChart
     Maintainer Burnout: [0.5, 0.4]
     Dependency Issues: [0.4, 0.6]
     Legal Issues: [0.8, 0.2]
+    Rate Limiting: [0.45, 0.7]
+    Data Loss: [0.7, 0.2]
 ```
 
 ## 16.2 Risk Register
