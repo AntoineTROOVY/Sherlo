@@ -609,6 +609,39 @@ describe('mountMcpServer (raw-Express request-handling path)', () => {
     else expect(h.authService.validateApiKey).toHaveBeenCalledWith(expected, undefined, 's1');
   });
 
+  // Node keeps only the first of two Authorization headers, while the SDK's web Request joins them,
+  // so the tool call must reuse the key the gate validated rather than parse its own header copy.
+  it('uses the key the gate validated when the SDK headers carry a joined Authorization', async () => {
+    const h = mount();
+    h.authService.validateApiKey.mockResolvedValue({ id: 'k1' });
+    const gate = (h.adapter.post.mock.calls[0] as unknown[])[3] as (
+      req: Request,
+      res: Response,
+      next: () => void,
+    ) => Promise<void>;
+    const req = {
+      method: 'POST',
+      path: '/mcp',
+      headers: { authorization: 'Bearer good-key' },
+      body: { jsonrpc: '2.0', id: 1 },
+      socket: { remoteAddress: '203.0.113.7' },
+    } as unknown as Request & { auth?: unknown };
+    const next = jest.fn();
+    await gate(req, makeRes() as unknown as Response, next);
+    expect(next).toHaveBeenCalledTimes(1);
+    await h.routeHandler(req, makeRes() as unknown as Response);
+
+    const result = (await toolCallback()(
+      { sessionId: 's1', to: '123', text: 'hi' },
+      { authInfo: req.auth, requestInfo: { headers: { authorization: 'Bearer good-key, Bearer other-key' } } },
+    )) as { isError?: boolean };
+
+    expect(result.isError).toBeFalsy();
+    expect(h.authService.validateApiKey).toHaveBeenLastCalledWith('good-key', undefined, 's1');
+    expect(h.tool.handler).toHaveBeenCalledTimes(1);
+    expect(h.auditService.logWarn).not.toHaveBeenCalled();
+  });
+
   it('fails closed on a session-scoped tool call without sessionId (guard fires before the auth lookup)', async () => {
     const h = mount();
     await post(h, { jsonrpc: '2.0', id: 1 }, { authorization: 'Bearer good-key' });
