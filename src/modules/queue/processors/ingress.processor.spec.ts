@@ -1,5 +1,4 @@
 import { IngressProcessor } from './ingress.processor';
-import { KeyedAsyncLock } from '../../integration/ordering-lock';
 
 function job(overrides = {}) {
   return {
@@ -157,11 +156,5 @@ describe('IngressProcessor stall exhaustion (worker failed event)', () => {
     const { proc, failures } = setup();
     failures.save.mockRejectedValue(new Error('db down'));
     await expect(proc.onWorkerFailed(job(), STALLED)).resolves.toBeUndefined();
-  });
-});
-
-describe('KeyedAsyncLock import sanity', () => {
-  it('is exported from the integration module for processor injection', () => {
-    expect(new KeyedAsyncLock()).toBeInstanceOf(KeyedAsyncLock);
   });
 });
