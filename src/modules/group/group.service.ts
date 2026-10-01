@@ -173,14 +173,22 @@ export class GroupService {
    * client error it is.
    */
   getGroupJoinInfo(sessionId: string, inviteCode: string) {
-    if (!inviteCode?.trim()) {
-      throw new BadRequestException('An invite code is required');
-    }
-    return this.getEngine(sessionId).getGroupJoinInfo(inviteCode.trim());
+    const code = this.requireInviteCode(inviteCode);
+    return this.getEngine(sessionId).getGroupJoinInfo(code);
   }
 
+  /** Same rule as the preview, so a code that previews also joins. */
   joinGroupViaInviteCode(sessionId: string, inviteCode: string) {
-    return this.getEngine(sessionId).joinGroupViaInviteCode(inviteCode);
+    const code = this.requireInviteCode(inviteCode);
+    return this.getEngine(sessionId).joinGroupViaInviteCode(code);
+  }
+
+  private requireInviteCode(inviteCode: string): string {
+    const code = inviteCode?.trim();
+    if (!code) {
+      throw new BadRequestException('An invite code is required');
+    }
+    return code;
   }
 
   /**

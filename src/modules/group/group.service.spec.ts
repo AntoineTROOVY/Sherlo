@@ -193,6 +193,16 @@ describe('GroupService', () => {
     expect(joinGroupViaInviteCode).toHaveBeenCalledWith('CODE123');
   });
 
+  // Same rule as the join-info preview, so a code that previews also joins.
+  it('joinGroupViaInviteCode sends the trimmed code and refuses a blank one locally', () => {
+    const joinGroupViaInviteCode = jest.fn().mockResolvedValue('120363000@g.us');
+    const svc = makeService({ joinGroupViaInviteCode });
+    void svc.joinGroupViaInviteCode('s1', ' CODE123 ');
+    expect(joinGroupViaInviteCode).toHaveBeenCalledWith('CODE123');
+    expect(() => svc.joinGroupViaInviteCode('s1', '   ')).toThrow(BadRequestException);
+    expect(joinGroupViaInviteCode).toHaveBeenCalledTimes(1);
+  });
+
   describe('getGroupSettings', () => {
     it('maps the settings fields from getGroupInfo', async () => {
       const svc = makeService({
