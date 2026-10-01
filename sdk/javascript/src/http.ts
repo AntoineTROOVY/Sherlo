@@ -75,7 +75,8 @@ export function buildUrl(baseUrl: string, path: string, query?: object): string 
     params.append(key, String(value));
   }
   const qs = params.toString();
-  return qs ? `${url}?${qs}` : url;
+  // A raw path may already carry a query string; extend it rather than start a second one.
+  return qs ? `${url}${path.includes('?') ? '&' : '?'}${qs}` : url;
 }
 
 /**
