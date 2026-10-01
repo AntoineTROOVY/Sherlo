@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
-/** Cap on each addressbook name part. Mirrors CONTACT_NAME_MAX_LENGTH on the send-contact DTO. */
+/** Cap on each addressbook name part. Independent of CONTACT_NAME_MAX_LENGTH (255) on the send-contact DTO. */
 export const ADDRESSBOOK_NAME_MAX_LENGTH = 100;
 
 export class UpsertContactDto {
