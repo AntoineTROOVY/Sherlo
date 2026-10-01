@@ -1215,7 +1215,7 @@ flowchart TB
 
     subgraph Migration["Migration Path"]
         C[Update engine library]
-        D[Switch ENGINE_TYPE to the other engine]
+        D[Switch ENGINE_TYPE to the other engine\nre-link each session by QR or pairing code]
         E[Track upstream fix\nOperators use fallback channel]
     end
 
@@ -1223,6 +1223,7 @@ flowchart TB
         F[Service Restored]
     end
 
+    A2 --> B
     A --> B
     B -->|Minor| C --> F
     B -->|Major one engine| D --> F
