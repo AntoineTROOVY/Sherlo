@@ -880,7 +880,7 @@ describe('IngressService per-instance rate bucket', () => {
           route: 'chatwoot',
           maxBodyBytes: 1024,
           signature: { scheme: 'none' },
-          response: { preflight: ['session-alive'], ack: { status: 200 } },
+          response: { preflight: [{ type: 'session-alive' }], ack: { status: 200 } },
         }),
       }),
     );
