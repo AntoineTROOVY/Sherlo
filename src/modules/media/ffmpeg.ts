@@ -99,8 +99,10 @@ export function buildFfmpegArgs(
   // the temp directory (a RAM-backed tmpfs in the compose files) before the size check after exit.
   // It is an output option, so it sits right before the output path. The limit is one byte above
   // the cap: a cut-off file is then always over the cap and rejected, and a complete one at the cap
-  // still passes.
-  return [...BASE_ARGS, '-i', inputPath, ...encodeArgs, '-fs', String(maxOutputBytes + 1), outputPath];
+  // still passes. ffmpeg refuses a -fs past a 64-bit integer, so a limit too large to matter is clamped
+  // rather than failing every conversion.
+  const fs = Math.min(maxOutputBytes, Number.MAX_SAFE_INTEGER - 1) + 1;
+  return [...BASE_ARGS, '-i', inputPath, ...encodeArgs, '-fs', String(fs), outputPath];
 }
 
 /**

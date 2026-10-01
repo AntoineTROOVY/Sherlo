@@ -89,6 +89,15 @@ describe('ffmpeg invocation shape', () => {
     expect(at).toBe(args.length - 3);
   });
 
+  // ffmpeg parses -fs as a signed 64-bit integer and exits 1 on anything wider, so a row-of-nines cap
+  // meant as "unlimited" would fail every conversion instead.
+  it('keeps the size cap within what ffmpeg accepts, however large the configured limit', () => {
+    for (const limit of [Number('99999999999999999999'), 1e21]) {
+      const huge = buildFfmpegArgs('/in', '/out', [], limit);
+      expect(huge[huge.indexOf('-fs') + 1]).toBe(String(Number.MAX_SAFE_INTEGER));
+    }
+  });
+
   it('confines ffmpeg to the file protocol', () => {
     expect(args[args.indexOf('-protocol_whitelist') + 1]).toBe('file');
   });
