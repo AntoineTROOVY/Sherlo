@@ -12,7 +12,9 @@ import { ENGINE_NOT_READY_409, SESSION_NOT_STARTED_404 } from '../../common/open
  * unanswered for an account without a catalog. The adapter bounds that walk with its own budget
  * rather than reporting an unanswered query as an empty catalog.
  */
-const CATALOG_TIMEOUT_503 = 'WhatsApp did not answer the catalog query within the request budget — retry shortly.';
+const CATALOG_TIMEOUT_503 =
+  'WhatsApp did not answer the catalog query within the request budget. For some business accounts ' +
+  'WhatsApp never answers it, so a retry may not help.';
 
 @ApiTags('catalog')
 @Controller('sessions/:sessionId')
@@ -74,7 +76,7 @@ export class CatalogController {
   @RequireRole(ApiKeyRole.OPERATOR)
   @ApiOperation({ summary: 'Send a product message (Baileys engine only)' })
   @ApiResponse({ status: 201, description: 'Product message accepted for sending', type: ProductMessageResponseDto })
-  @ApiResponse({ status: 404, description: 'Product id not found in the session catalog.' })
+  @ApiResponse({ status: 404, description: 'Product id not found in the session catalog. ' + SESSION_NOT_STARTED_404 })
   @ApiResponse({
     status: 400,
     description:
