@@ -720,6 +720,25 @@ describe('validateEnv', () => {
     },
   );
 
+  it('rejects a non-positive or overflowing SSRF_DNS_TIMEOUT_MS', () => {
+    expect(() => validateEnv({ SSRF_DNS_TIMEOUT_MS: '0' })).toThrow(/SSRF_DNS_TIMEOUT_MS must be a positive integer/);
+    expect(() => validateEnv({ SSRF_DNS_TIMEOUT_MS: '10s' })).toThrow(/SSRF_DNS_TIMEOUT_MS must be a positive integer/);
+    expect(() => validateEnv({ SSRF_DNS_TIMEOUT_MS: '2147483648' })).toThrow(
+      /SSRF_DNS_TIMEOUT_MS must not exceed 2147483647 ms/,
+    );
+    expect(() => validateEnv({ SSRF_DNS_TIMEOUT_MS: '2147483647' })).not.toThrow();
+  });
+
+  // pg arms these with setTimeout and sends statement_timeout to a server capped at INT_MAX; 0 still disables.
+  it.each(['DATABASE_CONNECTION_TIMEOUT_MS', 'DATABASE_IDLE_TIMEOUT_MS', 'DATABASE_STATEMENT_TIMEOUT_MS'])(
+    'rejects a %s above 2147483647 ms and keeps 0',
+    key => {
+      expect(() => validateEnv({ [key]: '99999999999' })).toThrow(new RegExp(`${key} must not exceed 2147483647 ms`));
+      expect(() => validateEnv({ [key]: '2147483647' })).not.toThrow();
+      expect(() => validateEnv({ [key]: '0' })).not.toThrow();
+    },
+  );
+
   it('rejects a SESSION_LEASE_HEARTBEAT_MS above the Node timer ceiling even inside a longer lease', () => {
     const lease = { SESSION_LEASE_TTL_MS: '5000000000' };
     expect(() => validateEnv({ ...lease, SESSION_LEASE_HEARTBEAT_MS: '2147483648' })).toThrow(
