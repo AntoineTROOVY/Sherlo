@@ -1,3 +1,4 @@
+import { hostname } from 'node:os';
 import { DataSource, Repository } from 'typeorm';
 import { SessionOwnershipService } from './session-ownership.service';
 import { Session } from './entities/session.entity';
@@ -656,11 +657,15 @@ describe('SessionOwnershipService', () => {
 
   describe('node identity', () => {
     it('falls back to the hostname when nothing is configured, and never to the pid', () => {
-      const bare = new SessionOwnershipService(sessions);
-      expect(bare.nodeId).toBeTruthy();
       // A pid-derived id would never match after a restart, so a process could not recognise — and
       // therefore could not reset — its own leftover rows.
-      expect(bare.nodeId).not.toContain(String(process.pid));
+      const saved = process.env.NODE_ID;
+      delete process.env.NODE_ID;
+      try {
+        expect(new SessionOwnershipService(sessions).nodeId).toBe(hostname());
+      } finally {
+        if (saved !== undefined) process.env.NODE_ID = saved;
+      }
     });
   });
 
