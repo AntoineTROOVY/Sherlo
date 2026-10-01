@@ -1,3 +1,5 @@
+// A plain-object copy of fs, so a test can spy on existsSync (the real module's exports are not configurable).
+jest.mock('fs', () => ({ __esModule: true, ...jest.requireActual<typeof import('fs')>('fs') }));
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -370,14 +372,25 @@ describe('EngineFactory', () => {
 
     // Why the legacy purge matches a directory listing instead of asking existsSync: there, deleting
     // `Alice` would remove the directory holding `alice`'s login, which is #1597 through the delete
-    // path. The two only diverge on a case-insensitive filesystem, which is where the bug lives.
+    // path. The two only diverge on a case-insensitive filesystem, which is where the bug lives, so
+    // existsSync is made to answer as one does: CI runs on a case-sensitive one, where it never would.
     it('leaves a legacy directory whose stored name differs only in case alone', async () => {
       const { factory } = buildBothDirFactory('baileys');
       const otherSession = wwjsAuthDir(path.join(tmpRoot, 'sessions'), 'alice');
       fs.mkdirSync(otherSession, { recursive: true });
 
-      await factory.purgeSessionData(SESSION_ID, 'Alice');
+      const exists = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      const rm = jest.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
+      try {
+        await factory.purgeSessionData(SESSION_ID, 'Alice');
+        expect(rm).not.toHaveBeenCalledWith(wwjsAuthDir(path.join(tmpRoot, 'sessions'), 'Alice'), expect.anything());
+        expect(rm).not.toHaveBeenCalledWith(baileysAuthDir(path.join(tmpRoot, 'baileys'), 'Alice'), expect.anything());
+      } finally {
+        exists.mockRestore();
+        rm.mockRestore();
+      }
 
+      await factory.purgeSessionData(SESSION_ID, 'Alice');
       expect(fs.existsSync(otherSession)).toBe(true);
     });
 
