@@ -292,7 +292,7 @@ export function mountMcpServer(
   type Mount = (path: string, ...handlers: RequestHandler[]) => unknown;
   const adapter = httpAdapter as unknown as { post: Mount; get: Mount; delete: Mount };
   // The route throttle gates the auth DB lookup and per-request MCP server/transport construction. The
-  // process-wide capped json() in main.ts runs first for all routes; this route-level parser is a
+  // process-wide capped json() in src/configure-app.ts runs first for all routes; this route-level parser is a
   // defensive fallback and no-ops once the global parser has consumed the body. It sits before the
   // throttle so the throttle always sees a parsed body and can charge a batch per message.
   // `inflate: false` matches the global parsers: a compressed body is refused by the budget
