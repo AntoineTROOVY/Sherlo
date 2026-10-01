@@ -42,6 +42,7 @@ All five SDKs expose the same fluent resource surface:
 | `calls`     | rejectCall, createLink _(OPERATOR)_                                                                                                                                                                                                                                                        |
 | `media`     | conversionStatus, convertVoice _(OPERATOR)_, convertVideo _(OPERATOR)_                                                                                                                                                                                                                     |
 | `health`    | check, live, ready                                                                                                                                                                                                                                                                         |
+| `auth`      | validate (`client.auth()`; `client.Auth.Validate` in Go)                                                                                                                                                                                                                                   |
 
 The table describes `main`. The 0.5.0 registry builds do not include
 `sessions.getProxy`, `sessions.updateProxy` or `messages.clickButton`
@@ -66,7 +67,8 @@ ships with the next SDK release.
 
 > ⚠️ Endpoints requiring an `OPERATOR`-level API key are noted in the inline
 > docs. Deliberately **not** exposed, matching `docs/18-sdk-design.md` exactly:
-> `auth`/api-keys, `audit`, `settings`, `stats`, `automation`, `infra`,
+> `auth/api-keys` (key validation itself is the `auth` row above), `audit`,
+> `settings`, `stats`, `automation`, `infra`,
 > `plugins`, the `integration` management routes, `metrics`, `mcp`, `ingress`
 > and `docker`. These two lists have to agree — they did not, in both
 > directions, and a list that disagrees with its own design doc reads as an
