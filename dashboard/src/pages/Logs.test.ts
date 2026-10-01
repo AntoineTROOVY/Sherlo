@@ -321,3 +321,13 @@ test('the severity badge shows the translated severity', async () => {
   const badges = [...container.querySelectorAll('.severity-badge')].map(badge => badge.textContent);
   assert.deepEqual(badges, ['Info', 'Error']);
 });
+
+test('the search matches errorMessage as well as action, whatever the case', async () => {
+  const { screen, fireEvent, waitFor } = rtl;
+  renderLogs();
+  await screen.findByText('infra.restart');
+  // Only LOG_FAILED_SEND's errorMessage ('SESSION_STOP_INCOMPLETE') holds this, and only case-insensitively.
+  fireEvent.change(screen.getByPlaceholderText('Search logs...'), { target: { value: 'Stop_Incomplete' } });
+  await waitFor(() => assert.ok(!screen.queryByText('infra.restart'), 'the search did not filter'));
+  assert.ok(screen.queryByText('session.stop'), 'the errorMessage match was hidden');
+});
