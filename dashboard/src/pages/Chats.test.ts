@@ -1437,7 +1437,7 @@ test('a staged reply is kept on reopening its chat and dropped when a different 
   );
 });
 
-test('a chat reopened after switching sessions and back fetches its thread again', async () => {
+async function reopenAfterSessionSwitch(): Promise<void> {
   const { screen, fireEvent, within, waitFor } = rtl;
   twoSessions = true;
   chatsResponder = sessionId => Promise.resolve(jsonResponse(sessionId === SESSION.id ? [CHAT] : [CHAT_2]));
@@ -1474,6 +1474,36 @@ test('a chat reopened after switching sessions and back fetches its thread again
     globalThis.fetch = stub;
     twoSessions = false;
   }
+}
+
+test('a chat reopened after switching sessions and back fetches its thread again', reopenAfterSessionSwitch);
+
+// A chat-scoped key is refused at the /events handshake, so its page never has a live feed.
+test('a chat reopened after switching sessions and back fetches its thread again without a live feed', async () => {
+  holdConnect();
+  await reopenAfterSessionSwitch();
+});
+
+// A drop alone delivers nothing new; the reconnect is what refetches the open thread.
+test('a socket drop does not refetch the open thread', async () => {
+  const { screen, fireEvent, within, act } = rtl;
+  resetFetchCalls();
+  const { container } = renderChats();
+  fireEvent.click(await screen.findByText('Alice'));
+  await within(container.querySelector('.room-messages') as HTMLElement).findByText('hello from alice');
+  const threadFetches = () =>
+    fetchCalls.filter(
+      c =>
+        c.method === 'GET' &&
+        c.path.startsWith(`/api/sessions/${SESSION.id}/messages?chatId=${encodeURIComponent(CHAT.id)}&`),
+    ).length;
+  const before = threadFetches();
+
+  const socket = lastSocket();
+  assert.ok(socket, 'expected the page to have opened a socket');
+  act(() => socket.receive('disconnect', 'transport close'));
+  await act(() => new Promise(resolve => setTimeout(resolve, 50)));
+  assert.equal(threadFetches(), before, 'the open thread was refetched on a socket drop');
 });
 
 test('a staged reply is dropped when another session is opened', async () => {

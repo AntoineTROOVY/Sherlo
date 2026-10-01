@@ -675,6 +675,14 @@ export function Chats() {
     }
   }, [isConnected, connectionFailed, selectedSessionId, queryClient, loadChats, activeChatId, canWrite, markChatRead]);
 
+  // The threads cache at staleTime: Infinity, and this session's events were not delivered while
+  // another session was selected or the page was away. Mark them stale on a mount or a session switch
+  // so the open one refetches and the others do when opened, with or without a live feed (a
+  // chat-scoped key is refused one).
+  useEffect(() => {
+    if (selectedSessionId) void queryClient.invalidateQueries({ queryKey: ['messages', selectedSessionId] });
+  }, [selectedSessionId, queryClient]);
+
   useEffect(() => {
     if (selectedSessionId && isConnected) {
       subscribe(selectedSessionId, [
@@ -686,9 +694,8 @@ export function Chats() {
         'message.edited',
         'status.received',
       ]);
-      // The threads cache at staleTime: Infinity, and events for this session were not delivered before
-      // this subscribe: after a mount, a session switch or a reconnect, a cached thread may miss some.
-      // Mark them stale so the open one refetches and the others do when opened.
+      // Events sent while the socket was down were not delivered: after a reconnect, a cached thread
+      // may miss some. Mark them stale the same way.
       void queryClient.invalidateQueries({ queryKey: ['messages', selectedSessionId] });
       return () => {
         unsubscribe(selectedSessionId);
