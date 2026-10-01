@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsIn, IsObject, IsOptional, IsString, IsUrl, Matches, MaxLength, MinLength, Validate } from 'class-validator';
 import { MaxCodePoints } from '../../../common/validation/max-code-points';
 import { HasDecodableProxyCredentialsConstraint } from './has-decodable-proxy-credentials.validator';
+import { normaliseSessionConfig, RecognisedSessionConfigConstraint } from './recognised-session-config.validator';
 
 export class CreateSessionDto {
   @ApiProperty({
@@ -32,8 +34,10 @@ export class CreateSessionDto {
       'from the next session start.',
     example: { autoRejectCalls: false, maxReconnectAttempts: 5, reconnectBaseDelay: 5000 },
   })
+  @Transform(({ value }) => normaliseSessionConfig(value))
   @IsOptional()
   @IsObject()
+  @Validate(RecognisedSessionConfigConstraint)
   config?: Record<string, unknown>;
 
   // Phase 3: Proxy per session
