@@ -135,7 +135,11 @@ describe('SessionTakeoverService', () => {
     const { svc } = build([lapsed({ name: 'raced' }), lapsed({ name: 'ours' })], { startImpl: start });
 
     const sweep = svc.sweep();
-    await jest.advanceTimersByTimeAsync(2100); // the inter-launch stagger
+    // The second launch waits out the inter-launch stagger, to the millisecond.
+    await jest.advanceTimersByTimeAsync(1999);
+    expect(start).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(start).toHaveBeenCalledTimes(2);
     await sweep;
 
     expect(start.mock.calls).toEqual([['id-raced'], ['id-ours']]);
@@ -159,7 +163,7 @@ describe('SessionTakeoverService', () => {
     const { svc } = build([lapsed({ name: 'boom' }), lapsed({ name: 'fine' })], { startImpl: start });
 
     const sweep = svc.sweep();
-    await jest.advanceTimersByTimeAsync(2100);
+    await jest.advanceTimersByTimeAsync(2000); // the inter-launch stagger
     await expect(sweep).resolves.toBeUndefined();
 
     expect(start).toHaveBeenCalledTimes(2);

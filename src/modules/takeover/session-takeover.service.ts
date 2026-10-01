@@ -1,6 +1,5 @@
 import { ConflictException, Injectable, OnApplicationBootstrap, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { setTimeout } from 'node:timers/promises';
 import { createLogger } from '../../common/services/logger.service';
 import { resolveFeatureFlags } from '../../config/feature-flags';
 import { Session, SessionStatus } from '../session/entities/session.entity';
@@ -182,7 +181,7 @@ export class SessionTakeoverService implements OnApplicationBootstrap, OnModuleD
         }
       }
       if (i < eligible.length - 1) {
-        await setTimeout(TAKEOVER_START_STAGGER_MS);
+        await new Promise(resolve => setTimeout(resolve, TAKEOVER_START_STAGGER_MS));
       }
     }
   }
