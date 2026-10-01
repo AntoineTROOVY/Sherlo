@@ -31,8 +31,9 @@ The overriding goal is to preserve the sandboxed-worker safety invariants _by co
 plugins reach the host through a capability-gated worker bridge; the worker is fault containment, not a
 security boundary against a malicious plugin (see [30 - Plugin Sandboxing](./30-plugin-sandboxing.md)).
 Every host↔worker message is a serializable POJO across a `structuredClone` boundary; host-initiated
-calls fail open on a timeout and drain on a worker crash; permissions are manifest-static and cannot be
-widened by configuration; session scope is enforced host-side.
+calls are bounded by a timeout and drain on a worker crash (a hook fails open; an ingress dispatch fails
+the delivery); permissions are manifest-static and cannot be widened by configuration; session scope is
+enforced host-side.
 
 Rather than invent new machinery that would have to re-earn those properties, the Integration Fabric is
 **~90% a faithful clone of seams OpenWA already ships**:
