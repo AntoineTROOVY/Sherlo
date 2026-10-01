@@ -33,6 +33,7 @@ import { SessionStatusBroadcaster } from './session-status-broadcaster';
 // resulting import cycle is deferred-usage only — the bindings are read inside method bodies,
 // never at module-eval time — which the CommonJS loader resolves safely.
 import {
+  isReconnectPending,
   resolveMaxConcurrentSessions,
   resolveReconnectConfig,
   type ReconnectState,
@@ -194,8 +195,11 @@ export class SessionEngineControls {
         // `engines` (set at the start of initializeEngine) and `initializingSessions` (until
         // start()'s finally), so summing the two sizes would double-count it; and `id` itself is
         // already reserved in `initializingSessions` (added at entry), so it must not count
-        // against the cap it is being checked against.
+        // against the cap it is being checked against. A session waiting out a failed relaunch holds
+        // no engine (the attempt evicted it) but re-registers one when its timer fires, without a cap
+        // check of its own, so it keeps its slot here.
         const activeIds = new Set<string>(this.engines.activeIds());
+        for (const [rid, state] of this.reconnectStates) if (isReconnectPending(state)) activeIds.add(rid);
         activeIds.delete(id);
         if (activeIds.size >= maxConcurrentSessions) {
           throw new BadRequestException(`Maximum concurrent sessions reached (${maxConcurrentSessions})`);

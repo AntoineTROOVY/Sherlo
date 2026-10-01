@@ -96,6 +96,11 @@ export function resolveReconnectConfig(
   return { maxAttempts, baseDelay };
 }
 
+/** An armed reconnect timer, or a fired one whose executeReconnect has counted its attempt and not seen READY. */
+export function isReconnectPending(state: ReconnectState): boolean {
+  return state.timer !== null || (state.attempts > 0 && state.readyAt === undefined);
+}
+
 export function resolveMaxConcurrentSessions(configService?: Pick<ConfigService, 'get'>): number | null {
   const configured = configService?.get<number>('sessions.maxConcurrent', 0) ?? 0;
   if (!Number.isFinite(configured) || configured <= 0) return null;
@@ -533,9 +538,7 @@ export class SessionEngineLifecycle {
     // this node forever. So is a state whose last event was READY: its streak survives for the
     // stability window, but nothing is pending until the next drop arms a timer.
     const reconnect = this.reconnectStates.get(id);
-    return (
-      reconnect != null && (reconnect.timer !== null || (reconnect.attempts > 0 && reconnect.readyAt === undefined))
-    );
+    return reconnect != null && isReconnectPending(reconnect);
   }
 
   /** Whether the last READY stretch lasted STABLE_READY_MS, measured to where it ended (or to now). */
