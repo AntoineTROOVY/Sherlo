@@ -2256,6 +2256,8 @@ describe('WebhookDeliveryService', () => {
     // A retry backoff gives its slot up, so without a count of the sleepers every failed attempt let
     // another delivery in, and the number held in heap grew with the event rate.
     it('counts deliveries waiting out a backoff against the dispatch bound', async () => {
+      // Earlier tests leave calls on the shared spy; the first wait below must see this test's backoff.
+      (sleep as unknown as jest.Mock).mockClear();
       internals().dispatchLimiter = new ConcurrencyLimiter(1, 1000);
       internals().dispatchMaxQueued = 1;
       hooksBySession['sess-a'] = [createMockWebhook({ id: 'wh-a', url: 'https://a.example/hook', retryCount: 2 })];
@@ -2295,6 +2297,7 @@ describe('WebhookDeliveryService', () => {
     // A delivery woken from its backoff parks to take its slot back while it is still counted as
     // admitted, so counting the parked tasks as well shed deliveries below the bound.
     it('counts a delivery waiting to take its slot back once against the dispatch bound', async () => {
+      (sleep as unknown as jest.Mock).mockClear();
       internals().dispatchLimiter = new ConcurrencyLimiter(1, 1000);
       internals().dispatchMaxQueued = 2;
       for (const s of ['a', 'b', 'c', 'd']) {
