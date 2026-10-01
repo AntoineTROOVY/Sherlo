@@ -244,6 +244,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard: Hebrew and Arabic text renders in the Heebo and Noto Sans Arabic fonts, and the login form aligns right in both; the body font and a selector that never matched overrode them.
 - Dashboard: a browser language the dashboard does not ship no longer forces English over a supported later preference.
 - Dashboard: a slow startup key check no longer changes the role of, or signs out, a session that signed in with another key meanwhile.
+- Dashboard: a sign-in key pasted with surrounding spaces is stored trimmed, so the API Keys page warns before you edit the key you are signed in with.
 - Dashboard: a lazy page chunk that keeps failing to load shows the error instead of reloading the page endlessly.
 - Dashboard: closing a parent dialog before its nested one no longer leaves the page unable to scroll.
 - Dashboard: a remote `ws://` `VITE_WS_URL` logs the same insecure-transport warning as a remote `http://` URL.
