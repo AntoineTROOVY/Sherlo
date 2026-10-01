@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 
 /** A conversion that ffmpeg refused, timed out on, or produced too much output for. */
 export class FfmpegConversionError extends Error {
@@ -170,7 +170,16 @@ export async function runFfmpeg(
   const outputPath = join(dir, `out.${outputExtension}`);
   try {
     await writeFile(inputPath, input);
-    await execute(buildFfmpegArgs(inputPath, outputPath, encodeArgs, options.maxOutputBytes), options);
+    try {
+      await execute(buildFfmpegArgs(inputPath, outputPath, encodeArgs, options.maxOutputBytes), options);
+    } catch (error) {
+      // ffmpeg names its input and output by the paths it was given. Those are this process's own temp
+      // files, so the directory is dropped and the reason names only `in.<ext>` or `out.<ext>`.
+      if (error instanceof FfmpegConversionError && error.detail) {
+        throw new FfmpegConversionError(error.message, error.detail.replaceAll(dir + sep, ''));
+      }
+      throw error;
+    }
 
     // Check the size on disk before reading, so an unexpectedly large result is refused instead of
     // being pulled into memory first. `-fs` stops ffmpeg at one byte over the cap and ffmpeg then

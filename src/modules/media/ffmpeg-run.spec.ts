@@ -41,10 +41,13 @@ if [ "$1" = "-version" ]; then echo "ffmpeg version stub"; exit 0; fi
 mode=ok
 for a in "$@"; do
   case "$a" in MODE=*) mode="\${a#MODE=}" ;; esac
+  [ "$prev" = "-i" ] && in="$a"
+  prev="$a"
   out="$a"
 done
 case "$mode" in
   fail)  echo "Invalid data found when processing input" >&2; exit 1 ;;
+  badinput) echo "$in: Invalid data found when processing input" >&2; exit 1 ;;
   hang)  sleep 10 ;;
   orphan) sleep 10 & echo $! > "$0.pid"; wait ;;
   empty) : > "$out" ;;
@@ -103,6 +106,14 @@ esac
     await expect(runFfmpeg(Buffer.from('input'), 'bin', 'ogg', mode('fail'), options())).rejects.toMatchObject({
       message: expect.stringContaining('exited with code 1') as unknown,
       detail: 'Invalid data found when processing input',
+    });
+  });
+
+  // ffmpeg names its input by the path it was handed, which is this process's own temp directory and
+  // nothing the caller supplied, so it must not reach the reason the caller is shown.
+  it('keeps its temp directory out of the reason it reports', async () => {
+    await expect(runFfmpeg(Buffer.from('input'), 'bin', 'ogg', mode('badinput'), options())).rejects.toMatchObject({
+      detail: 'in.bin: Invalid data found when processing input',
     });
   });
 

@@ -96,7 +96,7 @@ export class MediaConversionService {
       if (error instanceof FfmpegConversionError) {
         // ffmpeg's stderr is about the caller's own bytes, so returning it is what makes a rejection
         // actionable. It never names a path the caller did not supply: the only paths in the command
-        // are the temp files this process created.
+        // are the temp files this process created, and runFfmpeg strips their directory.
         this.logger.warn('Media conversion failed', { reason: error.message, detail: error.detail });
         throw new BadRequestException(error.detail ? `${error.message}: ${error.detail}` : error.message);
       }
