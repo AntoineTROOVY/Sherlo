@@ -433,7 +433,7 @@ services:
       - 'no-new-privileges:true'
     environment:
       POSTGRES_USER: ${DATABASE_USERNAME:-openwa}
-      # M16: no committed default secret. Empty unless the operator sets it; the postgres
+      # No committed default secret. Empty unless the operator sets it; the postgres
       # image refuses to initialize with an empty password (clear fail-fast), and the app's
       # production boot guard rejects empty/placeholder secrets before startup.
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-}
