@@ -296,7 +296,9 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
     // that renamed it to `$1` (#747), which is the same build whose page-side rename makes these
     // downloads fail. The warnings below are the diagnostic for it, so they must carry a real id.
     const msgId = readWid(msg.id);
-    const maxBytes = maxBytesOverride ?? inboundMediaMaxBytes();
+    // An override (the status seed's STATUS_MEDIA_MAX_BYTES) only tightens the global cap: a larger one
+    // would let a download the cap below always drops run anyway, past the memory guard it exists for.
+    const maxBytes = Math.min(maxBytesOverride ?? Number.POSITIVE_INFINITY, inboundMediaMaxBytes());
     const data = (msg as unknown as { _data?: { size?: number; mimetype?: string; filename?: string } })._data;
     const declared = coerceDeclaredSize(data?.size);
     if (declared > maxBytes) {
@@ -393,6 +395,7 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
       filename: media.filename || undefined,
       sizeBytes: Buffer.byteLength(media.data, 'base64'),
       toBase64: () => media.data,
+      maxBytes,
     });
     if (capped.omitted) {
       this.logger.warn('Inbound media exceeds MEDIA_DOWNLOAD_MAX_BYTES; dropped payload, kept envelope', {

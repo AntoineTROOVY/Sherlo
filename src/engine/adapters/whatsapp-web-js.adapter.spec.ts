@@ -5470,6 +5470,47 @@ describe('WhatsAppWebJsAdapter inbound media concurrency (slot held until the re
     expect(media.data).toBe(Buffer.from('ok').toString('base64'));
     expect(calls).toEqual(['bad', 'good']);
   });
+
+  it('never lets a per-call override raise the cap above MEDIA_DOWNLOAD_MAX_BYTES', async () => {
+    process.env.MEDIA_DOWNLOAD_MAX_BYTES = '1000';
+    process.env.MEDIA_DOWNLOAD_ENABLED = 'true';
+
+    const adapter = newAdapter();
+    const downloadMedia = jest.fn(() => Promise.resolve({ mimetype: 'video/mp4', data: 'x'.repeat(2000) }));
+    const msg = { id: { _serialized: 'big' }, _data: { size: 1500, mimetype: 'video/mp4' }, downloadMedia };
+    const cap = (m: unknown, override: number): Promise<unknown> =>
+      (adapter as unknown as { capInboundMediaFor: (msg: unknown, o: number) => Promise<unknown> }).capInboundMediaFor(
+        m,
+        override,
+      );
+
+    // The declared 1500 bytes is over the global 1000 cap, so the larger override must not admit it.
+    await expect(cap(msg, 5000)).resolves.toEqual(
+      expect.objectContaining({ mimetype: 'video/mp4', omitted: true, sizeBytes: 1500 }),
+    );
+    expect(downloadMedia).not.toHaveBeenCalled();
+  });
+
+  it('drops a downloaded payload over the per-call override when no size was declared', async () => {
+    process.env.MEDIA_DOWNLOAD_MAX_BYTES = '1000';
+    process.env.MEDIA_DOWNLOAD_ENABLED = 'true';
+
+    const adapter = newAdapter();
+    const data = Buffer.alloc(300).toString('base64');
+    const downloadMedia = jest.fn(() => Promise.resolve({ mimetype: 'image/jpeg', data }));
+    const msg = { id: { _serialized: 'undeclared' }, _data: {}, downloadMedia };
+    const cap = (m: unknown, override: number): Promise<unknown> =>
+      (adapter as unknown as { capInboundMediaFor: (msg: unknown, o: number) => Promise<unknown> }).capInboundMediaFor(
+        m,
+        override,
+      );
+
+    // Nothing declared, so the pre-gate admits it; the real 300 bytes is under the global cap but over 100.
+    await expect(cap(msg, 100)).resolves.toEqual(
+      expect.objectContaining({ mimetype: 'image/jpeg', omitted: true, sizeBytes: 300 }),
+    );
+    expect(downloadMedia).toHaveBeenCalledTimes(1);
+  });
 });
 
 /**
