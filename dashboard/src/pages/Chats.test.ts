@@ -1783,6 +1783,50 @@ test('every message for a chat the sidebar does not list refetches the list, and
   await screen.findByText('Dave');
 });
 
+function revoke(chatId: string, id: string): void {
+  const socket = lastSocket();
+  assert.ok(socket, 'expected the page to have opened a socket');
+  socket.receive('message', {
+    type: 'event',
+    timestamp: new Date(1_700_003_000_000).toISOString(),
+    payload: {
+      event: 'message.revoked',
+      sessionId: SESSION.id,
+      data: { id, revokedId: id, chatId, from: chatId, to: 'me', body: '', type: 'revoked', timestamp: 1_700_003_000 },
+    },
+  });
+}
+
+test("a message deleted for everyone leaves the sidebar preview when it was the chat's newest", async () => {
+  const { screen, fireEvent, within, waitFor } = rtl;
+  const { container } = renderChats();
+  fireEvent.click(await screen.findByText('Alice'));
+  await within(container.querySelector('.room-messages') as HTMLElement).findByText('hello from alice');
+
+  const room = container.querySelector('.room-messages') as HTMLElement;
+  const sidebar = container.querySelector('.chats-sidebar') as HTMLElement;
+
+  // An older row going leaves the preview, which shows the newest one.
+  revoke(CHAT.id, DB_MESSAGE.waMessageId as string);
+  await waitFor(() => assert.ok(!within(room).queryByText('hello from alice'), 'the deleted row kept its text'));
+  within(sidebar).getByText('hello from alice');
+
+  revoke(CHAT.id, OMITTED_MEDIA_MESSAGE_2.waMessageId as string);
+  await waitFor(() =>
+    assert.ok(!within(sidebar).queryByText('hello from alice'), 'the sidebar still previews the deleted message'),
+  );
+});
+
+test('a message deleted for everyone in a chat never opened refetches the chat list', async () => {
+  const { screen, waitFor } = rtl;
+  renderChats();
+  await screen.findByText('Carol');
+  resetFetchCalls();
+
+  revoke(CHAT_2.id, 'wamid.carol.1');
+  await waitFor(() => assert.equal(countFetchCalls('GET', `/api/sessions/${SESSION.id}/chats`), 1));
+});
+
 // A global-search hit in the third session, on Alice's chat.
 const THIRD_SESSION_HIT: SearchHit = {
   messageId: 'db-9',

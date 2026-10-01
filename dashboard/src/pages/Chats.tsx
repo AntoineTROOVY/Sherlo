@@ -538,14 +538,21 @@ export function Chats() {
   );
 
   const handleIncomingMessageRevoked = useCallback(
-    (event: { sessionId: string; id: string; revokedId?: string; type: string }) => {
+    (event: { sessionId: string; id: string; revokedId?: string; chatId: string; type: string }) => {
       if (event.sessionId !== selectedSessionId) return;
 
       // Walk every cached chat under this session, find the deleted message and zero it — the
       // backend emits an empty body; the localized "deleted" label is rendered below. Matching is
       // in findRevokedIndex: the event carries two candidate ids and wwebjs's `id` alone can miss.
       const revoked = (m: ChatMessageView): boolean => findRevokedIndex([m], event) !== -1;
-      for (const [key] of cachedSessionThreads(queryClient, event.sessionId, revoked)) {
+      let matchedCachedMessage = false;
+      let revokedLastMessage = false;
+      for (const [key, thread] of cachedSessionThreads(queryClient, event.sessionId, revoked)) {
+        matchedCachedMessage = true;
+        // The sidebar previews the newest row, so only deleting that one changes it.
+        if (key[2] === event.chatId && findRevokedIndex(thread, event) === thread.length - 1) {
+          revokedLastMessage = true;
+        }
         updateCachedMessages(queryClient, key, list => {
           const idx = findRevokedIndex(list, event);
           if (idx === -1) return list;
@@ -554,8 +561,15 @@ export function Chats() {
           return next;
         });
       }
+      if (revokedLastMessage) {
+        setChats(previous => previous.map(chat => (chat.id === event.chatId ? { ...chat, lastMessage: '' } : chat)));
+      } else if (!matchedCachedMessage) {
+        // No cached thread proves whether the deleted message was the chat's newest; refresh the
+        // summaries, as an edit does.
+        void loadChats(selectedSessionId, { background: true });
+      }
     },
-    [selectedSessionId, queryClient],
+    [selectedSessionId, queryClient, loadChats],
   );
 
   const handleIncomingMessageEdited = useCallback(
