@@ -697,6 +697,15 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ [key]: '2147483647' })).not.toThrow();
   });
 
+  // 0 disables each sweep; a negative value used to boot clean and keep the sweep running.
+  it.each(['MESSAGE_REAPER_INTERVAL_MS', 'WEBHOOK_RECONCILE_INTERVAL_MS', 'INGRESS_RECONCILE_INTERVAL_MS'])(
+    'rejects a negative %s and keeps 0 as the off switch',
+    key => {
+      expect(() => validateEnv({ [key]: '-1' })).toThrow(new RegExp(`${key} must be a non-negative integer`));
+      expect(() => validateEnv({ [key]: '0' })).not.toThrow();
+    },
+  );
+
   it('rejects a SESSION_LEASE_HEARTBEAT_MS above the Node timer ceiling even inside a longer lease', () => {
     const lease = { SESSION_LEASE_TTL_MS: '5000000000' };
     expect(() => validateEnv({ ...lease, SESSION_LEASE_HEARTBEAT_MS: '2147483648' })).toThrow(
