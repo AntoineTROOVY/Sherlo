@@ -203,7 +203,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A plugin manifest whose `permissions`, `sessions`, `hooks`, `net.allow` or `net.allowConfigHosts` is not a list of strings is refused at install and boot instead of being matched by substring.
 - A plugin `ctx.net.fetch(url, null)` call no longer holds one of the 16 process-wide plugin fetch slots forever.
 - A sandboxed plugin that posts a malformed message, such as a log line with an unknown level, no longer crashes the gateway process.
-- A sandboxed plugin whose hook result, log metadata or capability call argument cannot be cloned no longer crashes its worker or sets the plugin to `ERROR`.
+- A sandboxed plugin whose hook result or log metadata cannot be cloned no longer crashes its worker or sets the plugin to `ERROR`.
+- A sandboxed plugin's capability call with an argument that cannot be cloned no longer leaves a pending call behind for the life of its worker.
 - Plugin storage `list()` in a package directory no longer reports the plugin's own JSON files as keys, which a clear-all loop could delete.
 - Uninstalling a plugin from the legacy `./plugins` directory that failed to load removes its code.
 - A plugin handover state other than `bot`, `human` or `closed` is refused instead of being stored with no effect.
