@@ -40,6 +40,15 @@ describe('TemplateController', () => {
     expect(service.update).toHaveBeenCalledWith('s1', 't1', dto);
   });
 
+  // The global ValidationPipe refuses an invalid body, or one carrying an undeclared field, with a 400.
+  it.each(['create', 'update'] as const)('declares the validation 400 on %s', handler => {
+    const responses = (Reflect.getMetadata(
+      'swagger/apiResponse',
+      Object.getOwnPropertyDescriptor(TemplateController.prototype, handler)?.value as object,
+    ) ?? {}) as Record<string, unknown>;
+    expect(Object.keys(responses)).toContain('400');
+  });
+
   it('delete delegates and resolves void', async () => {
     service.delete.mockResolvedValue(undefined);
     await expect(controller.delete('s1', 't1')).resolves.toBeUndefined();
