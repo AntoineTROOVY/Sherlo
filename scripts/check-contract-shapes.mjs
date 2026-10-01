@@ -188,7 +188,7 @@ const EXCLUDED = {
     WebhookResponse:
       'BY DESIGN: `WebhookEvent` is a type ALIAS for string so the Event* constants drop into a []string literal without a conversion, which means the events list resolves to array<string> and cannot carry the vocabulary. Un-excluding means making it a defined type and retyping the three Events fields, a source break for a published client',
     CreateWebhookRequest:
-      'BY DESIGN: `events` carries no omitempty so the key is always on the wire, which is what lets an empty slice mean "subscribe to nothing": the server keeps [] and only defaults when the key is absent. Adding omitempty would silently turn that into the default subscription',
+      'BY DESIGN: `events` carries no omitempty, so a nil slice is sent as null, which the server treats like an absent key (default ["message.received"]), and an empty slice is sent as [] and refused with 400 (ArrayMinSize(1)). Adding omitempty would silently turn that empty slice into the default subscription. The harvester reads the missing omitempty as a required field, which the optional DTO field does not match',
     UpdateSessionConfigRequest:
       'BY DESIGN: every component is `json:"-"` and MarshalJSON writes the body by hand, because the three fields need an explicit null to reset and Go cannot express "null" and "absent" through one pointer, so the harvester sees no wire fields at all',
     UpdateSessionProxyRequest:
