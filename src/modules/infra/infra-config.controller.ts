@@ -191,8 +191,14 @@ export class InfraConfigController {
   @ApiOperation({ summary: 'Save infrastructure configuration to .env file' })
   @ApiResponse({
     status: 200,
-    description: 'Save outcome. A failed write also answers 200 with `saved: false` — read the flag, not the status.',
+    description: 'Save outcome. A failed disk write answers 200 with `saved: false`, so read the flag, not the status.',
     type: InfraConfigSaveResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Rejected before anything was written: an invalid or unknown field, an unknown engine type, a value with a ' +
+      'line break or one that cannot be stored, or a configuration that would not boot in production.',
   })
   @ApiBody({ description: 'Configuration to save', type: SaveConfigDto })
   saveConfig(@Body() config: SaveConfigDto): { message: string; saved: boolean; envPath: string; profiles: string[] } {
