@@ -304,6 +304,7 @@ REDIS_HOST=your-redis-host.com
 REDIS_PORT=6379
 REDIS_USERNAME=optional
 REDIS_PASSWORD=optional
+REDIS_TLS=false          # true for a managed Redis that requires TLS
 ```
 
 > Setting `REDIS_BUILTIN` in `.env` **pins** it: the env value wins, so the dashboard's built-in
@@ -315,8 +316,9 @@ REDIS_PASSWORD=optional
 > This applies to a bare-metal install that reads the project `.env`. Compose does not forward
 > `REDIS_BUILTIN` (nor `POSTGRES_BUILTIN` or `MINIO_BUILTIN`), so on compose clear "Use Built-in Redis
 > Container" in Dashboard > Infrastructure (or set `REDIS_BUILTIN=false` in `data/.env.generated`), and
-> put only the forwarded `REDIS_ENABLED`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME` and
-> `REDIS_PASSWORD` in the `.env` next to `docker-compose.yml`.
+> put only the forwarded `REDIS_ENABLED`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`,
+> `REDIS_PASSWORD`, `REDIS_TLS`, `REDIS_CONNECT_TIMEOUT_MS` and `REDIS_CACHE_DB` in the `.env` next
+> to `docker-compose.yml`.
 
 | Scenario                  | Support | Notes                                      |
 | ------------------------- | ------- | ------------------------------------------ |
