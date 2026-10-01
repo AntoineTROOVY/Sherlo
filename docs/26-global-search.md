@@ -91,7 +91,7 @@ it into Postgres). Concretely:
 
 ## 26.5 Configuration
 
-All search configuration lives in the environment (`.env` / Compose / dashboard Infrastructure form):
+All search configuration lives in the environment (`.env` / Compose):
 
 | Variable           | Default        | Meaning                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
