@@ -109,8 +109,8 @@ export default () => ({
   // HTTP server timeouts (Node http.Server). Pinned explicitly so they are operator-tunable and
   // observable at boot rather than left at Node's implicit defaults. requestTimeout defaults to
   // Node's 300s; keepAliveTimeout to 5s; headersTimeout to 65s (a second above keepAlive — Node
-  // requires headers > keepAlive, and main.ts normalizes it anyway). Set any to 0 at your own risk;
-  // env.validation rejects 0 so a bound is never silently disabled.
+  // requires headers > keepAlive, and main.ts normalizes it anyway). env.validation rejects 0 for all
+  // three, so a bound is never silently disabled.
   http: {
     requestTimeoutMs: resolveRequestTimeoutMs(process.env.REQUEST_TIMEOUT_MS),
     headersTimeoutMs: parseInt(process.env.HEADERS_TIMEOUT_MS || '65000', 10),
@@ -392,7 +392,8 @@ export default () => ({
     // fully-unauthenticated @Public() endpoint: once an instance is provisioned against it, anyone who can
     // reach the host can POST a forged payload that triggers outbound WhatsApp sends. Default off — only
     // set ALLOW_UNSIGNED_INGRESS=true for a provider that genuinely offers no HMAC, and front the route
-    // with a network/reverse-proxy ACL. Refused in production by the boot guard unless explicitly set.
+    // with a network/reverse-proxy ACL. With the flag off, the plugin loader refuses such a manifest in every
+    // environment (validateIngressManifest).
     allowUnsigned: process.env.ALLOW_UNSIGNED_INGRESS === 'true',
   },
 
