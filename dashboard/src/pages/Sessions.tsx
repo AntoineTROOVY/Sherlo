@@ -94,7 +94,9 @@ export function Sessions() {
   // Session config is not on the list payload — the API never returns the config column, so it is
   // fetched per session when the detail modal opens rather than N times to render the list.
   const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null);
-  const [savingConfig, setSavingConfig] = useState(false);
+  // Ids of sessions with an auto-reject save in flight. Per session, because Close stays enabled while
+  // one saves: the modal reopened for that session must stay locked, and another session's must not.
+  const [savingConfigIds, setSavingConfigIds] = useState<ReadonlySet<string>>(new Set());
   const [proxySession, setProxySession] = useState<Session | null>(null);
   const [proxyInfo, setProxyInfo] = useState<SessionProxy | null>(null);
   const [proxyLoading, setProxyLoading] = useState(false);
@@ -456,7 +458,7 @@ export function Sessions() {
     const id = selectedSessionId;
     const previous = sessionConfig;
     setSessionConfig({ ...sessionConfig, autoRejectCalls: next });
-    setSavingConfig(true);
+    setSavingConfigIds(current => new Set(current).add(id));
     try {
       const saved = await sessionApi.updateConfig(id, { autoRejectCalls: next });
       if (configSessionId.current === id) setSessionConfig(saved);
@@ -466,7 +468,11 @@ export function Sessions() {
       if (configSessionId.current === id) setSessionConfig(previous);
       toast.error(t('sessions.details.autoRejectCalls'), err instanceof Error ? err.message : t('common.unknownError'));
     } finally {
-      setSavingConfig(false);
+      setSavingConfigIds(current => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -979,7 +985,7 @@ export function Sessions() {
                       type="checkbox"
                       aria-labelledby="auto-reject-calls-label"
                       checked={sessionConfig.autoRejectCalls}
-                      disabled={!canWrite || savingConfig}
+                      disabled={!canWrite || savingConfigIds.has(selectedSession.id)}
                       onChange={e => void handleAutoRejectToggle(e.target.checked)}
                     />
                     <span className="toggle-slider"></span>

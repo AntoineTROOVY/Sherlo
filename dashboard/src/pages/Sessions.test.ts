@@ -1654,10 +1654,57 @@ test('a toggle answer that lands after its modal closed does not change another 
 
   const other = await openDetailFor('stale-engine');
   assert.equal(other.checked, false);
+  assert.equal(other.disabled, false, 'the pending toggle of the closed modal locked this one');
   release();
   await waitFor(() => assert.equal(sessionConfig.autoRejectCalls, true));
   await new Promise(resolve => setTimeout(resolve, 50));
   assert.equal((screen.getByRole('checkbox') as HTMLInputElement).checked, false);
+});
+
+test('a session reopened while its toggle saves keeps the toggle locked until that save answers', async () => {
+  const { screen, within, fireEvent, waitFor } = rtl;
+  resetFetchCalls();
+  sessionConfig = { autoRejectCalls: false, maxReconnectAttempts: null, reconnectBaseDelay: 5000 };
+  configPatchFails = false;
+  let release!: () => void;
+  configPatchGate = new Promise<void>(resolve => (release = resolve));
+  renderSessions();
+
+  fireEvent.click(await openDetailFor('new-device'));
+  await waitFor(() => assert.ok(fetchCalls.some(c => c.method === 'PATCH')));
+  fireEvent.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: 'Close' })[0]);
+  await waitFor(() => assert.equal(screen.queryByRole('dialog') === null, true));
+
+  const reopened = await openDetailFor('new-device');
+  assert.equal(reopened.disabled, true, 'a second write could overlap the one still pending');
+  release();
+  await waitFor(() => assert.equal((screen.getByRole('checkbox') as HTMLInputElement).disabled, false));
+});
+
+test("one session's toggle answer does not unlock another session's pending toggle", async () => {
+  const { screen, within, fireEvent, waitFor } = rtl;
+  resetFetchCalls();
+  sessionConfig = { autoRejectCalls: false, maxReconnectAttempts: null, reconnectBaseDelay: 5000 };
+  configPatchFails = false;
+  let releaseFirst!: () => void;
+  configPatchGate = new Promise<void>(resolve => (releaseFirst = resolve));
+  renderSessions();
+
+  fireEvent.click(await openDetailFor('new-device'));
+  await waitFor(() => assert.equal(fetchCalls.filter(c => c.method === 'PATCH').length, 1));
+  fireEvent.click(within(screen.getByRole('dialog')).getAllByRole('button', { name: 'Close' })[0]);
+  await waitFor(() => assert.equal(screen.queryByRole('dialog') === null, true));
+
+  let releaseSecond!: () => void;
+  configPatchGate = new Promise<void>(resolve => (releaseSecond = resolve));
+  fireEvent.click(await openDetailFor('stale-engine'));
+  await waitFor(() => assert.equal(fetchCalls.filter(c => c.method === 'PATCH').length, 2));
+  releaseFirst();
+  await waitFor(() => assert.equal(sessionConfig.autoRejectCalls, true));
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal((screen.getByRole('checkbox') as HTMLInputElement).disabled, true);
+  releaseSecond();
+  await waitFor(() => assert.equal((screen.getByRole('checkbox') as HTMLInputElement).disabled, false));
 });
 
 test('a failed toggle that lands after its modal closed does not revert another session', async () => {
@@ -1679,6 +1726,7 @@ test('a failed toggle that lands after its modal closed does not revert another 
     sessionConfig = { autoRejectCalls: true, maxReconnectAttempts: null, reconnectBaseDelay: 5000 };
     const other = await openDetailFor('stale-engine');
     assert.equal(other.checked, true);
+    assert.equal(other.disabled, false, 'the pending toggle of the closed modal locked this one');
     release();
     await screen.findByRole('alert');
     assert.equal((screen.getByRole('checkbox') as HTMLInputElement).checked, true);
