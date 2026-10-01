@@ -433,3 +433,10 @@ test('English Redis copy does not claim Redis stores sessions', () => {
     assert.doesNotMatch(copy, /session/i, `${key} claims session storage: "${copy}"`);
   }
 });
+
+// Plugin config, session activation and per-session overrides all apply live; a restart the toast
+// asks for would only drop every WhatsApp session for nothing.
+test('English plugin save toast does not ask for a server restart', () => {
+  const desc = i18n.t('plugins.toasts.savedDesc', { lng: 'en' });
+  assert.doesNotMatch(desc, /restart required/i, `toast asks for a restart: "${desc}"`);
+});

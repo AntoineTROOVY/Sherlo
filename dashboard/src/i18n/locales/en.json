@@ -1051,7 +1051,7 @@
       "healthFail": "Health Check Failed",
       "healthError": "Health Check Error",
       "savedTitle": "Configuration Saved",
-      "savedDesc": "Server restart required to apply changes.",
+      "savedDesc": "Changes take effect without a server restart.",
       "saveFailed": "Save Failed",
       "installed": "Plugin installed",
       "installFailed": "Install failed",
