@@ -1364,6 +1364,45 @@ test('a list read in flight does not undo a create, a stop or a delete', async (
   }
 });
 
+test('a list read in flight does not undo a start', async () => {
+  const { screen, fireEvent, within, waitFor, act } = rtl;
+  resetFetchCalls();
+  window.sessionStorage.setItem('openwa_api_key', 'test-key');
+  startResult = { answer: { status: 'initializing', engineLoaded: true } };
+  SESSIONS.push({ ...SESSION_QR, id: 'sess-start-race', name: 'start-race', status: 'created', engineLoaded: false });
+  const releases: (() => void)[] = [];
+  const gateNextRead = () => {
+    listGate = new Promise<void>(resolve => releases.push(resolve));
+  };
+  try {
+    renderSessions();
+    const card = (await screen.findByText('start-race')).closest('.session-card') as HTMLElement;
+    const reads = () => fetchCalls.filter(c => c.method === 'GET' && c.path === '/api/sessions').length;
+
+    // A push's read snapshots the row before the start and answers late.
+    gateNextRead();
+    const before = reads();
+    pushSessionStatus(SESSION_TIMELOCKED.id, 'action_required');
+    await waitFor(() => assert.equal(reads(), before + 1));
+
+    // The start's own re-read is held too, so the older read answers first.
+    gateNextRead();
+    fireEvent.click(within(card).getByRole('button', { name: 'Start' }));
+    await waitFor(() => assert.equal(reads(), before + 2));
+    assert.ok(!within(card).queryByRole('button', { name: 'Start' }), 'the start answer was not rendered');
+
+    releases[0]();
+    await act(() => new Promise<void>(resolve => setTimeout(resolve, 20)));
+    assert.ok(
+      !within(card).queryByRole('button', { name: 'Start' }),
+      'a read older than the start put the session back to not started',
+    );
+  } finally {
+    releases.forEach(release => release());
+    SESSIONS.pop();
+  }
+});
+
 // A push for another session, handled before React renders a create or a delete, must patch the list
 // that write produced rather than the one on screen before it.
 test('a status push landing right after a create or a delete keeps what it wrote', async () => {

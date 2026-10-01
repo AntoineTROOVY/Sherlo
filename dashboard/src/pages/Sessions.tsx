@@ -389,6 +389,7 @@ export function Sessions() {
       // from before the start, which now includes `engineLoaded` and would leave the card offering
       // Start for a session that just acquired an engine.
       const started = await sessionApi.start(id);
+      rowWrites.current += 1;
       updateSessions(current => replaceSession(current, started));
       // A 200 does not promise the engine is still there when the list is read back: a concurrent stop
       // retires the start, and an engine can fail right after answering. Skip the modal when the re-read
