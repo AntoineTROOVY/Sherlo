@@ -6432,7 +6432,8 @@ describe('SessionService', () => {
       (messageRepository.insert as jest.Mock).mockReset();
       (webhookService.dispatch as jest.Mock).mockClear();
       (messageRepository.insert as jest.Mock)
-        .mockResolvedValueOnce(undefined) // first delivery: new row
+        // first delivery: new row
+        .mockResolvedValueOnce({ identifiers: [{ id: 'gen-uuid-1' }], generatedMaps: [], raw: undefined })
         .mockRejectedValueOnce({
           driverError: { code: 'SQLITE_CONSTRAINT_UNIQUE', message: 'UNIQUE constraint failed' },
         }); // re-fire
@@ -6457,6 +6458,9 @@ describe('SessionService', () => {
       expect(messageRepository.insert).toHaveBeenCalledTimes(2);
       expect(
         ((webhookService.dispatch as jest.Mock).mock.calls as unknown[][]).filter(c => c[1] === 'message.received'),
+      ).toHaveLength(1);
+      expect(
+        ((hookManager.execute as jest.Mock).mock.calls as unknown[][]).filter(c => c[0] === 'message:persisted'),
       ).toHaveLength(1);
     });
 
