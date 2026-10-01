@@ -52,13 +52,15 @@ describe('ffmpeg encoder arguments', () => {
       expect(valueOf(args, '-movflags')).toBe('+faststart');
     });
 
-    // Unquoted, ffmpeg reads the filter as `scale=if(gte(iw`. The longer edge is capped at 1280 and
-    // truncated to even, and -2 derives the other edge, even too; H.264 requires both. Bounding the
-    // width alone let an odd width through (a 499x281 GIF, refused by libx264) and left a 1080x1920
-    // portrait video at its full height.
-    it('quotes the scale expressions, bounds the longer edge and keeps both edges even', () => {
+    // Unquoted, ffmpeg reads the filter as `scale=min(iw`. The frame is fitted inside 1280x720 (or
+    // 720x1280), which keeps every aspect ratio within the Baseline 3.1 frame size the stream declares:
+    // capping only the longer edge left a square 1080x1080 or a 4:3 1280x960 frame above it. Both
+    // edges are kept even, which H.264 requires (an odd 499x281 GIF is refused by libx264).
+    it('quotes the scale expressions, fits the frame within level 3.1 and keeps both edges even', () => {
+      expect(valueOf(args, '-level')).toBe('3.1');
       expect(valueOf(args, '-vf')).toBe(
-        "scale='if(gte(iw,ih),min(1280,trunc(iw/2)*2),-2)':'if(gte(iw,ih),-2,min(1280,trunc(ih/2)*2))'",
+        "scale='min(iw,if(gte(iw,ih),1280,720))':'min(ih,if(gte(iw,ih),720,1280))'" +
+          ':force_original_aspect_ratio=decrease:force_divisible_by=2',
       );
     });
   });
