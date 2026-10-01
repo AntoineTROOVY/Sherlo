@@ -1,10 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, MaxLength, ValidateIf } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, MaxLength, NotContains, ValidateIf } from 'class-validator';
 import { MaxCodePoints } from '../../../common/validation/max-code-points';
 
 const NAME_MAX_LENGTH = 100;
 const BODY_MAX_LENGTH = 4096;
 const HEADER_FOOTER_MAX_LENGTH = 1024;
+
+// PostgreSQL text and varchar columns cannot store U+0000, so the write would fail as a 500.
+const NoNulCharacter = () => NotContains('\u0000', { message: '$property must not contain a NUL character' });
 
 export class CreateTemplateDto {
   @ApiProperty({
@@ -15,6 +18,7 @@ export class CreateTemplateDto {
   @IsString()
   @IsNotEmpty()
   @MaxCodePoints(NAME_MAX_LENGTH)
+  @NoNulCharacter()
   name!: string;
 
   @ApiProperty({
@@ -25,6 +29,7 @@ export class CreateTemplateDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(BODY_MAX_LENGTH)
+  @NoNulCharacter()
   body!: string;
 
   @ApiPropertyOptional({
@@ -35,6 +40,7 @@ export class CreateTemplateDto {
   @IsOptional()
   @IsString()
   @MaxLength(HEADER_FOOTER_MAX_LENGTH)
+  @NoNulCharacter()
   header?: string;
 
   @ApiPropertyOptional({
@@ -45,6 +51,7 @@ export class CreateTemplateDto {
   @IsOptional()
   @IsString()
   @MaxLength(HEADER_FOOTER_MAX_LENGTH)
+  @NoNulCharacter()
   footer?: string;
 }
 
@@ -55,6 +62,7 @@ export class UpdateTemplateDto {
   @IsString()
   @IsNotEmpty()
   @MaxCodePoints(NAME_MAX_LENGTH)
+  @NoNulCharacter()
   name?: string;
 
   @ApiPropertyOptional({ description: 'Template body with {{variable}} placeholders', maxLength: BODY_MAX_LENGTH })
@@ -62,18 +70,21 @@ export class UpdateTemplateDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(BODY_MAX_LENGTH)
+  @NoNulCharacter()
   body?: string;
 
   @ApiPropertyOptional({ description: 'Optional header text', maxLength: HEADER_FOOTER_MAX_LENGTH })
   @IsOptional()
   @IsString()
   @MaxLength(HEADER_FOOTER_MAX_LENGTH)
+  @NoNulCharacter()
   header?: string;
 
   @ApiPropertyOptional({ description: 'Optional footer text', maxLength: HEADER_FOOTER_MAX_LENGTH })
   @IsOptional()
   @IsString()
   @MaxLength(HEADER_FOOTER_MAX_LENGTH)
+  @NoNulCharacter()
   footer?: string;
 }
 
