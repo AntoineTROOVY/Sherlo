@@ -1065,7 +1065,12 @@ export class SessionEngineLifecycle {
       },
     );
 
-    void this.updateStatus(id, SessionStatus.DISCONNECTED);
+    void this.updateStatus(id, SessionStatus.DISCONNECTED).catch(err =>
+      this.logger.warn('Failed to persist the disconnected status', {
+        sessionId: id,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
 
     // Pre-schedule fence: scheduleReconnect's timer eventually calls executeReconnect, which does
     // a fresh engines.get(id) and destroys whatever engine currently owns the id. If this engine
@@ -1128,7 +1133,14 @@ export class SessionEngineLifecycle {
       // Same ownership fence as the engine callbacks: a reconnect chain that exhausts itself after
       // this node's lease lapsed must not park a peer's session in FAILED, which nothing resets
       // automatically. The in-memory error above is per-process and harmless either way.
-      if (this.ownsSession(id)) void this.updateStatus(id, SessionStatus.FAILED);
+      if (this.ownsSession(id)) {
+        void this.updateStatus(id, SessionStatus.FAILED).catch(err =>
+          this.logger.warn('Failed to persist the reconnect-exhausted FAILED state', {
+            sessionId: id,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        );
+      }
       // The hook signal a terminal failure carries: a failed re-init no longer fires session:error per
       // attempt, so the episode's one terminal end reports it here.
       void this.hookManager.execute('session:error', { reason }, { sessionId: id, source: 'SessionService' });

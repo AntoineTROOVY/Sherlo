@@ -228,4 +228,41 @@ describe('SessionEngineLifecycle races', () => {
       expect(failedWrites()).toBe(0);
     });
   });
+
+  describe('engine-driven status writes', () => {
+    const rejectStatus = (status: SessionStatus): void => {
+      repository.update.mockImplementation((_id: unknown, patch: { status?: unknown }) =>
+        patch.status === status ? Promise.reject(new Error('SQLITE_BUSY')) : Promise.resolve({ affected: 1 }),
+      );
+    };
+
+    it('logs a failed DISCONNECTED write instead of leaving it unhandled', async () => {
+      const warn = jest.spyOn(internals.logger, 'warn');
+      rejectStatus(SessionStatus.DISCONNECTED);
+      const engine = makeEngine();
+      internals.engines.set(ID, engine as never);
+
+      await lifecycle.handleEngineDisconnected(ID, engine as never, 'NAVIGATION');
+      await flush();
+
+      expect(warn).toHaveBeenCalledWith('Failed to persist the disconnected status', {
+        sessionId: ID,
+        error: 'SQLITE_BUSY',
+      });
+    });
+
+    it('logs a failed FAILED write when reconnect attempts run out', async () => {
+      const warn = jest.spyOn(internals.logger, 'warn');
+      rejectStatus(SessionStatus.FAILED);
+      internals.reconnectStates.set(ID, { attempts: 5, timer: null, maxAttempts: 5, baseDelay: 5000 });
+
+      internals.scheduleReconnect(ID, session());
+      await flush();
+
+      expect(warn).toHaveBeenCalledWith('Failed to persist the reconnect-exhausted FAILED state', {
+        sessionId: ID,
+        error: 'SQLITE_BUSY',
+      });
+    });
+  });
 });
