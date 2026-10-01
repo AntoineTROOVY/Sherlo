@@ -5102,16 +5102,12 @@ Readiness probe — verifies the `main` (auth/audit) and `data` TypeORM datasour
 }
 ```
 
-**Errors:** `503` — either datasource fails or exceeds its 3 s `SELECT 1` timeout, or the app is shutting down. The handler throws `ServiceUnavailableException`, so NestJS wraps the custom `{ status, details }` object as the `message` field:
+**Errors:** `503` — either datasource fails or exceeds its 3 s `SELECT 1` timeout, or the app is shutting down. The handler throws `ServiceUnavailableException` with the `{ status, details }` object, and NestJS sends that object as the whole body (no `statusCode`/`message`/`error` wrapper):
 
 ```json
 {
-  "statusCode": 503,
-  "message": {
-    "status": "error",
-    "details": { "mainDatabase": { "status": "up" }, "dataDatabase": { "status": "down" } }
-  },
-  "error": "Service Unavailable"
+  "status": "error",
+  "details": { "mainDatabase": { "status": "up" }, "dataDatabase": { "status": "down" } }
 }
 ```
 
