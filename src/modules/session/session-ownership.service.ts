@@ -445,12 +445,6 @@ export class SessionOwnershipService {
     );
   }
 
-  /** For the boot reset, which must run before anything is claimed. */
-  ownedByOtherLiveNode(session: Pick<Session, 'nodeId' | 'leaseExpiresAt'>, now = new Date()): boolean {
-    if (!session.nodeId || session.nodeId === this.nodeId) return false;
-    return session.leaseExpiresAt != null && session.leaseExpiresAt > now;
-  }
-
   /**
    * Sessions another node held whose lease has lapsed — a crashed peer, or this node's own
    * previous identity after a container recreate (the default nodeId is the hostname, which a

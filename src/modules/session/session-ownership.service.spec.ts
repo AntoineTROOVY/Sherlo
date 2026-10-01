@@ -576,36 +576,6 @@ describe('SessionOwnershipService', () => {
     });
   });
 
-  describe('what a booting process may reset', () => {
-    const now = new Date();
-
-    it('leaves alone a session another node holds on a live lease', () => {
-      expect(
-        service('node-b').ownedByOtherLiveNode(
-          { nodeId: 'node-a', leaseExpiresAt: new Date(now.getTime() + 60_000) },
-          now,
-        ),
-      ).toBe(true);
-    });
-
-    it('reclaims its own rows, which really are dead after a restart', () => {
-      expect(
-        service('node-a').ownedByOtherLiveNode(
-          { nodeId: 'node-a', leaseExpiresAt: new Date(now.getTime() + 60_000) },
-          now,
-        ),
-      ).toBe(false);
-    });
-
-    it('reclaims an unowned row and one whose lease has lapsed', () => {
-      const node = service('node-b');
-      expect(node.ownedByOtherLiveNode({ nodeId: null, leaseExpiresAt: null }, now)).toBe(false);
-      expect(node.ownedByOtherLiveNode({ nodeId: 'node-a', leaseExpiresAt: new Date(now.getTime() - 1) }, now)).toBe(
-        false,
-      );
-    });
-  });
-
   /**
    * Drives an operator-facing warning during a data import: this process can only stop its own
    * engines, so a session running elsewhere has to be named rather than quietly counted as handled.
