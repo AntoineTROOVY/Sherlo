@@ -88,6 +88,8 @@ afterEach(() => {
   queryClient?.clear();
   queryClient = undefined;
   sessionsStatus = 200;
+  templatesStatus = 200;
+  templates = [];
   extraSessions = [];
   firstSessionGone = false;
 });
@@ -152,8 +154,12 @@ test('any other failed read shows the error, not an empty library', async () => 
 });
 
 test('a successful empty read still shows the empty state', async () => {
-  templatesStatus = 200;
   renderTemplates();
+  // Before a session is selected the templates read has not started and the list is briefly empty, so
+  // only the settled read can tell an empty library from a loaded one.
+  await rtl.waitFor(() =>
+    assert.equal(queryClient!.getQueryState(['sessions', 'sess-1', 'templates'])?.status, 'success'),
+  );
   await rtl.screen.findByText('No templates saved');
 });
 
