@@ -15,7 +15,7 @@ import type { Request } from 'express';
 import { NestFactory } from '@nestjs/core';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { request as httpRequest } from 'http';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -73,13 +73,16 @@ class HttpSurfaceModule {}
 
 // A stand-in for the bundled document: the real dashboard/index.html carries the placeholder in a
 // meta element, which Plugins.tsx reads to copy the nonce onto its sandboxed iframe's scripts.
-const distDir = join(mkdtempSync(join(tmpdir(), 'openwa-surface-')), 'dashboard', 'dist');
+const surfaceRoot = mkdtempSync(join(tmpdir(), 'openwa-surface-'));
+const distDir = join(surfaceRoot, 'dashboard', 'dist');
 mkdirSync(distDir, { recursive: true });
 writeFileSync(
   join(distDir, 'index.html'),
   `<!doctype html><html><head><meta name="openwa-csp-nonce" content="${DASHBOARD_CSP_NONCE_PLACEHOLDER}" />` +
     `</head><body><script nonce="${DASHBOARD_CSP_NONCE_PLACEHOLDER}"></script></body></html>`,
 );
+// The e2e globalTeardown sweeps only openwa-e2e-* entries, so this suite removes its own fixture.
+afterAll(() => rmSync(surfaceRoot, { recursive: true, force: true }));
 
 describe('production HTTP surface (configureApp)', () => {
   let app: INestApplication<App>;
