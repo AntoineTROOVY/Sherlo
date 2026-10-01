@@ -6606,7 +6606,8 @@ tuned for speech. Post the returned `base64` to `send-audio` with `ptt: true`.
 | url    | string | Public http(s) URL to fetch (server-side, SSRF-guarded) |
 | base64 | string | Inline bytes. Takes precedence when both are given      |
 
-Exactly one of `url` / `base64` is required. No `mimetype` is accepted: the input format is
+At least one of `url` / `base64` is required; when both are given, `base64` is used.
+No `mimetype` is accepted: the input format is
 identified from the bytes. Both conversion routes accept single-file media inputs only: MP4, M4A,
 3GP and MOV, Matroska and WebM, Ogg, MP3, WAV and W64, AAC, AC-3 and E-AC-3, FLAC, WavPack, AU,
 AMR, AVI, MPEG-PS and MPEG-TS, ASF, FLV, CAF, AIFF, GIF, and raw H.264 and HEVC. Anything else,
