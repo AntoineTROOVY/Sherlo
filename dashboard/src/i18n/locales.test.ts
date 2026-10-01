@@ -354,6 +354,28 @@ test('no locale catalogue is imported statically, anywhere in the dashboard sour
   assert.deepEqual(offenders, [], 'a static locale import is back — those languages are on the critical path again');
 });
 
+// The parity gate compares the other catalogues with en.json and never reads the source, and a
+// component test that builds its expected label with t() passes on the raw key too. So a literal key
+// that no catalogue has would render to the operator as the key itself. Template-literal and variable
+// keys are out of reach of this scan.
+const LITERAL_KEY = /\bt\(\s*['"]([a-zA-Z][\w-]*(?:\.[\w-]+)+)['"]|i18nKey=['"]([\w.-]+)['"]/g;
+
+test('every literal t() and i18nKey key in the dashboard source resolves in every locale', () => {
+  const keys = new Set(
+    readdirSync(SRC_DIR, { recursive: true, withFileTypes: true })
+      .filter(entry => entry.isFile() && /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name))
+      .flatMap(entry => [...readFileSync(join(entry.parentPath, entry.name), 'utf8').matchAll(LITERAL_KEY)])
+      .map(m => m[1] ?? m[2]),
+  );
+  assert.ok(keys.size > 500, `only ${keys.size} literal keys found, the scan pattern has drifted`);
+  const missing = LOCALE_IDS.flatMap(lng =>
+    [...keys]
+      .filter(key => !i18n.exists(key, { lng }) && !i18n.exists(`${key}_other`, { lng }))
+      .map(key => `${lng}: ${key}`),
+  );
+  assert.deepEqual(missing, [], 'these keys would render as the raw key');
+});
+
 // rtlLanguages is deliberately a SUBSET (only he/ar today), so it is checked for validity, not parity:
 // an id here that is not a shipped locale would set dir="rtl" for a language that cannot be selected.
 test('rtlLanguages only names shipped locales', () => {
