@@ -190,7 +190,17 @@ export function isBlockedAddress(ip: string): boolean {
       if (hextets[0] === 0x2002) {
         return isBlockedAddress(hextetsToV4(hextets[1], hextets[2])); // 6to4
       }
-      if (hextets[0] === 0x64 && hextets[1] === 0xff9b) {
+      // NAT64 /96: the well-known 64:ff9b::/96 and the local-use 64:ff9b:1::/96 (RFC 8215). Any other
+      // 64:ff9b layout (a /48 local-use prefix embeds the IPv4 in the middle hextets) falls through to
+      // the reserved-range check below and is blocked.
+      if (
+        hextets[0] === 0x64 &&
+        hextets[1] === 0xff9b &&
+        hextets[2] <= 1 &&
+        hextets[3] === 0 &&
+        hextets[4] === 0 &&
+        hextets[5] === 0
+      ) {
         return isBlockedAddress(hextetsToV4(hextets[6], hextets[7])); // NAT64
       }
       if (hextets.slice(0, 6).every(h => h === 0) && (hextets[6] | hextets[7]) !== 0) {
