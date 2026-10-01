@@ -45,10 +45,6 @@ export class ContactService {
     return this.getEngine(sessionId).getBlockedContacts();
   }
 
-  checkNumberExists(sessionId: string, number: string) {
-    return this.getEngine(sessionId).checkNumberExists(number);
-  }
-
   getNumberId(sessionId: string, number: string) {
     return this.getEngine(sessionId).getNumberId(number);
   }

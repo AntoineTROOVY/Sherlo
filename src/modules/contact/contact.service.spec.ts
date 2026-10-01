@@ -52,12 +52,6 @@ describe('ContactService', () => {
     await expect(svc.getContactById('s1', 'c404')).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('delegates checkNumberExists to the engine', async () => {
-    const checkNumberExists = jest.fn().mockResolvedValue(true);
-    await expect(makeService({ checkNumberExists }).checkNumberExists('s1', '628123')).resolves.toBe(true);
-    expect(checkNumberExists).toHaveBeenCalledWith('628123');
-  });
-
   it('delegates getNumberId to the engine (canonical JID resolution)', async () => {
     const getNumberId = jest.fn().mockResolvedValue('628123@c.us');
     await expect(makeService({ getNumberId }).getNumberId('s1', '628123')).resolves.toBe('628123@c.us');
