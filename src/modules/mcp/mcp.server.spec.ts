@@ -223,7 +223,6 @@ describe('auditMcpAuthFailure (MCP auth-failure audit trail, mirrors REST ApiKey
   it('does nothing when auditService is unavailable (mount without DI)', () => {
     expect(() => auditMcpAuthFailure(undefined, new UnauthorizedException('x'), reqContext)).not.toThrow();
   });
-
 });
 
 describe('createKeyGate (every MCP request needs a valid key)', () => {
