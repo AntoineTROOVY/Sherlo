@@ -60,7 +60,7 @@ flowchart TB
     M4 --> A4[< 24h patch capability]
 ```
 
-Switching `ENGINE_TYPE` (M3) helps only when one engine library breaks. A gate WhatsApp enforces inside the linking handshake, such as the passkey step ([#560](https://github.com/rmyndharis/OpenWA/issues/560), upstream [WhiskeySockets/Baileys#2672](https://github.com/WhiskeySockets/Baileys/issues/2672)), stops new links on both engines; the fix has to come from the engine libraries, and operators rely on their fallback channel until then (see [Plan A](#plan-a-whatsapp-protocol-change)).
+Switching `ENGINE_TYPE` (M3) helps only when one engine library breaks, and every session must then be linked again, because each engine keeps its own auth state. A gate WhatsApp enforces inside the linking handshake, such as the passkey step ([#560](https://github.com/rmyndharis/OpenWA/issues/560), upstream [WhiskeySockets/Baileys#2672](https://github.com/WhiskeySockets/Baileys/issues/2672)), stops new links on both engines; the fix has to come from the engine libraries, and operators rely on their fallback channel until then (see [Plan A](#plan-a-whatsapp-protocol-change)).
 
 **Action Items:**
 
@@ -454,7 +454,8 @@ flowchart TB
 
     E --> |One engine| C1[Notify users]
     C1 --> C2[Set ENGINE_TYPE to the unaffected engine]
-    C2 --> M1
+    C2 --> C3[Link every session again on the new engine - auth state is per engine]
+    C3 --> M1
     E --> |Both engines or server-side gate| B1[Notify users and link the tracking issue]
     B1 --> B2[Keep linked sessions running - no logout or restart churn]
     B2 --> B3[Operators move critical traffic to their fallback channel]
@@ -463,6 +464,8 @@ flowchart TB
 ```
 
 During a both-engines event keep linked sessions running rather than logging them out or deleting them: linking again may hit the same gate.
+
+After a one-engine switch every session starts without credentials, because each engine keeps its own auth state. An account behind the passkey gate cannot link again, so keep it on the fallback channel.
 
 ### Plan B: Critical Security Vulnerability
 
