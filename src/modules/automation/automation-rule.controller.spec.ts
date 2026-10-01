@@ -112,6 +112,14 @@ describe('AutomationRuleController', () => {
     await expect(controller.findOne('s1', 'rule-404')).rejects.toBe(error);
   });
 
+  it.each(['create', 'update'] as const)('declares the validation 400 on %s', handler => {
+    const responses = (Reflect.getMetadata(
+      'swagger/apiResponse',
+      Object.getOwnPropertyDescriptor(AutomationRuleController.prototype, handler)?.value as object,
+    ) ?? {}) as Record<string, unknown>;
+    expect(Object.keys(responses)).toContain('400');
+  });
+
   it('remove propagates not-found rejections unmapped', async () => {
     const error = new NotFoundException('Automation rule rule-404 not found');
     service.remove.mockRejectedValue(error);
