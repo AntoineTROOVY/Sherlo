@@ -3588,7 +3588,6 @@ Get business catalog info for the session's WhatsApp Business account.
 {
   "id": "1234567890123456",
   "name": "My Storefront",
-  "description": "Best products in town",
   "productCount": 12,
   "url": "https://wa.me/c/6281234567890"
 }
@@ -3630,7 +3629,7 @@ Validated against `ProductQueryDto` via the global ValidationPipe; any unknown q
       "description": "Noise-cancelling, 24h battery",
       "price": 49990,
       "currency": "IDR",
-      "priceFormatted": "Rp 49.990",
+      "priceFormatted": "IDR 49,990",
       "imageUrl": "https://example.com/img/earbuds.jpg",
       "url": "https://wa.me/p/PROD_12345/6281234567890",
       "isAvailable": true,
@@ -3669,7 +3668,7 @@ Get a specific catalog product by id.
   "description": "Noise-cancelling, 24h battery",
   "price": 49990,
   "currency": "IDR",
-  "priceFormatted": "Rp 49.990",
+  "priceFormatted": "IDR 49,990",
   "imageUrl": "https://example.com/img/earbuds.jpg",
   "url": "https://wa.me/p/PROD_12345/6281234567890",
   "isAvailable": true,
