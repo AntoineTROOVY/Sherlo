@@ -347,7 +347,7 @@
       "configured": "{{host}} ({{type}})",
       "noProxy": "Kein Proxy konfiguriert",
       "hasCredentials": "Zugangsdaten sind gespeichert, werden aber nicht angezeigt. Gib eine vollständige URL ein, um sie zu ändern.",
-      "hint": "Änderungen gelten ab dem nächsten Sitzungsstart, nicht für eine laufende Verbindung. Der Proxy muss echt und erreichbar sein: Ein nicht erreichbarer Wert blockiert die QR-Zustellung: Unter whatsapp-web.js gibt der Start 504 zurück, unter Baileys gelingt der Start und die Sitzung versucht es weiter.",
+      "hint": "Änderungen gelten ab dem nächsten Sitzungsstart, nicht für eine laufende Verbindung. Der Proxy muss echt und erreichbar sein: Ein nicht erreichbarer Wert blockiert die QR-Zustellung. Unter whatsapp-web.js gibt der Start 504 zurück, unter Baileys gelingt der Start und die Sitzung versucht es weiter.",
       "createHint": "Nur nötig, wenn dein Netzwerk WhatsApp nicht direkt erreichen kann. Muss ein echter, erreichbarer Proxy sein.",
       "invalidUrl": "Gib eine gültige http-, https-, socks4- oder socks5-Proxy-URL ein.",
       "saveSuccessTitle": "Proxy gespeichert",

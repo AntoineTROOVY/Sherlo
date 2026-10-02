@@ -352,7 +352,7 @@
       "configured": "{{host}} ({{type}})",
       "noProxy": "Yapılandırılmış proxy yok",
       "hasCredentials": "Kimlik bilgileri kayıtlı ancak gösterilmiyor. Değiştirmek için tam bir URL girin.",
-      "hint": "Değişiklikler çalışan bir bağlantıya değil, oturumun bir sonraki başlatılışında uygulanır. Proxy gerçek ve erişilebilir olmalıdır: erişilemeyen bir değer QR teslimini engeller: whatsapp-web.js'te başlatma 504 döndürür, Baileys'te başlatma başarılı olur ve oturum yeniden denemeye devam eder.",
+      "hint": "Değişiklikler çalışan bir bağlantıya değil, oturumun bir sonraki başlatılışında uygulanır. Proxy gerçek ve erişilebilir olmalıdır: erişilemeyen bir değer QR teslimini engeller. whatsapp-web.js'te başlatma 504 döndürür, Baileys'te başlatma başarılı olur ve oturum yeniden denemeye devam eder.",
       "createHint": "Yalnızca ağınız WhatsApp'a doğrudan erişemiyorsa gereklidir. Gerçek ve erişilebilir bir proxy olmalıdır.",
       "invalidUrl": "Geçerli bir http, https, socks4 veya socks5 proxy URL'si girin.",
       "saveSuccessTitle": "Proxy Kaydedildi",
