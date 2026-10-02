@@ -52,7 +52,9 @@ export class TemplateService {
   }
 
   async findOne(sessionId: string, id: string): Promise<Template> {
-    const template = await this.templateRepository.findOne({ where: { id, sessionId } });
+    // PostgreSQL rejects a NUL in a bound text parameter (a 500), and ids are server-generated uuids, so
+    // none can match: answer 404 without querying. Covers the :id routes and resolve() by id.
+    const template = id.includes('\u0000') ? null : await this.templateRepository.findOne({ where: { id, sessionId } });
     if (!template) {
       throw new NotFoundException(`Template with id '${id}' not found`);
     }
