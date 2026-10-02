@@ -42,6 +42,14 @@ import {
 /** A start refused because an operator stopped the session. Same 409 on the wire as any conflict. */
 export class SessionStoppedException extends ConflictException {}
 
+/** Caller callbacks for stop()/delete(), run around the session read that opens each verb. */
+export interface StopHooks {
+  /** stop() only: runs once the session read succeeds and before any teardown; records the stop. */
+  afterRead?: () => Promise<void>;
+  /** Runs when the session read fails, after the stop mark is dropped: undoes the caller's request count. */
+  onReadFailed?: () => void;
+}
+
 /**
  * The deps + core call-ins SessionEngineControls needs from the lifecycle. Built ONCE in the
  * lifecycle's constructor. The dependency VALUES (sessionRepository … broadcaster) are captured at
@@ -56,14 +64,6 @@ export class SessionStoppedException extends ConflictException {}
  * lifecycle's dataSource on the instance after construction (logout-teardown-race.spec) and
  * delete()'s transaction must observe the current one at call time.
  */
-/** Caller callbacks for stop()/delete(), run around the session read that opens each verb. */
-export interface StopHooks {
-  /** stop() only: runs once the session read succeeds and before any teardown; records the stop. */
-  afterRead?: () => Promise<void>;
-  /** Runs when the session read fails, after the stop mark is dropped: undoes the caller's request count. */
-  onReadFailed?: () => void;
-}
-
 export interface SessionEngineControlsHost {
   sessionRepository: Repository<Session>;
   engineFactory: EngineFactory;
