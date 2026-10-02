@@ -130,7 +130,9 @@ Alongside this async pipeline, a route may additionally declare a `response` con
 - **Identity, dedup, and DLQ tables** — see §25.5.
 - **Ingress queue** — a durable BullMQ queue that is a _sibling_ of the outbound webhook queue (its own
   worker, not the reordering webhook worker), with exponential-backoff retries and a dead-letter row on
-  the final attempt.
+  the final attempt. When that row cannot be written (a data-database outage), the delivery is re-queued
+  under a new job id and runs again after 60s with the same retries; a re-queued copy that fails again
+  adds no second row while one is open.
 
 ## 25.5 Data model
 
@@ -148,10 +150,12 @@ Four tables live on the data connection, each created by a hand-authored dual-di
   markers the reconciler sweeps on: `dispatchState` (`pending | dispatched | failed`, `NULL` on rows
   that predate the columns on a synchronize-bootstrapped DB — "not watched"), `dispatchAttempts`, and
   `lastDispatchAt`. New rows are `pending`; a recorded enqueue outcome flips them to `dispatched`;
-  `failed` is terminal (recovery continues via the DLQ row + redrive). The row carries the **full
-  request payload only while it is the sole durability handle** — from the persist until the dispatch
-  outcome is recorded. Once the dispatch tier owns the delivery (the BullMQ job data, or the DLQ row
-  on failure), the payload is retired to `NULL` and the row slims to its dedup marker plus
+  `failed` is terminal (recovery continues via the DLQ row + redrive), except that a re-queued copy
+  (see §25.4) that delivers moves the event to `dispatched` and retires the delivery's open DLQ row.
+  The row carries the **full request payload only while it is the sole durability handle** — from the
+  persist until the dispatch outcome is recorded. Once the dispatch tier owns the delivery (the BullMQ
+  job data, or the DLQ row on failure), the payload is retired to `NULL` and the row slims to its
+  dedup marker plus
   `payloadHash` (a sha256 of the raw body kept for operator correlation). This keeps steady-state
   growth at a few hundred bytes per delivery instead of up to 2× `maxBodyBytes`; dedup rows are
   pruned on their own short window (`INGRESS_DEDUP_RETENTION_DAYS`, default 7 — a dedup oracle is not
@@ -247,11 +251,15 @@ live path uses and with the original delivery id as job id, so a replay is idemp
 the crashed live path may have enqueued. The stored row is sufficient for re-dispatch — while
 `pending` it is the full verified request (headers/query/body/rawBody) plus the route and session
 provenance; the conversation lane is re-derived from the current manifest. After
-`INGRESS_RECONCILE_MAX_ATTEMPTS` (default 5) the row goes `failed` (terminal) and a dead-letter row
+`INGRESS_RECONCILE_MAX_ATTEMPTS` (default 5) the row goes `failed` and a dead-letter row
 is guaranteed to exist **before** the row's payload is retired, so recovery continues through the
 bounded redrive path instead of an infinite replay loop; a successful replay likewise retires the
 row's payload with the `dispatched` mark and retires any live-path dead-letter row for the same
-delivery so a later redrive never double-delivers. A `pending` row found without a payload (only
+delivery so a later redrive never double-delivers. The replay looks the queue job up first: a job
+still in the queue or completed, or a live or completed re-queued copy of it, takes the `dispatched`
+mark without a second enqueue, and a job that failed with no such copy is not replayed: the row goes
+`failed` with a dead-letter row guaranteed as above, so none is written while a copy can still
+deliver. A `pending` row found without a payload (only
 possible for imported/corrupt history — payloads are retired only with a recorded outcome) is
 excluded from the sweep and never replayed empty; nothing logs it, and it stays `pending` until
 `INGRESS_DEDUP_RETENTION_DAYS` prunes it.
