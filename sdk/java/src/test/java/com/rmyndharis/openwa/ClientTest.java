@@ -45,6 +45,14 @@ class ClientTest {
     }
 
     @Test
+    void pathWithoutLeadingSlashIsRefusedBeforeSending() {
+        // Appended to the base URL, such a path could move the request and its API key to another host.
+        assertThrows(IllegalArgumentException.class,
+            () -> client.requestVoid(HttpMethod.GET, "@evil.example/api/sessions", null, null));
+        assertNull(tx.lastRequest());
+    }
+
+    @Test
     void apiErrorCarriesCodeRetryAfterAndHeaders() {
         tx.respondRaw(429, "{\"statusCode\":429,\"message\":\"ThrottlerException: Too Many Requests\"}"
             .getBytes(StandardCharsets.UTF_8), Map.of("retry-after", List.of("7")));
