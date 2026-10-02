@@ -125,7 +125,6 @@
       "unknownType": "Tipo sconosciuto"
     },
     "you": "Tu",
-    "youPrefix": "Tu: ",
     "yesterday": "Ieri",
     "attachTitle": "Invia file / immagine",
     "emojiTitle": "Scegli emoji",
@@ -493,11 +492,9 @@
       "valueLabel": "Valore filtro"
     },
     "columns": {
-      "url": "URL",
       "events": "Eventi",
       "session": "Sessione",
-      "status": "Stato",
-      "actions": "Azioni"
+      "status": "Stato"
     },
     "empty": {
       "title": "Nessun webhook configurato",
@@ -677,7 +674,6 @@
       "revoke": "Revoca"
     },
     "actions": {
-      "copy": "Copia",
       "revoke": "Revoca",
       "delete": "Elimina",
       "edit": "Modifica accesso"

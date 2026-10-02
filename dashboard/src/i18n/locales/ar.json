@@ -134,7 +134,6 @@
       "unknownType": "نوع غير معروف"
     },
     "you": "أنت",
-    "youPrefix": "أنت: ",
     "yesterday": "أمس",
     "attachTitle": "إرسال ملف / صورة",
     "emojiTitle": "اختيار إيموجي",
@@ -512,11 +511,9 @@
       "valueLabel": "قيمة التصفية"
     },
     "columns": {
-      "url": "الرابط",
       "events": "الأحداث",
       "session": "الجلسة",
-      "status": "الحالة",
-      "actions": "إجراءات"
+      "status": "الحالة"
     },
     "empty": {
       "title": "لا توجد ويب هوك مُهيّأة",
@@ -696,7 +693,6 @@
       "revoke": "إلغاء"
     },
     "actions": {
-      "copy": "نسخ",
       "revoke": "إلغاء",
       "delete": "حذف",
       "edit": "تعديل الوصول"

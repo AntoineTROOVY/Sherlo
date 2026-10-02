@@ -128,7 +128,6 @@
       "unknownType": "סוג לא ידוע"
     },
     "you": "אתה",
-    "youPrefix": "אתה: ",
     "yesterday": "אתמול",
     "attachTitle": "שליחת קובץ / תמונה",
     "emojiTitle": "בחירת אימוג'י",
@@ -500,11 +499,9 @@
       "valueLabel": "ערך סינון"
     },
     "columns": {
-      "url": "כתובת URL",
       "events": "אירועים",
       "session": "Session",
-      "status": "סטטוס",
-      "actions": "פעולות"
+      "status": "סטטוס"
     },
     "empty": {
       "title": "לא הוגדרו Webhooks",
@@ -684,7 +681,6 @@
       "revoke": "ביטול"
     },
     "actions": {
-      "copy": "העתקה",
       "revoke": "ביטול",
       "delete": "מחיקה",
       "edit": "עריכת גישה"

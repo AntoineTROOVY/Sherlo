@@ -122,7 +122,6 @@
       "unknownType": "Tipe tidak diketahui"
     },
     "you": "Anda",
-    "youPrefix": "Anda: ",
     "yesterday": "Kemarin",
     "attachTitle": "Kirim berkas / gambar",
     "emojiTitle": "Pilih emoji",
@@ -487,11 +486,9 @@
       "valueLabel": "Nilai filter"
     },
     "columns": {
-      "url": "URL",
       "events": "Kejadian",
       "session": "Sesi",
-      "status": "Status",
-      "actions": "Aksi"
+      "status": "Status"
     },
     "empty": {
       "title": "Belum ada webhook dikonfigurasi",
@@ -671,7 +668,6 @@
       "revoke": "Cabut"
     },
     "actions": {
-      "copy": "Salin",
       "revoke": "Cabut",
       "delete": "Hapus",
       "edit": "Edit akses"

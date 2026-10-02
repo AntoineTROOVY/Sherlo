@@ -122,7 +122,6 @@
       "unknownType": "Unbekannter Typ"
     },
     "you": "Du",
-    "youPrefix": "Du: ",
     "yesterday": "Gestern",
     "attachTitle": "Datei/Bild senden",
     "emojiTitle": "Emoji auswählen",
@@ -487,11 +486,9 @@
       "valueLabel": "Filterwert"
     },
     "columns": {
-      "url": "URL",
       "events": "Ereignisse",
       "session": "Sitzung",
-      "status": "Status",
-      "actions": "Aktionen"
+      "status": "Status"
     },
     "empty": {
       "title": "Keine Webhooks konfiguriert",
@@ -671,7 +668,6 @@
       "revoke": "Widerrufen"
     },
     "actions": {
-      "copy": "Kopieren",
       "revoke": "Widerrufen",
       "delete": "Löschen",
       "edit": "Zugriff bearbeiten"

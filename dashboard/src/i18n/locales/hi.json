@@ -122,7 +122,6 @@
       "unknownType": "अज्ञात प्रकार"
     },
     "you": "आप",
-    "youPrefix": "आप: ",
     "yesterday": "कल",
     "attachTitle": "फ़ाइल / छवि भेजें",
     "emojiTitle": "इमोजी चुनें",
@@ -487,11 +486,9 @@
       "valueLabel": "फ़िल्टर मान"
     },
     "columns": {
-      "url": "URL",
       "events": "घटनाएँ",
       "session": "सत्र",
-      "status": "स्थिति",
-      "actions": "कार्रवाइयाँ"
+      "status": "स्थिति"
     },
     "empty": {
       "title": "कोई वेबहुक कॉन्फ़िगर नहीं किया गया",
@@ -671,7 +668,6 @@
       "revoke": "निरस्त करें"
     },
     "actions": {
-      "copy": "कॉपी करें",
       "revoke": "निरस्त करें",
       "delete": "हटाएं",
       "edit": "पहुँच संपादित करें"
