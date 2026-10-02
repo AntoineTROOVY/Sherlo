@@ -293,6 +293,10 @@ const check = (id, ok, detail) => results.push({ id, ok, detail });
     // `--set` parses this one as a YAML boolean rather than a string.
     ['CSP upgrade off as a boolean', false, ['--set', 'ingress.enabled=true', '--set', 'env.CSP_UPGRADE_INSECURE_REQUESTS=false']],
     ['ingress with TLS', false, ['--set', 'ingress.enabled=true', ...tls]],
+    // A null drops the key from the ConfigMap, so the image's NODE_ENV=production applies.
+    ['NODE_ENV removed', true, ['--set', 'ingress.enabled=true', '--set', 'env.NODE_ENV=null']],
+    // An empty value reaches the container and overrides the image default.
+    ['NODE_ENV empty', false, ['--set', 'ingress.enabled=true', '--set-string', 'env.NODE_ENV=']],
     ['no ingress', false, []],
   ];
   const wrong = cases.filter(([, want, args]) => warns(notes(...args)) !== want).map(([name, want]) => `${name} (expected ${want ? 'a' : 'no'} warning)`);
