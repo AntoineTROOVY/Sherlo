@@ -6148,9 +6148,9 @@ Update a plugin's base configuration object.
 
 **Request body** — `PluginConfigDto` (class-validated; body must be exactly `{config:{…}}`)
 
-| Field    | Type   | Required | Constraints   | Description                                                                                                 |
-| -------- | ------ | -------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
-| `config` | object | Yes      | `@IsObject()` | Whole config object. Masked/sentinel secret values mean "unchanged" and are restored from the stored config |
+| Field    | Type   | Required | Constraints   | Description                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------- | ------ | -------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config` | object | Yes      | `@IsObject()` | Keys to set, merged over the stored config: omitted keys keep their value. Every key sent is stored, and for a built-in engine plugin (`whatsapp-web.js`, `baileys`) a stored key overrides its `.env`-derived setting on every later boot, so send only the keys you mean to change, not the whole object `GET /api/plugins/:id` returns. Masked/sentinel secret values mean "unchanged" and are restored from the stored config |
 
 ```json
 { "config": { "apiKey": "sk-...", "replyDelayMs": 1500 } }
