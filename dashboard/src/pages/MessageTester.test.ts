@@ -365,23 +365,24 @@ test('a group poll send holds a question over 255 or an option over 100 characte
   await assertLengthBound(rtl.screen.getByPlaceholderText('Option 1'), 100);
 });
 
-test('each bounded single-send field stops taking input at the limit Send enforces', async () => {
-  const maxLength = (element: HTMLElement): number => (element as HTMLInputElement).maxLength;
+test('no single-send field truncates input by UTF-16 units', async () => {
+  // A native maxlength counts a surrogate pair as two and cuts pasted text the gateway would accept;
+  // Send alone holds an over-limit field, counting characters the way the gateway does.
+  const capped = (element: HTMLElement): boolean => element.hasAttribute('maxlength');
   await renderGroupSendOf('Text');
-  assert.equal(maxLength(byId('mt-2')), 4096);
+  assert.equal(capped(byId('mt-2')), false);
+  await assertLengthBound(byId('mt-2'), 4096, '\u{1F600}');
   rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Image' }));
-  assert.equal(maxLength(byId('mt-14')), 1024);
-  rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Document' }));
-  assert.equal(maxLength(byId('mt-14')), 255);
+  assert.equal(capped(byId('mt-14')), false);
   rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Location' }));
-  assert.equal(maxLength(byId('mt-15')), 1024);
-  assert.equal(maxLength(byId('mt-16')), 1024);
+  assert.equal(capped(byId('mt-15')), false);
+  assert.equal(capped(byId('mt-16')), false);
   rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Contact' }));
-  assert.equal(maxLength(byId('mt-6')), 255);
-  assert.equal(maxLength(byId('mt-7')), 30);
+  assert.equal(capped(byId('mt-6')), false);
+  assert.equal(capped(byId('mt-7')), false);
   rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Poll' }));
-  assert.equal(maxLength(byId('mt-8')), 255);
-  assert.equal(maxLength(rtl.screen.getByPlaceholderText('Option 1')), 100);
+  assert.equal(capped(byId('mt-8')), false);
+  assert.equal(capped(rtl.screen.getByPlaceholderText('Option 1')), false);
 });
 
 test('a session that stops being ready is replaced by what the selector shows', async () => {
