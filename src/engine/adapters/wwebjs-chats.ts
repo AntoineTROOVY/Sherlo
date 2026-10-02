@@ -252,7 +252,8 @@ export class WwebjsChats {
   /**
    * The write leg of mute, pin and the account's own presence. A dead page or an expired protocol
    * timeout is a 503 (mute, unmute, pin, unpin and a presence change all converge when repeated) and
-   * a dead page is reported as the early death signal. Any other rejection is rethrown untouched, for the reason above.
+   * a dead page is reported as the early death signal. Any other rejection is rethrown untouched,
+   * for the reason above.
    */
   private async chatWrite<T>(context: string, op: () => Promise<T>): Promise<T> {
     try {
