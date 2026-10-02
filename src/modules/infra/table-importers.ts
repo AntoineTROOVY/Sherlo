@@ -418,7 +418,7 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       row.event,
       row.idempotencyKey,
       row.deliveryId,
-      row.payload,
+      row.payload == null ? null : typeof row.payload === 'string' ? row.payload : JSON.stringify(row.payload),
       row.state,
       row.attempts,
       row.lastAttemptAt,

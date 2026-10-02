@@ -118,6 +118,24 @@ describe('automationRules table importer', () => {
 });
 
 /**
+ * A restore of the outbox restores the replay backlog. The payload column is text on both dialects, so
+ * a decoded object must be written as JSON text: better-sqlite3 would read it as a named parameter bag
+ * and fail the insert, rolling back the whole restore on SQLite while PostgreSQL accepted it.
+ */
+describe('webhookOutboxEvents table importer', () => {
+  const outbox = TABLE_IMPORTERS.find(importer => importer.key === 'webhookOutboxEvents');
+  const payload = (value: unknown): unknown => outbox!.map({ id: 'ob-1', payload: value } as never)[6];
+  const body = { event: 'message.received', data: { id: 'm1' } };
+
+  it('writes a decoded payload as JSON text, and keeps text or null as they are', () => {
+    expect(payload(body)).toBe(JSON.stringify(body));
+    expect(payload(JSON.stringify(body))).toBe(JSON.stringify(body));
+    expect(payload(null)).toBeNull();
+    expect(payload(undefined)).toBeNull();
+  });
+});
+
+/**
  * A template name loses its NUL characters on restore, and (sessionId, name) is unique. Two names of
  * one session that differ only by NUL would collide on insert and roll the restore back, so the
  * guard refuses the second one up front and names both rows.
