@@ -98,6 +98,7 @@ afterEach(() => {
   holdWebhooks = false;
   requested.length = 0;
   window.sessionStorage.setItem('openwa_user_role', 'viewer');
+  window.sessionStorage.removeItem('openwa_key_scoped');
 });
 
 function renderDashboard(): void {
@@ -258,6 +259,17 @@ test('an admin key loads the chart section', async () => {
   window.sessionStorage.setItem('openwa_user_role', 'admin');
   renderDashboard();
   await rtl.waitFor(() => assert.ok(requested.some(p => p.startsWith('/api/stats/messages'))));
+});
+
+test('a session-scoped admin key never loads the cross-session statistics', async () => {
+  // GET /stats/overview and /stats/messages refuse a key restricted to selected sessions, whatever its role.
+  window.sessionStorage.setItem('openwa_user_role', 'admin');
+  window.sessionStorage.setItem('openwa_key_scoped', 'true');
+  renderDashboard();
+  await rtl.waitFor(() => assert.ok(requested.includes('/api/sessions')));
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.ok(!requested.includes('/api/stats/overview'), 'the overview was requested');
+  assert.ok(!requested.some(p => p.startsWith('/api/stats/messages')), 'the charts asked for /stats/messages');
 });
 
 // The session table renders `status-pill ${session.status}`, so every status needs its own colour.

@@ -62,6 +62,8 @@ before(async () => {
     canWrite: true,
     engineType: null,
     setEngineType: () => undefined,
+    scoped: false,
+    setScoped: () => undefined,
   };
   wrap = children =>
     createElement(

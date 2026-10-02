@@ -18,14 +18,16 @@ import { isSessionStarted } from '../utils/sessionActions';
 import './Dashboard.css';
 
 // recharts is heavy (~116 kB gzip); load the analytics section on demand so it never bloats the
-// main/login bundle, and only for an admin key: /stats/messages refuses every other role.
+// main/login bundle, and only for an unscoped admin key: /stats/messages refuses every other key.
 const DashboardCharts = lazy(() => import('../components/DashboardCharts').then(m => ({ default: m.DashboardCharts })));
 
 export function Dashboard() {
   const { t } = useTranslation();
   useDocumentTitle(t('dashboard.title'));
   const navigate = useNavigate();
-  const { canWrite, isAdmin } = useRole();
+  const { canWrite, isAdmin, scoped } = useRole();
+  // The cross-session statistics also refuse a session-scoped key, whatever its role.
+  const canReadStats = isAdmin && !scoped;
   const toast = useToast();
   const {
     data: sessions = [],
@@ -38,7 +40,7 @@ export function Dashboard() {
   // them, since the gateway audits every refusal as a failed authentication; their cards show the
   // unavailable placeholder.
   const { data: webhooks } = useWebhooksQuery(canWrite);
-  const { data: overview } = useStatsOverviewQuery(isAdmin);
+  const { data: overview } = useStatsOverviewQuery(canReadStats);
   const stopMutation = useStopSessionMutation();
   const unavailable = '—';
   const messagesToday = overview ? overview.messages.today.sent + overview.messages.today.received : unavailable;
@@ -138,7 +140,7 @@ export function Dashboard() {
         ))}
       </div>
 
-      {isAdmin && (
+      {canReadStats && (
         <Suspense fallback={null}>
           <DashboardCharts />
         </Suspense>

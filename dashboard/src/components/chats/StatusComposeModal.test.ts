@@ -49,6 +49,8 @@ before(async () => {
     canWrite: true,
     engineType: 'whatsapp-web.js',
     setEngineType: () => undefined,
+    scoped: false,
+    setScoped: () => undefined,
   };
   render = () =>
     rtl.render(
