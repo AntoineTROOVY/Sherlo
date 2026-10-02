@@ -216,7 +216,6 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
       capInboundMediaFor: (msg, maxBytesOverride) => this.capInboundMediaFor(msg, maxBytesOverride),
       config: this.config,
       getCallbacks: () => this.callbacks,
-      getSelfWid: () => this.client?.info?.wid?._serialized,
     };
     this.groups = new WwebjsGroups(this.host);
     this.messaging = new WwebjsMessaging(this.host);
