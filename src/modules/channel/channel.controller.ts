@@ -16,6 +16,10 @@ import {
   ENGINE_REFUSED_403,
 } from '../../common/openapi/engine-status-responses';
 
+/** Delete and unsubscribe refuse a non-channel id up front; neither looks the channel up. */
+const CHANNEL_ID_INVALID_404 =
+  'The id is not a channel id (it does not end in `@newsletter`). Retrying the same id cannot succeed.';
+
 @ApiTags('channels')
 @Controller('sessions/:sessionId/channels')
 export class ChannelController {
@@ -131,7 +135,7 @@ export class ChannelController {
   @ApiResponse({ status: 400, description: 'Session not started' })
   @ApiResponse({ status: 403, description: 'The engine refused — not found, or this account does not own it' })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
-  @ApiResponse({ status: 404, description: CHANNEL_NOT_FOUND_404 })
+  @ApiResponse({ status: 404, description: CHANNEL_ID_INVALID_404 })
   async remove(
     @Param('sessionId') sessionId: string,
     @Param('channelId') channelId: string,
@@ -294,7 +298,7 @@ export class ChannelController {
   @ApiResponse({ status: 400, description: 'Session not started' })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
   @ApiResponse({ status: 403, description: ENGINE_REFUSED_403 })
-  @ApiResponse({ status: 404, description: CHANNEL_NOT_FOUND_404 })
+  @ApiResponse({ status: 404, description: CHANNEL_ID_INVALID_404 })
   async unsubscribe(@Param('sessionId') sessionId: string, @Param('channelId') channelId: string) {
     await this.channelService.unsubscribeFromChannel(sessionId, channelId);
     return { success: true };
