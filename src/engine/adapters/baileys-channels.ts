@@ -129,13 +129,18 @@ export class BaileysChannels {
    * Deliberately NOT bounded, unlike every other call here: creating a channel is non-idempotent,
    * and 503 is a backpressure status the Go SDK retries three times for POST (sdk/go/retry.go).
    * A deadline abandons without cancelling, so a slow-but-succeeding create could leave duplicates.
+   * An unanswered query therefore still surfaces opaquely rather than as something retryable, and so
+   * does WA code 408: a server timeout does not say whether the channel was created.
    */
   async createChannel(name: string, description?: string): Promise<Channel> {
     this.host.ensureReady();
     const meta = await mapServerRefusal(
       'Creating the channel',
       () => this.sock().newsletterCreate(name, description),
-      wmexRefusalCode,
+      error => {
+        const code = wmexRefusalCode(error);
+        return code === 408 ? undefined : code;
+      },
     );
     return this.toChannel(meta);
   }

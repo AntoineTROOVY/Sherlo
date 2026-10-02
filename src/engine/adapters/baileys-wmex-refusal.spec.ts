@@ -121,6 +121,15 @@ describe('what must NOT be classified as a refusal', () => {
     );
   });
 
+  it('a WhatsApp 408 on channel create stays opaque rather than becoming a retryable 503', async () => {
+    // A server timeout does not say whether the channel was created, and a 503 invites a retried POST.
+    const timedOut = wmexRefusal(408);
+    const newsletterCreate = jest.fn().mockRejectedValue(timedOut);
+    const result = channels({ newsletterCreate }, 500).createChannel('N');
+    await expect(result).rejects.toBe(timedOut);
+    await expect(result).rejects.not.toBeInstanceOf(EngineTransportError);
+  });
+
   it('the WMex no-answer shape is not a refusal either — its data is null', async () => {
     // executeWMexQuery's other throw: Boom(..., { statusCode: 400, data: result }) with result
     // undefined, which Boom normalises to null.
