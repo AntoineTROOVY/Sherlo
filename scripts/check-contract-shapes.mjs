@@ -145,6 +145,7 @@ const MAPPINGS = {
   'dashboard/src/services/api.ts': {
     AccountRestriction: 'AccountRestrictionDto',
     AuditLog: 'AuditLogDto',
+    BatchCancelResponse: 'BatchCancelResponseDto',
     BatchMessageResult: 'BatchMessageResultDto',
     BatchProgress: 'BatchProgressDto',
     BatchStatusResponse: 'BatchStatusResponseDto',
@@ -175,10 +176,10 @@ const MAPPINGS = {
  */
 const MINIMUM_MAPPED = {
   'sdk/javascript/src/types.ts': 85,
-  'dashboard/src/services/api.ts': 21,
-  'sdk/python/openwa/types.py': 80,
-  'sdk/go': 80,
-  'sdk/java': 84,
+  'dashboard/src/services/api.ts': 22,
+  'sdk/python/openwa/types.py': 81,
+  'sdk/go': 81,
+  'sdk/java': 85,
 };
 
 /** Known drift, deliberately not gated yet — each line is a to-adjudicate follow-up. */
@@ -216,6 +217,7 @@ const EXCLUDED = {
 const PYTHON_MAPPING = {
   AccountRestriction: 'AccountRestrictionDto',
   ArchiveChatRequest: 'ArchiveChatDto',
+  BatchCancelResponse: 'BatchCancelResponseDto',
   BatchMessageResult: 'BatchMessageResultDto',
   BatchProgress: 'BatchProgressDto',
   BatchStatusResponse: 'BatchStatusResponseDto',
@@ -300,6 +302,7 @@ const PYTHON_MAPPING = {
 const GO_MAPPING = {
   AccountRestriction: 'AccountRestrictionDto',
   ArchiveChatRequest: 'ArchiveChatDto',
+  BatchCancelResponse: 'BatchCancelResponseDto',
   BatchMessageResult: 'BatchMessageResultDto',
   BatchProgress: 'BatchProgressDto',
   BatchStatusResponse: 'BatchStatusResponseDto',
@@ -384,6 +387,7 @@ const GO_MAPPING = {
 const JAVA_MAPPING = {
   AccountRestriction: 'AccountRestrictionDto',
   ArchiveChatRequest: 'ArchiveChatDto',
+  BatchCancelResponse: 'BatchCancelResponseDto',
   BatchMessageResult: 'BatchMessageResultDto',
   BatchProgress: 'BatchProgressDto',
   BatchStatusResponse: 'BatchStatusResponseDto',
