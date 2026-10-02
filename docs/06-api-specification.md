@@ -6624,8 +6624,8 @@ including playlists and manifests, is refused with `400`.
 
 #### POST /api/sessions/:sessionId/media/convert/video
 
-Convert video into an MP4 every WhatsApp client accepts: baseline H.264 with AAC audio, long edge
-bounded at 1280 (never upscaled), index moved to the front so playback can start before the whole
+Convert video into an MP4 every WhatsApp client accepts: baseline H.264 with AAC audio, frame
+fitted inside 1280x720, or 720x1280 for portrait (never upscaled), index moved to the front so playback can start before the whole
 file arrives.
 
 **Errors:** `400` neither field given, a `url` that answers non-2xx, times out or cannot be reached, or ffmpeg refused the input (its reason is included) · `401` missing/invalid `X-API-Key` · `403` key lacks OPERATOR role · `413` media above the size cap · `503` conversion is disabled, the ffmpeg binary is not runnable, the conversion queue is saturated, or a `url` fetch through the session's egress proxy failed before any response, the proxy or the target at fault
