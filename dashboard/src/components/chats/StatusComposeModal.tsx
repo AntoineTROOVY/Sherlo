@@ -59,6 +59,8 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
     queryKey: ['status-compose-contacts', sessionId],
     queryFn: () => contactApi.list(sessionId!),
     enabled: isBaileysEngine && Boolean(sessionId),
+    // contactApi.list already retried a throttled page; another attempt would walk every page again.
+    retry: false,
   });
   const composeContacts = composeContactsQuery.data ?? [];
   const composeRecipientSearchLower = composeRecipientSearch.toLowerCase();
@@ -286,6 +288,8 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
               <div className="compose-recipients-empty">
                 <Loader2 className="animate-spin" size={16} />
               </div>
+            ) : composeContactsQuery.isError ? (
+              <div className="compose-recipients-empty">{t('dashboard.loadError')}</div>
             ) : filteredComposeContacts.length === 0 ? (
               <div className="compose-recipients-empty">{t('chats.status.noContacts')}</div>
             ) : (

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 
 let rtl: typeof import('@testing-library/react');
-let render: () => ReturnType<typeof import('@testing-library/react').render>;
+let render: (engineType?: string) => ReturnType<typeof import('@testing-library/react').render>;
 let queryClient: import('@tanstack/react-query').QueryClient;
 
 let reads = 0;
@@ -21,12 +21,23 @@ class CountingFileReader {
 
 // Bodies the modal posted, in order.
 const posted: unknown[] = [];
+// Contact-list reads, each answered with a 429.
+let contactReads = 0;
 
 before(async () => {
   const { installJsdomGlobals } = await import('../../test-helpers/jsdom.ts');
   await installJsdomGlobals();
   (globalThis as Record<string, unknown>).FileReader = CountingFileReader;
-  globalThis.fetch = ((_input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).includes('/contacts')) {
+      contactReads += 1;
+      return Promise.resolve(
+        new Response(JSON.stringify({ statusCode: 429, message: 'Too Many Requests' }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    }
     posted.push(JSON.parse(String(init?.body)));
     return Promise.resolve(
       new Response(JSON.stringify({ id: 'status-1' }), { headers: { 'Content-Type': 'application/json' } }),
@@ -40,26 +51,26 @@ before(async () => {
   const { RoleContext } = await import('../../hooks/useRole.tsx');
   const { default: StatusComposeModal } = await import('./StatusComposeModal.tsx');
   queryClient = new QueryClient();
-  const role = {
+  const role = (engineType: string) => ({
     role: 'operator' as const,
     setRole: () => undefined,
     isAdmin: false,
     isOperator: true,
     isViewer: false,
     canWrite: true,
-    engineType: 'whatsapp-web.js',
+    engineType,
     setEngineType: () => undefined,
     scoped: false,
     setScoped: () => undefined,
-  };
-  render = () =>
+  });
+  render = (engineType = 'whatsapp-web.js') =>
     rtl.render(
       createElement(
         QueryClientProvider,
         { client: queryClient },
         createElement(
           RoleContext.Provider,
-          { value: role },
+          { value: role(engineType) },
           createElement(
             ToastProvider,
             null,
@@ -74,6 +85,8 @@ afterEach(() => {
   rtl.cleanup();
   reads = 0;
   posted.length = 0;
+  contactReads = 0;
+  queryClient.clear();
 });
 
 after(() => {
@@ -127,4 +140,14 @@ test('a picked image is posted with its own type', async () => {
     base64: 'data:image/png;base64,eA==',
     mimetype: 'image/png',
   });
+});
+
+test('a contact list that stays throttled reads as a failure, not an empty address book', async () => {
+  const { screen } = rtl;
+  render('baileys');
+
+  // Two throttle retries wait one and then two seconds; a further query retry would page through again.
+  await screen.findByText('Failed to load data', undefined, { timeout: 6000 });
+  assert.equal(screen.queryByText('No contacts found') === null, true);
+  assert.equal(contactReads, 3);
 });
