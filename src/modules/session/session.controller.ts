@@ -306,8 +306,9 @@ export class SessionController {
     status: 400,
     description:
       'Session already started or already starting, or this node is at its MAX_CONCURRENT_SESSIONS cap ' +
-      '(`Maximum concurrent sessions reached (N)`); a start refused at the cap launches nothing ' +
-      'and leaves a stop in place.',
+      '(`Maximum concurrent sessions reached (N)`), answered only after the 404 and the 409 for a ' +
+      'session running on another node; a start refused at the cap launches nothing and leaves a ' +
+      'stop in place.',
   })
   @ApiResponse({ status: 404, description: 'Session not found' })
   @ApiResponse({
