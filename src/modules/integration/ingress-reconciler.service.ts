@@ -205,25 +205,22 @@ export class IngressReconcilerService implements OnModuleInit, OnModuleDestroy {
       // becomes the payload's only home). A re-queued copy that delivers retires the row and marks the
       // event 'dispatched'; one that fails again finds the row and adds no second one. The copy can
       // settle mid-sweep, before this row exists, so the mark only lands on a still-'pending' event,
-      // and a row written for an event the copy already dispatched is retired again.
-      await this.ensureDeadLetterRow(jobData, resolveIngressJobOptions().attempts, 'ingress queue job failed');
+      // and the row this sweep wrote for an event the copy already dispatched is retired again. Only
+      // that row: 'dispatched' is also the mark for a job that was still live, and a row written
+      // before this sweep can be the dead letter of a delivery that never arrived.
+      const written = await this.ensureDeadLetterRow(
+        jobData,
+        resolveIngressJobOptions().attempts,
+        'ingress queue job failed',
+      );
       const marked = await this.events.update(
         { id: row.id, dispatchState: 'pending' },
         { lastDispatchAt: now, dispatchState: 'failed', payload: null },
       );
-      if (!marked.affected) {
+      if (!marked.affected && written) {
         const current = await this.events.findOne({ where: { id: row.id }, select: { dispatchState: true } });
         if (current?.dispatchState === 'dispatched') {
-          await this.failures.update(
-            {
-              direction: 'inbound',
-              pluginId: row.pluginId,
-              instanceId: row.instanceId,
-              deliveryId: row.providerDeliveryId,
-              redriven: false,
-            },
-            { redriven: true },
-          );
+          await this.failures.update({ id: written, redriven: false }, { redriven: true });
           return 'replayed';
         }
       }
@@ -315,8 +312,13 @@ export class IngressReconcilerService implements OnModuleInit, OnModuleDestroy {
   }
 
   // The live path dead-letters an inline-dispatch failure at request time, so a terminal row may
-  // already have its DLQ entry — write one only if missing, and never a second copy.
-  private async ensureDeadLetterRow(data: IngressJobData, attempts: number, error?: string): Promise<void> {
+  // already have its DLQ entry — write one only if missing, and never a second copy. Returns the id of
+  // the row it wrote, or undefined when one already existed.
+  private async ensureDeadLetterRow(
+    data: IngressJobData,
+    attempts: number,
+    error?: string,
+  ): Promise<string | undefined> {
     const existing = await this.failures.count({
       where: {
         direction: 'inbound',
@@ -325,8 +327,8 @@ export class IngressReconcilerService implements OnModuleInit, OnModuleDestroy {
         deliveryId: data.deliveryId,
       },
     });
-    if (existing > 0) return;
-    await this.failures.save({ ...buildIngressDeadLetterRow(data, error), attempts });
+    if (existing > 0) return undefined;
+    return (await this.failures.save({ ...buildIngressDeadLetterRow(data, error), attempts })).id;
   }
 }
 

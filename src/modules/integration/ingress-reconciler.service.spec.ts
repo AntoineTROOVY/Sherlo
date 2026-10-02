@@ -398,15 +398,35 @@ describe('IngressReconcilerService.sweep', () => {
 
     it('keeps the dead-letter row open when another sweep already marked the event failed', async () => {
       const id = await insertEvent();
-      queue.getJobState.mockImplementation(async () => {
-        await processorDeadLetter();
-        await events.update({ id }, { dispatchState: 'failed', payload: null });
-        return 'failed';
-      });
+      queue.getJobState
+        .mockImplementationOnce(async () => {
+          await processorDeadLetter();
+          await events.update({ id }, { dispatchState: 'failed', payload: null });
+          return 'failed';
+        })
+        .mockResolvedValue('unknown');
 
       await service.sweep(OPTS);
 
       expect((await stored(id)).dispatchState).toBe('failed');
+      expect(await failures.count({ where: { deliveryId: 'd-1', redriven: false } })).toBe(1);
+    });
+
+    // 'dispatched' does not mean delivered: another node can mark it for a job that was still live, and
+    // the job can then spend its attempts and be dead-lettered by the processor.
+    it('keeps the processor dead-letter row open when the event was marked dispatched for a job that failed', async () => {
+      const id = await insertEvent();
+      queue.getJobState
+        .mockImplementationOnce(async () => {
+          await events.update({ id }, { dispatchState: 'dispatched', payload: null });
+          await processorDeadLetter();
+          return 'failed';
+        })
+        .mockResolvedValue('unknown');
+
+      const stats = await service.sweep(OPTS);
+
+      expect(stats).toMatchObject({ scanned: 1, replayed: 0, failed: 1 });
       expect(await failures.count({ where: { deliveryId: 'd-1', redriven: false } })).toBe(1);
     });
 
