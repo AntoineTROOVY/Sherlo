@@ -435,7 +435,7 @@ from openwa import OpenWAClient
 - **Import package:** `openwa`
 - **Client class:** `OpenWAClient`
 - **Python:** `>=3.9` (per `pyproject.toml`)
-- **Runtime dependencies:** `httpx>=0.25.0,<1.0`, plus `typing_extensions>=4.0` on Python < 3.11
+- **Runtime dependencies:** `httpx>=0.27.1,<1.0`, plus `typing_extensions>=4.0` on Python < 3.11
 - **Typed:** ships `py.typed` markers for `openwa` and `openwa.resources` (PEP 561)
 
 ### Quick Start
