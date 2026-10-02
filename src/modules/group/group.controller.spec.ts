@@ -168,6 +168,13 @@ describe('GroupController OpenAPI responses', () => {
     expect(silent).toEqual([]);
   });
 
+  // On Baileys the picture lookup also maps a WhatsApp 5xx to 503; the metadata query behind the
+  // settings read does not, so a 5xx there answers 500 and its 503 must not promise otherwise.
+  it('names the WhatsApp 5xx on the picture 503 and not on the settings 503', () => {
+    expect(responsesOf('getPicture')['503']?.description).toContain('5xx');
+    expect(responsesOf('getSettings')['503']?.description).not.toContain('5xx');
+  });
+
   it('declares the rate-limited 503 on group creation', () => {
     expect(responsesOf('create')['503']?.description).toContain('429');
   });

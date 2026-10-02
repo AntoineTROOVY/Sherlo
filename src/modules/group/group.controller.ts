@@ -156,10 +156,7 @@ export class GroupController {
   @ApiResponse({ status: 404, description: 'Group not found' })
   @ApiResponse({
     status: 503,
-    description:
-      'WhatsApp did not answer within the request budget — nothing could be read.' +
-      THROTTLED_503 +
-      ' On Baileys, a WhatsApp server error (5xx) on the lookup also answers 503.',
+    description: 'WhatsApp did not answer within the request budget — nothing could be read.' + THROTTLED_503,
   })
   @ApiResponse({ status: 400, description: SESSION_NOT_STARTED_400 })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
@@ -511,7 +508,10 @@ export class GroupController {
   @ApiResponse({ status: 400, description: 'The id does not name a group, or the session is not active' })
   @ApiResponse({
     status: 503,
-    description: 'WhatsApp did not answer within the request budget — nothing could be read.' + THROTTLED_503,
+    description:
+      'WhatsApp did not answer within the request budget — nothing could be read.' +
+      THROTTLED_503 +
+      ' On Baileys, a WhatsApp server error (5xx) on the lookup also answers 503.',
   })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
   async getPicture(@Param('sessionId') sessionId: string, @Param('groupId') groupId: string) {
