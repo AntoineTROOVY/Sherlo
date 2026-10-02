@@ -15,7 +15,6 @@ function wire(): { client: EventEmitter; onMessageRevoked: jest.Mock } {
   const onMessageRevoked = jest.fn();
   const host = {
     logger: createLogger('wwebjs-revoke-chat-id.spec'),
-    getSelfWid: () => '628111@c.us',
     getCallbacks: () => ({ onMessageRevoked }),
   } as unknown as WwebjsEngineHost;
   registerWwebjsMessageEvents(client as unknown as Client, host);
