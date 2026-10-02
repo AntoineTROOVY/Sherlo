@@ -20,6 +20,7 @@ import { EventsGateway } from '../events/events.gateway';
 import { WebhookService } from '../webhook/webhook.service';
 import { HookManager } from '../../core/hooks';
 import { StatusStoreService } from '../status-store/status-store.service';
+import { EngineStatus, type EngineEventCallbacks } from '../../engine/interfaces/whatsapp-engine.interface';
 
 const ID = 'sess-uuid-1';
 const NAME = 'test-session';
@@ -253,6 +254,23 @@ describe('SessionEngineLifecycle races', () => {
 
       expect(warn).toHaveBeenCalledWith('Failed to persist the disconnected status', {
         sessionId: ID,
+        error: 'SQLITE_BUSY',
+      });
+    });
+
+    it('logs a failed write of a status the engine reported', async () => {
+      const warn = jest.spyOn(internals.logger, 'warn');
+      await lifecycle.start(ID);
+      const engine = (engineFactory.create.mock.results[0] as { value: Record<string, jest.Mock> }).value;
+      const callbacks = (engine.initialize.mock.calls as [EngineEventCallbacks][])[0][0];
+      rejectStatus(SessionStatus.AUTHENTICATING);
+
+      callbacks.onStateChanged?.(EngineStatus.AUTHENTICATING);
+      await flush();
+
+      expect(warn).toHaveBeenCalledWith('Failed to persist an engine status', {
+        sessionId: ID,
+        status: SessionStatus.AUTHENTICATING,
         error: 'SQLITE_BUSY',
       });
     });
