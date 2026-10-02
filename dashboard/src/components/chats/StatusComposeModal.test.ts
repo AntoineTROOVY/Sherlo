@@ -181,9 +181,11 @@ test('status text and caption are bounded by Post, not truncated by UTF-16 units
   fireEvent.change(text, { target: { value: '\u{1F600}'.repeat(4096) } });
   assert.equal(post.disabled, false, 'text the gateway accepts is held');
   assert.equal(screen.queryByText('Limited to 4096 characters (4096 now).'), null);
+  // A live region mounted together with its text is often not announced, so each hint fills one already there.
+  let regions = screen.queryAllByRole('status');
   fireEvent.change(text, { target: { value: '\u{1F600}'.repeat(4097) } });
   assert.equal(post.disabled, true, 'text over 4096 characters can be posted');
-  screen.getByText('Limited to 4096 characters (4097 now).');
+  assert.ok(regions.includes(screen.getByText('Limited to 4096 characters (4097 now).')));
 
   fireEvent.click(screen.getByRole('button', { name: 'Image' }));
   fireEvent.change(screen.getByLabelText('Status image'), {
@@ -194,7 +196,8 @@ test('status text and caption are bounded by Post, not truncated by UTF-16 units
   assert.equal(caption.hasAttribute('maxlength'), false);
   fireEvent.change(caption, { target: { value: '\u{1F600}'.repeat(1024) } });
   assert.equal(post.disabled, false, 'a caption the gateway accepts is held');
+  regions = screen.queryAllByRole('status');
   fireEvent.change(caption, { target: { value: '\u{1F600}'.repeat(1025) } });
   assert.equal(post.disabled, true, 'a caption over 1024 characters can be posted');
-  screen.getByText('Limited to 1024 characters (1025 now).');
+  assert.ok(regions.includes(screen.getByText('Limited to 1024 characters (1025 now).')));
 });

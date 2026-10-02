@@ -218,11 +218,10 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
               onChange={e => setComposeText(e.target.value)}
               placeholder={t('chats.status.composeText')}
             />
-            {composeTextLength > 4096 && (
-              <p className="input-hint" role="status">
-                {t('common.fieldTooLong', { max: 4096, count: composeTextLength })}
-              </p>
-            )}
+            {/* Kept mounted, unstyled while empty: a live region inserted with its text is often not announced. */}
+            <span className={composeTextLength > 4096 ? 'input-hint' : undefined} role="status">
+              {composeTextLength > 4096 ? t('common.fieldTooLong', { max: 4096, count: composeTextLength }) : ''}
+            </span>
           </div>
           <div className="compose-row">
             <div className="compose-field">
@@ -280,11 +279,9 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
               value={composeCaption}
               onChange={e => setComposeCaption(e.target.value)}
             />
-            {composeCaptionLength > 1024 && (
-              <p className="input-hint" role="status">
-                {t('common.fieldTooLong', { max: 1024, count: composeCaptionLength })}
-              </p>
-            )}
+            <span className={composeCaptionLength > 1024 ? 'input-hint' : undefined} role="status">
+              {composeCaptionLength > 1024 ? t('common.fieldTooLong', { max: 1024, count: composeCaptionLength }) : ''}
+            </span>
           </div>
         </>
       )}

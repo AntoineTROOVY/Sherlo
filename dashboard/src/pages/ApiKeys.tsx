@@ -579,11 +579,10 @@ export function ApiKeys() {
               {newKey.name.length > 0 && nameTooShort && (
                 <span className="key-field-hint">{t('apiKeys.nameTooShort')}</span>
               )}
-              {nameTooLong && (
-                <span className="key-field-hint" role="status">
-                  {t('common.fieldTooLong', { max: 100, count: nameLength })}
-                </span>
-              )}
+              {/* Kept mounted, unstyled while empty: a live region inserted with its text is often not announced. */}
+              <span className={nameTooLong ? 'key-field-hint' : undefined} role="status">
+                {nameTooLong ? t('common.fieldTooLong', { max: 100, count: nameLength }) : ''}
+              </span>
               <label htmlFor="ak-2">{t('common.role')}</label>
               <select
                 id="ak-2"
