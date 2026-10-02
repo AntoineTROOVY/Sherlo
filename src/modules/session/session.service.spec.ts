@@ -1422,6 +1422,66 @@ describe('SessionService', () => {
       return ownership;
     };
 
+    /** A row whose desiredState follows the service's own writes, so a stop's keep-down is visible. */
+    const trackDesiredState = (): (() => string | null) => {
+      let desired: string | null = null;
+      (repository.findOne as jest.Mock).mockImplementation(() =>
+        Promise.resolve(createMockSession({ desiredState: desired as Session['desiredState'] })),
+      );
+      (repository.update as jest.Mock).mockImplementation((_where: unknown, patch: Record<string, unknown>) => {
+        if ('desiredState' in patch) desired = patch.desiredState as string | null;
+        return Promise.resolve({ affected: 1 });
+      });
+      return () => desired;
+    };
+
+    // The stop finished, released its claim and answered 200 while the start still waited on its
+    // claim; the start then launched the engine on the released claim and cleared the stop record.
+    it('start() refuses with 409 when a stop() lands while its claim is pending', async () => {
+      const ownership = withOwnership();
+      const desired = trackDesiredState();
+      let finishClaim: () => void = () => undefined;
+      ownership.claim.mockImplementationOnce(
+        () => new Promise<boolean>(resolve => (finishClaim = () => resolve(true))),
+      );
+
+      const starting = service.start('sess-uuid-1', { explicit: true });
+      const outcome = starting.catch((error: unknown) => error);
+      await service.stop('sess-uuid-1');
+      const releasesBefore = ownership.release.mock.calls.length;
+      finishClaim();
+
+      expect(await outcome).toBeInstanceOf(SessionStoppedException);
+      expect(mockEngine.initialize).not.toHaveBeenCalled();
+      expect(lifecycle.isEngineActive('sess-uuid-1')).toBe(false);
+      expect(desired()).toBe('stopped');
+      expect(ownership.release.mock.calls.length).toBeGreaterThan(releasesBefore);
+    });
+
+    it('start() does not retry a transient failure when a stop() lands while the re-claim is pending', async () => {
+      const ownership = withOwnership();
+      const desired = trackDesiredState();
+      (engineFactory.create as jest.Mock).mockReturnValue(mockEngine);
+      mockEngine.initialize.mockRejectedValueOnce(new EngineTransportError('Protocol error: Target closed'));
+      let finishClaim: () => void = () => undefined;
+      let reclaimed: () => void = () => undefined;
+      const reclaim = new Promise<void>(resolve => (reclaimed = resolve));
+      ownership.claim.mockResolvedValueOnce(true).mockImplementationOnce(() => {
+        reclaimed();
+        return new Promise<boolean>(resolve => (finishClaim = () => resolve(true)));
+      });
+
+      const outcome = service.start('sess-uuid-1', { explicit: true }).catch((error: unknown) => error);
+      await reclaim;
+      await service.stop('sess-uuid-1');
+      finishClaim();
+
+      expect(await outcome).toBeInstanceOf(EngineTransportError);
+      expect(mockEngine.initialize).toHaveBeenCalledTimes(1);
+      expect(lifecycle.isEngineActive('sess-uuid-1')).toBe(false);
+      expect(desired()).toBe('stopped');
+    });
+
     it('start() releases the claim when the launch fails and nothing stays alive here', async () => {
       const ownership = withOwnership();
       jest.spyOn(lifecycle, 'start').mockRejectedValue(new Error('engine init failed'));

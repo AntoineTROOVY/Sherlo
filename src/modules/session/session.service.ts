@@ -629,6 +629,8 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
   }
 
   private async claimAndStart(id: string, explicit: boolean): Promise<Session> {
+    // Read before the claim, so a stop that lands while the claim is pending counts against this start.
+    const stopRequestsBefore = this.stopRequests.get(id);
     // Claimed before the engine is launched, never after: launching first and discovering the
     // session belongs elsewhere would already have opened a second connection to the account.
     if (this.ownership && !(await this.ownership.claim(id))) {
@@ -637,7 +639,6 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
       await this.findOne(id);
       throw new ConflictException(`Session ${id} is running on another node`);
     }
-    const stopRequestsBefore = this.stopRequests.get(id);
     let session: Session;
     try {
       session = await this.startWithTransientRetry(id, explicit, stopRequestsBefore);
@@ -675,6 +676,11 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     explicit: boolean,
     stopRequestsBefore: number | undefined,
   ): Promise<Session> {
+    // A stop that finished during the claim already released it and answered 200; the engine's own
+    // stop-mark check cannot tell its mark from a stale one, so the start is refused here.
+    if (this.stopRequests.get(id) !== stopRequestsBefore) {
+      throw new SessionStoppedException(`Session ${id} was stopped`);
+    }
     try {
       return await this.engineLifecycle.start(id, { explicit });
     } catch (error) {
@@ -695,6 +701,8 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
         await this.findOne(id);
         throw new ConflictException(`Session ${id} is running on another node`);
       }
+      // Checked again: a stop that landed during the re-claim has already released it.
+      if (this.stopRequests.get(id) !== stopRequestsBefore) throw error;
       return this.engineLifecycle.start(id, { explicit });
     }
   }
