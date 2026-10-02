@@ -6711,7 +6711,7 @@ Get one rule. **Auth:** API key (OPERATOR) · `200` or `404` when the rule does 
 
 #### PUT /api/sessions/:sessionId/automation-rules/:ruleId
 
-Partial update (any subset of the create fields). **Auth:** API key (OPERATOR) · `200` or `404`.
+Partial update (any subset of the create fields). **Auth:** API key (OPERATOR) · `200`, `400` for an invalid field (same rules as create), or `404`.
 
 #### DELETE /api/sessions/:sessionId/automation-rules/:ruleId
 
