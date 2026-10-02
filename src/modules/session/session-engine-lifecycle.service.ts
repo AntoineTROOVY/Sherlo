@@ -457,8 +457,8 @@ export class SessionEngineLifecycle {
   }
 
   /** Delegate: SessionEngineControls.forceKill. */
-  forceKill(id: string): Promise<Session> {
-    return this.controls.forceKill(id);
+  forceKill(id: string, hooks?: StopHooks): Promise<Session> {
+    return this.controls.forceKill(id, hooks);
   }
 
   /** Delegate: SessionEngineControls.delete. */

@@ -72,6 +72,8 @@ export interface StopHooks {
   afterRead?: () => Promise<void>;
   /** Runs when the session read fails, after the stop mark is dropped: undoes the caller's request count. */
   onReadFailed?: () => void;
+  /** forceKill() only: runs synchronously once there is an engine to kill; records the stop request. */
+  onEngineFound?: () => void;
 }
 
 /**
@@ -544,8 +546,12 @@ export class SessionEngineControls {
    * engine is hung. Mirrors stop()'s lifecycle (stop-mark + cancel-reconnect + bounded, isolated
    * teardown + Map reconciliation) but uses the engine's forceDestroy().
    */
-  async forceKill(id: string): Promise<Session> {
-    const session = await this.requireSession(id);
+  async forceKill(id: string, hooks: StopHooks = {}): Promise<Session> {
+    // No stop mark is set yet, so a failed read leaves a concurrent stop's mark alone.
+    const session = await this.requireSession(id).catch((error: unknown) => {
+      hooks.onReadFailed?.();
+      throw error;
+    });
     const engine = this.engines.get(id);
 
     // No live engine means there is nothing to SIGKILL. Resolving would let the controller write a
@@ -555,6 +561,8 @@ export class SessionEngineControls {
     if (!engine) {
       throw new BadRequestException('Session is not started. Call POST /sessions/:sessionId/start first.');
     }
+    // In the same synchronous step as the engine lookup: a refused or failed kill never gets here.
+    hooks.onEngineFound?.();
 
     // Mark as tearing down BEFORE cleanup so an in-flight reconnect can't resurrect it.
     this.stoppingSessions.add(id);

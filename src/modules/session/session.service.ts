@@ -771,17 +771,31 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
   }
 
   async forceKill(id: string): Promise<Session> {
-    // Counted like stop(), so a start still waiting on its claim yields rather than relaunching.
-    this.countStopRequest(id);
+    // Counted like stop(), so a start still waiting on its claim yields rather than relaunching, but
+    // only while there is an engine to kill: at once if one runs, so a start sent after the kill keeps
+    // its place, otherwise once the kill finds one. A kill that took nothing down (a 400, a 404 or a
+    // failed row read) is uncounted, so it cannot retire a start that is still waiting on its claim.
+    let counted = false;
+    const count = (): void => {
+      if (counted) return;
+      counted = true;
+      this.countStopRequest(id);
+    };
+    const uncount = (): void => {
+      if (!counted) return;
+      counted = false;
+      this.uncountStopRequest(id);
+    };
+    if (this.engines.get(id)) count();
     try {
       // The engine kill records the stop itself, once it has an engine to kill.
-      const session = await this.engineLifecycle.forceKill(id);
+      const session = await this.engineLifecycle.forceKill(id, { onReadFailed: uncount, onEngineFound: count });
       await this.releaseAfterTeardown(id);
       return session;
     } catch (error) {
-      // A 400 "not started" or a 404 took nothing down, so it is uncounted, and the 400 keeps its claim
-      // as in logout(). The 502 did evict the engine: it stays counted and releases.
-      if (error instanceof BadRequestException || error instanceof NotFoundException) this.uncountStopRequest(id);
+      // The 400 "not started" also keeps its claim as in logout(). The 502 did evict the engine: it
+      // stays counted and releases.
+      if (error instanceof BadRequestException) uncount();
       if (!(error instanceof BadRequestException)) await this.releaseAfterTeardown(id);
       throw error;
     }

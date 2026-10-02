@@ -1524,6 +1524,75 @@ describe('SessionService', () => {
       expect(lifecycle.isEngineActive('sess-uuid-1')).toBe(true);
     });
 
+    // The claim resolves while the force-kill is still reading the row, and the start's own read is
+    // held so no engine appears meanwhile: a kill that ends in a 400 (no engine) or in a failed read
+    // took nothing down, so the start must still launch.
+    type SettleRead = (resolveRead: (row: Session) => void, failRead: (error: Error) => void) => void;
+    it.each<[string, SettleRead]>([
+      ['refused with 400', resolveRead => resolveRead(createMockSession())],
+      ['whose row read fails', (_resolveRead, failRead) => failRead(new Error('connection terminated'))],
+    ])('start() still launches when a forceKill() %s overlaps its claim', async (_label, settleRead) => {
+      const ownership = withOwnership();
+      const desired = trackDesiredState();
+      let finishClaim: () => void = () => undefined;
+      ownership.claim.mockImplementationOnce(
+        () => new Promise<boolean>(resolve => (finishClaim = () => resolve(true))),
+      );
+      const starting = service.start('sess-uuid-1', { explicit: true });
+      await new Promise(resolve => setImmediate(resolve));
+
+      let resolveKillRead: (row: Session) => void = () => undefined;
+      let failKillRead: (error: Error) => void = () => undefined;
+      let resolveStartRead: (row: Session) => void = () => undefined;
+      (repository.findOne as jest.Mock)
+        .mockImplementationOnce(
+          () =>
+            new Promise<Session>((resolve, reject) => {
+              resolveKillRead = resolve;
+              failKillRead = reject;
+            }),
+        )
+        .mockImplementationOnce(() => new Promise<Session>(resolve => (resolveStartRead = resolve)));
+      const killing = service.forceKill('sess-uuid-1').catch((error: unknown) => error);
+      finishClaim();
+      await new Promise(resolve => setImmediate(resolve));
+      settleRead(resolveKillRead, failKillRead);
+      await killing;
+      resolveStartRead(createMockSession());
+      await starting;
+
+      expect(lifecycle.isEngineActive('sess-uuid-1')).toBe(true);
+      expect(desired()).not.toBe('stopped');
+    });
+
+    // An engine registered while the force-kill read the row is still killed, and still counted.
+    it('start() refuses with 409 when a forceKill() finds an engine only after its row read', async () => {
+      const ownership = withOwnership();
+      trackDesiredState();
+      let finishClaim: () => void = () => undefined;
+      ownership.claim.mockImplementationOnce(
+        () => new Promise<boolean>(resolve => (finishClaim = () => resolve(true))),
+      );
+      const starting = service.start('sess-uuid-1', { explicit: true });
+      const outcome = starting.catch((error: unknown) => error);
+      await new Promise(resolve => setImmediate(resolve));
+
+      let resolveKillRead: (row: Session) => void = () => undefined;
+      (repository.findOne as jest.Mock).mockImplementationOnce(
+        () => new Promise<Session>(resolve => (resolveKillRead = resolve)),
+      );
+      const killing = service.forceKill('sess-uuid-1');
+      (service as unknown as { engines: Map<string, unknown> }).engines.set('sess-uuid-1', {
+        forceDestroy: jest.fn().mockResolvedValue(undefined),
+      });
+      resolveKillRead(createMockSession());
+      await killing;
+      finishClaim();
+
+      expect(await outcome).toBeInstanceOf(SessionStoppedException);
+      expect(mockEngine.initialize).not.toHaveBeenCalled();
+    });
+
     // The teardown finished while a start sent after it still waited on its claim, and handed back
     // the claim that start had just taken: the start then ran its engine on a row no node held.
     it.each([
