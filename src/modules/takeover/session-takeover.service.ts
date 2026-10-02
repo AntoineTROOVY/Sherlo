@@ -8,7 +8,6 @@ import { ShutdownService } from '../../common/services/shutdown.service';
 import { SessionService } from '../session/session.service';
 import { SessionStoppedException } from '../session/session-engine-controls';
 import { resolveMaxConcurrentSessions } from '../session/session-engine-lifecycle.service';
-import { EngineRegistry } from '../../engine/engine-registry.service';
 
 /**
  * Statuses worth adopting from a lapsed node. They all mean "an engine was (or should be) running".
@@ -87,8 +86,6 @@ export class SessionTakeoverService implements OnApplicationBootstrap, OnModuleD
     // source session-engine-lifecycle and the liveness watchdog already consult.
     @Optional()
     private readonly shutdownService?: ShutdownService,
-    @Optional()
-    private readonly engines?: EngineRegistry,
   ) {}
 
   /** True once EITHER the drain has begun or Nest has torn this module down. */
@@ -202,7 +199,7 @@ export class SessionTakeoverService implements OnApplicationBootstrap, OnModuleD
   /** The same count the start path's MAX_CONCURRENT_SESSIONS check uses. */
   private hasStartCapacity(): boolean {
     const max = resolveMaxConcurrentSessions(this.configService);
-    return max === null || !this.engines || this.engines.activeIds().length < max;
+    return max === null || this.sessionService.hasStartCapacity(max);
   }
 
   private isEligible(session: Session): boolean {

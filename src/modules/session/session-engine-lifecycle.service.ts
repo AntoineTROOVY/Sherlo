@@ -107,6 +107,17 @@ export function isReconnectPending(state: ReconnectState): boolean {
   return state.timer !== null || (state.attempts > 0 && state.readyAt === undefined);
 }
 
+/**
+ * Sessions holding a MAX_CONCURRENT_SESSIONS slot: engines, init reservations and pending relaunches. A
+ * session waiting out a failed relaunch holds no engine, but re-registers one when its timer fires without
+ * a cap check of its own, so it keeps its slot.
+ */
+export function startSlotHolders(engines: EngineRegistry, reconnectStates: Map<string, ReconnectState>): Set<string> {
+  const ids = new Set<string>(engines.activeIds());
+  for (const [rid, state] of reconnectStates) if (isReconnectPending(state)) ids.add(rid);
+  return ids;
+}
+
 export function resolveMaxConcurrentSessions(configService?: Pick<ConfigService, 'get'>): number | null {
   const configured = configService?.get<number>('sessions.maxConcurrent', 0) ?? 0;
   if (!Number.isFinite(configured) || configured <= 0) return null;
@@ -545,6 +556,11 @@ export class SessionEngineLifecycle {
     // stability window, but nothing is pending until the next drop arms a timer.
     const reconnect = this.reconnectStates.get(id);
     return reconnect != null && isReconnectPending(reconnect);
+  }
+
+  /** Sessions holding a MAX_CONCURRENT_SESSIONS slot: engines, init reservations and pending relaunches. */
+  startSlotHolders(): Set<string> {
+    return startSlotHolders(this.engines, this.reconnectStates);
   }
 
   /** Whether the last READY stretch lasted STABLE_READY_MS, measured to where it ended (or to now). */

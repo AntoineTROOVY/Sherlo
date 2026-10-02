@@ -1910,6 +1910,41 @@ describe('SessionService', () => {
       expect(lifecycle.isEngineActive('x')).toBe(false);
     });
 
+    it('a session waiting out a relaunch holds a start slot; a dormant reconnect entry does not', () => {
+      const intern = lifecycle as unknown as { reconnectStates: Map<string, unknown> };
+      const timer = setTimeout(() => undefined, 60_000);
+      try {
+        intern.reconnectStates.set('waiting', { attempts: 1, timer });
+        intern.reconnectStates.set('dormant', { attempts: 0, timer: null });
+
+        expect([...lifecycle.startSlotHolders()]).toEqual(['waiting']);
+      } finally {
+        clearTimeout(timer);
+        intern.reconnectStates.clear();
+      }
+    });
+
+    // The takeover sweep asks this before adopting a lapsed session: counting engines alone let it
+    // call start() at the cap, and the refused start released the claimed lease to no node.
+    it('hasStartCapacity counts a pending relaunch with no engine against the cap', () => {
+      const intern = lifecycle as unknown as {
+        engines: { set: (id: string, e: unknown) => void; delete: (id: string) => void };
+        reconnectStates: Map<string, unknown>;
+      };
+      const timer = setTimeout(() => undefined, 60_000);
+      try {
+        intern.engines.set('running', {});
+        intern.reconnectStates.set('waiting', { attempts: 1, timer });
+
+        expect(service.hasStartCapacity(2)).toBe(false);
+        expect(service.hasStartCapacity(3)).toBe(true);
+      } finally {
+        clearTimeout(timer);
+        intern.engines.delete('running');
+        intern.reconnectStates.clear();
+      }
+    });
+
     it('a failed start leaves no reconnect state behind', async () => {
       (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
       (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });

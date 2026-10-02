@@ -6,7 +6,6 @@ import type { SessionService } from '../session/session.service';
 import type { SessionOwnershipService } from '../session/session-ownership.service';
 import type { ConfigService } from '@nestjs/config';
 import type { ShutdownService } from '../../common/services/shutdown.service';
-import type { EngineRegistry } from '../../engine/engine-registry.service';
 
 /**
  * The sweep is the retry that boot auto-start never had: both live incidents (a container recreate
@@ -28,7 +27,7 @@ describe('SessionTakeoverService', () => {
 
   const build = (
     rows: Session[],
-    opts: { autoStart?: boolean; startImpl?: jest.Mock; maxConcurrent?: number; activeIds?: string[] } = {},
+    opts: { autoStart?: boolean; startImpl?: jest.Mock; maxConcurrent?: number; slotHolders?: number } = {},
   ): {
     svc: SessionTakeoverService;
     start: jest.Mock;
@@ -44,15 +43,14 @@ describe('SessionTakeoverService', () => {
           'sessions.maxConcurrent': opts.maxConcurrent,
         })[key as 'features'] ?? def,
     } as unknown as ConfigService;
+    const hasStartCapacity = jest.fn((max: number) => (opts.slotHolders ?? 0) < max);
     const svc = new SessionTakeoverService(
-      { start, markLapsedDisconnected } as unknown as SessionService,
+      { start, markLapsedDisconnected, hasStartCapacity } as unknown as SessionService,
       {
         lapsedHeldByOthers: jest.fn().mockResolvedValue(rows),
         leaseTtlMs: 60_000,
       } as unknown as SessionOwnershipService,
       config,
-      undefined,
-      { activeIds: () => opts.activeIds ?? [] } as unknown as EngineRegistry,
     );
     return { svc, start, markLapsedDisconnected };
   };
@@ -153,7 +151,7 @@ describe('SessionTakeoverService', () => {
   // nobody: no peer adopts a row without a holder, so the session would stay down. A node at its cap
   // leaves the lease alone for a peer with room.
   it('adopts nothing while this node is at MAX_CONCURRENT_SESSIONS', async () => {
-    const { svc, start } = build([lapsed({ name: 'a' })], { maxConcurrent: 1, activeIds: ['busy'] });
+    const { svc, start } = build([lapsed({ name: 'a' })], { maxConcurrent: 1, slotHolders: 1 });
 
     await svc.sweep();
 
@@ -161,7 +159,7 @@ describe('SessionTakeoverService', () => {
   });
 
   it('adopts while this node is still below MAX_CONCURRENT_SESSIONS', async () => {
-    const { svc, start } = build([lapsed({ name: 'a' })], { maxConcurrent: 2, activeIds: ['busy'] });
+    const { svc, start } = build([lapsed({ name: 'a' })], { maxConcurrent: 2, slotHolders: 1 });
 
     await svc.sweep();
 

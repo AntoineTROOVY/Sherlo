@@ -1104,6 +1104,11 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     return this.engines.activeIds();
   }
 
+  /** Whether this node has a MAX_CONCURRENT_SESSIONS slot free, counted exactly as the start path counts it. */
+  hasStartCapacity(max: number): boolean {
+    return this.engineLifecycle.startSlotHolders().size < max;
+  }
+
   /**
    * Stop engines for session ids whose DB row is about to be replaced by an infra import.
    * Owned by the lifecycle service; see SessionEngineLifecycle.stopOrphanEngines().
