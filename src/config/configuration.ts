@@ -116,8 +116,8 @@ export default () => ({
     headersTimeoutMs: parseInt(process.env.HEADERS_TIMEOUT_MS || '65000', 10),
     keepAliveTimeoutMs: parseInt(process.env.KEEPALIVE_TIMEOUT_MS || '5000', 10),
     // Aggregate cap on request-body bytes buffered across ALL connections (the pre-body-parser
-    // budget middleware in main.ts). Defaults to 4 × the per-request BODY_SIZE_LIMIT so the two
-    // scale together; explicit bytes override via INFLIGHT_BODY_BUDGET_BYTES.
+    // budget middleware in src/configure-app.ts). Defaults to 4 × the per-request BODY_SIZE_LIMIT so
+    // the two scale together; explicit bytes override via INFLIGHT_BODY_BUDGET_BYTES.
     inflightBodyBudgetBytes: resolveInflightBodyBudgetBytes(
       process.env.INFLIGHT_BODY_BUDGET_BYTES,
       process.env.BODY_SIZE_LIMIT,
