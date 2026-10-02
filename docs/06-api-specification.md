@@ -1698,8 +1698,8 @@ through the same SSRF guard used elsewhere, which validates the destination **an
 connection to the vetted address**, closing the DNS-rebinding window a validate-then-delegate
 approach would leave open. The pin holds on a direct fetch and through a SOCKS session proxy; behind
 an HTTP or HTTPS session proxy the proxy resolves the name, so that window stays open there (see
-"Per-session egress proxy" above). `WEBHOOK_SSRF_PROTECT` and `SSRF_ALLOWED_HOSTS` apply, so a deployment
-that intentionally allows an internal host keeps that behaviour. A refused, slow or broken site
+"Per-session egress proxy" above). The fetch is always guarded, independent of `WEBHOOK_SSRF_PROTECT`; a deployment
+that intentionally allows an internal host lists it in `SSRF_ALLOWED_HOSTS`. A refused, slow or broken site
 yields no preview — never a failed send.
 
 `customLinkPreview` fetches **nothing at all**, so it works for URLs this server cannot reach, and it
