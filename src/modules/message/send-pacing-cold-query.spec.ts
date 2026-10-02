@@ -667,6 +667,79 @@ describe('concurrent sends against a real database', () => {
     });
   });
 
+  describe('a cold send with no row in a busy session', () => {
+    const seedKnown = (): Promise<unknown> =>
+      ds.query(
+        `INSERT INTO "messages" ("id","sessionId","chatId","from","to","type","direction","createdAt")
+         VALUES ('seed','s1','known@c.us','a','b','text','incoming',?)`,
+        [new Date(NOW.getTime() - 86_400_000).toISOString()],
+      );
+
+    // A cold bulk item with an unknown outcome (it never writes a row), a cold send whose row lands,
+    // then a warm send every 3 s for 30 s.
+    const busySession = async (service: SendPacingService): Promise<void> => {
+      await seedKnown();
+      const settle = await service.assertSendAllowed('s1', 'x@c.us', { untilSettled: true });
+      settle?.(true);
+      expect(await send(service, 'y@c.us', 1)).toBe(true);
+      for (let t = 1; t <= 10; t++) {
+        jest.setSystemTime(NOW.getTime() + t * 3_000);
+        expect(await send(service, 'known@c.us', 10 + t)).toBe(true);
+      }
+    };
+
+    it('stops counting it once its own window ends, however busy the session', async () => {
+      const service = build([10_000], [2]);
+      await busySession(service);
+
+      // One new chat (y) of two reached.
+      expect(await send(service, 'z@c.us', 99)).toBe(true);
+    });
+
+    it('stops charging it to a group add once its own window ends, however busy the session', async () => {
+      const service = build([10_000], [2]);
+      await busySession(service);
+
+      await expect(service.assertReachoutAllowed('s1', ['z@c.us'])).resolves.toMatchObject({ coldCount: 1 });
+    });
+
+    it('judges a second send to that chat against the cap once the first stopped counting', async () => {
+      const service = build([10_000], [2]);
+      await busySession(service);
+      expect(await send(service, 'z@c.us', 99)).toBe(true);
+
+      // y and z reached; x would be a third new chat.
+      await expect(service.assertSendAllowed('s1', 'x@c.us')).rejects.toMatchObject({ status: 429 });
+    });
+  });
+
+  it.each([
+    ['send', (service: SendPacingService) => service.assertSendAllowed('s1', 'y@c.us')],
+    ['group add', (service: SendPacingService) => service.assertReachoutAllowed('s1', ['y@c.us'])],
+  ])('answers a cold %s refused by held sends with a hint a retry then passes', async (_, attempt) => {
+    const service = build([10_000], [1]);
+    await ds.query(
+      `INSERT INTO "messages" ("id","sessionId","chatId","from","to","type","direction","createdAt")
+       VALUES ('seed','s1','known@c.us','a','b','text','incoming',?)`,
+      [new Date(NOW.getTime() - 86_400_000).toISOString()],
+    );
+    // A bulk item to a known chat, in flight until +5 s, and a cold send admitted meanwhile whose row never lands.
+    const settleKnown = await service.assertSendAllowed('s1', 'known@c.us', { untilSettled: true });
+    jest.setSystemTime(NOW.getTime() + 1_000);
+    await service.assertSendAllowed('s1', 'x@c.us');
+    jest.setSystemTime(NOW.getTime() + 5_000);
+    settleKnown?.(true);
+    await insertRow('m1', 'known@c.us');
+    jest.setSystemTime(NOW.getTime() + 6_000);
+
+    const refusal = (await attempt(service).catch((error: HttpException) => error.getResponse())) as {
+      retryAfterSeconds: number;
+    };
+    jest.setSystemTime(NOW.getTime() + 6_000 + refusal.retryAfterSeconds * 1_000);
+
+    await expect(attempt(service)).resolves.toBeDefined();
+  });
+
   it('keeps holding a send taken until settled while it is still running, then for a window from the settle', async () => {
     const service = build([2], []);
     expect(await send(service, 'known@c.us', 1)).toBe(true);
@@ -816,7 +889,7 @@ describe('concurrent sends against a real database', () => {
     await expect(service.assertSendAllowed('s1', 'known@c.us')).rejects.toMatchObject({ status: 429 });
   });
 
-  it('hints a settled cold send as held until the send admitted while it was in flight lapses', async () => {
+  it('stops counting a settled cold send once its own window ends, though a warm send admitted meanwhile is held', async () => {
     const service = build([10_000], [1]);
     await ds.query(
       `INSERT INTO "messages" ("id","sessionId","chatId","from","to","type","direction","createdAt")
@@ -828,11 +901,14 @@ describe('concurrent sends against a real database', () => {
     settleCold?.(true);
     jest.setSystemTime(NOW.getTime() + 5_000);
     settleKnown?.(true);
+    jest.setSystemTime(NOW.getTime() + 9_000);
+    await expect(service.assertSendAllowed('s1', 'z@c.us')).rejects.toMatchObject({
+      response: { code: SEND_PACING_LIMITED, retryAfterSeconds: 1 },
+    });
     jest.setSystemTime(NOW.getTime() + 12_000);
 
-    await expect(service.assertSendAllowed('s1', 'z@c.us')).rejects.toMatchObject({
-      response: { code: SEND_PACING_LIMITED, retryAfterSeconds: 3 },
-    });
+    // The warm send read no cold count, so it cannot have missed the cold send's row.
+    await expect(service.assertSendAllowed('s1', 'z@c.us')).resolves.toBeDefined();
   });
 
   it('hands back a send taken until settled at once when it is settled as never sent', async () => {

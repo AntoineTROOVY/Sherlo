@@ -100,7 +100,8 @@ interface BreakerState {
  * persisted count and, for every held admission, the count it read plus the admissions held from it
  * on: none of those rows can be in the count it read, so nothing is counted twice. An admission stays held
  * for as long as any admission taken after it is held, since those may have read before its row landed
- * and would otherwise miss it once it stops being held.
+ * and would otherwise miss it once it stops being held. The cold cap holds its own chain the same way, over
+ * the cold admissions alone: only a cold admission reads a cold count.
  */
 interface Admission {
   /** Epoch ms its own term ends: a window from its admission, or from its settle. */
@@ -108,7 +109,10 @@ interface Admission {
   /** Epoch ms it stops being held, so only its row counts from then on; refreshed by heldAdmissions. */
   heldUntil: number;
   sentToday: number;
-  /** Set for a cold send; the key is folded the way the cold count folds dialects. */
+  /**
+   * Set for a cold send; the key is folded the way the cold count folds dialects. Cleared by heldAdmissions
+   * once no cold admission's own term is running, so from then on only its row counts against the cold cap.
+   */
   cold: { key: string; coldToday: number } | null;
 }
 
@@ -323,6 +327,11 @@ export class SendPacingService {
     const hold = this.holds.get(sessionId);
     if (!hold) return [];
     const now = Date.now();
+    // The cold terms lapse as a whole, once no cold admission's own term is running: a warm admission read no
+    // cold count, so it cannot have missed a cold row, and letting it hold them would keep a cold send that
+    // wrote no row counted for as long as warm sends keep arriving. Cleared rather than skipped, so a cold
+    // admission taken later cannot bring them back.
+    if (!hold.admissions.some(a => a.cold && a.until > now)) for (const a of hold.admissions) a.cold = null;
     // Newest first: an admission stays held while the next one is. Each one taken after it may have read
     // its count before this one's row landed, and its own term counts this one and each later one once, on
     // a count read before any of their rows.
@@ -418,7 +427,11 @@ export class SendPacingService {
     // Refused only because of cold sends still held: the batch fits once they lapse, not at the next UTC day.
     const retryAfter =
       coldChats + groupToday + coldCount <= allowance
-        ? secondsUntilLapsed(this.heldAdmissions(sessionId, dayStart).filter(a => a.cold))
+        ? secondsUntilLapsed(
+            this.heldAdmissions(sessionId, dayStart)
+              .filter(a => a.cold)
+              .map(a => a.until),
+          )
         : secondsUntilNextUtcDay();
     this.refuse('cold_daily_cap', sessionId, retryAfter, {
       reason:
@@ -540,7 +553,8 @@ export class SendPacingService {
     const sentToday = held.reduce((max, a, i) => Math.max(max, a.sentToday + held.length - i), persisted);
     if (sentToday < allowance) return;
 
-    const retryAfter = persisted < allowance ? secondsUntilLapsed(held) : secondsUntilNextUtcDay();
+    const retryAfter =
+      persisted < allowance ? secondsUntilLapsed(held.map(a => a.heldUntil)) : secondsUntilNextUtcDay();
     this.refuse('daily_cap', sessionId, retryAfter, {
       reason: `Daily send allowance of ${allowance} reached for a session ${ageDays} day(s) old`,
       allowance,
@@ -632,7 +646,11 @@ export class SendPacingService {
 
     const retryAfter =
       persisted + groupToday < allowance
-        ? secondsUntilLapsed(this.heldAdmissions(sessionId, dayStart).filter(a => a.cold))
+        ? secondsUntilLapsed(
+            this.heldAdmissions(sessionId, dayStart)
+              .filter(a => a.cold)
+              .map(a => a.until),
+          )
         : secondsUntilNextUtcDay();
     this.refuse('cold_daily_cap', sessionId, retryAfter, {
       reason: `Daily allowance of ${allowance} new conversation(s) reached for a session ${ageDays} day(s) old`,
@@ -758,13 +776,13 @@ function startOfUtcDay(at: Date): Date {
 }
 
 /**
- * Seconds until every one of these held admissions could have lapsed: when the persisted count alone is
- * under the cap, the refusal lifts then, not at the next UTC day. One still unsettled lapses a window
- * after its settle at the earliest, so it is hinted as if it settled now.
+ * Seconds until every one of these held admissions could have lapsed, given the epoch ms each one's hold
+ * ends: when the persisted count alone is under the cap, the refusal lifts then, not at the next UTC day.
+ * One still unsettled lapses a window after its settle at the earliest, so it is hinted as if it settled now.
  */
-function secondsUntilLapsed(held: Admission[]): number {
+function secondsUntilLapsed(holdEnds: number[]): number {
   const now = Date.now();
-  const last = held.reduce((max, a) => Math.max(max, Math.min(a.heldUntil, now + ADMISSION_WINDOW_MS)), now);
+  const last = holdEnds.reduce((max, end) => Math.max(max, Math.min(end, now + ADMISSION_WINDOW_MS)), now);
   return Math.max(1, Math.ceil((last - now) / 1000));
 }
 
