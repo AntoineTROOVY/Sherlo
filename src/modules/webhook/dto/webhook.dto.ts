@@ -394,7 +394,10 @@ export class WebhookDeliveryFailureDto {
   deliveryId?: string | null;
 
   @ApiProperty({
-    description: 'Attempts recorded for the delivery; 0 when it was shed, refused or failed before sending.',
+    description:
+      'Attempts recorded for the delivery; 0 when it was shed, refused or failed before sending. With the ' +
+      'queue disabled, a delivery that shutdown caught in a retry backoff also records 0, although earlier ' +
+      'attempts were sent.',
     example: 5,
   })
   attempts!: number;
