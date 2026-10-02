@@ -708,7 +708,7 @@ export class WwebjsMessaging {
     await this.withPage('reactToMessage', async () => {
       // NOTE: do NOT resolve chatId to @lid here — whatsapp-web.js reacts using the found message's own
       // id, not this chatId, so LID-resolving the lookup gives no send benefit and would miss a message
-      // stored under the pre-migration @c.us chat (#583 R1 review).
+      // stored under the pre-migration @c.us chat (#583).
       const chat = await this.client().getChatById(chatId);
       // getChatById RESOLVES undefined for an unknown chat (wwebjs does not throw); guard it so the
       // caller gets the 404 editMessage returns rather than a TypeError surfacing as an opaque 500.
@@ -888,7 +888,7 @@ export class WwebjsMessaging {
     this.host.ensureReady();
     // NOTE: do NOT resolve chatId to @lid here — delete operates on the found message's own key, not
     // this chatId, so LID-resolving the lookup gives no benefit and would miss a message stored under
-    // the pre-migration @c.us chat (#583 R1 review).
+    // the pre-migration @c.us chat (#583).
     await this.withPage('deleteMessage', async () => {
       const chat = await this.client().getChatById(chatId);
       if (!chat) {
@@ -909,7 +909,7 @@ export class WwebjsMessaging {
     // Same lookup window as react/delete: fetchMessages sees only the 100 most recent messages.
     // NOTE: do NOT resolve chatId to @lid here — edit operates on the found message's own key, not
     // this chatId, so LID-resolving the lookup would miss a message stored under the pre-migration
-    // @c.us chat (#583 R1 review).
+    // @c.us chat (#583).
     const edited = await this.withPage('editMessage', async () => {
       const chat = await this.client().getChatById(chatId);
       // getChatById RESOLVES undefined for an unknown chat (wwebjs does not throw) — that is the same
