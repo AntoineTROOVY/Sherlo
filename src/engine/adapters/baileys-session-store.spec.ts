@@ -581,6 +581,18 @@ describe('BaileysSessionStore', () => {
       expect(store.getEphemeralExpiration('628111@s.whatsapp.net')).toBeUndefined();
     });
 
+    it.each([
+      ['111@lid', '628111@s.whatsapp.net'],
+      ['628111@s.whatsapp.net', '111@lid'],
+    ])('clears a timer stored on the %s chat when the %s twin turns it off', (stored, updated) => {
+      store.addLidMappings([{ lid: '111@lid', pn: '628111@s.whatsapp.net' }]);
+      store.upsertChats([{ id: stored, ephemeralExpiration: 86400 }]);
+      store.upsertChats([{ id: updated, ephemeralExpiration: null }]);
+      expect(store.getEphemeralExpiration('111@lid')).toBeUndefined();
+      expect(store.getEphemeralExpiration('628111@s.whatsapp.net')).toBeUndefined();
+      expect(store.getEphemeralExpiration('628111@c.us')).toBeUndefined();
+    });
+
     it('keeps a message-learned timer when a chat update does not carry ephemeralExpiration', () => {
       store.recordMessage({
         key: { remoteJid: '628111@s.whatsapp.net', fromMe: false, id: 'M1' },
