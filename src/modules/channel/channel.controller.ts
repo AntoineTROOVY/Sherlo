@@ -16,7 +16,7 @@ import {
   ENGINE_REFUSED_403,
 } from '../../common/openapi/engine-status-responses';
 
-/** Delete and unsubscribe refuse a non-channel id up front; neither looks the channel up. */
+/** Delete, mute and unsubscribe refuse a non-channel id up front, before any channel lookup. */
 const CHANNEL_ID_INVALID_404 =
   'The id is not a channel id (it does not end in `@newsletter`). Retrying the same id cannot succeed.';
 
@@ -176,7 +176,13 @@ export class ChannelController {
   @ApiResponse({ status: 400, description: 'Session not started, or validation failed' })
   @ApiResponse({ status: 403, description: 'The engine refused' })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
-  @ApiResponse({ status: 404, description: CHANNEL_NOT_FOUND_404 })
+  @ApiResponse({
+    status: 404,
+    description:
+      CHANNEL_ID_INVALID_404 +
+      " On whatsapp-web.js, also answered for a channel id that is not among the session's subscribed channels" +
+      ' or has not synced into the local collection yet.',
+  })
   async mute(
     @Param('sessionId') sessionId: string,
     @Param('channelId') channelId: string,
