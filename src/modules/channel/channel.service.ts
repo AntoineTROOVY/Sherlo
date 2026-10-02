@@ -50,8 +50,9 @@ export class ChannelService {
 
   /**
    * A channel id, or 404. whatsapp-web.js resolves any other id to an ordinary chat, creating one if
-   * needed, before its channel delete or unsubscribe fails with a 500 (the adapter's mute guards the
-   * same way). Every channel id ends in `@newsletter` on both engines.
+   * needed, before its channel delete or unsubscribe fails with a 500, and Baileys hands it to WhatsApp,
+   * which refuses it with a 403 or an opaque failure. Every channel id ends in `@newsletter` on both
+   * engines.
    */
   private requireChannelId(channelId: string): string {
     if (!channelId.endsWith('@newsletter')) throw new ChannelNotFoundError(channelId);
@@ -66,7 +67,8 @@ export class ChannelService {
 
   /** Mute or unmute a channel's notifications. Subscription is untouched either way. */
   muteChannel(sessionId: string, channelId: string, mute: boolean) {
-    return this.getEngine(sessionId).muteChannel(channelId, mute);
+    const engine = this.getEngine(sessionId);
+    return engine.muteChannel(this.requireChannelId(channelId), mute);
   }
 
   /**

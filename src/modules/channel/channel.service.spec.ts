@@ -124,6 +124,21 @@ describe('ChannelService', () => {
     },
   );
 
+  // Baileys has no adapter guard on mute, so without this the same id answered 404 on one engine
+  // and 403 or 500 on the other.
+  it('muteChannel refuses an id that is not a channel with 404 and never reaches the engine', () => {
+    const muteChannel = jest.fn().mockResolvedValue(undefined);
+    const svc = makeService({ muteChannel });
+    expect(() => svc.muteChannel('s1', '628123456789@c.us', true)).toThrow(ChannelNotFoundError);
+    expect(muteChannel).not.toHaveBeenCalled();
+  });
+
+  it('muteChannel forwards a channel id', async () => {
+    const muteChannel = jest.fn().mockResolvedValue(undefined);
+    await makeService({ muteChannel }).muteChannel('s1', '120363000000000000@newsletter', false);
+    expect(muteChannel).toHaveBeenCalledWith('120363000000000000@newsletter', false);
+  });
+
   it.each(['deleteChannel', 'unsubscribeFromChannel'] as const)('%s forwards a channel id', async method => {
     const engineCall = jest.fn().mockResolvedValue(undefined);
     await makeService({ [method]: engineCall })[method]('s1', '120363000000000000@newsletter');
