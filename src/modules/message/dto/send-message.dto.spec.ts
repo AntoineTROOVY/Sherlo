@@ -1,6 +1,8 @@
+import { DECORATORS } from '@nestjs/swagger';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import {
+  CustomLinkPreviewDto,
   SendTextMessageDto,
   SendMediaMessageDto,
   SendAudioMessageDto,
@@ -15,6 +17,7 @@ import {
   SEND_POLL_BODY_EXAMPLES,
 } from './send-message.dto';
 import { SendLocationDto, SendContactDto, SendPollDto } from './message-actions.dto';
+import { SendTemplateMessageDto } from './send-template.dto';
 import { GLOBAL_VALIDATION_OPTIONS } from '../../../config/app-validation';
 
 // Read the production pipe's own options rather than restating them, so these cases cannot assert a
@@ -266,5 +269,25 @@ describe('SendMediaMessageDto base64', () => {
       mimetype: 'image/jpeg',
     });
     expect(errors.map(e => e.property)).toContain('base64');
+  });
+});
+
+// @nestjs/swagger derives no bounds from the validators, so each one is declared on the decorator;
+// without it the published schema advertises an unbounded field the server answers 400 for.
+describe('published schema bounds', () => {
+  const published = (cls: new () => object, key: string): Record<string, unknown> | undefined =>
+    Reflect.getMetadata(DECORATORS.API_MODEL_PROPERTIES, cls.prototype as object, key) as
+      Record<string, unknown> | undefined;
+
+  it.each([SendTextMessageDto, SendMediaMessageDto, SendTemplateMessageDto])('%p bounds mentions', cls => {
+    expect(published(cls, 'mentions')).toMatchObject({
+      maxItems: 1024,
+      items: { type: 'string', maxLength: 64 },
+    });
+  });
+
+  it('bounds the media filename and the custom preview url', () => {
+    expect(published(SendMediaMessageDto, 'filename')?.maxLength).toBe(255);
+    expect(published(CustomLinkPreviewDto, 'url')?.maxLength).toBe(2048);
   });
 });

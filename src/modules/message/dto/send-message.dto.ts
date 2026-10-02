@@ -63,6 +63,7 @@ export class CustomLinkPreviewDto {
   @ApiProperty({
     description: 'The URL as it appears in the message text — WhatsApp anchors the preview to it.',
     example: 'https://example.com/launch',
+    maxLength: CUSTOM_PREVIEW_URL_MAX_LENGTH,
   })
   @IsString()
   @IsNotEmpty()
@@ -105,7 +106,13 @@ export class SendTextMessageDto {
   @MaxLength(MESSAGE_TEXT_MAX_LENGTH)
   text!: string;
 
-  @ApiPropertyOptional({ description: MENTIONS_DESCRIPTION, example: ['628123456789@c.us'], type: [String] })
+  @ApiPropertyOptional({
+    description: MENTIONS_DESCRIPTION,
+    example: ['628123456789@c.us'],
+    type: [String],
+    maxItems: MENTIONS_MAX,
+    items: { type: 'string', maxLength: MENTION_WID_MAX_LENGTH },
+  })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(MENTIONS_MAX)
@@ -217,6 +224,7 @@ export class SendMediaMessageDto {
     description:
       "Filename for the media. Only rendered on document sends — defaults to 'file' when omitted (a URL-based document send on whatsapp-web.js first derives the URL basename)",
     example: 'image.jpg',
+    maxLength: 255,
   })
   @IsOptional()
   @IsString()
@@ -233,7 +241,13 @@ export class SendMediaMessageDto {
   @MaxLength(1024)
   caption?: string;
 
-  @ApiPropertyOptional({ description: MENTIONS_DESCRIPTION, example: ['628123456789@c.us'], type: [String] })
+  @ApiPropertyOptional({
+    description: MENTIONS_DESCRIPTION,
+    example: ['628123456789@c.us'],
+    type: [String],
+    maxItems: MENTIONS_MAX,
+    items: { type: 'string', maxLength: MENTION_WID_MAX_LENGTH },
+  })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(MENTIONS_MAX)
