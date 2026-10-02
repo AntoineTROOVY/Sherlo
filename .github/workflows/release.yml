@@ -807,7 +807,7 @@ jobs:
             grep -q "$want" /tmp/inspect.txt || { echo "MISSING PLATFORM: $want"; exit 1; }
           done
 
-  # ──── Staging tag cleanup (happy path AND failure path) ───────────
+  # ──── Staging tag cleanup (only when promote never ran) ───────────
   # Best-effort tidy-up of the staging tag, and it MUST refuse to act unless that tag is the only
   # one on its version.
   #
