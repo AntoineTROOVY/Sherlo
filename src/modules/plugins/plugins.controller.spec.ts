@@ -59,4 +59,16 @@ describe('PluginsController.install() OpenAPI responses', () => {
     ) as Record<string, unknown>;
     expect(Object.keys(responses)).toContain('413');
   });
+
+  // The global ValidationPipe refuses an invalid body, or one carrying an undeclared field, with a 400.
+  it.each(['updateConfig', 'updateSessionConfig', 'updateSessions'] as const)(
+    'declares the validation 400 on %s',
+    handler => {
+      const responses = (Reflect.getMetadata(
+        'swagger/apiResponse',
+        Object.getOwnPropertyDescriptor(PluginsController.prototype, handler)!.value as object,
+      ) ?? {}) as Record<string, { description?: string }>;
+      expect(responses['400']?.description).toMatch(/validation/i);
+    },
+  );
 });
