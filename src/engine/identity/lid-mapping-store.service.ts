@@ -128,6 +128,9 @@ export class LidMappingStoreService implements LidMappingStore, OnModuleInit {
    * fail the import — resolution falls back to engine re-resolution until the table is readable.
    */
   async reload(): Promise<void> {
+    // Dropped before the read too: a restore may have replaced the table, so if the read fails, a lid
+    // not cached must read through rather than trust a stale absence.
+    this.absentFromTable.clear();
     try {
       // Deterministic preload: an unordered find() followed by LRU eviction keeps an ARBITRARY
       // subset once the table exceeds the cap. Order by last-write and take at most the cap, so

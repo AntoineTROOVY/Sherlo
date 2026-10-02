@@ -561,6 +561,24 @@ describe('LidMappingStoreService — deterministic preload + repository fallback
     expect(store.getCached('lid-imported')).toBe('620003'); // asked the table again rather than blocked
   });
 
+  it('forgets every recorded absence even when the reload cannot read the table', async () => {
+    const repo = makeFakeRepo();
+    const store = new LidMappingStoreService(repo as unknown as Repository<LidMapping>);
+
+    expect(store.getCached('lid-restored')).toBeUndefined();
+    await new Promise(resolve => setImmediate(resolve));
+    expect(repo.findOne).toHaveBeenCalledTimes(1); // 'lid-restored' is now known to have no row
+
+    // A restore brings the row back, then the post-commit reload fails.
+    repo.rows.push({ lid: 'lid-restored', phone: '620005', sessionId: null, updatedAt: new Date() });
+    repo.find.mockRejectedValueOnce(new Error('SQLITE_BUSY'));
+    await expect(store.reload()).resolves.toBeUndefined();
+
+    expect(store.getCached('lid-restored')).toBeUndefined();
+    await new Promise(resolve => setImmediate(resolve));
+    expect(store.getCached('lid-restored')).toBe('620005');
+  });
+
   it('swallows a fallback read error (table unavailable) — the miss stays a miss and never throws', async () => {
     const repo = makeFakeRepo();
     repo.findOne.mockRejectedValueOnce(new Error('no such table: lid_mappings'));
