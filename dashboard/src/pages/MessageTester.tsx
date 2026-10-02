@@ -826,6 +826,7 @@ export function MessageTester() {
                   value={content}
                   onChange={e => setContent(e.target.value)}
                   placeholder={t('messageTester.messagePlaceholder')}
+                  maxLength={MESSAGE_TEXT_MAX_LENGTH}
                   rows={5}
                 />
               </div>
@@ -844,6 +845,7 @@ export function MessageTester() {
                       id="mt-14"
                       type="text"
                       value={content}
+                      maxLength={messageType === 'document' ? MEDIA_FILENAME_MAX_LENGTH : BULK_CAPTION_MAX_LENGTH}
                       onChange={e => setContent(e.target.value)}
                       placeholder={
                         messageType === 'document'
@@ -894,6 +896,7 @@ export function MessageTester() {
                     id="mt-15"
                     type="text"
                     value={locationDescription}
+                    maxLength={LOCATION_TEXT_MAX_LENGTH}
                     onChange={e => setLocationDescription(e.target.value)}
                   />
                 </div>
@@ -905,6 +908,7 @@ export function MessageTester() {
                     id="mt-16"
                     type="text"
                     value={locationAddress}
+                    maxLength={LOCATION_TEXT_MAX_LENGTH}
                     onChange={e => setLocationAddress(e.target.value)}
                   />
                 </div>
@@ -919,6 +923,7 @@ export function MessageTester() {
                     id="mt-6"
                     type="text"
                     value={contactName}
+                    maxLength={CONTACT_NAME_MAX_LENGTH}
                     onChange={e => setContactName(e.target.value)}
                     placeholder={t('messageTester.contactNamePlaceholder')}
                   />
@@ -929,6 +934,7 @@ export function MessageTester() {
                     id="mt-7"
                     type="text"
                     value={contactNumber}
+                    maxLength={CONTACT_NUMBER_MAX_LENGTH}
                     onChange={e => setContactNumber(e.target.value)}
                     placeholder="+62812345678"
                   />
@@ -944,6 +950,7 @@ export function MessageTester() {
                     id="mt-8"
                     type="text"
                     value={pollQuestion}
+                    maxLength={POLL_NAME_MAX_LENGTH}
                     onChange={e => setPollQuestion(e.target.value)}
                     placeholder={t('messageTester.pollQuestionPlaceholder')}
                   />
@@ -955,6 +962,7 @@ export function MessageTester() {
                       <input
                         type="text"
                         value={option}
+                        maxLength={POLL_OPTION_MAX_LENGTH}
                         onChange={e => setPollOptions(prev => prev.map((o, i) => (i === index ? e.target.value : o)))}
                         placeholder={t('messageTester.pollOptionPlaceholder', { index: index + 1 })}
                       />

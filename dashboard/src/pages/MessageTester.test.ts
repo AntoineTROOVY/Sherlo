@@ -365,6 +365,25 @@ test('a group poll send holds a question over 255 or an option over 100 characte
   await assertLengthBound(rtl.screen.getByPlaceholderText('Option 1'), 100);
 });
 
+test('each bounded single-send field stops taking input at the limit Send enforces', async () => {
+  const maxLength = (element: HTMLElement): number => (element as HTMLInputElement).maxLength;
+  await renderGroupSendOf('Text');
+  assert.equal(maxLength(byId('mt-2')), 4096);
+  rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Image' }));
+  assert.equal(maxLength(byId('mt-14')), 1024);
+  rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Document' }));
+  assert.equal(maxLength(byId('mt-14')), 255);
+  rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Location' }));
+  assert.equal(maxLength(byId('mt-15')), 1024);
+  assert.equal(maxLength(byId('mt-16')), 1024);
+  rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Contact' }));
+  assert.equal(maxLength(byId('mt-6')), 255);
+  assert.equal(maxLength(byId('mt-7')), 30);
+  rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Poll' }));
+  assert.equal(maxLength(byId('mt-8')), 255);
+  assert.equal(maxLength(rtl.screen.getByPlaceholderText('Option 1')), 100);
+});
+
 test('a session that stops being ready is replaced by what the selector shows', async () => {
   const status: Record<string, string> = { s1: 'ready', s2: 'ready' };
   const sends: string[] = [];
