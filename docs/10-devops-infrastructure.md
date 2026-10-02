@@ -479,8 +479,9 @@ WEBHOOK_DISPATCH_MAX_QUEUED=1000
 # admitted before it (running, parked, or in their retries) are not counted. The direct delivery
 # used when Redis rejects an enqueue is not capped. Queued, it applies to every job attempt
 # that starts afterwards, including retries and jobs already waiting (the rest wait in the delayed
-# set without spending an attempt); only an attempt already running is not counted. The failing
-# state and the cap are held per process, not per cluster.
+# set without spending an attempt, each wait doubling up to 64 times WEBHOOK_RETRY_DELAY (at
+# least 1 s), plus up to as much again in jitter); only an attempt already running is not counted.
+# The failing state and the cap are held per process, not per cluster.
 # The first 2xx from the webhook lifts it. With the queue disabled, a session parks at most a
 # quarter of WEBHOOK_DISPATCH_MAX_QUEUED behind that limit and sheds the rest, so other sessions
 # keep room.
