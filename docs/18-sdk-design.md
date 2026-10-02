@@ -83,6 +83,9 @@ async function main() {
   const session = await client.sessions.create({ name: 'my-session' });
   await client.sessions.start(session.id);
 
+  // Link the account before sending: scan sessions.getQrCode or use sessions.requestPairingCode,
+  // then wait for status 'ready'. An unlinked session answers the send with 409.
+
   // Send a text message.
   const result = await client.messages.sendText(session.id, {
     chatId: '628123456789@c.us',
@@ -450,6 +453,9 @@ client = OpenWAClient(
 session = client.sessions.create({"name": "my-session"})
 client.sessions.start(session["id"])
 
+# Link the account before sending: scan sessions.get_qr_code or use sessions.request_pairing_code,
+# then wait for status "ready". An unlinked session answers the send with 409.
+
 # Send a text message
 result = client.messages.send_text(session["id"], {
     "chatId": "628123456789@c.us",
@@ -816,6 +822,8 @@ $client = new Client([
 $session = $client->sessions->create(['name' => 'my-session']);
 $client->sessions->start($session['id']);
 
+// Link the account before sending: scan sessions->getQrCode or use sessions->requestPairingCode,
+// then wait for status 'ready'. An unlinked session answers the send with 409.
 $result = $client->messages->sendText($session['id'], [
     'chatId' => '628123456789@c.us',
     'text'   => 'Hello from the OpenWA PHP SDK!',
