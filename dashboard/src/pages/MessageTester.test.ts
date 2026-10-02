@@ -480,6 +480,17 @@ test('a bulk send with a picked image carries it in every item', async () => {
   }
 });
 
+test('a bulk text over 4096 characters with no attachment keeps Send disabled and says why', async () => {
+  stubGateway();
+  const container = await renderBulkAsWriter();
+  type(container, '#mt-11', '15550000001');
+  type(container, '#mt-12', 'x'.repeat(4096));
+  await rtl.waitFor(() => assert.equal(sendButton().disabled, false));
+  type(container, '#mt-12', 'x'.repeat(4097));
+  assert.equal(sendButton().disabled, true);
+  rtl.screen.getByText('Limited to 4096 characters (4097 now).');
+});
+
 test('a bulk send that resolves after the page is left starts no progress polling', async () => {
   let release: (response: Response) => void = () => {};
   let bulkPosted = false;

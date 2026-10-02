@@ -349,6 +349,8 @@ export function MessageTester() {
   const bulkAudioWithText = bulkAttachment?.kind === 'audio' && content.trim().length > 0;
   const bulkCaptionTooLong =
     bulkAttachment !== null && bulkAttachment.kind !== 'audio' && captionLength(content) > BULK_CAPTION_MAX_LENGTH;
+  // Without an attachment every item is a text message, under the same bound as a single text send.
+  const bulkTextTooLong = bulkAttachment === null && captionLength(content) > MESSAGE_TEXT_MAX_LENGTH;
 
   // The text field goes out as the caption on image and video and as the filename on a document.
   const mediaContentMax =
@@ -396,6 +398,7 @@ export function MessageTester() {
       !mediaUrlInvalid &&
       !bulkAudioWithText &&
       !bulkCaptionTooLong &&
+      !bulkTextTooLong &&
       bulkRecipientList.length > 0 &&
       bulkRecipientList.length <= BULK_MAX_RECIPIENTS &&
       (delayMs === undefined || (!Number.isNaN(delayMs) && delayMs >= 1000 && delayMs <= 60000));
@@ -1108,7 +1111,9 @@ export function MessageTester() {
                             max: BULK_CAPTION_MAX_LENGTH,
                             count: captionLength(content),
                           })
-                        : ''}
+                        : bulkTextTooLong
+                          ? t('common.fieldTooLong', { max: MESSAGE_TEXT_MAX_LENGTH, count: captionLength(content) })
+                          : ''}
                   </span>
                 </div>
                 {mediaSourceFields}
