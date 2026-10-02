@@ -20,6 +20,7 @@ export class CreateCallLinkDto {
       'whatsapp-web.js generates an event-linked call and has no notion of "no start time", so a ' +
       'link for right now is `Date.now()` rather than an omitted field.',
     example: 1800000000000,
+    type: 'integer',
     minimum: 1,
     maximum: MAX_DATE_MS,
   })
