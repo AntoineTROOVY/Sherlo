@@ -44,3 +44,36 @@ describe('sessions table importer: desiredState', () => {
     expect(mapped({ desiredState: 'bogus' })[12]).toBeNull();
   });
 });
+
+/**
+ * A restore bypasses CreateWebhookDto. Dispatch reads a filters object without a conditions array as
+ * "no filtering", so a malformed one stored verbatim would deliver every subscribed event; a non-list
+ * events column silently never fires. Both are vetoed with a reason instead.
+ */
+describe('webhooks table importer', () => {
+  const webhooks = TABLE_IMPORTERS.find(importer => importer.key === 'webhooks');
+  const skip = (overrides: Record<string, unknown>) =>
+    webhooks?.skip?.({ id: 'wh-1', events: ['message.received'], filters: null, ...overrides } as never);
+  const chatFilter = { conditions: [{ field: 'isGroup', operator: 'is', value: true }] };
+
+  it('accepts events and filters in either decoded or JSON-text form', () => {
+    expect(skip({})).toBeNull();
+    expect(skip({ events: '["message.received","*"]', filters: JSON.stringify(chatFilter) })).toBeNull();
+    expect(skip({ filters: chatFilter })).toBeNull();
+    expect(skip({ events: undefined, filters: undefined })).toBeNull();
+  });
+
+  it.each([['message.received'], ['not json'], [{ 0: 'message.received' }], [[1]], ['[null]']])(
+    'skips a row whose events is %j',
+    events => {
+      expect(skip({ events })).toMatch(/events/);
+    },
+  );
+
+  it.each([[{}], [{ conditions: 'x' }], ['not json'], ['{}'], [{ conditions: [{ field: 'nope', operator: 'is' }] }]])(
+    'skips a row whose filters is %j',
+    filters => {
+      expect(skip({ filters })).toMatch(/filters/);
+    },
+  );
+});

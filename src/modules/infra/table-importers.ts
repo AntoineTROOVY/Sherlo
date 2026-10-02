@@ -1,4 +1,5 @@
 import { isSafeSessionName } from '../../common/utils/path-safety';
+import { collectFilterErrors } from '../webhook/filters/filter-validation';
 import type {
   MigrationTables,
   SessionRow,
@@ -54,6 +55,17 @@ function defineTableImporter<K extends keyof MigrationTables>(importer: TableImp
   return importer;
 }
 
+// A JSON column arrives decoded from Postgres and as text from SQLite. Text that does not parse is
+// returned as-is, so a validator sees a string and refuses it rather than reading it as absent.
+function decodeJsonColumn(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
+}
+
 // Restore order is FK order: sessions first (webhooks/messages/templates/etc. reference it), the
 // standalone cache/DLQ tables after. The per-block comments from the former inline import blocks
 // live on their descriptor entries.
@@ -103,6 +115,19 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
     sql: `INSERT INTO webhooks (id, "sessionId", url, events, secret, headers, filters, active, "retryCount", "lastTriggeredAt", "createdAt", "updatedAt")
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     id: (webhook: WebhookRow) => webhook.id,
+    // This path bypasses CreateWebhookDto. Dispatch reads a filters value without a conditions array
+    // as "no filtering", so a malformed one stored verbatim would deliver every subscribed event, and
+    // an events value that is not a list never fires at all. Veto the row with a warning, like the
+    // sessions guard; any warning rolls the restore back and names the row.
+    skip: (webhook: WebhookRow) => {
+      const events = decodeJsonColumn(webhook.events ?? []);
+      if (!Array.isArray(events) || !events.every(event => typeof event === 'string')) {
+        return `Skipped webhook ${webhook.id}: events is not a list of event names`;
+      }
+      const filterErrors = collectFilterErrors(decodeJsonColumn(webhook.filters));
+      if (filterErrors.length === 0) return null;
+      return `Skipped webhook ${webhook.id}: invalid filters (${filterErrors.join('; ')})`;
+    },
     map: (webhook: WebhookRow) => [
       webhook.id,
       webhook.sessionId,

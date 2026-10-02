@@ -1715,7 +1715,7 @@ describe('InfraDataController.import/export preserves every data-DB table', () =
         headers: {},
         active: true,
         retryCount: 3,
-        filters: { conditions: [{ field: 'sender', operator: 'equals', value: '123@c.us' }] },
+        filters: { conditions: [{ field: 'sender', operator: 'is', value: ['123@c.us'] }] },
       }),
     );
 
@@ -1724,7 +1724,7 @@ describe('InfraDataController.import/export preserves every data-DB table', () =
 
     expect(res.imported).toBe(true);
     expect((await ds.getRepository(Webhook).findOneByOrFail({ id: 'w1' })).filters).toEqual({
-      conditions: [{ field: 'sender', operator: 'equals', value: '123@c.us' }],
+      conditions: [{ field: 'sender', operator: 'is', value: ['123@c.us'] }],
     });
     // The active flag (exported as integer 1 from SQLite) must round-trip as a real boolean.
     expect((await ds.getRepository(Webhook).findOneByOrFail({ id: 'w1' })).active).toBe(true);
