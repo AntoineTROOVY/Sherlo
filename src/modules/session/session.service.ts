@@ -779,9 +779,9 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
       await this.releaseAfterTeardown(id);
       return session;
     } catch (error) {
-      // A 400 "not started" or 404 took nothing down; the 502 did evict the engine and stays counted.
+      // A 400 "not started" or a 404 took nothing down, so it is uncounted, and the 400 keeps its claim
+      // as in logout(). The 502 did evict the engine: it stays counted and releases.
       if (error instanceof BadRequestException || error instanceof NotFoundException) this.uncountStopRequest(id);
-      // Same 400 rule as logout(): a "not started" refusal took nothing down.
       if (!(error instanceof BadRequestException)) await this.releaseAfterTeardown(id);
       throw error;
     }
