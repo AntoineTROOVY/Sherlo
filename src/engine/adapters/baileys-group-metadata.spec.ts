@@ -43,6 +43,11 @@ describe('getGroupInfo', () => {
     );
   });
 
+  it.each([408, 429])('reports a WA %s as retryable instead of a bare 500', async code => {
+    const groupMetadata = jest.fn().mockRejectedValue(new Boom('refused', { data: code }));
+    await expect(groups({ groupMetadata }, 500).getGroupInfo('123@g.us')).rejects.toBeInstanceOf(EngineTransportError);
+  });
+
   it.each([401, 403, 404])('still treats a WA %s refusal as not-found', async code => {
     const groupMetadata = jest.fn().mockRejectedValue(new Boom('refused', { data: code }));
     await expect(groups({ groupMetadata }, 500).getGroupInfo('123@g.us')).resolves.toBeNull();

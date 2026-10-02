@@ -211,6 +211,9 @@ export class BaileysGroups {
       // account cannot see it. Anything else — a dropped socket, a timeout, a protocol error —
       // folded into null makes a dead transport look like a missing group, so it propagates.
       const code = refusedStatusCode(err);
+      if (code === 408 || code === 429) {
+        throw new EngineTransportError(`WhatsApp rate-limited or timed out the group metadata query (code ${code})`);
+      }
       if (code === 401 || code === 403 || code === 404) {
         this.host.logger.debug('groupMetadata refused; treating as not-found', {
           groupId,
