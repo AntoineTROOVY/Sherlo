@@ -46,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/backup.sh` adds an `ENGINE-STATE-NOTE` to the archive, and logs a warning, when a whatsapp-web.js profile held a Chromium lock, Baileys state was present, or engine auth files changed during the copy; `scripts/restore.sh` prints it, and `--strict` still refuses only a possibly torn database.
 - The Docker image is built on a refreshed `node:22-slim` base image.
 - Dashboard: fonts ship in the build instead of loading from Google Fonts, and the CSP no longer allows `fonts.googleapis.com` or `fonts.gstatic.com`, so the Bull Board queue UI at `/api/admin/queues` falls back to system fonts.
-- `proxyType` on `POST /api/sessions` is marked deprecated in the OpenAPI contract and, from the next SDK release after 0.5.0, in the Java and Python SDKs; it was always ignored, since the `proxyUrl` scheme selects the proxy protocol.
+- `proxyType` on `POST /api/sessions` is marked deprecated in the OpenAPI contract and, from the next SDK release after 0.5.0, in the JavaScript, Python, Go and Java SDKs; it was always ignored, since the `proxyUrl` scheme selects the proxy protocol.
 - Statistics requests no longer write a `sessions:stats` key to Redis that nothing reads.
 - Webhook filters and automation rule conditions refuse with `400` a key other than `conditions`, or a condition key other than `field`, `operator`, `value` and `caseSensitive`; such keys were stored and ignored.
 - A group create or participant add naming more new contacts than a whole day's cold-reachout allowance answers `400` naming the batch size to split into, instead of a `429` whose `retryAfterSeconds` never lets it through.
