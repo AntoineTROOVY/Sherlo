@@ -94,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A node that adopts a session no longer marks FAILED the bulk batches it started itself while the adopted engine was still initializing, or a batch that finished while the reap was reading it.
 - When a stop and start, or a reconnect, replaces an engine that is still starting, the old start's timeout or failure no longer untracks or tears down the new engine, or marks the session `disconnected` or `failed`.
 - An engine whose graceful shutdown fails is force-killed instead of left running with no handle when its node loses the session's claim, `POST /api/infra/import-data` stops orphan engines, or a stop or delete retires a start or reconnect.
-- With `AUTO_START_SESSIONS=true`, a session stopped with `POST /api/sessions/:sessionId/stop` or `POST /api/sessions/:sessionId/force-kill` stays down across restarts and is not adopted by another node until `POST /api/sessions/:sessionId/start`.
+- With `AUTO_START_SESSIONS=true`, a session stopped with `POST /api/sessions/:sessionId/stop` or `POST /api/sessions/:sessionId/force-kill` stays down across restarts and is not adopted by another node until `POST /api/sessions/:sessionId/start`; a stop or delete whose session read fails records no stop.
 - Two gateway processes sharing one `NODE_ID` (by default the hostname, as with host networking or pm2 cluster mode) log a `duplicate_node_id` error while either holds a session; give each process its own `NODE_ID`.
 - An inbound message, or one the account sent outside the API, is inserted once more after a transient database error (a SQLite lock, a dropped connection, a PostgreSQL pool timeout or connection limit), instead of reaching webhooks with no stored row.
 - Messages in one chat are stored, emitted over the WebSocket and handed to webhook dispatch in arrival order, even when a plugin's `message:received` or `message:sent` handler is slower on an earlier one. Webhook deliveries themselves can still arrive out of order.
@@ -115,7 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A WebSocket `message` frame with no payload answers `INVALID_MESSAGE` instead of a generic exception.
 - On PostgreSQL, boot no longer runs FTS schema DDL when the `body_ts` column and its index already exist, so a restart no longer queues every read and write on `messages` behind the open ones.
 - Two plugins with the same instance id no longer serialize each other's ingress deliveries.
-- A sandboxed plugin whose worker stays blocked after a hook, webhook or search call times out is stopped and set to `ERROR`, instead of making every later event wait out the 5 s hook timeout.
+- A sandboxed plugin whose worker stays blocked after a hook, webhook or search call times out is stopped and set to `ERROR`, instead of making every later event wait out the 5 s hook timeout; a worker that answered while the gateway's own event loop stalled is kept.
 - Storage file count, export and import answer `503` when `STORAGE_TYPE=s3` and the bucket has not been reachable since boot, instead of silently using the local fallback directory; after that, an outage answers `500`, or `imported: false` for the import.
 - With `STORAGE_TYPE=s3`, a bucket still missing when S3 becomes reachable after boot is now created, instead of leaving storage on the local fallback until a restart.
 - Built-in S3 storage (the compose `minio` and `full` profiles and the Dashboard > Infrastructure built-in option) runs `pgsty/silo`, a maintained MinIO fork pinned by release tag and digest, because `minio/minio` can no longer be pulled ([#1729](https://github.com/rmyndharis/OpenWA/issues/1729)).
@@ -131,12 +131,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `POST /api/sessions/:sessionId/messages/send-product` answers `400` for an empty `chatId` or `productId`, a `productId` over 255 characters or a `body` over 4096 characters.
 - The received-status purge deletes expired statuses in batches, so a backlog after downtime no longer makes every purge fail while the table keeps growing.
 - The received-status and `CHAT_MEDIA_ARCHIVE_TTL_DAYS` purges no longer stall behind files they cannot delete, and an S3 delete that never answers is abandoned after 30 s.
-- A timed-out media conversion kills ffmpeg's whole process group and releases its stderr pipe at once, so an `FFMPEG_PATH` wrapper script that does not `exec` ffmpeg no longer leaves it running outside the conversion limit.
+- A timed-out media conversion kills ffmpeg's whole process group and releases its stderr pipe at once, so an `FFMPEG_PATH` wrapper script that does not `exec` ffmpeg no longer leaves it running outside the conversion limit, and conversions still running when the gateway exits are killed.
 - Statistics requests and metrics scrapes that arrive while the statistics memo is empty or expired share one database aggregation instead of each running their own.
 - An `api_key_auth_failed` audit row for a revoked or expired API key, or one refused by its `allowedIps` or `allowedSessions`, names that key on REST, `/api/admin/queues`, `GET /api/health` and MCP; it recorded only the client IP.
 - The `api_key_created` audit row records the new key's allowed IPs, sessions and chats and its expiry, as `api_key_updated` already does.
 - The OpenAPI contract declares `401` and `403` on every operation that takes an API key and gives each documented error response an `ErrorResponse` body schema.
-- `SEARCH_LIMIT_MAX`, `INGRESS_MAX_ATTEMPTS`, `INGRESS_RETRY_DELAY_MS`, `WEBHOOK_WORKER_CONCURRENCY`, `INGRESS_WORKER_CONCURRENCY` and `REDIS_CACHE_DB` are validated at boot; a typo no longer falls back to the default in silence, and a negative or fractional `SEARCH_LIMIT_MAX` no longer reaches the search provider.
+- `SEARCH_LIMIT_MAX`, `INGRESS_MAX_ATTEMPTS`, `INGRESS_RETRY_DELAY_MS`, `WEBHOOK_WORKER_CONCURRENCY`, `INGRESS_WORKER_CONCURRENCY`, `REDIS_CACHE_DB` and `SSRF_DNS_TIMEOUT_MS` are validated at boot; a typo no longer falls back to the default in silence, and a negative or fractional `SEARCH_LIMIT_MAX` no longer reaches the search provider.
 - An invalid environment value stops the boot before the storage root is created or the built-in PostgreSQL container is started, and is logged once instead of twice.
 - Nest framework log lines, including the stack of an unhandled `500`, and the modules that logged through Nest's own logger now follow `LOG_LEVEL` and `LOG_FORMAT` and carry the request id; their debug lines printed at every level.
 - `docker-compose.dev.yml` no longer pins `QUEUE_ENABLED=false`, so enabling the queue in Dashboard > Infrastructure takes effect on the Quick Start stack.
@@ -153,14 +153,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard: the WebSocket dials only the origin of `VITE_WS_URL`, else of `VITE_API_URL`, so a split-origin build reaches the API and a trailing slash or path no longer breaks live events.
 - Dashboard: Safari's `Load failed` collapses into the single connection-lost toast.
 - Dashboard Message Tester: bulk progress polling stops and shows the server's message when the batch answers `404` or `403`.
-- Dashboard: the home page loads the analytics charts and `GET /api/stats/overview` only for an admin key and `GET /api/webhooks` only for an operator or admin key, so other keys no longer download the chart bundle or add refused requests to the audit log.
+- Dashboard: the home page loads the analytics charts and `GET /api/stats/overview` only for an admin key without a session restriction and `GET /api/webhooks` only for an operator or admin key, so other keys no longer download the chart bundle or add refused requests to the audit log.
 - Dashboard: the Infrastructure backup hint says webhook signing secrets, custom webhook headers and proxy credentials are left out of the data export, and that integration instance secrets and settings are included in plaintext.
 - Dashboard Webhooks: Create and Save stay disabled while the URL is blank, no event is selected, a filter condition has no value or the filters exceed the gateway's limits of 20 conditions, 100 values per condition and 1000 characters of text, with a hint, and a double click on Save sends one update.
-- Dashboard API Keys: an expired key is listed as Expired instead of Active, Create stays disabled for a name shorter than 3 characters and the name field stops at 100, and at exactly 768 px wide a key card no longer shows a stray Last Used date above its name.
+- Dashboard API Keys: an expired key is listed as Expired instead of Active, Create stays disabled for a name shorter than 3 characters, counted as the gateway counts them, and the name field stops at 100, and at exactly 768 px wide a key card no longer shows a stray Last Used date above its name.
 - Dashboard: the Headless Mode, Session Data Path, Browser Arguments and Storage Path fields show the environment-pin note when a variable supplies them, and `GET /api/infra/status` lists `PUPPETEER_HEADLESS`, `SESSION_DATA_PATH`, `PUPPETEER_ARGS` and `STORAGE_LOCAL_PATH` in `envPinned`.
 - A release tag with any `-` suffix is marked prerelease on GitHub as well, so it can no longer become the release the update check reads as latest.
 - The `ghcr.io/rmyndharis/openwa:main` image tag moves only after the image passes the CI smoke tests and only while its commit is still the head of `main`, so overlapping merges can no longer leave it on an older build.
 - Revoking, deleting or setting an expiry on an admin API key answers `409` unless another active, unexpired admin key with no session or chat restriction lasts at least as long, so admin access can no longer run out when the remaining key expires; pushing an existing expiry later is still allowed.
+- Revoking, deleting or restricting an API key can no longer leave no usable unrestricted admin key when a concurrent update made it the last one.
 - API key usage counts no longer lose uses when two requests land at the same stats window boundary.
 - Updating a webhook re-checks its URL only when the URL changes, so a webhook whose host no longer resolves or is now blocked can still be deactivated or re-filtered.
 - Webhook create and update answer `400` for a URL longer than 2048 characters instead of `500` on PostgreSQL.
@@ -169,7 +170,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A template or automation rule name, a webhook URL or signing secret, or a session proxy URL longer than its column in code points, such as one of emoji with variation selectors, is refused with `400` instead of failing with `500` on PostgreSQL.
 - An API key name is bounded at 100 code points like the other name fields, so a longer one, such as one of emoji with variation selectors, is refused with `400` instead of being stored as given.
 - `POST /api/sessions/:sessionId/messages/send-bulk` answers `429` instead of `400` when the node already runs `BULK_MAX_CONCURRENT_BATCHES` batches, so clients retry it.
-- A bulk batch whose run failed before processing started, or whose process died first, ends `FAILED` instead of staying `PENDING`, and batches failed by the startup or takeover reap report `completedAt`.
+- A bulk batch whose run failed before processing started, or whose process died first, ends `FAILED` instead of staying `PENDING`, a run that fails partway keeps the results of the items it sent, and batches failed by the startup or takeover reap report `completedAt`.
 - Starting or stopping a session whose node's lease lapsed, with `POST /api/sessions/:sessionId/start` or `POST /api/sessions/:sessionId/stop`, fails that node's unfinished bulk batches, as the takeover sweep does; before, they stayed `PENDING` or `PROCESSING` until a node restarted.
 - A bulk batch failed by the node that took over its session stays `FAILED`: a node still running it stops at its next progress save and records only the items it sent, instead of writing its own outcome over it.
 - A bulk batch cancelled from another node just as its run finishes keeps the run's results, and its counters no longer report items that were delivered as cancelled.
@@ -189,19 +190,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Boot validates `PLUGIN_DOWNLOAD_MAX_BYTES`, `PLUGIN_STORAGE_MAX_BYTES`, `PLUGIN_CAP_TIMEOUT_MS`, `TEMPLATE_RENDER_MAX_CHARS`, `STORAGE_IMPORT_MAX_BYTES`, `STORAGE_IMPORT_MAX_ENTRIES`, `STORAGE_LIST_MAX_FILES`, `BAILEYS_MESSAGE_STORE_LIMIT`, `SHUTDOWN_DELAY_MS` and the webhook and ingress retention days as positive integers (non-negative for `SHUTDOWN_DELAY_MS`, any integer for the retention days); a unit suffix such as `5mb` or `30s` was read as its leading digits.
 - Boot refuses `0` for `RATE_LIMIT_SHORT_TTL`, `RATE_LIMIT_MEDIUM_TTL`, `RATE_LIMIT_LONG_TTL` and `INGRESS_INSTANCE_TTL`, which turned that rate-limit tier off.
 - Boot refuses a retention window above 36500 days for audit logs, archived chat media, webhook delivery failures, the webhook outbox, ingress dead letters and ingress dedup; on SQLite such a value deleted every row.
-- Boot refuses a timer value past Node's 2147483647 ms limit, a quarter of it for `PLUGIN_CAP_TIMEOUT_MS` and an eighth for `WEBHOOK_RETRY_DELAY`; Node fired such timers after 1 ms.
+- Boot refuses a timer value past Node's 2147483647 ms limit, including `SSRF_DNS_TIMEOUT_MS` and the PostgreSQL connection and idle timeouts, a quarter of it for `PLUGIN_CAP_TIMEOUT_MS` and an eighth for `WEBHOOK_RETRY_DELAY`; Node fired such timers after 1 ms. A `DATABASE_STATEMENT_TIMEOUT_MS` past that limit, which PostgreSQL refused on every connection, is refused too.
 - Boot accepts only `true` or `false` for `CSP_UPGRADE_INSECURE_REQUESTS`, `ENABLE_SWAGGER`, `VALIDATION_ERROR_DETAIL`, `PLUGIN_INSTALL_REQUIRE_PIN` and `WEBHOOK_SSRF_REDIRECTS`; another spelling silently fell back to the default.
 - First boot no longer logs a spurious chmod `ENOENT` warning when it creates `data/.env.generated` or the bootstrap key file.
 - A PostgreSQL connection dropped while boot waits for or holds the migration lock no longer crashes the process; the boot is retried.
 - Startup no longer logs a `LegacyRouteConverter` warning for `/api/*`.
 - MCP no longer logs an info line on every request, and logs a tool call refused with a `4xx` as a one-line warning instead of an error with a stack.
-- Video conversion no longer fails on an odd-width input such as a GIF, and bounds a portrait video to 1280 pixels on its long edge.
+- Video conversion no longer fails on an odd-width input such as a GIF, and fits its output inside 1280x720, or 720x1280 for portrait, so square and 4:3 inputs also stay within the H.264 level older Android clients play.
 - A plugin search provider's fractional `tookMs`, `total` or hit `timestamp` is returned as a whole number, so the Go and Java SDKs can decode the search reply.
 - `GET /api/infra/export-data` and `POST /api/infra/import-data` answer `409` while the other runs; on SQLite an export taken during an import could archive a half-restored database.
 - A data export taken while a session is being created no longer produces a backup whose restore rolls back on an orphaned child row.
-- A storage export fails with `500` when a listed file cannot be read, instead of reporting success with a partial archive, and a failed export no longer leaves its partial archive in `data/exports`.
+- A storage export fails with `500` when a listed file cannot be read or the S3 bucket is gone, instead of reporting success with a partial archive, and a failed export no longer leaves its partial archive in `data/exports`.
 - A storage import skips directory and link entries and strips a leading `./` from entry names, so an archive built with `tar -C media .` no longer writes empty files over media.
-- A storage import that aborts partway is recorded in the audit log.
+- A storage import that aborts partway is recorded in the audit log with the number of entries it wrote before the abort.
 - Ingress routes answer `415` for a body whose `Content-Type` is not `application/json` or `application/x-www-form-urlencoded`, instead of accepting it as empty and dropping later deliveries as duplicates.
 - Deleting or disabling a session-wide (wildcard) integration instance no longer silences enabled instances bound to specific sessions until a restart.
 - Plugin install from a URL accepts single-label and underscore hosts, so a host listed in `SSRF_ALLOWED_HOSTS` is no longer refused with `400`.
@@ -209,42 +210,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A plugin manifest whose `permissions`, `sessions`, `hooks`, `net.allow` or `net.allowConfigHosts` is not a list of strings is refused at install and boot instead of being matched by substring.
 - A plugin `ctx.net.fetch(url, null)` call no longer holds one of the 16 process-wide plugin fetch slots forever.
 - A sandboxed plugin that posts a malformed message, such as a log line with an unknown level, no longer crashes the gateway process.
-- A sandboxed plugin whose hook result or log metadata cannot be cloned no longer crashes its worker or sets the plugin to `ERROR`.
+- A sandboxed plugin whose hook result or log metadata cannot be cloned no longer crashes its worker or sets the plugin to `ERROR`, and an error log keeps its error text.
 - A sandboxed plugin's capability call with an argument that cannot be cloned no longer leaves a pending call behind for the life of its worker.
 - Plugin storage `list()` in a package directory no longer reports the plugin's own JSON files as keys, which a clear-all loop could delete.
-- Uninstalling a plugin from the legacy `./plugins` directory that failed to load removes its code.
+- Uninstalling a plugin removes its copy in the legacy `./plugins` directory, including one that failed to load or that `./data/plugins` also holds, so it no longer comes back after a restart.
 - A plugin handover state other than `bot`, `human` or `closed` is refused instead of being stored with no effect.
 - A built-in PostgreSQL, Redis or MinIO container that fails to start reports a create or start failure instead of telling the operator to use `docker-compose`.
 - `docker-compose.yml` no longer bind-mounts itself into `openwa-api`, which nothing read and which left an empty `docker-compose.yml` directory when the stack ran from a renamed compose file.
-- `scripts/backup.sh` no longer fails when the app deletes or renames a file during an online copy; it logs the torn copy and goes on.
+- `scripts/backup.sh` no longer fails when the app deletes or renames a file during an online copy, on hosts in any language; it logs the torn copy and goes on, while a permission or disk-full error still fails the run.
 - `scripts/backup.sh` warns about a missing Baileys auth directory when Baileys was selected in the dashboard.
-- `scripts/backup.sh` and `scripts/restore.sh` use the built-in default for a key left blank in `./.env`, as the app does, instead of the value in `data/.env.generated`.
-- The OpenAPI contract declares the `400`, `404`, `409`, `429`, `502` and `504` responses the API key, integration instance, plugin, session, stats, webhook, bulk send, force-kill and data export routes return, and marks `expiresAt: null` as clearing an API key's expiry.
+- `scripts/backup.sh` and `scripts/restore.sh` use the built-in default for a key left blank in `./.env`, and read a quoted value or one followed by a comment, as the app does, instead of the value in `data/.env.generated`.
+- `scripts/backup.sh` no longer fails with `database is locked` while the gateway writes to its SQLite databases, or deletes a complete archive as missing its databases when the archive holds thousands of files.
+- The OpenAPI contract declares the `400`, `404`, `409`, `429`, `502` and `504` responses the API key, integration instance, plugin, session, stats, webhook, bulk send, force-kill and data export routes return, the `400` of every route that takes a body and of the channel, contact, group, label, chat history and reaction routes for a session that is not started, the `413` of an oversized plugin upload and the `503` of `GET /api/health/ready` while the node drains; it marks `expiresAt: null` as clearing an API key's expiry and the chat presence read's `200` body as nullable.
+- The OpenAPI contract publishes the bounds the server enforces on API key names, session `proxyUrl`, the pairing-code `phoneNumber`, integration instance fields, channel descriptions, contact first names, mentions, poll options, bulk messages, media filenames, custom preview URLs, the call-link `startTime`, the chat `muteUntil` and the search `limit` and `offset`.
+- Two concurrent creates of one integration instance id answer `201` and `409` instead of both succeeding with only the last secret valid, a `PATCH` racing a delete or a secret regeneration no longer re-creates the instance or restores the old secret, and a `PATCH` or regeneration of an instance deleted mid-request answers `404`.
+- An ingress delivery replayed by the reconciler, or redriven from a dead-letter row the reconciler wrote, keeps its HTTP method instead of arriving as `POST`.
+- A queued ingress delivery whose dead-letter row cannot be written, such as during a database outage, is queued again and retried instead of lost.
+- A webhook update racing a delete answers `404` instead of re-creating the deleted webhook, and an update no longer reverts fields it did not set.
+- A stored webhook whose `events` or `filters` is malformed, such as one from a hand-edited backup, is skipped on its own instead of stopping delivery to every webhook of its session or failing the outbox replay, and `POST /api/infra/import-data` refuses to restore one.
+- Two `presence.update` events for one group in the same millisecond get distinct idempotency keys, so a deduplicating receiver no longer drops the second.
+- Parallel sends can no longer together exceed the send-pacing daily and cold-reachout caps, and an edit is checked against the caps without being counted as a send.
+- Overlapping `PATCH /api/sessions/:sessionId/config` requests no longer drop each other's keys; one that keeps losing the race answers `409`.
+- `MAX_CONCURRENT_SESSIONS` counts a session waiting to relaunch after a failed reconnect, so another start can no longer run one engine over the cap, and a node at the cap no longer takes over a lapsed session it cannot start, which left that session down and reporting the dead node's status.
+- A failed reconnect attempt no longer arms another attempt that tears down the next attempt's engine, which repeated until the session ended `failed`.
+- A failed write of an engine-reported session status, such as on a disconnect or when reconnects run out, is logged as a warning instead of raising an unhandled promise rejection.
+- `POST /api/infra/import-data` with `stopOrphans: true` refuses a backup with no rows before stopping any engine, where it stopped every running session first, and no longer lets a start still reading its session row launch an engine for a session the import removes.
+- Dashboard Infrastructure saves are no longer refused with `400` when external PostgreSQL or S3 credentials come from the project `.env` or use the legacy `S3_ACCESS_KEY` and `S3_SECRET_KEY` names, and the config read no longer reports those S3 credentials as unset.
+- S3 requests time out against a store that accepts connections but never answers, after 5 s to connect or 30 s without data, and a bucket probe is abandoned after 10 s, so media reads and writes and `GET /api/infra/status` no longer hang and S3 recovers without a restart.
+- Outbound media archived from both the engine echo and the REST send at once no longer leaves a second copy in storage.
+- Lowering an automation rule's `cooldownSeconds` applies to a quiet period already running in a chat.
+- `POST /api/sessions/:sessionId/calls/link` answers `400` for a `startTime` past the largest date JavaScript can hold, instead of `403` or `500`.
+- Channel delete and unsubscribe answer `404` for an id that is not a channel; on whatsapp-web.js they created a chat for it and failed with `500`.
+- Group and profile picture writes and media sends answer `400` for a non-string `base64` sent next to a `url`, and `send-template` for a non-string `templateId` or `templateName` sent next to the other, instead of `500`.
+- `POST /api/sessions/:sessionId/groups/join` trims whitespace around the invite code, as the join preview does.
+- A template name, body, header or footer containing a NUL character is refused with `400` instead of failing with `500` on PostgreSQL.
+- A replica that starts while Redis is unreachable subscribes to cross-replica WebSocket events once Redis returns, instead of missing them until a restart.
+- Status media received without a type is served as `application/octet-stream` instead of answering `404` on the `mediaUrl` it was advertised with.
+- SQLite search no longer returns other messages after `DATABASE_SYNCHRONIZE=true` rebuilt the messages table; the next boot rebuilds the search index.
+- `GET /api/search` applies a `dateTo` or `dateFrom` of `0` instead of returning every match.
+- With the dashboard served, a mis-cased API path such as `GET /API/sessions` reaches the API instead of answering the dashboard page.
+- A lid re-mapped to a new phone number no longer resolves to the previous one from cache when a table read raced the new mapping's write.
+- `GET /api/metrics` no longer logs a Content-Type warning for every refused scrape.
+- Boot and the migration commands no longer print dotenv's `injected env` line, and the env loader's boot lines, such as the `DATABASE_SSL` override warning, go through the logger, so production logs them as JSON with a level.
+- An unhandled promise rejection whose reason cannot be turned into a string is logged instead of exiting the process.
+- On PostgreSQL 14 and newer, boot migrations no longer fail on every retry when `idle_session_timeout` is set on the role or database.
+- Boot refuses a `BODY_SIZE_LIMIT` of `0` or with a unit it does not know, such as `50M`; `0` refused every request body and an unknown unit fell back to `25mb`.
+- Boot refuses a negative `MESSAGE_REAPER_INTERVAL_MS`, `WEBHOOK_RECONCILE_INTERVAL_MS` or `INGRESS_RECONCILE_INTERVAL_MS`, which kept the sweep running, and a `MESSAGE_REAPER_GRACE_MS`, `WEBHOOK_RECONCILE_GRACE_MS` or `INGRESS_RECONCILE_GRACE_MS` that is not a non-negative integer of at most 36500 days; on SQLite a larger grace window acted on fresh rows.
+- The startup banner names the bootstrap key file's actual path instead of `data/.api-key` or the dashboard, which never shows a full key.
+- The production warning for a missing `API_KEY_PEPPER` says to set it before the first boot and names the two recoveries, instead of advising a key re-issue that a new pepper makes impossible.
+- A plugin manifest whose ingress route has no `signature`, an unknown signature scheme or an encoding other than `hex` or `base64` is refused when it loads, naming the route, instead of loading and rejecting every delivery.
+- A sandboxed plugin whose `onConfigChange` throws synchronously has the error logged instead of its worker crashing and the plugin landing in `ERROR`.
+- A plugin registry that cannot be read is moved aside to `registry.json.corrupt-<ms>` at boot instead of being overwritten, which lost every plugin's config, secrets and enable state.
+- Saving a built-in engine plugin's config with `PUT /api/plugins/:id/config` stores only the keys it sets, instead of every environment-derived engine setting, which then ignored later `.env` changes.
+- MCP: `LabelUpsert` is marked destructive, so clients that auto-approve non-destructive tools ask before it replaces a label.
+- Helm chart: the pod no longer gets Kubernetes service-link variables, so a Service named `redis` or `database` in the namespace no longer fails boot validation on `REDIS_PORT` or `DATABASE_PORT`.
+- Helm chart: the install notes warn when an ingress without TLS would serve a blank dashboard and name `ingress.tls` or `env.CSP_UPGRADE_INSECURE_REQUESTS="false"` as the fix, and `values.yaml` notes the same opt-out.
 - whatsapp-web.js: group info returns `createdAt` as Unix seconds instead of an ISO date string, which the Go and Java SDKs could not decode, and reports `isAnnounce`, with `isReadOnly` true only when the group is announce-only and the account is not an admin.
 - whatsapp-web.js: a stop and start during stuck-login recovery no longer races the removal of the session's browser profile.
 - whatsapp-web.js: a send whose retry to a lid address hits a dead browser page reports the session disconnected, as the first attempt does.
+- whatsapp-web.js: `message.revoked` names the peer or group as `chatId` when the account deletes its own message in a lid chat or group, instead of the account's own lid.
+- whatsapp-web.js: mute, unmute, pin and unpin answer `503` and report the session disconnected when the page dies or times out during the write, instead of `500`.
+- whatsapp-web.js: revoking a group invite code without admin rights answers `403`, and approving or rejecting membership requests for an unknown or non-group id answers `404`, instead of `500`.
+- whatsapp-web.js: a stop, delete or force-kill while the session is still launching no longer marks it `failed`, sends a failed status webhook or runs the `session:error` hook.
+- whatsapp-web.js: a session waiting for operator action (`action_required`) no longer returns to `ready` on its own after a page reload.
+- whatsapp-web.js: a `STATUS_MEDIA_MAX_BYTES` above `MEDIA_DOWNLOAD_MAX_BYTES` no longer raises the status media download cap, per item or in total, above it.
 - Baileys: with `STORE_EPHEMERAL_MESSAGES=false`, product, poll, contact, live-location, order and event messages in a disappearing chat are skipped like the chat's other messages instead of being stored and dispatched.
 - Baileys: deleting or editing a message from a contact known by both phone number and lid updates the chat preview in `GET /api/sessions/:sessionId/chats`.
-- Baileys: a send whose socket a session stop or logout tears down before it reaches WhatsApp, during a media fetch, quote lookup or lid resolution, answers `409` instead of `500` and no longer counts toward the send breaker.
+- Baileys: a send interrupted by a session stop or logout answers `409` instead of `500` and no longer counts toward the send breaker.
 - Baileys: link previews follow redirects, so bare-domain, `http://` and short links get one, and their titles and descriptions are no longer cut at an apostrophe or quote.
-- Dashboard Chats: reopening a chat after switching sessions or leaving the Chats page shows the messages that arrived meanwhile.
+- Baileys: API sends no longer go out as disappearing messages after the chat turns them off, and follow a changed timer at once.
+- Baileys: a contact's `profilePicUrl` is no longer the picture-change marker `changed` or `removed`; only a URL is reported.
+- Baileys: a profile-picture lookup whose connection drops answers `503` instead of `200` with a null `url`.
+- Baileys: a WhatsApp refusal on the catalog routes answers `403` instead of `500`, an account without a catalog gets the documented empty answer, and a refused product lookup in `send-product` no longer counts toward the send breaker.
+- Baileys: a group, channel or catalog call that WhatsApp rate-limits or times out answers `503` instead of a `403` permissions error, except a timed-out group or channel create, which may have succeeded and so is not answered with a retryable `503`.
+- Baileys: a call-link request WhatsApp never answers gets `503` instead of `500`; a retry can create a second link.
+- Dashboard Chats: reopening a chat after switching sessions or leaving the Chats page shows the messages that arrived meanwhile, also when the live event feed is unavailable.
 - Dashboard Chats: a chat marked unread shows an unread badge in the sidebar and keeps it when a new message arrives.
-- Dashboard Chats: sending text while a picked file is still loading no longer discards the file.
+- Dashboard Chats: sending while a picked file is still loading no longer discards the file or sends the file it replaced.
 - Dashboard Chats: a document sent by URL opens in a new tab instead of navigating the dashboard away.
 - Dashboard Chats: a channel search with no match shows an empty-state message instead of a blank list.
-- Dashboard Chats: a search hit in the chat already open scrolls to the message at once, and a hit whose chat is not in the session's list no longer opens that chat later on its own.
+- Dashboard Chats: a search hit in the chat already open scrolls to the message at once, a hit whose chat is not in the session's list no longer opens that chat later on its own, leaving a chat opened from a hit while it loads no longer reopens it, and a hit in another session opens its chat when the same chat was open in the current one.
 - Dashboard Chats: keys that cannot search messages are no longer offered message search, and the search's load-more button reads `Show more (N of M)`.
 - Dashboard: a long incoming message full of unmatched `*`, `_` or `~` markers no longer freezes the chat view.
-- Dashboard Status: the recipient picker lists every contact instead of the first 1000, and an image over 18 MiB is refused before upload.
+- Dashboard Status: the recipient picker lists every contact instead of the first 1000, or shows a load error when the gateway keeps throttling the list, and an image over 18 MiB is refused before upload without posting an earlier pick.
+- Dashboard Status: a picked image is posted with its own type, such as PNG or WebP, instead of as `image/jpeg`.
 - Dashboard: the home page offers Disconnect for every session with a running engine, as the Sessions page does.
 - Dashboard Webhooks: removing a filter condition no longer moves its unsent chip text into the next condition.
 - Dashboard Webhooks: testing one webhook no longer re-enables another's Test button mid-flight, and a double click on the delete confirm sends one request.
-- Dashboard Sessions: a late auto-reject toggle or proxy save answer no longer changes, closes or locks another session's modal.
-- Dashboard Audit Logs: the table no longer ends in an empty column, the search box keeps focus while typing on a later page, the severity badge is translated, and a severity filter that matches nothing says no logs were found.
+- Dashboard Sessions: a late auto-reject toggle or proxy save answer no longer changes, closes or locks another session's modal, and a toggle stays locked while its own save is pending, also after its modal is reopened.
+- Dashboard Sessions: a refused create's error banner clears once a later create succeeds, an older list read no longer turns a just-started session back to Start, and a double click on the delete or force-kill confirm sends one request.
+- Dashboard Audit Logs: the table no longer ends in an empty column, the search box keeps focus while typing on a later page, the severity badge is translated, a severity filter that matches nothing says no logs were found, a failed load no longer also says no logs exist, and the search is trimmed before it filters the table and the CSV export.
 - Dashboard Message Tester: Send stays disabled while a bulk batch cancel is in flight, so a new batch keeps its progress panel, and an email column in an uploaded CSV no longer becomes recipients.
 - Dashboard Plugins: the Catalog tab shows a failed load with Refresh instead of an empty catalog, and refreshes its Installed and update state after a `.zip` install or an uninstall.
 - Dashboard Plugins: a config schema without `properties` no longer crashes the page, and a config editor that fails to start no longer points to a schema form that is not shown.
-- Dashboard Templates: the first-load spinner is centered, a search with no match says so, and deleting the selected session elsewhere moves the page to another session.
+- Dashboard Templates: the first-load spinner is centered and shows until the first session's templates load instead of a brief No templates saved, a search with no match says so, and deleting the selected session elsewhere moves the page to another session.
 - Dashboard Infrastructure: the Browser Arguments placeholder shows the four-flag default.
 - Dashboard: the theme button cycles Light, Dark and System, so following the OS color scheme can be picked again.
 - Dashboard: Hebrew and Arabic text renders in the Heebo and Noto Sans Arabic fonts, and the login form aligns right in both; the body font and a selector that never matched overrode them.
@@ -254,13 +313,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard: a lazy page chunk that keeps failing to load shows the error instead of reloading the page endlessly.
 - Dashboard: closing a parent dialog before its nested one no longer leaves the page unable to scroll.
 - Dashboard: a remote `ws://` `VITE_WS_URL` logs the same insecure-transport warning as a remote `http://` URL.
+- Dashboard: in Hebrew and Arabic, the closed mobile sidebar no longer covers the page, the collapse chevron points the right way, and at exactly 768 px wide the content no longer slides under the sidebar.
+- Dashboard: in Hebrew and Arabic, the API key table headers, the Chats pane divider and quote and reply bars, the Templates column dividers and the Sessions pairing steps and error values sit on the correct side.
+- Dashboard: dark-mode error text on error-tinted pills and buttons meets WCAG AA contrast.
+- Dashboard: the Infrastructure database card says migrations run at startup instead of claiming the schema is auto-synchronized, the Redis settings list what Redis backs instead of session storage, and a plugin save no longer asks for a server restart.
+- Dashboard: the login page reports a gateway or proxy outage, such as a `502` during a restart, as a connection error instead of an invalid API key.
+- Dashboard: the home page colors every session status pill and no longer shows 0 Webhooks Configured while the webhook list loads.
+- Dashboard: global search no longer lists a hit twice when messages are indexed between pages.
+- Dashboard Chats: switching to a chat that is not cached opens it at the newest message instead of the oldest, and a message deleted for everyone no longer stays as its chat's preview.
+- Dashboard Chats: a channel post that holds only media shows the Media unavailable placeholder instead of an empty bubble.
+- Dashboard Webhooks: a create, save or delete dialog stays open until its request finishes, so a slow request no longer clears another webhook's draft, and the Status toggle shows keyboard focus.
+- Dashboard API Keys: the create dialog cannot be closed while the key is being created, so its one-time secret is no longer lost.
+- Dashboard Message Tester: a single send keeps Send disabled until a media URL is a full `http` or `https` address and every field is within the gateway's limits, and sends the URL trimmed.
+- Dashboard Plugins: number fields with a minimum or maximum accept fractional values, and a card's buttons stay disabled while its own action runs when another plugin's finishes first.
+- Dashboard Infrastructure: a save no longer warns of a database switch when the external PostgreSQL host, port or name came from the environment, and Save with Restart Later shows the pending-restart note at once.
 - Java SDK (next SDK release after 0.5.0): `health.ready()` no longer fails with `Non-JSON response` against a healthy gateway; `HealthReadyDetails` holds `DependencyStatus` records.
 - Java SDK (next SDK release after 0.5.0): `ClientConfig` copies `defaultHeaders` when built and rejects a null header name or value with `IllegalArgumentException`.
 - Go SDK (next SDK release after 0.5.0): a timeout while reading a response body is a `*TimeoutError`, and one caused by the caller's context deadline no longer names the client timeout.
 - Go SDK (next SDK release after 0.5.0): `&WebhookFilters{}` sends `{"conditions":[]}` instead of `{"conditions":null}`, which the gateway refused with `400`.
 - JavaScript SDK (next SDK release after 0.5.0): the package entry exports the list query types (`ListSessionsQuery`, `ListChatsQuery`, `ListContactsQuery`, `ListGroupsQuery`, `WebhookListQuery`, `DeliveryFailureQuery`) and `encodeSegment`.
-- Python SDK (next SDK release after 0.5.0): `client.request()` keeps a query string written in the path when `query=` is also given, and `ChatSummary.timestamp` is typed `int`, as the gateway sends it.
-- PHP SDK (next SDK release after 0.5.0): `catalog->info()` and `catalog->product()` return `null` on an empty `200`, when there is no catalog or no such product, instead of throwing a `TypeError`.
+- Python SDK (next SDK release after 0.5.0): `ChatSummary.timestamp` is typed `int`, as the gateway sends it, and the SDK requires httpx 0.27.1 or newer, since older releases sent a `%` in a query value unescaped.
+- All five SDKs (next SDK release after 0.5.0): a raw request keeps a query string written in the path when query values are also given; the JavaScript, Go and Java SDKs sent a second `?` and the PHP SDK dropped the path's query.
+- SDKs (next SDK release after 0.5.0): a catalog info or product read returns `null` on the gateway's empty `200`, when there is no catalog or no such product. The PHP SDK threw a `TypeError` there, the Go SDK returned a zero-valued record, and the JavaScript and Python SDKs now type both reads as nullable.
+- SDKs (next SDK release after 0.5.0): batch cancel returns `BatchCancelResponse` (`batchId`, `status`, `progress`) in the JavaScript, Python, Go and Java SDKs instead of `BatchStatusResponse`, whose `results` the route never sends.
+- JavaScript SDK (next SDK release after 0.5.0): a timeout while reading an error response body rejects with `OpenWATimeoutError` instead of an `OpenWAApiError` with an empty body, and a per-request header replaces a default header whose name differs only in case.
+- Go SDK (next SDK release after 0.5.0): `Channels.Create`, `Channels.Delete`, `Channels.Mute`, `Chats.SubscribePresence`, `Groups.JoinInfo`, `Labels.Upsert` and `Labels.Delete` return a nil result with an error instead of a zero-valued one.
 
 ### Documentation
 
