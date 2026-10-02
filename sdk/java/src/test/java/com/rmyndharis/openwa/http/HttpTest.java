@@ -66,6 +66,14 @@ class HttpTest {
     }
 
     @Test
+    void buildUrlAppendsQueryToPathThatAlreadyHasOne() {
+        // A second "?" would fold the query into the last value of the path's own query string.
+        assertEquals(
+            "http://h/m?a=1&limit=50",
+            Http.buildUrl("http://h", "/m?a=1", new Query(null, 50, null), gson));
+    }
+
+    @Test
     void mergeHeadersAuthAndJsonWin() {
         Map<String, String> defaults = new LinkedHashMap<>();
         defaults.put("Content-Type", "text/plain");

@@ -63,7 +63,7 @@ public final class Http {
             qs.add(encodeQuery(e.getKey()) + "=" + encodeQuery(value));
         }
         String q = qs.toString();
-        return q.isEmpty() ? url : url + "?" + q;
+        return q.isEmpty() ? url : url + (url.contains("?") ? "&" : "?") + q;
     }
 
     private static String encodeQuery(String s) {
