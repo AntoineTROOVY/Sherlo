@@ -49,6 +49,16 @@ describe('getProfilePicture', () => {
     );
   });
 
+  it.each([
+    ['internal-server-error', 500],
+    ['service-unavailable', 503],
+  ])('reports a WhatsApp server error (%s) instead of "no picture"', async (text, code) => {
+    const profilePictureUrl = jest.fn().mockRejectedValue(new Boom(text, { data: code }));
+    await expect(contacts({ profilePictureUrl }, 500).getProfilePicture('628123@c.us')).rejects.toBeInstanceOf(
+      EngineTransportError,
+    );
+  });
+
   it('reports a connection that closed mid-lookup instead of "no picture"', async () => {
     const profilePictureUrl = jest.fn().mockRejectedValue(new Boom('Connection Closed', { statusCode: 428 }));
     await expect(contacts({ profilePictureUrl }, 500).getProfilePicture('628123@c.us')).rejects.toBeInstanceOf(

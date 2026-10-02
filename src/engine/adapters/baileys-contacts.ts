@@ -98,9 +98,9 @@ export class BaileysContacts {
       if (code === undefined) {
         throw new EngineTransportError('WhatsApp did not answer the profile picture lookup');
       }
-      // A rate limit or server timeout (408/429) is not a verdict about the picture either.
-      if (code === 408 || code === 429) {
-        throw new EngineTransportError(`WhatsApp rate-limited or timed out the profile picture lookup (code ${code})`);
+      // A rate limit, server timeout (408/429) or server error (5xx) is not a verdict about the picture either.
+      if (code === 408 || code === 429 || code >= 500) {
+        throw new EngineTransportError(`WhatsApp could not answer the profile picture lookup (code ${code})`);
       }
       this.host.logger.debug('profilePictureUrl failed; no picture or hidden', {
         contactId,
