@@ -516,7 +516,8 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     this.markStopping(id);
     try {
       if (this.ownership) await this.assertNotHeldElsewhere(id);
-      await this.engineLifecycle.delete(id);
+      // A failed row read deleted nothing: the lifecycle drops the mark, and the count goes with it.
+      await this.engineLifecycle.delete(id, { onReadFailed: () => this.uncountStopRequest(id) });
       await this.ownership?.release(id);
       this.stopRequests.delete(id);
     } catch (error) {
@@ -655,15 +656,20 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     let session: Session;
     try {
       if (this.ownership) await this.assertNotHeldElsewhere(id);
-      // Recorded BEFORE the teardown, so the 502 SESSION_STOP_INCOMPLETE path keeps it too: a
-      // stopped session stays down across restarts and takeover until an explicit start. A failed
-      // write took nothing down, so the mark and count are undone as for a failed ownership read.
-      await this.keepDown(id).catch((error: unknown) => {
-        this.engineLifecycle.clearStopping(id);
-        this.uncountStopRequest(id);
-        throw error;
+      // Recorded once the row read succeeds and BEFORE the teardown, so the 502
+      // SESSION_STOP_INCOMPLETE path keeps it too: a stopped session stays down across restarts and
+      // takeover until an explicit start. A failed write took nothing down, so the mark and count are
+      // undone as for a failed ownership read; a failed read took nothing down either, and the
+      // lifecycle has already dropped the mark, so only the count is undone.
+      session = await this.engineLifecycle.stop(id, {
+        afterRead: () =>
+          this.keepDown(id).catch((error: unknown) => {
+            this.engineLifecycle.clearStopping(id);
+            this.uncountStopRequest(id);
+            throw error;
+          }),
+        onReadFailed: () => this.uncountStopRequest(id),
       });
-      session = await this.engineLifecycle.stop(id);
     } catch (error) {
       // Only the local 502 (SESSION_STOP_INCOMPLETE) releases: it evicted the engine and wrote
       // DISCONNECTED, and a claim left to lapse still names this node, so a peer's takeover sweep

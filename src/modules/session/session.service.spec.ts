@@ -1466,7 +1466,7 @@ describe('SessionService', () => {
 
         await call(service);
 
-        expect(lifecycleSpy).toHaveBeenCalledWith('sess-uuid-1');
+        expect(lifecycleSpy).toHaveBeenCalledWith('sess-uuid-1', expect.any(Object));
       },
     );
 
@@ -1687,6 +1687,12 @@ describe('SessionService', () => {
       (repository.findOne as jest.Mock).mockRejectedValueOnce(new Error('Connection terminated unexpectedly'));
       await expect(call(service)).rejects.toThrow('Connection terminated unexpectedly');
       expect(internals.stoppingSessions.has('sess-uuid-1')).toBe(false);
+      // Nothing was taken down, so no stop is recorded for the next boot and no request stays counted.
+      expect((repository.update as jest.Mock).mock.calls).not.toContainEqual([
+        'sess-uuid-1',
+        { desiredState: 'stopped' },
+      ]);
+      expect((service as unknown as { stopRequests: Map<string, number> }).stopRequests.has('sess-uuid-1')).toBe(false);
 
       callbacks.onDisconnected?.('socket closed');
       await new Promise(resolve => setImmediate(resolve));
@@ -8130,17 +8136,23 @@ describe('SessionService', () => {
     });
 
     it('stop() records the stop before tearing down', async () => {
-      const stop = jest.spyOn(lifecycle, 'stop').mockResolvedValue(createMockSession());
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      await service.start('sess-uuid-1');
 
       await service.stop('sess-uuid-1');
 
-      expect(repository.update).toHaveBeenCalledWith('sess-uuid-1', STOPPED);
-      const writeOrder = (repository.update as jest.Mock).mock.invocationCallOrder[0];
-      expect(writeOrder).toBeLessThan(stop.mock.invocationCallOrder[0]);
+      const at = updates().findIndex(([, patch]) => (patch as { desiredState?: unknown }).desiredState === 'stopped');
+      expect(at).toBeGreaterThanOrEqual(0);
+      expect((repository.update as jest.Mock).mock.invocationCallOrder[at]).toBeLessThan(
+        mockEngine.disconnect.mock.invocationCallOrder[0],
+      );
     });
 
     it('stop() keeps the record on the 502 SESSION_STOP_INCOMPLETE path', async () => {
-      jest.spyOn(lifecycle, 'stop').mockRejectedValue(new BadGatewayException({ code: 'SESSION_STOP_INCOMPLETE' }));
+      jest.spyOn(lifecycle, 'stop').mockImplementation(async (_id, hooks) => {
+        await hooks?.afterRead?.();
+        throw new BadGatewayException({ code: 'SESSION_STOP_INCOMPLETE' });
+      });
 
       await expect(service.stop('sess-uuid-1')).rejects.toBeInstanceOf(BadGatewayException);
 
@@ -8156,15 +8168,18 @@ describe('SessionService', () => {
     });
 
     it('stop() whose record write fails takes nothing down and leaves no stop mark behind', async () => {
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      await service.start('sess-uuid-1');
       (repository.update as jest.Mock).mockRejectedValueOnce(new Error('db down'));
-      const stop = jest.spyOn(lifecycle, 'stop');
 
       await expect(service.stop('sess-uuid-1')).rejects.toThrow('db down');
 
-      expect(stop).not.toHaveBeenCalled();
+      expect(mockEngine.disconnect).not.toHaveBeenCalled();
+      expect(mockEngine.forceDestroy).not.toHaveBeenCalled();
       expect((lifecycle as unknown as { stoppingSessions: Set<string> }).stoppingSessions.has('sess-uuid-1')).toBe(
         false,
       );
+      expect((service as unknown as { stopRequests: Map<string, number> }).stopRequests.has('sess-uuid-1')).toBe(false);
     });
 
     it('forceKill() records the stop before the teardown; a "not started" refusal does not', async () => {
@@ -8292,7 +8307,10 @@ describe('SessionService', () => {
         (repository.update as jest.Mock).mockImplementation((...args: Parameters<Repository<Session>['update']>) =>
           sessions.update(...args),
         );
-        jest.spyOn(lifecycle, 'stop').mockResolvedValue(createMockSession());
+        jest.spyOn(lifecycle, 'stop').mockImplementation(async (_id, hooks) => {
+          await hooks?.afterRead?.();
+          return createMockSession();
+        });
         const engineStart = jest.spyOn(lifecycle, 'start').mockResolvedValue(createMockSession());
 
         await service.stop(stopped.id);
