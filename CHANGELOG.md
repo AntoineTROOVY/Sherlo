@@ -251,7 +251,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Channel delete and unsubscribe answer `404` for an id that is not a channel; on whatsapp-web.js they created a chat for it and failed with `500`.
 - Group and profile picture writes and media sends answer `400` for a non-string `base64` sent next to a `url`, and `send-template` for a non-string `templateId` or `templateName` sent next to the other, instead of `500`.
 - `POST /api/sessions/:sessionId/groups/join` trims whitespace around the invite code, as the join preview does.
-- A template name, body, header or footer, or an automation rule name or reply text, containing a NUL character is refused with `400`, and a `send-template` naming a template by such a name or id, or a `/templates/:id` route given such an id, answers `404`, instead of failing with `500` on PostgreSQL.
+- A request whose path or query string contains `%00` is refused with `400`, the unauthenticated ingress route included, instead of failing with `500` on PostgreSQL.
+- A request body or MCP tool input holding a NUL character is refused with `400` instead of failing with `500` on PostgreSQL; `POST /api/infra/import-data` still accepts a backup holding one.
+- On PostgreSQL, a NUL character in received message text, a status, an archived media type or a dead-letter error is dropped when stored instead of failing the write, so a history sync no longer loses the rest of its batch.
+- An ingress delivery whose plugin error holds a NUL character is dead-lettered on PostgreSQL instead of being re-queued or replayed without end.
 - A replica that starts while Redis is unreachable subscribes to cross-replica WebSocket events once Redis returns, instead of missing them until a restart.
 - Status media received without a type is served as `application/octet-stream` instead of answering `404` on the `mediaUrl` it was advertised with.
 - SQLite search no longer returns other messages after `DATABASE_SYNCHRONIZE=true` rebuilt the messages table; the next boot rebuilds the search index.
@@ -481,6 +484,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⚠️ **Breaking (API).** A group create or participant add naming more new contacts than a whole day's cold-reachout allowance gets `400` without `retryAfterSeconds` instead of `429`; split the batch.
 - ⚠️ **Breaking (API).** Media conversion answers `503` instead of `400` when ffmpeg cannot be started, and on Baileys a rate-limited or timed-out group, channel or catalog call answers `503` instead of `403`, except a group or channel create that WhatsApp times out (code 408), which may have succeeded and answers `500` instead of `403`; a profile-picture lookup whose connection drops, or that WhatsApp rate-limits or times out (code 429 or 408), answers `503` instead of `200` with a null `url`; a client that branched on the old code needs updating.
 - Media conversion on a source install needs ffmpeg 4.4 or newer: an older binary fails every video conversion with `400`.
+- A NUL character is now refused with `400` in a request path, query, body or MCP tool input, and dropped from received message text, statuses and dead-letter errors when stored, on SQLite as well as PostgreSQL.
 - ⚠️ **Breaking (API).** `POST /api/sessions` refuses an out-of-range or mistyped `config.maxReconnectAttempts`, `config.reconnectBaseDelay` or `config.autoRejectCalls` with `400` instead of storing it; a string such as `"true"` or `"5"` is still accepted and stored typed.
 - `PATCH /api/sessions/:sessionId/config` answers `409` when concurrent updates to the same session keep conflicting; retry it.
 - ⚠️ **Breaking (API).** API key create and update refuse with `400` an `expiresAt` that is valid ISO 8601 but not a date the gateway can read, such as the week form `2026-W40-1`, and a key already stored with such an expiry is treated as expired; give it a new expiry with `PUT /api/auth/api-keys/:id`.
