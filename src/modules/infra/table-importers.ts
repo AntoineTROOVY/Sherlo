@@ -69,7 +69,8 @@ function decodeJsonColumn(value: unknown): unknown {
 
 // The entity columns that drop U+0000 do it in a TypeORM transformer, which raw SQL never runs. An
 // older SQLite backup may still hold one, and PostgreSQL refuses it in a bound parameter, failing the
-// whole restore. Apply the same drop here, to those same free-text columns only, never to an id.
+// whole restore. Apply the same drop here, to those same free-text columns and to the template and
+// rule text the DTOs only refuse from 0.24.0 on; never to an id or a lookup key such as a template name.
 function nulFree(value: unknown): unknown {
   return NulFreeTransformer.to(value);
 }
@@ -230,9 +231,9 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       tpl.id,
       tpl.sessionId,
       tpl.name,
-      tpl.body,
-      tpl.header ?? null,
-      tpl.footer ?? null,
+      nulFree(tpl.body),
+      nulFree(tpl.header ?? null),
+      nulFree(tpl.footer ?? null),
       tpl.createdAt,
       tpl.updatedAt,
     ],
@@ -464,10 +465,10 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
     map: (rule: AutomationRuleRow) => [
       rule.id,
       rule.sessionId,
-      rule.name,
+      nulFree(rule.name),
       rule.enabled ?? true,
       rule.conditions ?? null,
-      rule.replyText,
+      nulFree(rule.replyText),
       rule.cooldownSeconds ?? 60,
       rule.createdAt,
       rule.updatedAt,
