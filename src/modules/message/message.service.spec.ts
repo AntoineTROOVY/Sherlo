@@ -71,7 +71,7 @@ describe('MessageService', () => {
   let hookManager: jest.Mocked<Partial<HookManager>>;
   let lidMappingStore: { findLidsForPhone: jest.Mock; findPhoneForLid: jest.Mock };
   let mockEngine: ReturnType<typeof createMockEngine>;
-  let pacing: SendPacingService;
+  let pacing: { assertSendAllowed: jest.Mock };
 
   beforeEach(async () => {
     repository = {
@@ -859,7 +859,7 @@ describe('MessageService', () => {
     it('checks an edit against the pacing caps without holding it', async () => {
       await service.editMessage('sess-1', { chatId: 'test@c.us', messageId: 'wa-msg-1', body: 'edited' });
 
-      expect(jest.mocked(pacing.assertSendAllowed)).toHaveBeenCalledWith('sess-1', 'test@c.us', { hold: false });
+      expect(pacing.assertSendAllowed).toHaveBeenCalledWith('sess-1', 'test@c.us', { hold: false });
     });
 
     it('lets a plugin block an edit before the engine is called', async () => {
