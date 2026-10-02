@@ -58,9 +58,12 @@ does not recognise to `null` (`MessageType` and `ChatKind` included), and
 `SessionStatus`, `DeliveryStatus` and the other response enums that lack an
 `unknown` wire value have no `UNKNOWN` constant there.
 The refusal of an empty, `.` or `..` id (and, in the JavaScript, Go and Java
-raw-request methods, of a `.` or `..` path segment) and the PHP
-`sessions->create()` fix that sends an empty `config` as `{}` are not in 0.5.0
-either; they ship with the next SDK release.
+raw-request methods, of a `.` or `..` path segment), the PHP
+`sessions->create()` fix that sends an empty `config` as `{}`, the PHP
+`allowInsecureHttp` option (0.5.0 always raises an `E_USER_WARNING` for a
+non-local `http://` `baseUrl`) and the `null` return of PHP `catalog->info()`
+and `catalog->product()` for a missing catalog or product (0.5.0 throws a
+`TypeError`) are not in 0.5.0 either; they ship with the next SDK release.
 Nor is the `name` filter on `sessions.list` (`ListSessionsQuery.Name` in Go,
 the `name` field of `ListSessionsQuery` in Java, JavaScript and Python); it
 ships with the next SDK release.
