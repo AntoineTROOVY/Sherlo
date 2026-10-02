@@ -506,15 +506,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The MinIO container that Dashboard > Infrastructure creates for built-in storage no longer publishes ports 9000 and 9001 on the host's `127.0.0.1`; OpenWA reaches it over the Docker network.
 - Release images on GHCR and Docker Hub carry a signed build provenance attestation from the release workflow; verify one with `gh attestation verify oci://ghcr.io/rmyndharis/openwa:<version> --repo rmyndharis/OpenWA --signer-workflow rmyndharis/OpenWA/.github/workflows/release.yml --source-ref refs/tags/v<version>`.
 - `linux/arm64` image: the release image scan no longer fails on 14 Chromium CVEs fixed upstream in 154.0.8037.57, which the image already runs as Debian's `154.0.8037.57-1~deb12u1` rebuild that the scanner ranks below the recorded fix. They are listed in `.trivyignore` until bookworm-security publishes a newer build.
-- `linux/amd64` image: 6 `libexpat1` CVEs are accepted in the release image scan until bookworm-security publishes the fixed `2.5.0-1+deb12u4` for amd64, as it has for arm64.
 - Image: CVE-2026-102276 and CVE-2026-102278 (`brace-expansion` 5.0.9) and CVE-2026-19534 (`undici` 6.28.0) in the npm CLI's own bundle are accepted in `.trivyignore` until npm ships fixed copies; npm is not on the request path, and the application tree already resolves the fixed versions.
 - whatsapp-web.js: a session whose stored proxy URL is not a supported `http`, `https`, `socks4` or `socks5` URL ends `failed` with the fix named, instead of starting without the proxy.
-- Baileys: unlinking a session no longer lets an in-flight chat-state write list the old account's chats, with their pin, mute or archive state, under the next linked account.
+- Baileys: unlinking a session no longer lets an in-flight chat-state write list the old account's chats, with their pin, mute or archive state, under the next linked account, or a message still being processed be stored after the unlink cleared the message store.
 - Deleting a session while one of its bulk batches runs no longer brings the batch row, with its recipients and texts, back as `CANCELLED`.
 - Chat media is served with its base type only, so a sender-declared type with parameters can no longer add a second type to `Content-Type` or fail the request with `500`.
-- Plugin install refuses a package whose entries repeat a path after normalization, so the manifest that loads is always the one that was validated.
-- Go SDK (next SDK release after 0.5.0): `Client.Do` refuses a path that does not start with `/`, which could send the request and its API key to another host, and request and retry logs redact a password in the base URL.
+- Plugin install refuses a package whose entries repeat a path after path normalization, Unicode normalization or case folding, so the manifest that loads is always the one that was validated, also on macOS and Windows file systems.
+- From the next SDK release after 0.5.0, the raw request methods of all five SDKs refuse a path that does not start with `/`, which could send the request and its API key to another host, and the Go SDK's request and retry logs redact a password in the base URL.
 - The JavaScript SDK release publishes the `dist/` its tests and smoke check ran against, instead of rebuilding it during `npm publish`.
+- Baileys: inbound media is downloaded only over `https` from WhatsApp hosts on the default port; a received message that points its media at any other address gets the omitted media marker instead of a fetch from the server.
+- The SSRF guard refuses a `64:ff9b` NAT64 address outside the `64:ff9b::/96` and `64:ff9b:1::/96` layouts, which could carry an internal IPv4 address past it.
+- A key restricted to selected chats is no longer admitted for an id with the same digits under another domain, such as `@bot`, and message reads and stored-chat purges for such an id no longer match the phone chat's rows.
+- An API key `expiresAt` that is valid ISO 8601 but does not parse as a date, such as `2026-W40-1`, is refused with `400` instead of being stored as an expiry that never arrives, and such a stored expiry counts as expired for authentication and the request-body budget.
+- The WebSocket gateway writes an `api_key_auth_failed` audit row when it refuses a key restricted to selected chats, or a key revoked, expired or refused by `allowedIps` after it connected.
+- When a different number scans a bound session's QR, the messages and history that account delivers before its logout completes are no longer stored or sent to webhooks under the session.
+- A plugin granted a host through `net.allowConfigHosts` reaches it only over `https` on the configured port, instead of over any scheme and port.
+- The plugin sandbox log relay caps log metadata and non-string messages at the 8192 characters it already allowed a string message.
+- A media conversion that ffmpeg refuses no longer names the server's temp directory in its `400` reason.
 
 ## [0.23.7] - 2026-09-25
 
