@@ -249,7 +249,8 @@ docker compose restart openwa-api
 Proxy egress (if WhatsApp is blocked on your network) is configured **per session** via the
 `proxyUrl` field on `POST /api/sessions` or with `PATCH /api/sessions/:sessionId/proxy`, both of
 which need an ADMIN key. It is **not** an environment variable, and an unreachable proxy silently
-blocks the WhatsApp WebSocket (see the _No QR code appears, or `/start` returns `504`_ entry below).
+blocks the WhatsApp WebSocket on either engine (see the _No QR code appears, or `/start` returns `504`_
+entry below: on whatsapp-web.js `/start` returns `504`, on Baileys it succeeds and no QR arrives).
 
 ### Issue: Linking asks for a passkey and never completes (both engines)
 
@@ -290,15 +291,17 @@ phone-number pairing example in `docs/examples/session-phone-number-pairing.md`.
 
 **Symptoms:**
 
-- `POST /api/sessions/:sessionId/start` returns `504 Gateway Timeout`
+- On whatsapp-web.js, `POST /api/sessions/:sessionId/start` returns `504 Gateway Timeout`
   (`WhatsApp Web authentication timed out...`)
+- On Baileys, `POST /api/sessions/:sessionId/start` succeeds and the session keeps retrying the connection
 - No QR code is ever produced — `GET /api/sessions/:sessionId/qr` never has one
-- Engine log shows `Session engine failed: auth timeout` after ~30s
+- On whatsapp-web.js, the engine log shows `Session engine failed: auth timeout` after ~30s
 
 **Cause:** The session was created with a `proxyUrl` that doesn't resolve to a real, reachable proxy
-(e.g. the `http://proxy.example.com:8080` placeholder copied from an example). The engine launches
-Chromium pinned to that proxy, the WhatsApp WebSocket can never connect, no QR is produced, and the
-auth poll times out.
+(e.g. the `http://proxy.example.com:8080` placeholder copied from an example). The engine sends its
+WhatsApp WebSocket through that proxy, so it can never connect and no QR is produced. On
+whatsapp-web.js, which launches Chromium pinned to the proxy, the auth poll then times out; Baileys
+keeps retrying the connection instead.
 
 **Fix:** Don't set a proxy unless your network actually requires one. Clear `proxyUrl` in place, or
 set it to a real, reachable proxy server the same way, with an ADMIN key. The change applies on the
@@ -312,7 +315,7 @@ curl -X POST "$BASE/api/sessions/{sessionId}/stop" -H "X-API-Key: $API_KEY"
 curl -X POST "$BASE/api/sessions/{sessionId}/start" -H "X-API-Key: $API_KEY"
 ```
 
-> ℹ️ Proxy egress for the `whatsapp-web.js` engine is configured **per session** via the
+> ℹ️ Proxy egress, on either engine, is configured **per session** via the
 > `proxyUrl` field on `POST /api/sessions` or `PATCH /api/sessions/:sessionId/proxy` (ADMIN key for
 > both), not via environment variables.
 
