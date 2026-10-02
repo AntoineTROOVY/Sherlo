@@ -70,7 +70,10 @@ export class StopMarks extends Set<string> {
 export interface StopHooks {
   /** stop() only: runs once the session read succeeds and before any teardown; records the stop. */
   afterRead?: () => Promise<void>;
-  /** Runs when the session read fails, after the stop mark is dropped: undoes the caller's request count. */
+  /**
+   * Runs when the first session read fails (for stop() and delete(), after the stop mark is dropped):
+   * undoes the caller's request count.
+   */
   onReadFailed?: () => void;
   /** forceKill() only: runs synchronously once there is an engine to kill; records the stop request. */
   onEngineFound?: () => void;
