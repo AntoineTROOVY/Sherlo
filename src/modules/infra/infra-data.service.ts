@@ -586,11 +586,20 @@ export class InfraDataService {
     // An archive with no rows is always refused (see the totalRestored check below), so refuse it here,
     // before the orphan pre-flight: with no sessions in it every running engine reads as an orphan, and
     // a stopOrphans retry would tear all of them down for a restore that was never going to happen.
-    if (TABLE_IMPORTERS.every(importer => !data.tables[importer.key]?.length)) {
+    // A row a skip guard vetoes is just as certain a rollback (see the warnings gate below), and the
+    // guards read only the archived row, so run them here too. The in-transaction call stays as a backstop.
+    const refusals = TABLE_IMPORTERS.every(importer => !data.tables[importer.key]?.length)
+      ? [EMPTY_ARCHIVE_WARNING]
+      : TABLE_IMPORTERS.flatMap(importer =>
+          (data.tables[importer.key] ?? [])
+            .map(row => importer.skip?.(row as never))
+            .filter((warning): warning is string => warning != null),
+        );
+    if (refusals.length > 0) {
       return {
         imported: false,
         counts: Object.fromEntries(TABLE_IMPORTERS.map(importer => [importer.key, 0] as const)) as TableCounts,
-        warnings: [EMPTY_ARCHIVE_WARNING],
+        warnings: refusals,
         notices: [],
         restartRequired: false,
         orphanedEngines: [],

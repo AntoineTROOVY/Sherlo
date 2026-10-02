@@ -2467,6 +2467,32 @@ describe('InfraDataController.importData status_updates + runtime reconciliation
     expect(await ds.getRepository(Session).count()).toBe(1);
   });
 
+  it('refuses an archive holding a row the import would skip before stopOrphans tears down any engine', async () => {
+    // A skipped row always rolls the restore back, and the teardown cannot be undone with it.
+    await seedSession('s1');
+    const stopOrphanEngines = jest.fn().mockResolvedValue({ stopped: ['ghost'], notRunning: [], failed: [] });
+    const controller = build({
+      sessionService: { getActiveSessionIds: () => ['ghost'], stopOrphanEngines },
+    });
+    const dump = await controller.exportData();
+    const filters = { conditions: [{ field: 'type', operator: 'is', value: ['text'], negate: true }] };
+
+    const res = await controller.importData({
+      tables: {
+        ...dump.tables,
+        webhooks: [{ id: 'wh1', sessionId: 's1', url: 'https://example.com/hook', events: [], filters }] as never,
+      },
+      stopOrphans: true,
+    });
+
+    expect(res.imported).toBe(false);
+    expect(res.warnings).toEqual([expect.stringContaining('Skipped webhook wh1')]);
+    expect(stopOrphanEngines).not.toHaveBeenCalled();
+    expect(res.stoppedOrphanEngines).toEqual([]);
+    expect(res.orphanedEngines).toEqual([]);
+    expect(await ds.getRepository(Session).count()).toBe(1);
+  });
+
   it('still reports the engines it already stopped when the import rolls back', async () => {
     // The pre-flight teardown runs BEFORE the transaction opens and cannot be rolled back with it.
     // An operator reading imported:false plus empty orphan arrays would conclude nothing happened,
@@ -2763,8 +2789,8 @@ describe('InfraDataController.importData rejects a malformed table value', () =>
   // the guard hardening into refusing shapes the endpoint supports: an absent table (a partial
   // archive) and an empty one (a table that legitimately has no rows).
   it.each([
-    ['omits a table', { sessions: [{ id: 's1' }] }],
-    ['carries an empty table', { sessions: [{ id: 's1' }], messages: [] }],
+    ['omits a table', { sessions: [{ id: 's1', name: 's1' }] }],
+    ['carries an empty table', { sessions: [{ id: 's1', name: 's1' }], messages: [] }],
   ])('does not reject an archive that %s', async (_label, tables) => {
     await expect(controller().importData({ tables } as never)).rejects.not.toThrow(/must be an array/);
   });
