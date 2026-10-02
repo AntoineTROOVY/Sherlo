@@ -532,4 +532,31 @@ describe('PluginLoaderService — sandbox log relay bounds', () => {
     });
     expect(logSpy).toHaveBeenNthCalledWith(2, '[p1] small', { n: 1, pluginId: 'p1' });
   });
+
+  it('keeps the error text of a worker error log whose meta is oversized or not serializable', async () => {
+    // logger.error's reason travels as meta.error, and the host error call gets no trace argument.
+    const loader = makeLoader();
+    seed(loader, { builtIn: false, instance: null });
+    await loader.enablePlugin('p1');
+    const errorSpy = jest
+      .spyOn((loader as unknown as { logger: { error: jest.Mock } }).logger, 'error')
+      .mockImplementation(() => undefined);
+
+    loader.capturedOnLog!('error', 'big', { data: 'x'.repeat(20000), error: 'boom' });
+    loader.capturedOnLog!('error', 'bigint', { n: 1n, error: 'boom' });
+    loader.capturedOnLog!('error', 'long', { error: 'e'.repeat(10000) });
+    loader.capturedOnLog!('error', 'nullmeta', null as unknown as Record<string, unknown>);
+
+    expect(errorSpy).toHaveBeenNthCalledWith(1, '[p1] big', 'undefined', {
+      error: 'boom',
+      metaTruncated: true,
+      metaLength: 20026,
+      pluginId: 'p1',
+    });
+    expect(errorSpy).toHaveBeenNthCalledWith(2, '[p1] bigint', 'undefined', { error: 'boom', pluginId: 'p1' });
+    const longMeta = errorSpy.mock.calls[2][2] as { error: string; metaTruncated: boolean };
+    expect(longMeta.metaTruncated).toBe(true);
+    expect(longMeta.error).toBe(`${'e'.repeat(8192)}…[truncated]`);
+    expect(errorSpy).toHaveBeenNthCalledWith(4, '[p1] nullmeta', 'undefined', { pluginId: 'p1' });
+  });
 });
