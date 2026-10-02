@@ -128,17 +128,11 @@ export class InfraConfigController {
     // while the process actually runs baileys/postgres (#1313). isEnvPinned's boot snapshot excludes
     // file-sourced keys, so a value that only ever lived in data/.env.generated is NOT pinned and the
     // freshly-saved file still wins over process.env's stale boot-time copy — keeping the
-    // "saved, pending restart" form state intact until the reboot applies it (#226/#1082). The blank
-    // rule is the same one the save guard's bootValue applies: a blank counts as unset only for the
-    // blank-forwarded keys boot's clearBlankEnv clears; elsewhere the runtime reads the blank as-is
-    // (configuration.ts's `=== 'true'` checks), so the read must not fall through to the file there.
-    const effective = (key: string): string | undefined => {
-      const envValue = isEnvPinned(key) ? process.env[key] : undefined;
-      if (envValue !== undefined && (envValue.trim() !== '' || !BLANK_SHADOWED_ENV_KEYS.includes(key))) {
-        return envValue;
-      }
-      return saved[key];
-    };
+    // "saved, pending restart" form state intact until the reboot applies it (#226/#1082). A pinned
+    // blank is read as-is: boot's clearBlankEnv drops blank host forwards before the snapshot, so a
+    // blank that is still pinned is a `KEY=` line in ./.env, which the file can never fill at boot.
+    const effective = (key: string): string | undefined =>
+      (isEnvPinned(key) ? process.env[key] : undefined) ?? saved[key];
 
     // Secrets (passwords, S3 keys) are never returned; the form shows a "set" indicator
     // and an empty submission preserves the stored value (see saveConfig). This lets
@@ -309,8 +303,10 @@ export class InfraConfigController {
     // loads with dotenv override:false, so a value supplied via the container environment
     // (compose `environment:`) wins over this file — the precedence the file header documents.
     // Without that, a deployment providing DATABASE_PASSWORD & co. through the environment is
-    // refused on EVERY save even though its boot passes the guard. A blank compose-forwarded
-    // value counts as unset exactly like clearBlankEnv treats it at boot.
+    // refused on EVERY save even though its boot passes the guard. A pinned blank is kept as-is:
+    // clearBlankEnv drops blank host forwards before either snapshot, so a blank that is still
+    // pinned is a `KEY=` line in ./.env, and boot keeps it. Only without a snapshot (a process that
+    // never ran load-env) does a blank on a blank-forwarded key count as unset, as clearBlankEnv would.
     //
     // Only a key from a layer ABOVE the file may win: the host, or the project .env, which load-env
     // also loads ahead of data/.env.generated with override:false. load-env merges the generated
@@ -321,7 +317,8 @@ export class InfraConfigController {
     // snapshot is taken before that file loads; isOsProvidedEnv keeps the no-snapshot default of
     // assuming an override.
     const bootValue = (key: string): string | undefined => {
-      const envValue = isEnvPinned(key) || isOsProvidedEnv(key) ? process.env[key] : undefined;
+      if (isEnvPinned(key) && process.env[key] !== undefined) return process.env[key];
+      const envValue = isOsProvidedEnv(key) ? process.env[key] : undefined;
       if (envValue !== undefined && (envValue.trim() !== '' || !BLANK_SHADOWED_ENV_KEYS.includes(key))) {
         return envValue;
       }

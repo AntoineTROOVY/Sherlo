@@ -1073,6 +1073,34 @@ describe('InfraConfigController.saveConfig built-in/external mode flips and the 
           recordPinnedEnvKeys({});
         }
       });
+
+      it('a blank project .env line keeps the key blank at boot, so fresh S3 keys cannot satisfy the guard', () => {
+        // clearBlankEnv runs on the host env before either snapshot, so a pinned blank can only be a
+        // `KEY=` line in ./.env. dotenv keeps it, data/.env.generated cannot fill it, and the next
+        // production boot refuses the empty credentials: the save must be refused the same way.
+        recordOsEnvKeys({});
+        recordPinnedEnvKeys({ S3_ACCESS_KEY_ID: '', S3_SECRET_ACCESS_KEY: '' });
+        process.env.S3_ACCESS_KEY_ID = '';
+        process.env.S3_SECRET_ACCESS_KEY = '';
+        try {
+          expectRejected(
+            {
+              storage: {
+                type: 's3',
+                builtIn: false,
+                s3Bucket: 'b',
+                s3AccessKey: 'AKIAEXAMPLESTRONG1',
+                s3SecretKey: 'Sup3rSecretS3Key!',
+                s3Endpoint: 'https://s3.example.com',
+              },
+            },
+            'STORAGE_TYPE=local\n',
+            /S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY/,
+          );
+        } finally {
+          recordPinnedEnvKeys({});
+        }
+      });
     });
   });
 });
@@ -1216,15 +1244,16 @@ describe('InfraConfigController.getConfig reflects environment-pinned values (#1
     (fs.readFileSync as jest.Mock).mockReturnValue('');
   });
 
-  it('a blank pinned forward counts as unset, so the file value applies', () => {
-    // Compose renders `- KEY=${KEY:-}` as an empty value when the operator set nothing; boot's
-    // clearBlankEnv treats it as unset, and the read must agree or the blank would shadow the file.
+  it('a blank pinned value hides the file value, as it does at boot', () => {
+    // clearBlankEnv runs on the host env before the snapshot, so a pinned blank can only be an
+    // `ENGINE_TYPE=` line in ./.env. dotenv keeps it and data/.env.generated cannot fill it, so the
+    // runtime falls back to the default engine and the form must report that, not the file value.
     recordPinnedEnvKeys({ ENGINE_TYPE: '' });
     process.env.ENGINE_TYPE = '';
     (fs.existsSync as jest.Mock).mockReturnValue(true);
     (fs.readFileSync as jest.Mock).mockReturnValue('ENGINE_TYPE=baileys\n');
 
-    expect(newController().getConfig().engine.type).toBe('baileys');
+    expect(newController().getConfig().engine.type).toBe('whatsapp-web.js');
 
     (fs.existsSync as jest.Mock).mockReturnValue(false);
     (fs.readFileSync as jest.Mock).mockReturnValue('');
