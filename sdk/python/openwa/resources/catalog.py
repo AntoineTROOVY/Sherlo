@@ -30,6 +30,7 @@ class CatalogResource:
         self._http = http
 
     def info(self, session_id: str) -> CatalogInfo | None:
+        """Get catalog info, or None when the account has no catalog."""
         return self._http.request("GET", f"/api/sessions/{quote_segment(session_id)}/catalog")
 
     def products(
@@ -40,6 +41,7 @@ class CatalogResource:
         )
 
     def product(self, session_id: str, product_id: str) -> CatalogProduct | None:
+        """Get one product, or None when no product has that id."""
         return self._http.request(
             "GET", f"/api/sessions/{quote_segment(session_id)}/catalog/products/{quote_segment(product_id)}"
         )
