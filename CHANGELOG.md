@@ -146,8 +146,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Helm chart: the startup, liveness and readiness probes time out after 5 s instead of the kubelet's 1 s, and liveness allows 6 consecutive failures instead of 3, so a CPU-throttled pod is not restarted over a slow answer.
 - PHP SDK (next SDK release after 0.5.0): `sessions->create()` sends an empty `config` as `{}`; it sent `[]`, which the gateway rejected with `400`.
 - Java SDK (next SDK release after 0.5.0): a response enum value newer than the SDK decodes to the enum's `UNKNOWN` constant instead of `null`, except for `WebhookEvent`, `ProxyType` and `MessageDirection`, which requests also carry.
-- Dashboard Chats: a message that arrives as the chat list renders no longer triggers a refetch that discards its preview and unread count, and one that arrives while the list refreshes, such as after a reconnect, keeps them.
-- Dashboard Chats: the chat list refreshes after a WebSocket reconnect, and the open chat is marked read once the refreshed list loads.
 - Dashboard Plugins: the config editor frame and the uninstall toast use the localized plugin name.
 - Dashboard: the restart dialog shows the server's reason when a restart is refused, says the outcome is unknown when a reverse proxy answers `502`, `504` or `520` to `527` without a gateway error code, and lists built-in services that failed to start or stop instead of reloading over them; its progress bar follows the server's estimated restart time, its failure message no longer claims a 30-second wait, and leaving the page stops its polling and reload.
 - Dashboard: the WebSocket dials only the origin of `VITE_WS_URL`, else of `VITE_API_URL`, so a split-origin build reaches the API and a trailing slash or path no longer breaks live events.
@@ -238,7 +236,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A failed reconnect attempt no longer arms another attempt that tears down the next attempt's engine, which repeated until the session ended `failed`.
 - A failed write of an engine-reported session status, such as on a disconnect or when reconnects run out, is logged as a warning instead of raising an unhandled promise rejection.
 - `POST /api/infra/import-data` with `stopOrphans: true` refuses a backup with no rows before stopping any engine, where it stopped every running session first, and no longer lets a start still reading its session row launch an engine for a session the import removes.
-- Dashboard Infrastructure saves are no longer refused with `400` when external PostgreSQL or S3 credentials come from the project `.env` or use the legacy `S3_ACCESS_KEY` and `S3_SECRET_KEY` names, and the config read no longer reports those S3 credentials as unset.
+- Dashboard Infrastructure: saves are no longer refused with `400` when external PostgreSQL or S3 credentials come from the project `.env` or use the legacy `S3_ACCESS_KEY` and `S3_SECRET_KEY` names, and the config read no longer reports those S3 credentials as unset.
 - S3 requests time out against a store that accepts connections but never answers, after 5 s to connect or 30 s without data, and a bucket probe is abandoned after 10 s, so media reads and writes and `GET /api/infra/status` no longer hang and S3 recovers without a restart.
 - Outbound media archived from both the engine echo and the REST send at once no longer leaves a second copy in storage.
 - Lowering an automation rule's `cooldownSeconds` applies to a quiet period already running in a chat.
@@ -294,6 +292,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard Chats: a channel search with no match shows an empty-state message instead of a blank list.
 - Dashboard Chats: a search hit in the chat already open scrolls to the message at once, a hit whose chat is not in the session's list no longer opens that chat later on its own, leaving a chat opened from a hit while it loads no longer reopens it, and a hit in another session opens its chat when the same chat was open in the current one.
 - Dashboard Chats: keys that cannot search messages are no longer offered message search, and the search's load-more button reads `Show more (N of M)`.
+- Dashboard Chats: a message that arrives as the chat list renders no longer triggers a refetch that discards its preview and unread count, and one that arrives while the list refreshes, such as after a reconnect, keeps them.
+- Dashboard Chats: the chat list refreshes after a WebSocket reconnect, and the open chat is marked read once the refreshed list loads.
+- Dashboard Chats: switching to a chat that is not cached opens it at the newest message instead of the oldest, and a message deleted for everyone no longer stays as its chat's preview.
+- Dashboard Chats: a channel post that holds only media shows the Media unavailable placeholder instead of an empty bubble.
 - Dashboard: a long incoming message full of unmatched `*`, `_` or `~` markers no longer freezes the chat view.
 - Dashboard Status: the recipient picker lists every contact instead of the first 1000, or shows a load error when the gateway keeps throttling the list, and an image over 18 MiB is refused before upload without posting an earlier pick.
 - Dashboard Status: a picked image is posted with its own type, such as PNG or WebP, instead of as `image/jpeg`.
@@ -323,8 +325,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard: the login page reports a gateway or proxy outage, such as a `502` during a restart, as a connection error instead of an invalid API key.
 - Dashboard: the home page colors every session status pill and no longer shows 0 Webhooks Configured while the webhook list loads.
 - Dashboard: global search no longer lists a hit twice when messages are indexed between pages.
-- Dashboard Chats: switching to a chat that is not cached opens it at the newest message instead of the oldest, and a message deleted for everyone no longer stays as its chat's preview.
-- Dashboard Chats: a channel post that holds only media shows the Media unavailable placeholder instead of an empty bubble.
 - Dashboard Webhooks: a create, save or delete dialog stays open until its request finishes, so a slow request no longer clears another webhook's draft, and the Status toggle shows keyboard focus.
 - Dashboard API Keys: the create dialog cannot be closed while the key is being created, so its one-time secret is no longer lost.
 - Dashboard Message Tester: a single send keeps Send disabled until a media URL is a full `http` or `https` address and every field is within the gateway's limits, and sends the URL trimmed.
