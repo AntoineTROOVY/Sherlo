@@ -313,10 +313,12 @@ export function ApiKeys() {
   const newErrors = limitErrors(newKey.role, newKey.ips, newKey.chats);
   const editErrors =
     editDraft && editingKey ? limitErrors(editDraft.role, editDraft.ips, editDraft.chats, editingKey) : null;
-  // The gateway requires a name of at least 3 characters, counted the way its validator counts them
-  // (an emoji is one); the input stops at its 100-character limit.
+  // The gateway takes a name of 3 to 100 characters, counted the way its validators count them (an
+  // emoji is one); Create is held outside that range.
   const nameTooShort = captionLength(newKey.name.trim()) < 3;
-  const canCreate = !createMutation.isPending && !nameTooShort && newErrors.ip === null && newErrors.chat === null;
+  const nameTooLong = [...newKey.name].length > 100;
+  const canCreate =
+    !createMutation.isPending && !nameTooShort && !nameTooLong && newErrors.ip === null && newErrors.chat === null;
   const canSave = !updateMutation.isPending && editErrors?.ip === null && editErrors.chat === null;
 
   const handleRevoke = async (id: string) => {
@@ -569,7 +571,6 @@ export function ApiKeys() {
               <input
                 id="ak-1"
                 type="text"
-                maxLength={100}
                 placeholder={t('apiKeys.namePlaceholder')}
                 value={newKey.name}
                 onChange={e => setNewKey({ ...newKey, name: e.target.value })}

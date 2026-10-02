@@ -215,10 +215,17 @@ test('a name of two emoji keeps Create disabled', async () => {
   assert.equal(create.disabled, false);
 });
 
-// A production gateway refuses a name over 100 characters with a bare "Bad Request".
-test('the key name cannot exceed the 100 characters the gateway takes', async () => {
-  await openCreate();
-  assert.equal(rtl.screen.getByLabelText<HTMLInputElement>('Name').maxLength, 100);
+// A production gateway refuses a name over 100 characters with a bare "Bad Request". It counts code
+// points, while a maxlength attribute counts UTF-16 units and would cut an emoji name at 50.
+test('a key name over the 100 characters the gateway takes keeps Create disabled', async () => {
+  const { screen, fireEvent } = rtl;
+  const create = await openCreate();
+  const name = screen.getByLabelText<HTMLInputElement>('Name');
+  assert.equal(name.hasAttribute('maxlength'), false);
+  fireEvent.change(name, { target: { value: '\u{1F511}'.repeat(100) } });
+  assert.equal(create.disabled, false, 'Create is disabled for a 100-character name');
+  fireEvent.change(name, { target: { value: '\u{1F511}'.repeat(101) } });
+  assert.equal(create.disabled, true, 'Create is enabled for a 101-character name');
 });
 
 test('an IP or chat line the gateway would refuse keeps Create disabled and names the line', async () => {
