@@ -1417,6 +1417,8 @@ DATABASE_NAME=""
 MAIN_DATABASE_NAME='./data/quoted main.sqlite'
 BAILEYS_AUTH_DIR=./data/bl#inline
 SESSION_DATA_PATH="./data/sess" # quoted, then a comment
+STORAGE_LOCAL_PATH="./data/media" # see "docs"
+PLUGIN_STATE_DIR='./data/state' # it'
 ENV
 printf 'DATABASE_NAME=./elsewhere/openwa.sqlite\nSESSION_DATA_PATH=./elsewhere/sess\n' >"$AG/data/.env.generated"
 resolve_ag() {
@@ -1424,15 +1426,17 @@ resolve_ag() {
 }
 # A blank value and an unparsed line both resolve to the default, never to data/.env.generated.
 for check in 'PLUGINS_DIR|./data/plugins' 'DATABASE_NAME|DEFAULT' 'MAIN_DATABASE_NAME|./data/quoted main.sqlite' \
-  'BAILEYS_AUTH_DIR|./data/bl' 'SESSION_DATA_PATH|DEFAULT'; do
+  'BAILEYS_AUTH_DIR|./data/bl' 'SESSION_DATA_PATH|DEFAULT' 'STORAGE_LOCAL_PATH|DEFAULT' 'PLUGIN_STATE_DIR|DEFAULT'; do
   key="${check%%|*}"
   got="$(resolve_ag "$key" DEFAULT)"
   if [ "$got" != "${check#*|}" ]; then
     fail "(ag) $key resolved to '$got', expected '${check#*|}'"
   fi
 done
-if [ "$(grep -c 'do not parse' "$AG/err")" -ne 1 ] || ! grep -q 'sets SESSION_DATA_PATH in a form' "$AG/err"; then
-  fail "(ag) the parse warning did not name exactly the one unparsed line: $(cat "$AG/err")"
+# A comment ending in the value's own quote must not pass for the closing quote.
+if [ "$(grep -c 'do not parse' "$AG/err")" -ne 3 ] || ! grep -q 'sets SESSION_DATA_PATH in a form' "$AG/err" ||
+  ! grep -q 'sets STORAGE_LOCAL_PATH in a form' "$AG/err" || ! grep -q 'sets PLUGIN_STATE_DIR in a form' "$AG/err"; then
+  fail "(ag) the parse warning did not name exactly the three unparsed lines: $(cat "$AG/err")"
 fi
 pass "(ag) dotenv's quoted, commented and empty forms resolve like the app, and an unparsed line stops the lookup"
 

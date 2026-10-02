@@ -43,8 +43,14 @@ openwa_env_file_value() {
       case "$value" in
         \"*\\*) ;; # dotenv expands \n and \r inside double quotes
         \"*\" | \'*\' | \`*\`)
-          printf '%s' "${value:1:${#value}-2}"
-          return 0
+          # A quote inside means the pair does not wrap the whole value: a comment ending in one follows it.
+          case "${value:1:${#value}-2}" in
+            *"${value:0:1}"*) ;;
+            *)
+              printf '%s' "${value:1:${#value}-2}"
+              return 0
+              ;;
+          esac
           ;;
         \"* | \'* | \`*) ;; # the quote does not close the value, as with a trailing comment
         *)
