@@ -303,6 +303,68 @@ test('a group media send holds a URL or caption the gateway would refuse, and se
   assert.equal(gateway.imageBodies[0].url, 'https://cdn.example.com/a.jpg');
 });
 
+/** Render a group send to one group and switch to `type`. */
+async function renderGroupSendOf(type: string): Promise<void> {
+  stubGroupGateway([{ id: 'g1@g.us', name: 'Family' }]);
+  await renderGroupsAsWriter();
+  rtl.fireEvent.click(await rtl.screen.findByRole('checkbox', { name: 'Family' }));
+  rtl.fireEvent.click(rtl.screen.getByRole('button', { name: type }));
+}
+
+function byId(id: string): HTMLElement {
+  const element = window.document.getElementById(id);
+  assert.ok(element, `expected #${id}`);
+  return element;
+}
+
+function setValue(element: HTMLElement, value: string): void {
+  rtl.fireEvent.change(element, { target: { value } });
+}
+
+/** Exactly `max` characters in `element` lets Send through; one more holds it. */
+async function assertLengthBound(element: HTMLElement, max: number, char = 'x'): Promise<void> {
+  setValue(element, char.repeat(max));
+  await rtl.waitFor(() => assert.equal(sendMessageButton().disabled, false));
+  setValue(element, char.repeat(max + 1));
+  assert.equal(sendMessageButton().disabled, true);
+  setValue(element, char.repeat(max));
+}
+
+test('a group text send holds a message over 4096 characters', async () => {
+  await renderGroupSendOf('Text');
+  await assertLengthBound(byId('mt-2'), 4096);
+});
+
+test('a group document send holds a filename over 255 characters', async () => {
+  await renderGroupSendOf('Document');
+  setValue(byId('mt-3'), 'https://cdn.example.com/a.pdf');
+  await assertLengthBound(byId('mt-14'), 255);
+});
+
+test('a group location send holds a description or address over 1024 characters', async () => {
+  await renderGroupSendOf('Location');
+  setValue(byId('mt-4'), '-6.2');
+  setValue(byId('mt-5'), '106.8');
+  await assertLengthBound(byId('mt-15'), 1024);
+  await assertLengthBound(byId('mt-16'), 1024);
+});
+
+test('a group contact send holds a name over 255 or a number over 30 characters', async () => {
+  await renderGroupSendOf('Contact');
+  setValue(byId('mt-6'), 'Ann');
+  setValue(byId('mt-7'), '15550000000');
+  await assertLengthBound(byId('mt-6'), 255);
+  await assertLengthBound(byId('mt-7'), 30, '1');
+});
+
+test('a group poll send holds a question over 255 or an option over 100 characters', async () => {
+  await renderGroupSendOf('Poll');
+  setValue(rtl.screen.getByPlaceholderText('Option 1'), 'a');
+  setValue(rtl.screen.getByPlaceholderText('Option 2'), 'b');
+  await assertLengthBound(byId('mt-8'), 255);
+  await assertLengthBound(rtl.screen.getByPlaceholderText('Option 1'), 100);
+});
+
 test('a session that stops being ready is replaced by what the selector shows', async () => {
   const status: Record<string, string> = { s1: 'ready', s2: 'ready' };
   const sends: string[] = [];
