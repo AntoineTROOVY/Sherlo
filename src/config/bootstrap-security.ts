@@ -128,8 +128,8 @@ const FORBIDDEN_PROD_SECRETS = new Set([
 
 /**
  * Whether to warn that API_KEY_PEPPER is unset in production. Without a pepper, stored API-key hashes
- * fall back to plain SHA-256 (still functional). Advisory only — enabling a pepper re-hashes keys and
- * invalidates existing ones (see api-key-hash.ts), so it stays opt-in and must never be enforced.
+ * fall back to plain SHA-256 (still functional). Advisory only: enabling a pepper on an install with keys
+ * locks every key out (see api-key-hash.ts), so it stays opt-in and must never be enforced.
  */
 export function isApiKeyPepperMissingInProduction(nodeEnv?: string, apiKeyPepper?: string): boolean {
   return nodeEnv === 'production' && !apiKeyPepper?.trim();
