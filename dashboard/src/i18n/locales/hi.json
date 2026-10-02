@@ -905,7 +905,7 @@
     "redis": {
       "title": "Redis",
       "enable": "Redis सक्षम करें",
-      "enableDesc": "कैशिंग, सत्र भंडारण और BullMQ कतारों के लिए आवश्यक",
+      "enableDesc": "कैशिंग, BullMQ कतारों, रेट-लिमिट काउंटरों और मल्टी-नोड WebSocket फ़ैन-आउट के लिए उपयोग होता है",
       "useBuiltIn": "अंतर्निहित Redis कंटेनर का उपयोग करें",
       "builtInDesc": "OpenWA आपके लिए एक Redis कंटेनर प्रबंधित करेगा",
       "queueTitle": "BullMQ कतार सिस्टम सक्षम करें",
@@ -917,7 +917,7 @@
       "failed": "विफल",
       "viewBullMq": "Bull MQ डैशबोर्ड देखें",
       "disabledTitle": "Redis अक्षम है",
-      "disabledDesc": "कैशिंग, सत्र भंडारण और BullMQ संदेश कतारों के लिए Redis को सक्षम करें।",
+      "disabledDesc": "कैशिंग, BullMQ संदेश कतारों, रेट-लिमिट काउंटरों और मल्टी-नोड WebSocket फ़ैन-आउट के लिए Redis को सक्षम करें।",
       "passwordOptional": "(वैकल्पिक)",
       "bullMqUrlCopied": "Bull MQ डैशबोर्ड URL कॉपी किया गया",
       "bullMqUrlHint": "इसे एक ADMIN API कुंजी के साथ खोलें — एक ब्राउज़र टैब प्रमाणित नहीं कर सकता है।"

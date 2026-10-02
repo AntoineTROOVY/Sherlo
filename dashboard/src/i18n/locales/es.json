@@ -911,7 +911,7 @@
     "redis": {
       "title": "Redis",
       "enable": "Habilitar Redis",
-      "enableDesc": "Necesario para caché, almacenamiento de sesiones y colas BullMQ",
+      "enableDesc": "Se usa para caché, colas BullMQ, contadores de límite de solicitudes y la distribución de WebSocket entre varios nodos",
       "useBuiltIn": "Usar contenedor Redis integrado",
       "builtInDesc": "OpenWA gestionará un contenedor Redis por ti",
       "queueTitle": "Habilitar sistema de colas BullMQ",
@@ -923,7 +923,7 @@
       "failed": "Fallido",
       "viewBullMq": "Ver panel BullMQ",
       "disabledTitle": "Redis está deshabilitado",
-      "disabledDesc": "Habilita Redis para caché, almacenamiento de sesiones y colas de mensajes BullMQ.",
+      "disabledDesc": "Habilita Redis para caché, colas de mensajes BullMQ, contadores de límite de solicitudes y la distribución de WebSocket entre varios nodos.",
       "passwordOptional": "(opcional)",
       "bullMqUrlCopied": "URL del panel de Bull MQ copiada",
       "bullMqUrlHint": "Ábrelo con una clave de API ADMIN: una pestaña del navegador no puede autenticarse."

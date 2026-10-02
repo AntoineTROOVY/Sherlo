@@ -905,7 +905,7 @@
     "redis": {
       "title": "Redis",
       "enable": "Redis 사용",
-      "enableDesc": "캐싱, 세션 저장, BullMQ 큐에 필요합니다",
+      "enableDesc": "캐싱, BullMQ 큐, 속도 제한 카운터, 멀티 노드 WebSocket 팬아웃에 사용됩니다",
       "useBuiltIn": "내장 Redis 컨테이너 사용",
       "builtInDesc": "OpenWA가 Redis 컨테이너를 관리합니다",
       "queueTitle": "BullMQ 큐 시스템 사용",
@@ -917,7 +917,7 @@
       "failed": "실패",
       "viewBullMq": "Bull MQ 대시보드 보기",
       "disabledTitle": "Redis 사용 안 함",
-      "disabledDesc": "캐싱, 세션 저장, BullMQ 메시지 큐를 사용하려면 Redis를 활성화하세요.",
+      "disabledDesc": "캐싱, BullMQ 메시지 큐, 속도 제한 카운터, 멀티 노드 WebSocket 팬아웃을 사용하려면 Redis를 활성화하세요.",
       "passwordOptional": "(선택 사항)",
       "bullMqUrlCopied": "Bull MQ 대시보드 URL이 복사되었습니다",
       "bullMqUrlHint": "ADMIN API 키로 열어 주세요 — 브라우저 탭은 인증할 수 없습니다."

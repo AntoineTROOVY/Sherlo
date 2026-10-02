@@ -911,7 +911,7 @@
     "redis": {
       "title": "Redis",
       "enable": "Abilita Redis",
-      "enableDesc": "Richiesto per la memorizzazione della cache, dello storage di sessione e delle code BullMQ",
+      "enableDesc": "Usato per la cache, le code BullMQ, i contatori di rate limiting e la distribuzione WebSocket multi-nodo",
       "useBuiltIn": "Usa Container Redis Integrato",
       "builtInDesc": "OpenWA gestirà un container Redis per te",
       "queueTitle": "Abilita Sistema di Code BullMQ",
@@ -923,7 +923,7 @@
       "failed": "Falliti",
       "viewBullMq": "Visualizza Dashboard BullMQ",
       "disabledTitle": "Redis è Disabilitato",
-      "disabledDesc": "Abilita Redis per la cache, lo storage delle sessioni e le code di messaggi BullMQ.",
+      "disabledDesc": "Abilita Redis per la cache, le code di messaggi BullMQ, i contatori di rate limiting e la distribuzione WebSocket multi-nodo.",
       "passwordOptional": "(opzionale)",
       "bullMqUrlCopied": "URL della dashboard Bull MQ copiato",
       "bullMqUrlHint": "Aprilo con una chiave API ADMIN: una scheda del browser non può autenticarsi."

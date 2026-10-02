@@ -905,7 +905,7 @@
     "redis": {
       "title": "Redis",
       "enable": "啟用 Redis",
-      "enableDesc": "快取、工作階段儲存及 BullMQ 佇列需要 Redis",
+      "enableDesc": "用於快取、BullMQ 佇列、速率限制計數器及多節點 WebSocket 分發",
       "useBuiltIn": "使用內置 Redis 容器",
       "builtInDesc": "OpenWA 會為你管理 Redis 容器",
       "queueTitle": "啟用 BullMQ 佇列系統",
@@ -917,7 +917,7 @@
       "failed": "失敗",
       "viewBullMq": "查看 Bull MQ 控制面板",
       "disabledTitle": "Redis 已停用",
-      "disabledDesc": "啟用 Redis 以使用快取、工作階段儲存及 BullMQ 訊息佇列。",
+      "disabledDesc": "啟用 Redis 以使用快取、BullMQ 訊息佇列、速率限制計數器及多節點 WebSocket 分發。",
       "passwordOptional": "（選填）",
       "bullMqUrlCopied": "已複製 Bull MQ 儀表板網址",
       "bullMqUrlHint": "請使用 ADMIN API 金鑰開啟 — 瀏覽器分頁無法進行身份驗證。"

@@ -930,7 +930,7 @@
     "redis": {
       "title": "Redis",
       "enable": "تفعيل Redis",
-      "enableDesc": "مطلوب للتخزين المؤقت وتخزين الجلسات وقوائم BullMQ",
+      "enableDesc": "يُستخدم للتخزين المؤقت وقوائم BullMQ وعدّادات تحديد المعدّل وتوزيع WebSocket عبر عدة عُقد",
       "useBuiltIn": "استخدام حاوية Redis المدمجة",
       "builtInDesc": "سيدير OpenWA حاوية Redis نيابةً عنك",
       "queueTitle": "تفعيل نظام قوائم BullMQ",
@@ -942,7 +942,7 @@
       "failed": "فشل",
       "viewBullMq": "عرض لوحة Bull MQ",
       "disabledTitle": "Redis معطّل",
-      "disabledDesc": "فعّل Redis للتخزين المؤقت وتخزين الجلسات وقوائم رسائل BullMQ.",
+      "disabledDesc": "فعّل Redis للتخزين المؤقت وقوائم رسائل BullMQ وعدّادات تحديد المعدّل وتوزيع WebSocket عبر عدة عُقد.",
       "passwordOptional": "(اختياري)",
       "bullMqUrlCopied": "تم نسخ رابط لوحة Bull MQ",
       "bullMqUrlHint": "افتحه باستخدام مفتاح API بصلاحية ADMIN — لا يمكن لعلامة تبويب المتصفح المصادقة."

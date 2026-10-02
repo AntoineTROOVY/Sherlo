@@ -905,7 +905,7 @@
     "redis": {
       "title": "Redis",
       "enable": "Redis aktivieren",
-      "enableDesc": "Erforderlich für Caching, Sitzungsspeicherung und BullMQ-Warteschlangen",
+      "enableDesc": "Wird für Caching, BullMQ-Warteschlangen, Rate-Limit-Zähler und die WebSocket-Verteilung über mehrere Knoten verwendet",
       "useBuiltIn": "Integrierten Redis-Container verwenden",
       "builtInDesc": "OpenWA verwaltet einen Redis-Container für dich",
       "queueTitle": "BullMQ-Warteschlangensystem aktivieren",
@@ -917,7 +917,7 @@
       "failed": "Fehlgeschlagen",
       "viewBullMq": "BullMQ-Dashboard ansehen",
       "disabledTitle": "Redis ist deaktiviert",
-      "disabledDesc": "Aktiviere Redis für Caching, Sitzungsspeicherung und BullMQ-Nachrichtenwarteschlangen.",
+      "disabledDesc": "Aktiviere Redis für Caching, BullMQ-Nachrichtenwarteschlangen, Rate-Limit-Zähler und die WebSocket-Verteilung über mehrere Knoten.",
       "passwordOptional": "(optional)",
       "bullMqUrlCopied": "URL des BullMQ-Dashboards kopiert",
       "bullMqUrlHint": "Öffne es mit einem ADMIN-API-Schlüssel — ein Browser-Tab kann sich nicht authentifizieren."

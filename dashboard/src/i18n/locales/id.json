@@ -905,7 +905,7 @@
     "redis": {
       "title": "Redis",
       "enable": "Aktifkan Redis",
-      "enableDesc": "Diperlukan untuk caching, penyimpanan sesi, dan antrian BullMQ",
+      "enableDesc": "Digunakan untuk caching, antrian BullMQ, penghitung rate limit, dan distribusi WebSocket multi-node",
       "useBuiltIn": "Gunakan Container Redis Bawaan",
       "builtInDesc": "OpenWA akan mengelola container Redis untuk Anda",
       "queueTitle": "Aktifkan Sistem Antrian BullMQ",
@@ -917,7 +917,7 @@
       "failed": "Gagal",
       "viewBullMq": "Lihat Dasbor Bull MQ",
       "disabledTitle": "Redis Dinonaktifkan",
-      "disabledDesc": "Aktifkan Redis untuk caching, penyimpanan sesi, dan antrian pesan BullMQ.",
+      "disabledDesc": "Aktifkan Redis untuk caching, antrian pesan BullMQ, penghitung rate limit, dan distribusi WebSocket multi-node.",
       "passwordOptional": "(opsional)",
       "bullMqUrlCopied": "URL dasbor Bull MQ disalin",
       "bullMqUrlHint": "Buka dengan kunci API ADMIN — tab browser tidak dapat mengautentikasi."

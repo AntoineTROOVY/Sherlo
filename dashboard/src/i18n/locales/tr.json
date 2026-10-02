@@ -905,7 +905,7 @@
     "redis": {
       "title": "Redis",
       "enable": "Redis'i Etkinleştir",
-      "enableDesc": "Önbelleğe alma, oturum depolama ve BullMQ kuyrukları için gereklidir",
+      "enableDesc": "Önbelleğe alma, BullMQ kuyrukları, hız sınırı sayaçları ve çok düğümlü WebSocket dağıtımı için kullanılır",
       "useBuiltIn": "Dahili Redis Konteynerini Kullan",
       "builtInDesc": "OpenWA sizin için bir Redis konteynerini yönetecektir",
       "queueTitle": "BullMQ Kuyruk Sistemini Etkinleştir",
@@ -917,7 +917,7 @@
       "failed": "Başarısız",
       "viewBullMq": "Bull MQ Kontrol Panelini Görüntüle",
       "disabledTitle": "Redis Devre Dışı",
-      "disabledDesc": "Önbelleğe alma, oturum depolama ve BullMQ mesaj kuyrukları için Redis'i etkinleştirin.",
+      "disabledDesc": "Önbelleğe alma, BullMQ mesaj kuyrukları, hız sınırı sayaçları ve çok düğümlü WebSocket dağıtımı için Redis'i etkinleştirin.",
       "passwordOptional": "(isteğe bağlı)",
       "bullMqUrlCopied": "Bull MQ kontrol paneli URL'si kopyalandı",
       "bullMqUrlHint": "Bir ADMIN API anahtarıyla açın — normal bir tarayıcı sekmesi kimlik doğrulaması yapamaz."

@@ -905,7 +905,7 @@
     "redis": {
       "title": "Redis",
       "enable": "启用 Redis",
-      "enableDesc": "缓存、会话存储和 BullMQ 队列需要 Redis",
+      "enableDesc": "用于缓存、BullMQ 队列、限流计数器和多节点 WebSocket 分发",
       "useBuiltIn": "使用内置 Redis 容器",
       "builtInDesc": "OpenWA 将为你管理 Redis 容器",
       "queueTitle": "启用 BullMQ 队列系统",
@@ -917,7 +917,7 @@
       "failed": "失败",
       "viewBullMq": "查看 Bull MQ 仪表盘",
       "disabledTitle": "Redis 已禁用",
-      "disabledDesc": "启用 Redis 以使用缓存、会话存储和 BullMQ 消息队列。",
+      "disabledDesc": "启用 Redis 以使用缓存、BullMQ 消息队列、限流计数器和多节点 WebSocket 分发。",
       "passwordOptional": "（可选）",
       "bullMqUrlCopied": "已复制 Bull MQ 仪表板网址",
       "bullMqUrlHint": "请使用 ADMIN API 密钥打开 — 浏览器标签页无法进行身份验证。"

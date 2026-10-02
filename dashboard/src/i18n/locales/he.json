@@ -918,7 +918,7 @@
     "redis": {
       "title": "Redis",
       "enable": "הפעלת Redis",
-      "enableDesc": "נדרש למטמון, אחסון Sessions ותורי BullMQ",
+      "enableDesc": "משמש למטמון, לתורי BullMQ, למוני הגבלת קצב ולהפצת WebSocket בין צמתים מרובים",
       "useBuiltIn": "שימוש בקונטיינר Redis מובנה",
       "builtInDesc": "OpenWA ינהל עבורך קונטיינר Redis",
       "queueTitle": "הפעלת מערכת התורים BullMQ",
@@ -930,7 +930,7 @@
       "failed": "נכשלו",
       "viewBullMq": "פתיחת Bull MQ Dashboard",
       "disabledTitle": "Redis מושבת",
-      "disabledDesc": "יש להפעיל את Redis למטמון, אחסון Sessions ותורי הודעות BullMQ.",
+      "disabledDesc": "יש להפעיל את Redis למטמון, לתורי הודעות BullMQ, למוני הגבלת קצב ולהפצת WebSocket בין צמתים מרובים.",
       "passwordOptional": "(אופציונלי)",
       "bullMqUrlCopied": "כתובת לוח Bull MQ הועתקה",
       "bullMqUrlHint": "פתח אותו עם מפתח API מסוג ADMIN — לשונית דפדפן אינה יכולה לאמת."
