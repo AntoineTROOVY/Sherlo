@@ -136,6 +136,12 @@ export class ValidateApiKeyResponseDto {
     example: 'baileys',
   })
   engineType?: string;
+
+  @ApiPropertyOptional({
+    description: 'Whether the key is restricted to selected sessions; present only when valid.',
+    example: false,
+  })
+  scoped?: boolean;
 }
 
 export class UpdateApiKeyDto {
