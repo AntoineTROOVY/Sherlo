@@ -149,6 +149,18 @@ describe('IngressService.handle', () => {
     expect(res.status).toBe(202);
   });
 
+  it('persists the request method so a replay keeps it', async () => {
+    const d = deps();
+    await new IngressService(d).handle({ ...req, method: 'PUT' });
+    expect(d.events.recordOrSkip).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: expect.objectContaining({ method: 'PUT' }) }),
+    );
+    expect(d.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'PUT', payload: expect.not.objectContaining({ method: 'PUT' }) }),
+      'd1',
+    );
+  });
+
   // A body no parser read would be handled as the empty body: it passes a header-only scheme, and every
   // such delivery hashes to the same dedup key, so all but the first are acked and dropped.
   it('refuses a body in a content type no parser read (415), before anything is persisted', async () => {
