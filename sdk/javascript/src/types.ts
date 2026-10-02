@@ -979,7 +979,10 @@ export interface CreateWebhookRequest {
   secret?: string;
   headers?: Record<string, string>;
   filters?: WebhookFilters | null;
-  /** 0–5; default 3. Server DTO field is `retryCount`. */
+  /**
+   * Total delivery attempts per event including the first, 0 to 5 (0 and 1 both mean one attempt); default 3 on
+   * create, while an update that omits it keeps the current value. Server DTO field is `retryCount`.
+   */
   retryCount?: number;
 }
 

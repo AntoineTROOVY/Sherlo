@@ -930,7 +930,8 @@ class UpdateWebhookRequest(TypedDict, total=False):
     secret: str
     headers: dict[str, str]
     filters: WebhookFilters | None
-    # Server DTO field is ``retryCount`` (0-5; default 3).
+    # Total delivery attempts per event including the first, 0 to 5 (0 and 1 both mean one attempt);
+    # omit to keep the current value. Server DTO field is ``retryCount``.
     retryCount: int
     active: bool
 
