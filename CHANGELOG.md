@@ -249,7 +249,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Channel delete and unsubscribe answer `404` for an id that is not a channel; on whatsapp-web.js they created a chat for it and failed with `500`.
 - Group and profile picture writes and media sends answer `400` for a non-string `base64` sent next to a `url`, and `send-template` for a non-string `templateId` or `templateName` sent next to the other, instead of `500`.
 - `POST /api/sessions/:sessionId/groups/join` trims whitespace around the invite code, as the join preview does.
-- A template name, body, header or footer, or an automation rule name or reply text, containing a NUL character is refused with `400` instead of failing with `500` on PostgreSQL.
+- A template name, body, header or footer, or an automation rule name or reply text, containing a NUL character is refused with `400`, and a `send-template` naming a template with one answers `404`, instead of failing with `500` on PostgreSQL.
 - A replica that starts while Redis is unreachable subscribes to cross-replica WebSocket events once Redis returns, instead of missing them until a restart.
 - Status media received without a type is served as `application/octet-stream` instead of answering `404` on the `mediaUrl` it was advertised with.
 - SQLite search no longer returns other messages after `DATABASE_SYNCHRONIZE=true` rebuilt the messages table; the next boot rebuilds the search index.
