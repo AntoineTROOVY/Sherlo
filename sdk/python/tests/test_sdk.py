@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import get_args
+from typing import get_args, get_type_hints
 
 import httpx
 import pytest
@@ -12,7 +12,14 @@ import pytest
 from openwa import OpenWAClient, OpenWAApiError, OpenWANotFoundError
 from openwa._http import build_url
 from openwa.errors import OpenWAServiceUnavailableError
-from openwa.types import WebhookDelivery, WebhookDeliveryEvent, WebhookEvent, WebhookFilters
+from openwa.resources.messages import MessagesResource
+from openwa.types import (
+    BatchCancelResponse,
+    WebhookDelivery,
+    WebhookDeliveryEvent,
+    WebhookEvent,
+    WebhookFilters,
+)
 
 from conftest import MockBackend, make_client
 
@@ -398,6 +405,11 @@ class TestMessages:
         assert cancelled["status"] == "cancelled"
         assert "/messages/batch/b/cancel" in backend.calls[-1].url
         assert backend.calls[-1].method == "POST"
+
+    def test_cancel_batch_is_typed_as_the_cancel_response(self):
+        # The cancel route sends no results, so typing it as BatchStatusResponse (results required)
+        # lets a caller read a key that is never there.
+        assert get_type_hints(MessagesResource.cancel_batch)["return"] is BatchCancelResponse
 
 
 # ── Sessions ───────────────────────────────────────────────────────

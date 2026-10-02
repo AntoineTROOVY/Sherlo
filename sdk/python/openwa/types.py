@@ -713,9 +713,9 @@ class BatchProgress(TypedDict):
 
 
 class BatchStatusResponse(TypedDict):
-    """Response from ``GET /messages/batch/:batchId`` and the cancel endpoint.
+    """Response from ``GET /messages/batch/:batchId``.
 
-    Distinct from :class:`BulkMessageResponse` (the send-bulk acknowledgement).
+    Distinct from :class:`BulkMessageResponse` (the send-bulk acknowledgement) and :class:`BatchCancelResponse`.
     """
 
     batchId: str
@@ -724,6 +724,14 @@ class BatchStatusResponse(TypedDict):
     results: list[BatchMessageResult]
     startedAt: NotRequired[str | None]
     completedAt: NotRequired[str | None]
+
+
+class BatchCancelResponse(TypedDict):
+    """Response from ``POST /messages/batch/:batchId/cancel``: the batch state without per-recipient ``results``."""
+
+    batchId: str
+    status: BatchLifecycleStatus
+    progress: BatchProgress
 
 
 # ── Contact ───────────────────────────────────────────────────────
