@@ -302,7 +302,13 @@ export class SessionController {
     description: 'Session started',
     type: SessionResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Session already started' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Session already started or already starting, or this node is at its MAX_CONCURRENT_SESSIONS cap ' +
+      '(`Maximum concurrent sessions reached (N)`); a start refused at the cap launches nothing ' +
+      'and leaves a stop in place.',
+  })
   @ApiResponse({ status: 404, description: 'Session not found' })
   @ApiResponse({
     status: 409,
