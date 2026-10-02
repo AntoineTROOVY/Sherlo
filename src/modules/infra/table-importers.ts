@@ -34,8 +34,11 @@ export interface TableImporter<K extends keyof MigrationTables = keyof Migration
   /** The id interpolated into the failure warning (lid_mappings rows key on lid, not id). */
   id: (row: MigrationTables[K][number]) => string;
   map: (row: MigrationTables[K][number]) => unknown[];
-  /** Per-row veto: returns the warning to record (the row is skipped) or null to import the row. */
-  skip?: (row: MigrationTables[K][number]) => string | null;
+  /**
+   * Per-row veto: returns the warning to record (the row is skipped) or null to import the row.
+   * `rows` is the whole archived table, for a guard that weighs a row against its siblings.
+   */
+  skip?: (row: MigrationTables[K][number], rows?: MigrationTables[K]) => string | null;
 }
 
 /**
@@ -48,7 +51,7 @@ export interface TableImporter<K extends keyof MigrationTables = keyof Migration
 export type AnyTableImporter = Omit<TableImporter, 'id' | 'map' | 'skip'> & {
   id: (row: never) => string;
   map: (row: never) => unknown[];
-  skip?: (row: never) => string | null;
+  skip?: (row: never, rows?: never) => string | null;
 };
 
 // Registers one concrete descriptor into the union-keyed TABLE_IMPORTERS array.
@@ -74,6 +77,22 @@ function decodeJsonColumn(value: unknown): unknown {
 // exception: no request can look up a name holding NUL, so keeping it would only strand the template.
 function nulFree(value: unknown): unknown {
   return NulFreeTransformer.to(value);
+}
+
+// (sessionId, NUL-free name) -> id of the first archived template holding it, built once per table.
+const templateNameOwners = new WeakMap<TemplateRow[], Map<string, string>>();
+
+function firstTemplateWithName(rows: TemplateRow[], sessionId: string, name: unknown): string | undefined {
+  let owners = templateNameOwners.get(rows);
+  if (!owners) {
+    owners = new Map();
+    for (const row of rows) {
+      const key = JSON.stringify([row.sessionId, nulFree(row.name)]);
+      if (!owners.has(key)) owners.set(key, row.id);
+    }
+    templateNameOwners.set(rows, owners);
+  }
+  return owners.get(JSON.stringify([sessionId, name]));
 }
 
 // Restore order is FK order: sessions first (webhooks/messages/templates/etc. reference it), the
@@ -228,6 +247,15 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
     sql: `INSERT INTO templates (id, "sessionId", name, body, header, footer, "createdAt", "updatedAt")
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     id: (tpl: TemplateRow) => tpl.id,
+    // (sessionId, name) is unique, and the name loses its NUL characters below. Two names of one
+    // session that differ only by NUL would collide on insert and roll the whole restore back, after
+    // any orphan engines were stopped; refuse the second one here instead, naming both rows.
+    skip: (tpl: TemplateRow, rows: TemplateRow[] = []) => {
+      const name = nulFree(tpl.name);
+      const owner = firstTemplateWithName(rows, tpl.sessionId, name);
+      if (owner === undefined || owner === tpl.id) return null;
+      return `Skipped template ${tpl.id}: name ${JSON.stringify(name)} without NUL characters collides with template ${owner} of session ${tpl.sessionId}`;
+    },
     map: (tpl: TemplateRow) => [
       tpl.id,
       tpl.sessionId,

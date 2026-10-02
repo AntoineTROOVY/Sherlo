@@ -118,6 +118,34 @@ describe('automationRules table importer', () => {
 });
 
 /**
+ * A template name loses its NUL characters on restore, and (sessionId, name) is unique. Two names of
+ * one session that differ only by NUL would collide on insert and roll the restore back, so the
+ * guard refuses the second one up front and names both rows.
+ */
+describe('templates table importer', () => {
+  const templates = TABLE_IMPORTERS.find(importer => importer.key === 'templates');
+  const rows = [
+    { id: 't1', sessionId: 's1', name: 'promo' },
+    { id: 't2', sessionId: 's1', name: 'promo\u0000' },
+    { id: 't3', sessionId: 's2', name: 'promo' },
+    { id: 't4', sessionId: 's1', name: 'other' },
+  ];
+  const skip = (row: Record<string, unknown>) => templates?.skip?.(row as never, rows as never);
+
+  it('refuses a name that matches another template of the same session once NUL is dropped', () => {
+    expect(skip(rows[1])).toBe(
+      'Skipped template t2: name "promo" without NUL characters collides with template t1 of session s1',
+    );
+  });
+
+  it('accepts the first of the pair, the same name in another session, and a distinct name', () => {
+    expect(skip(rows[0])).toBeNull();
+    expect(skip(rows[2])).toBeNull();
+    expect(skip(rows[3])).toBeNull();
+  });
+});
+
+/**
  * A restore writes with raw SQL, so the NUL drop the entities apply to their free-text columns never
  * runs. PostgreSQL rejects U+0000 in a bound parameter, and an older SQLite backup may hold one, also
  * in template and rule text written before the DTOs refused it, so the importers drop it from those
