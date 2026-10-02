@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Docker image can start as a non-root uid, such as `docker run --user 997:997` or a Kubernetes `runAsUser`, when `/app/data` is writable by it, and stops with an error naming the fix when it is not; the default root start is unchanged.
 - Helm chart: a `podSecurityContext` value (empty by default) sets the pod security context; `values.yaml` documents a non-root profile with uid, gid and `fsGroup` 997 and an opt-in `RuntimeDefault` seccomp profile.
 - Indonesian (Bahasa Indonesia) dashboard locale, selectable from the language picker. Thanks @qwerty0999999.
+- `POST /api/auth/validate` reports `scoped`, true for a key restricted to selected sessions; from the next SDK release after 0.5.0, the JavaScript, Python, Go and Java SDKs' `AuthValidateResponse` carries it.
 
 ### Changed
 
@@ -45,8 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/backup.sh` adds an `ENGINE-STATE-NOTE` to the archive, and logs a warning, when a whatsapp-web.js profile held a Chromium lock, Baileys state was present, or engine auth files changed during the copy; `scripts/restore.sh` prints it, and `--strict` still refuses only a possibly torn database.
 - The Docker image is built on a refreshed `node:22-slim` base image.
 - Dashboard: fonts ship in the build instead of loading from Google Fonts, and the CSP no longer allows `fonts.googleapis.com` or `fonts.gstatic.com`, so the Bull Board queue UI at `/api/admin/queues` falls back to system fonts.
-- `proxyType` on `POST /api/sessions` is marked deprecated in the OpenAPI contract; it was always ignored, since the `proxyUrl` scheme selects the proxy protocol.
+- `proxyType` on `POST /api/sessions` is marked deprecated in the OpenAPI contract and, from the next SDK release after 0.5.0, in the Java and Python SDKs; it was always ignored, since the `proxyUrl` scheme selects the proxy protocol.
 - Statistics requests no longer write a `sessions:stats` key to Redis that nothing reads.
+- Webhook filters and automation rule conditions refuse with `400` a key other than `conditions`, or a condition key other than `field`, `operator`, `value` and `caseSensitive`; such keys were stored and ignored.
+- A group create or participant add naming more new contacts than a whole day's cold-reachout allowance answers `400` naming the batch size to split into, instead of a `429` whose `retryAfterSeconds` never lets it through.
+- `POST /api/sessions` refuses a `config.maxReconnectAttempts` outside 0 to 20, a `config.reconnectBaseDelay` outside 1000 to 300000 ms or a non-boolean `config.autoRejectCalls` with `400`, as `PATCH /api/sessions/:sessionId/config` does, instead of storing it and clamping it at start.
+- `GET /api/settings` reports `notifications.webhookAlerts` as `false`, since there is no webhook alert feature.
+- The Docker image build fails when a Baileys upgrade moves `lib/Socket/chats.js` or `lib/Socket/newsletter.js`, instead of shipping without the app-state or channel-create patch.
 
 ### Fixed
 
