@@ -101,6 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A delivery ack, reaction, edit or deletion that arrives before its message is stored is applied once the message is stored.
 - A message deleted for everyone before it is stored no longer goes out as `message.received` or `message.sent` with its deleted content after `message.revoked`; one deleted through `POST /api/sessions/:sessionId/messages/delete` in that window goes out as `revoked` with an empty body, and one edited in that window with the edited body, to automation rules too.
 - The lid-to-phone cache no longer keeps an empty reverse entry for every phone it evicted or re-mapped, so its memory stays within the cache bound.
+- A lid-to-phone mapping restored by `POST /api/infra/import-data` resolves even when the store's reload after the import fails, instead of staying unresolved until a restart.
 - Webhook custom header values with characters outside Latin-1 are rejected with `400`; they were accepted and made every delivery to that webhook fail.
 - The webhook outbox replay no longer delivers an event the webhook has since been unsubscribed from.
 - A webhook delivery that succeeds removes the delivery-failure rows filed under its idempotency key, so an event the outbox replay delivers after a shed or shutdown refusal is no longer listed as lost.
@@ -131,6 +132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `POST /api/sessions/:sessionId/messages/send-product` answers `400` for an empty `chatId` or `productId`, a `productId` over 255 characters or a `body` over 4096 characters.
 - The received-status purge deletes expired statuses in batches, so a backlog after downtime no longer makes every purge fail while the table keeps growing.
 - The received-status and `CHAT_MEDIA_ARCHIVE_TTL_DAYS` purges no longer stall behind files they cannot delete, and an S3 delete that never answers is abandoned after 30 s.
+- SQLite writes wait up to 30 s for an online `scripts/backup.sh` copy to finish, instead of failing after 5 s.
 - A timed-out media conversion kills ffmpeg's whole process group and releases its stderr pipe at once, so an `FFMPEG_PATH` wrapper script that does not `exec` ffmpeg no longer leaves it running outside the conversion limit, and conversions still running when the gateway exits are killed.
 - Statistics requests and metrics scrapes that arrive while the statistics memo is empty or expired share one database aggregation instead of each running their own.
 - An `api_key_auth_failed` audit row for a revoked or expired API key, or one refused by its `allowedIps` or `allowedSessions`, names that key on REST, `/api/admin/queues`, `GET /api/health` and MCP; it recorded only the client IP.
@@ -211,7 +213,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A plugin manifest whose `permissions`, `sessions`, `hooks`, `net.allow` or `net.allowConfigHosts` is not a list of strings is refused at install and boot instead of being matched by substring.
 - A plugin `ctx.net.fetch(url, null)` call no longer holds one of the 16 process-wide plugin fetch slots forever.
 - A sandboxed plugin that posts a malformed message, such as a log line with an unknown level, no longer crashes the gateway process.
-- A sandboxed plugin whose hook result or log metadata cannot be cloned no longer crashes its worker or sets the plugin to `ERROR`, and an error log keeps its error text.
+- A sandboxed plugin whose hook result or log metadata cannot be cloned no longer crashes its worker or sets the plugin to `ERROR`, and an error log keeps its error text, also when its metadata is too large to relay or cannot be serialized.
 - A sandboxed plugin's capability call with an argument that cannot be cloned no longer leaves a pending call behind for the life of its worker.
 - Plugin storage `list()` in a package directory no longer reports the plugin's own JSON files as keys, which a clear-all loop could delete.
 - Uninstalling a plugin removes its copy in the legacy `./plugins` directory, including one that failed to load or that `./data/plugins` also holds, so it no longer comes back after a restart.
@@ -229,6 +231,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A queued ingress delivery whose dead-letter row cannot be written, such as during a database outage, is queued again and retried instead of lost.
 - A webhook update racing a delete answers `404` instead of re-creating the deleted webhook, and an update no longer reverts fields it did not set.
 - A stored webhook whose `events` or `filters` is malformed, such as one from a hand-edited backup, is skipped on its own instead of stopping delivery to every webhook of its session or failing the outbox replay, and `POST /api/infra/import-data` refuses to restore one.
+- A stored automation rule whose `conditions` is malformed, such as one from a hand-edited backup, is skipped on its own instead of stopping every rule of its session from replying, and `POST /api/infra/import-data` refuses to restore one.
 - Two `presence.update` events for one group in the same millisecond get distinct idempotency keys, so a deduplicating receiver no longer drops the second.
 - Parallel sends can no longer together exceed the send-pacing daily and cold-reachout caps, and an edit is checked against the caps without being counted as a send.
 - Overlapping `PATCH /api/sessions/:sessionId/config` requests no longer drop each other's keys; one that keeps losing the race answers `409`.
@@ -239,12 +242,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard Infrastructure: saves are no longer refused with `400` when external PostgreSQL or S3 credentials come from the project `.env` or use the legacy `S3_ACCESS_KEY` and `S3_SECRET_KEY` names, and the config read no longer reports those S3 credentials as unset.
 - S3 requests time out against a store that accepts connections but never answers, after 5 s to connect or 30 s without data, and a bucket probe is abandoned after 10 s, so media reads and writes and `GET /api/infra/status` no longer hang and S3 recovers without a restart.
 - Outbound media archived from both the engine echo and the REST send at once no longer leaves a second copy in storage.
-- Lowering an automation rule's `cooldownSeconds` applies to a quiet period already running in a chat.
+- Lowering or raising an automation rule's `cooldownSeconds` applies to a quiet period already running in a chat, also on a gateway tracking 10,000 or more chats.
 - `POST /api/sessions/:sessionId/calls/link` answers `400` for a `startTime` past the largest date JavaScript can hold, instead of `403` or `500`.
 - Channel delete and unsubscribe answer `404` for an id that is not a channel; on whatsapp-web.js they created a chat for it and failed with `500`.
 - Group and profile picture writes and media sends answer `400` for a non-string `base64` sent next to a `url`, and `send-template` for a non-string `templateId` or `templateName` sent next to the other, instead of `500`.
 - `POST /api/sessions/:sessionId/groups/join` trims whitespace around the invite code, as the join preview does.
-- A template name, body, header or footer containing a NUL character is refused with `400` instead of failing with `500` on PostgreSQL.
+- A template name, body, header or footer, or an automation rule name or reply text, containing a NUL character is refused with `400` instead of failing with `500` on PostgreSQL.
 - A replica that starts while Redis is unreachable subscribes to cross-replica WebSocket events once Redis returns, instead of missing them until a restart.
 - Status media received without a type is served as `application/octet-stream` instead of answering `404` on the `mediaUrl` it was advertised with.
 - SQLite search no longer returns other messages after `DATABASE_SYNCHRONIZE=true` rebuilt the messages table; the next boot rebuilds the search index.
@@ -256,13 +259,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An unhandled promise rejection whose reason cannot be turned into a string is logged instead of exiting the process.
 - On PostgreSQL 14 and newer, boot migrations no longer fail on every retry when `idle_session_timeout` is set on the role or database.
 - Boot refuses a `BODY_SIZE_LIMIT` of `0` or with a unit it does not know, such as `50M`; `0` refused every request body and an unknown unit fell back to `25mb`.
-- Boot refuses a negative `MESSAGE_REAPER_INTERVAL_MS`, `WEBHOOK_RECONCILE_INTERVAL_MS` or `INGRESS_RECONCILE_INTERVAL_MS`, which kept the sweep running, and a `MESSAGE_REAPER_GRACE_MS`, `WEBHOOK_RECONCILE_GRACE_MS` or `INGRESS_RECONCILE_GRACE_MS` that is not a non-negative integer of at most 36500 days; on SQLite a larger grace window acted on fresh rows.
+- Boot refuses a negative or non-integer `MESSAGE_REAPER_INTERVAL_MS`, `WEBHOOK_RECONCILE_INTERVAL_MS` or `INGRESS_RECONCILE_INTERVAL_MS`, which kept the sweep running, and a `MESSAGE_REAPER_GRACE_MS`, `WEBHOOK_RECONCILE_GRACE_MS` or `INGRESS_RECONCILE_GRACE_MS` that is not a non-negative integer of at most 36500 days; on SQLite a larger grace window acted on fresh rows.
 - The startup banner names the bootstrap key file's actual path instead of `data/.api-key` or the dashboard, which never shows a full key.
 - The production warning for a missing `API_KEY_PEPPER` says to set it before the first boot and names the two recoveries, instead of advising a key re-issue that a new pepper makes impossible.
 - A plugin manifest whose ingress route has no `signature`, an unknown signature scheme or an encoding other than `hex` or `base64` is refused when it loads, naming the route, instead of loading and rejecting every delivery.
 - A sandboxed plugin whose `onConfigChange` throws synchronously has the error logged instead of its worker crashing and the plugin landing in `ERROR`.
 - A plugin registry that cannot be read is moved aside to `registry.json.corrupt-<ms>` at boot instead of being overwritten, which lost every plugin's config, secrets and enable state.
-- Saving a built-in engine plugin's config with `PUT /api/plugins/:id/config` stores only the keys it sets, instead of every environment-derived engine setting, which then ignored later `.env` changes.
+- Saving a built-in engine plugin's config with `PUT /api/plugins/:id/config` stores only the keys it sets, instead of every environment-derived engine setting, which then ignored later `.env` changes; settings an earlier release already stored stay, see Upgrade notes.
 - MCP: `LabelUpsert` is marked destructive, so clients that auto-approve non-destructive tools ask before it replaces a label.
 - Helm chart: the pod no longer gets Kubernetes service-link variables, so a Service named `redis` or `database` in the namespace no longer fails boot validation on `REDIS_PORT` or `DATABASE_PORT`.
 - Helm chart: the install notes warn when an ingress without TLS would serve a blank dashboard and name `ingress.tls` or `env.CSP_UPGRADE_INSECURE_REQUESTS="false"` as the fix, and `values.yaml` notes the same opt-out.
@@ -277,13 +280,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - whatsapp-web.js: a `STATUS_MEDIA_MAX_BYTES` above `MEDIA_DOWNLOAD_MAX_BYTES` no longer raises the status media download cap, per item or in total, above it.
 - Baileys: with `STORE_EPHEMERAL_MESSAGES=false`, product, poll, contact, live-location, order and event messages in a disappearing chat are skipped like the chat's other messages instead of being stored and dispatched.
 - Baileys: deleting or editing a message from a contact known by both phone number and lid updates the chat preview in `GET /api/sessions/:sessionId/chats`.
-- Baileys: a send interrupted by a session stop or logout answers `409` instead of `500` and no longer counts toward the send breaker.
+- Baileys: a send, status post or status delete interrupted by a session stop or logout answers `409` instead of `500`, and a send or status post no longer counts toward the send breaker.
 - Baileys: link previews follow redirects, so bare-domain, `http://` and short links get one, and their titles and descriptions are no longer cut at an apostrophe or quote.
 - Baileys: API sends no longer go out as disappearing messages after the chat turns them off, and follow a changed timer at once.
 - Baileys: a contact's `profilePicUrl` is no longer the picture-change marker `changed` or `removed`; only a URL is reported.
 - Baileys: a profile-picture lookup whose connection drops answers `503` instead of `200` with a null `url`.
 - Baileys: a WhatsApp refusal on the catalog routes answers `403` instead of `500`, an account without a catalog gets the documented empty answer, and a refused product lookup in `send-product` no longer counts toward the send breaker.
-- Baileys: a group, channel or catalog call that WhatsApp rate-limits or times out answers `503` instead of a `403` permissions error, except a timed-out group or channel create, which may have succeeded and so is not answered with a retryable `503`.
+- Baileys: a group, channel or catalog call that WhatsApp rate-limits or times out answers `503` instead of a `403` permissions error or a `500`, except a timed-out group or channel create, which may have succeeded and so is not answered with a retryable `503`.
 - Baileys: a call-link request WhatsApp never answers gets `503` instead of `500`; a retry can create a second link.
 - Dashboard Chats: reopening a chat after switching sessions or leaving the Chats page shows the messages that arrived meanwhile, also when the live event feed is unavailable.
 - Dashboard Chats: a chat marked unread shows an unread badge in the sidebar and keeps it when a new message arrives.
@@ -299,7 +302,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard: a long incoming message full of unmatched `*`, `_` or `~` markers no longer freezes the chat view.
 - Dashboard Status: the recipient picker lists every contact instead of the first 1000, or shows a load error when the gateway keeps throttling the list, and an image over 18 MiB is refused before upload without posting an earlier pick.
 - Dashboard Status: a picked image is posted with its own type, such as PNG or WebP, instead of as `image/jpeg`.
+- Dashboard Status: posting while a newly picked image is still loading no longer sends the image it replaced.
 - Dashboard: the home page offers Disconnect for every session with a running engine, as the Sessions page does.
+- Dashboard: an admin key restricted to selected sessions is no longer shown API Keys, Infrastructure or Plugins and no longer requests the statistics or the release update check, so it stops adding refused requests to the audit log.
 - Dashboard Webhooks: removing a filter condition no longer moves its unsent chip text into the next condition.
 - Dashboard Webhooks: testing one webhook no longer re-enables another's Test button mid-flight, and a double click on the delete confirm sends one request.
 - Dashboard Sessions: a late auto-reject toggle or proxy save answer no longer changes, closes or locks another session's modal, and a toggle stays locked while its own save is pending, also after its modal is reopened.
@@ -328,6 +333,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard Webhooks: a create, save or delete dialog stays open until its request finishes, so a slow request no longer clears another webhook's draft, and the Status toggle shows keyboard focus.
 - Dashboard API Keys: the create dialog cannot be closed while the key is being created, so its one-time secret is no longer lost.
 - Dashboard Message Tester: a single send keeps Send disabled until a media URL is a full `http` or `https` address and every field is within the gateway's limits, and sends the URL trimmed.
+- Dashboard Message Tester: pasted emoji-heavy text within the gateway's length limit is no longer silently cut.
 - Dashboard Plugins: number fields with a minimum or maximum accept fractional values, and a card's buttons stay disabled while its own action runs when another plugin's finishes first.
 - Dashboard Infrastructure: a save no longer warns of a database switch when the external PostgreSQL host, port or name came from the environment, and Save with Restart Later shows the pending-restart note at once.
 - Java SDK (next SDK release after 0.5.0): `health.ready()` no longer fails with `Non-JSON response` against a healthy gateway; `HealthReadyDetails` holds `DependencyStatus` records.
@@ -467,7 +473,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⚠️ **Breaking (API).** whatsapp-web.js: group info `createdAt` is Unix seconds instead of an ISO date string, and `isReadOnly` is true only for an announce-only group where the account is not an admin.
 - ⚠️ **Breaking (SDK types only, no gateway change).** From the next SDK release after 0.5.0, the Java, JavaScript and Python SDKs type each `health.ready()` dependency as a `{ status }` object instead of a string, and the Python SDK types `status` and `details` as always present; code that compared a dependency to a string needs updating.
 - A deployment with a unit suffix or fraction in an integer setting, `0` in a rate-limit window, a `BODY_SIZE_LIMIT` of `0` or with an unknown unit, a negative reaper or reconciler interval (set `0` to turn a sweep off), a retention or grace window above 36500 days, a timer value past Node's limit, or a boolean flag such as `ENABLE_SWAGGER` spelled other than `true` or `false` now fails to start; the boot error names the key.
-- ⚠️ **Breaking (API).** Webhook filters and automation rule conditions with a key other than `conditions`, or a condition key other than `field`, `operator`, `value` and `caseSensitive`, are now refused with `400`, and `POST /api/infra/import-data` refuses a backup holding such a webhook; remove the extra keys.
+- ⚠️ **Breaking (API).** Webhook filters and automation rule conditions with a key other than `conditions`, or a condition key other than `field`, `operator`, `value` and `caseSensitive`, are now refused with `400`, and `POST /api/infra/import-data` refuses a backup holding such a webhook or automation rule; remove the extra keys.
 - ⚠️ **Breaking (API).** A group create or participant add naming more new contacts than a whole day's cold-reachout allowance gets `400` without `retryAfterSeconds` instead of `429`; split the batch.
 - ⚠️ **Breaking (API).** Media conversion answers `503` instead of `400` when ffmpeg cannot be started, and on Baileys a rate-limited or timed-out group, channel or catalog call answers `503` instead of `403` and a profile-picture lookup whose connection drops answers `503` instead of `200` with a null `url`; a client that branched on the old code needs updating.
 - ⚠️ **Breaking (API).** `POST /api/sessions` refuses an out-of-range or mistyped `config.maxReconnectAttempts`, `config.reconnectBaseDelay` or `config.autoRejectCalls` with `400` instead of storing it; a string such as `"true"` or `"5"` is still accepted and stored typed.
@@ -478,7 +484,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - From the next SDK release after 0.5.0, the Python SDK requires httpx 0.27.1 or newer.
 - From the next SDK release after 0.5.0, the Python SDK's `client.request` raises `ValueError` for a path that does not start with `/`, such as `api/health`, which httpx used to resolve against the base URL; add the leading slash.
 - An engine credential path set through `PUT /api/plugins/:id/config` (`sessionDataPath` for whatsapp-web.js, `baileys.authDir` for Baileys) is no longer used; before upgrading, move those session folders to `SESSION_DATA_PATH` or `BAILEYS_AUTH_DIR`, or point the variable at them, or the sessions need a new link.
-- whatsapp-web.js: a config saved with `PUT /api/plugins/whatsapp-web.js/config` before 0.24.0 stored the `puppeteer` settings of that time, which still override `PUPPETEER_*` in `.env`; with OpenWA stopped, remove the `puppeteer` key from that plugin's `config` in `data/plugins/registry.json` (under `PLUGIN_STATE_DIR` when set).
+- A config saved with `PUT /api/plugins/whatsapp-web.js/config` or `PUT /api/plugins/baileys/config` before 0.24.0 stored every environment-derived engine setting of that time, such as the `puppeteer` settings, which still override `.env`; with OpenWA stopped, remove the keys you did not set on purpose, or the whole `config`, from that plugin's entry in `plugins/registry.json` under `PLUGIN_STATE_DIR` (default `./data`).
 - whatsapp-web.js: a session whose stored proxy URL is not a supported proxy URL now ends `failed` at start instead of running without the proxy; fix or clear it with `PATCH /api/sessions/:sessionId/proxy`.
 - Baileys: with `STORE_EPHEMERAL_MESSAGES=false`, product, poll, contact, live-location, order and event messages received in a disappearing chat no longer produce `message.received` events or stored rows.
 - ⚠️ **Breaking (API).** Ingress deliveries whose `Content-Type` is not `application/json` or `application/x-www-form-urlencoded`, including JSON sent as `text/plain` or an `application/*+json` type, now get `415` instead of being accepted with an empty body.
