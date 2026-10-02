@@ -517,9 +517,16 @@ export interface MessageRecord {
   body?: string | null;
   type: string;
   direction: MessageDirection;
-  /** Chat display name, when the session resolves one for the chat. */
+  /**
+   * Push name of the sender as the engine reported it (their saved contact name when it reported no push
+   * name); in a group this is the member who posted, not the group subject. Null when no name was known.
+   */
   chatName?: string | null;
-  /** Author display name for an inbound group message. */
+  /**
+   * JID of the sender of a group, status or broadcast-list message (`from` is the group, `status@broadcast`
+   * or the list id there; on Baileys a received list message is filed under the sender, so `from` is the
+   * sender too). Null on 1:1 messages and outgoing echoes.
+   */
   author?: string | null;
   /** Storage key of the archived media copy, when chat-media archiving wrote one. */
   mediaPath?: string | null;
