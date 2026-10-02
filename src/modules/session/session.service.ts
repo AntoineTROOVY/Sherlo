@@ -141,7 +141,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
    * retry pause, when the engine holds no slot for it; every start is held for that reason, capped
    * or not.
    */
-  private readonly startReservations = new Set<string>();
+  private readonly startReservations = new Map<string, number>();
 
   constructor(
     @InjectRepository(Session, 'data')
@@ -620,13 +620,14 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
         throw new BadRequestException(`Maximum concurrent sessions reached (${max})`);
       }
     }
-    // A duplicate start of the same id leaves the reservation to the start that made it.
-    const reserved = !this.startReservations.has(id);
-    this.startReservations.add(id);
+    // Counted per start, so a duplicate start of the same id keeps the reservation after the first returns.
+    this.startReservations.set(id, (this.startReservations.get(id) ?? 0) + 1);
     try {
       return await this.claimAndStart(id, explicit);
     } finally {
-      if (reserved) this.startReservations.delete(id);
+      const left = (this.startReservations.get(id) ?? 1) - 1;
+      if (left > 0) this.startReservations.set(id, left);
+      else this.startReservations.delete(id);
     }
   }
 
@@ -678,7 +679,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     explicit: boolean,
     stopRequestsBefore: number | undefined,
   ): Promise<Session> {
-    // A stop that finished during the claim already released it and answered 200; the engine's own
+    // A stop that finished during the claim answered 200 and left the claim to this start; the engine's own
     // stop-mark check cannot tell its mark from a stale one, so the start is refused here.
     if (this.stopRequests.get(id) !== stopRequestsBefore) {
       throw new SessionStoppedException(`Session ${id} was stopped`);
@@ -707,7 +708,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
         await this.findOne(id);
         throw new ConflictException(`Session ${id} is running on another node`);
       }
-      // Checked again: a stop that landed during the re-claim has already released it.
+      // Checked again: a stop that landed during the re-claim leaves the claim for claimAndStart's catch to release.
       if (this.stopRequests.get(id) !== stopRequestsBefore) {
         throw new SessionStoppedException(`Session ${id} was stopped`);
       }
@@ -740,17 +741,16 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
       // DISCONNECTED, and a claim left to lapse still names this node, so a peer's takeover sweep
       // would adopt the row and start the session the operator just stopped. A released claim is
       // not adopted. The foreign-node 409 keeps its claim (it is the peer's), and so does a 404.
-      if (error instanceof BadGatewayException) await this.releaseUnlessEngineActive(id);
+      if (error instanceof BadGatewayException) await this.releaseAfterTeardown(id);
       this.discardStopMarkForMissingSession(id, error);
       throw error;
     }
     // Handed back on the way out so a peer can pick it up immediately rather than waiting for the
     // lease to lapse. Stop is the deliberate end of this process's ownership — but a start() that
-    // began before this stop and is still mid-launch owns the claim now, so the same
-    // engine-liveness guard the failure paths use applies here: releasing under an in-flight start
-    // would leave a live engine on an unclaimed row that no heartbeat renews and any peer may
-    // start a second time.
-    await this.releaseUnlessEngineActive(id);
+    // is still mid-launch or still waiting on its claim owns the claim now, so the same guard the
+    // failure paths use applies here: releasing under an in-flight start would leave a live engine
+    // on an unclaimed row that no heartbeat renews and any peer may start a second time.
+    await this.releaseAfterTeardown(id);
     return session;
   }
 
@@ -759,13 +759,13 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     try {
       const session = await this.engineLifecycle.logout(id);
       // Torn down locally on the 200 path — hand the claim back the way stop() does.
-      await this.releaseUnlessEngineActive(id);
+      await this.releaseAfterTeardown(id);
       return session;
     } catch (error) {
       // The 502-incomplete path tears the engine down, so its claim must not survive the call. A 400
       // "not started" refusal changed nothing and keeps whatever claim there is: release() also
       // clears a LAPSED foreign claim, which would take a crashed node's session out of takeover.
-      if (!(error instanceof BadRequestException)) await this.releaseUnlessEngineActive(id);
+      if (!(error instanceof BadRequestException)) await this.releaseAfterTeardown(id);
       throw error;
     }
   }
@@ -774,11 +774,11 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     try {
       // The engine kill records the stop itself, once it has an engine to kill.
       const session = await this.engineLifecycle.forceKill(id);
-      await this.releaseUnlessEngineActive(id);
+      await this.releaseAfterTeardown(id);
       return session;
     } catch (error) {
       // Same 400 rule as logout(): a "not started" refusal took nothing down.
-      if (!(error instanceof BadRequestException)) await this.releaseUnlessEngineActive(id);
+      if (!(error instanceof BadRequestException)) await this.releaseAfterTeardown(id);
       throw error;
     }
   }
@@ -831,6 +831,17 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     const remaining = (this.stopRequests.get(id) ?? 0) - 1;
     if (remaining > 0) this.stopRequests.set(id, remaining);
     else this.stopRequests.delete(id);
+  }
+
+  /**
+   * The claim release for an operator teardown (stop, logout, force-kill). A start() of the same id
+   * that is still waiting on its claim owns it, though nothing runs here yet for the engine check to
+   * see: releasing would leave the engine it is about to launch on a row no node holds. That start
+   * hands the claim back itself if it yields or fails.
+   */
+  private async releaseAfterTeardown(id: string): Promise<void> {
+    if (this.startReservations.has(id)) return;
+    await this.releaseUnlessEngineActive(id);
   }
 
   /** Hand the claim back unless something still runs here (engine, in-flight start, pending reconnect). */
@@ -1181,7 +1192,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
   }
 
   private startSlotsInUse(): Set<string> {
-    return new Set([...this.engineLifecycle.startSlotHolders(), ...this.startReservations]);
+    return new Set([...this.engineLifecycle.startSlotHolders(), ...this.startReservations.keys()]);
   }
 
   /**

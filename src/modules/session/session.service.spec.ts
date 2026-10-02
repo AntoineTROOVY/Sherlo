@@ -1481,6 +1481,67 @@ describe('SessionService', () => {
       expect(ownership.release.mock.calls.length).toBeGreaterThan(releasesBefore);
     });
 
+    // The teardown finished while a start sent after it still waited on its claim, and handed back
+    // the claim that start had just taken: the start then ran its engine on a row no node held.
+    it.each([
+      ['stop', true],
+      ['stop', false],
+      ['logout', true],
+      ['logout', false],
+      ['forceKill', true],
+      ['forceKill', false],
+    ] as const)('%s() leaves the claim to a start still claiming it (teardown completes: %s)', async (verb, clean) => {
+      const ownership = withOwnership();
+      trackDesiredState();
+      const teardown = () => (clean ? Promise.resolve() : Promise.reject(new Error('engine wedged')));
+      (service as unknown as { engines: Map<string, unknown> }).engines.set('sess-uuid-1', {
+        disconnect: jest.fn(teardown),
+        logout: jest.fn(teardown),
+        forceDestroy: jest.fn(teardown),
+      });
+      let finishClaim: () => void = () => undefined;
+      ownership.claim.mockImplementationOnce(
+        () => new Promise<boolean>(resolve => (finishClaim = () => resolve(true))),
+      );
+
+      const tearingDown = service[verb]('sess-uuid-1').catch((error: unknown) => error);
+      const starting = service.start('sess-uuid-1', { explicit: true });
+      const teardownOutcome = await tearingDown;
+      finishClaim();
+      await starting;
+
+      if (!clean) expect(teardownOutcome).toBeInstanceOf(BadGatewayException);
+      expect(lifecycle.isEngineActive('sess-uuid-1')).toBe(true);
+      expect(ownership.release).not.toHaveBeenCalled();
+    });
+
+    // A duplicate start of the same id (a double click, a client retry) must hold the claim as well:
+    // the first start returning early must not leave the second one's claim to the teardown.
+    it('stop() leaves the claim to a duplicate start still claiming it after the first start failed', async () => {
+      const ownership = withOwnership();
+      trackDesiredState();
+      (service as unknown as { engines: Map<string, unknown> }).engines.set('sess-uuid-1', {
+        disconnect: jest.fn().mockResolvedValue(undefined),
+      });
+      let finishFirstClaim: () => void = () => undefined;
+      let finishSecondClaim: () => void = () => undefined;
+      ownership.claim
+        .mockImplementationOnce(() => new Promise<boolean>(resolve => (finishFirstClaim = () => resolve(false))))
+        .mockImplementationOnce(() => new Promise<boolean>(resolve => (finishSecondClaim = () => resolve(true))));
+
+      const stopping = service.stop('sess-uuid-1');
+      const first = service.start('sess-uuid-1', { explicit: true }).catch((error: unknown) => error);
+      const second = service.start('sess-uuid-1', { explicit: true });
+      finishFirstClaim();
+      expect(await first).toBeInstanceOf(ConflictException);
+      await stopping;
+      finishSecondClaim();
+      await second;
+
+      expect(lifecycle.isEngineActive('sess-uuid-1')).toBe(true);
+      expect(ownership.release).not.toHaveBeenCalled();
+    });
+
     it('start() does not retry a transient failure when a stop() lands while the re-claim is pending', async () => {
       const ownership = withOwnership();
       const desired = trackDesiredState();
