@@ -92,6 +92,11 @@ test('a 401 without a message reads as an invalid key', async () => {
   assert.equal(await submitAndReadError(), 'Invalid API key');
 });
 
+test('a refusal other than 401 without a message is a connection error, not an invalid key', async () => {
+  reply = () => new Response('', { status: 403 });
+  assert.equal(await submitAndReadError(), 'Unable to connect to server. Please try again.');
+});
+
 test('the login form aligns to the document direction, which is set on <html>', () => {
   const css = readFileSync(fileURLToPath(new URL('./Login.css', import.meta.url)), 'utf8');
   // i18n sets `dir` on the document element only, so a `[dir]` compound after another selector part
