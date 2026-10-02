@@ -3821,7 +3821,7 @@ Get recent messages from a channel/newsletter.
 ]
 ```
 
-Bare array. `timestamp` is an epoch number (seconds). `mediaUrl` is present only when the message carries media with a readable URL.
+Bare array. `timestamp` is an epoch number (seconds). Neither engine populates `mediaUrl` on channel messages today; use `hasMedia` to tell a media post apart.
 
 **Errors:** `400` `Session is not started` · `401` missing/invalid API key · `404` `Channel <channelId> not found` (on whatsapp-web.js, the id is not among the channels the account follows) · `409` conflict or engine not ready (retryable) · `501` not supported on the active engine
 

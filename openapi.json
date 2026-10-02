@@ -23314,7 +23314,7 @@
           },
           "mediaUrl": {
             "type": "string",
-            "description": "Media URL, when the engine resolved one."
+            "description": "Media URL. Neither engine populates it today; use hasMedia."
           }
         },
         "required": [
