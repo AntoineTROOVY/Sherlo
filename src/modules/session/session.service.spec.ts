@@ -1079,6 +1079,29 @@ describe('SessionService', () => {
       expect(service.getActiveSessionIds()).toContain('relaunching');
     });
 
+    it('shows a start in its retry pause to the import pre-flight, and a stopOrphans import cancels it', async () => {
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
+      (engineFactory.create as jest.Mock).mockClear().mockReturnValue(mockEngine);
+      mockEngine.initialize.mockRejectedValueOnce(new EngineTransportError('Protocol error: Target closed'));
+
+      const outcome = service.start('sess-uuid-1').catch((error: unknown) => error);
+      for (let i = 0; i < 200 && mockEngine.initialize.mock.calls.length === 0; i++) {
+        await new Promise(resolve => setImmediate(resolve));
+      }
+      for (let i = 0; i < 200 && lifecycle.isEngineActive('sess-uuid-1'); i++) {
+        await new Promise(resolve => setImmediate(resolve));
+      }
+      expect(lifecycle.isEngineActive('sess-uuid-1')).toBe(false);
+
+      expect(service.getActiveSessionIds()).toContain('sess-uuid-1');
+      await service.stopOrphanEngines(['sess-uuid-1']);
+
+      expect(await outcome).toBeInstanceOf(SessionStoppedException);
+      expect(mockEngine.initialize).toHaveBeenCalledTimes(1);
+      expect(lifecycle.isEngineActive('sess-uuid-1')).toBe(false);
+    });
+
     it('evicts and tears down the engine when engine.initialize() fails (no orphan wedging the session)', async () => {
       (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
       (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });

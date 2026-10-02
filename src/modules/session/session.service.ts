@@ -137,6 +137,9 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
    * Starts past start()'s cap check, held until they return. That check counts them with the
    * engine's slot holders, so two starts at the last free slot cannot both pass it while their claims
    * are awaited. hasStartCapacity() does not: a held start whose claim then fails never used a slot.
+   * getActiveSessionIds() does, so the import pre-flight sees a start waiting on its claim or in its
+   * retry pause, when the engine holds no slot for it; every start is held for that reason, capped
+   * or not.
    */
   private readonly startReservations = new Set<string>();
 
@@ -605,18 +608,17 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     // authoritative one; this only keeps a refusal off the lease. A start that passes holds its slot
     // until it returns, so a concurrent start cannot pass on the same free slot during the claim.
     const max = resolveMaxConcurrentSessions(this.configService);
-    if (!this.ownership || max === null) {
-      return this.claimAndStart(id, explicit);
-    }
-    const holders = this.startSlotsInUse();
-    holders.delete(id);
-    if (holders.size >= max) {
-      // Same answer the failed claim below would give, so the cap does not mask a 404 or a 409.
-      await this.findOne(id);
-      if (await this.ownership.isHeldByOtherNode(id)) {
-        throw new ConflictException(`Session ${id} is running on another node`);
+    if (this.ownership && max !== null) {
+      const holders = this.startSlotsInUse();
+      holders.delete(id);
+      if (holders.size >= max) {
+        // Same answer the failed claim below would give, so the cap does not mask a 404 or a 409.
+        await this.findOne(id);
+        if (await this.ownership.isHeldByOtherNode(id)) {
+          throw new ConflictException(`Session ${id} is running on another node`);
+        }
+        throw new BadRequestException(`Maximum concurrent sessions reached (${max})`);
       }
-      throw new BadRequestException(`Maximum concurrent sessions reached (${max})`);
     }
     // A duplicate start of the same id leaves the reservation to the start that made it.
     const reserved = !this.startReservations.has(id);
@@ -811,8 +813,12 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
   }
 
   private markStopping(id: string): void {
-    this.stopRequests.set(id, (this.stopRequests.get(id) ?? 0) + 1);
+    this.countStopRequest(id);
     this.engineLifecycle.markStopping(id);
+  }
+
+  private countStopRequest(id: string): void {
+    this.stopRequests.set(id, (this.stopRequests.get(id) ?? 0) + 1);
   }
 
   /**
@@ -1161,11 +1167,12 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
   /**
    * Ids of every session with a live engine — including ones mid-initialization (their engine is not
    * in `engines` yet but will register when start() completes) and ones waiting to relaunch after a
-   * failed reconnect (their timer registers one). The infra import pre-flight uses this to refuse a
-   * full-replace restore that would orphan a running engine.
+   * failed reconnect (their timer registers one), plus starts still waiting on their claim or in their
+   * transient retry pause. The infra import pre-flight uses this to refuse a full-replace restore that
+   * would orphan a running engine.
    */
   getActiveSessionIds(): string[] {
-    return [...this.engineLifecycle.startSlotHolders()];
+    return [...this.startSlotsInUse()];
   }
 
   /** Whether this node has a MAX_CONCURRENT_SESSIONS slot free, counted exactly as the engine's cap check counts it. */
@@ -1179,11 +1186,14 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
 
   /**
    * Stop engines for session ids whose DB row is about to be replaced by an infra import.
-   * Owned by the lifecycle service; see SessionEngineLifecycle.stopOrphanEngines().
+   * Owned by the lifecycle service; see SessionEngineLifecycle.stopOrphanEngines(). Counted as a
+   * stop too, so a start waiting on its claim or in its retry pause launches nothing: the engine's
+   * stop mark alone reads as stale to the start that follows.
    */
   async stopOrphanEngines(
     sessionIds: string[],
   ): Promise<{ stopped: string[]; notRunning: string[]; failed: string[] }> {
+    for (const id of sessionIds) this.countStopRequest(id);
     return this.engineLifecycle.stopOrphanEngines(sessionIds);
   }
 
