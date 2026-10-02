@@ -20,6 +20,7 @@ export class MainSchemaMismatchError extends Error {
  * How long a runtime SQLite write waits on a lock before failing with SQLITE_BUSY. scripts/backup.sh
  * holds a read transaction for each file's whole online copy and blocks writes until it ends, so
  * this matches the backup's own `.timeout 30000` instead of better-sqlite3's 5 s default.
+ * better-sqlite3 waits synchronously, so the wait blocks the event loop.
  */
 export const SQLITE_BUSY_TIMEOUT_MS = 30_000;
 

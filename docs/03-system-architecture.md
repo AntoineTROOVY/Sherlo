@@ -1436,11 +1436,12 @@ return {
 
 > **Note:** OpenWA does not currently apply SQLite-specific concurrency hardening. There is **no**
 > `journal_mode = WAL` PRAGMA, no `SqliteWriteQueueService`, and no application-level write
-> serialization in the source. SQLite is used with TypeORM's defaults, so its standard
-> single-writer behavior applies. For high write-concurrency or multi-session deployments, use
-> PostgreSQL (`DATABASE_TYPE=postgres`). `MAX_CONCURRENT_SESSIONS` (default `0`, unlimited) caps
-> concurrent sessions on any database. Cross-dialect schema differences are handled at migration
-> time (see below), not by a runtime optimizations layer.
+> serialization in the source. SQLite is used with TypeORM's defaults apart from a fixed 30 s busy
+> timeout (`SQLITE_BUSY_TIMEOUT_MS`), so its standard single-writer behavior applies. For high
+> write-concurrency or multi-session deployments, use PostgreSQL (`DATABASE_TYPE=postgres`).
+> `MAX_CONCURRENT_SESSIONS` (default `0`, unlimited) caps concurrent sessions on any database.
+> Cross-dialect schema differences are handled at migration time (see below), not by a runtime
+> optimizations layer.
 
 #### Migration Strategy
 

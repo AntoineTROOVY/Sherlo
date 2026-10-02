@@ -1105,7 +1105,8 @@ sqlite3 ./data/openwa.sqlite "PRAGMA journal_mode=WAL;"
 There is no `DATABASE_SQLITE_BUSY_TIMEOUT`-style env knob — both SQLite connections wait a
 fixed 30 s on a lock (`SQLITE_BUSY_TIMEOUT_MS`, matching `scripts/backup.sh`'s `.timeout 30000`)
 before failing with `SQLITE_BUSY`, and `better-sqlite3` waits synchronously, so the whole gateway
-stalls for as long as a write waits. If locks persist under concurrent sessions, migrate to PostgreSQL.
+stalls for as long as a write waits. If locks persist under concurrent sessions, migrate to
+PostgreSQL.
 
 **When to Migrate to PostgreSQL:**
 
