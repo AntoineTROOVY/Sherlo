@@ -34,7 +34,7 @@ import {
   SessionEngineEventWiring,
   SessionEngineWiringHost,
 } from './session-engine-event-wiring';
-import { SessionEngineControls, type StopHooks } from './session-engine-controls';
+import { SessionEngineControls, StopMarks, type StopHooks } from './session-engine-controls';
 import { SessionOwnershipService, nodeOwnsSession } from './session-ownership.service';
 
 /**
@@ -240,7 +240,7 @@ export class SessionEngineLifecycle {
   // engine init, so a stop/delete during that window could re-register an engine AFTER
   // teardown (orphan). stop()/delete() add the id here; executeReconnect checks it after its
   // awaits and destroys any engine it just created; start() clears it (intentional restart).
-  private stoppingSessions: Set<string> = new Set();
+  private stoppingSessions = new StopMarks();
 
   // Sessions whose engine is mid-initialization (a start() is in flight). Reserved synchronously
   // in start() so a near-simultaneous second start() can't pass the engines.has() check during the

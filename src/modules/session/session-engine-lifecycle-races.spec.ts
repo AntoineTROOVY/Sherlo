@@ -193,6 +193,47 @@ describe('SessionEngineLifecycle races', () => {
 
       expect(internals.engines.has(ID)).toBe(true);
     });
+
+    it('retires the start when an older stop mark was already present', async () => {
+      await lifecycle.stopOrphanEngines([ID]);
+      const read = deferred<Session>();
+      repository.findOne.mockReturnValueOnce(read.promise);
+
+      const outcome = lifecycle.start(ID).then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      await flush();
+      await expect(lifecycle.stopOrphanEngines([ID])).resolves.toEqual({
+        stopped: [],
+        notRunning: [ID],
+        failed: [],
+      });
+      read.resolve(session());
+
+      expect(await outcome).toBeInstanceOf(SessionStoppedException);
+      expect(engineFactory.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('stop against an explicit start still reading its row', () => {
+    it('yields to a stop that lands while it waits, after an earlier stop', async () => {
+      repository.findOne.mockResolvedValue(session({ desiredState: 'stopped' }));
+      await lifecycle.stop(ID);
+      const read = deferred<Session>();
+      repository.findOne.mockReturnValueOnce(read.promise);
+
+      const outcome = lifecycle.start(ID, { explicit: true }).then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      await flush();
+      await lifecycle.stop(ID);
+      read.resolve(session({ desiredState: 'stopped' }));
+
+      expect(await outcome).toBeInstanceOf(SessionStoppedException);
+      expect(internals.engines.has(ID)).toBe(false);
+    });
   });
 
   describe('rejectRebind', () => {

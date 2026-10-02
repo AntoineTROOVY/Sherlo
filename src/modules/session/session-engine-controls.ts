@@ -42,6 +42,30 @@ import {
 /** A start refused because an operator stopped the session. Same 409 on the wire as any conflict. */
 export class SessionStoppedException extends ConflictException {}
 
+/**
+ * The stop marks. Each add() stamps the id afresh, even one already marked, so start() can tell a mark
+ * set while it waited from one that was already there when it began.
+ */
+export class StopMarks extends Set<string> {
+  private seq = 0;
+  private readonly stamps = new Map<string, number>();
+
+  override add(id: string): this {
+    this.stamps.set(id, ++this.seq);
+    return super.add(id);
+  }
+
+  override delete(id: string): boolean {
+    this.stamps.delete(id);
+    return super.delete(id);
+  }
+
+  /** The stamp of the id's current mark, undefined when it has none. */
+  stamp(id: string): number | undefined {
+    return this.stamps.get(id);
+  }
+}
+
 /** Caller callbacks for stop()/delete(), run around the session read that opens each verb. */
 export interface StopHooks {
   /** stop() only: runs once the session read succeeds and before any teardown; records the stop. */
@@ -85,7 +109,7 @@ export interface SessionEngineControlsHost {
   updateStatus(id: string, status: SessionStatus): Promise<void>;
   /** Ownership gate, same contract as SessionEngineWiringHost.ownsSession. */
   ownsSession(id: string): boolean;
-  stoppingSessions: Set<string>;
+  stoppingSessions: StopMarks;
   /** The engine each operator-initiated teardown is retiring; see the lifecycle field of the same name. */
   operatorTeardowns: Map<string, IWhatsAppEngine>;
   reconnectStates: Map<string, ReconnectState>;
@@ -118,7 +142,7 @@ export class SessionEngineControls {
   private readonly logger: ReturnType<typeof createLogger>;
   private readonly fences: SessionLifecycleFences;
   private readonly broadcaster: SessionStatusBroadcaster;
-  private readonly stoppingSessions: Set<string>;
+  private readonly stoppingSessions: StopMarks;
   private readonly operatorTeardowns: Map<string, IWhatsAppEngine>;
   private readonly reconnectStates: Map<string, ReconnectState>;
   private readonly stuckAuthRecoveryUsed: Set<string>;
@@ -186,8 +210,9 @@ export class SessionEngineControls {
     this.initializingSessions.add(id);
     // A stop mark already set when this start began is stale (a start is how one is cleared). One set
     // while it waits below comes from a retirement that saw this start in flight, stopOrphanEngines
-    // above all, which writes nothing else this start could read and counts on it aborting.
-    const markedAtEntry = this.stoppingSessions.has(id);
+    // above all, which writes nothing else this start could read and counts on it aborting. That
+    // includes a mark set again on top of a stale one, which only its stamp tells apart.
+    const markAtEntry = this.stoppingSessions.stamp(id);
 
     try {
       const session = await this.requireSession(id);
@@ -233,7 +258,7 @@ export class SessionEngineControls {
 
       // A fresh start intentionally (re-)creates the engine — clear any stale stop/delete mark, but
       // yield to one set after this start began, leaving it in place.
-      if (this.stoppingSessions.has(id) && !markedAtEntry) {
+      if (this.stoppingSessions.has(id) && this.stoppingSessions.stamp(id) !== markAtEntry) {
         throw new SessionStoppedException(`Session ${id} was stopped`);
       }
       this.stoppingSessions.delete(id);
