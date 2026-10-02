@@ -295,7 +295,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Baileys: a profile-picture lookup whose connection drops, or that WhatsApp rate-limits or times out (code 429 or 408), answers `503` instead of `200` with a null `url`.
 - Baileys: a WhatsApp refusal on the catalog routes answers `403` instead of `500`, an account without a catalog gets the documented empty answer, and a refused product lookup in `send-product` no longer counts toward the send breaker.
 - Baileys: a group, channel or catalog call that WhatsApp rate-limits or times out answers `503` instead of a `403` permissions error or a `500` (`404` for the group invite preview, `400` for a group join), except a timed-out group or channel create, which may have succeeded and so answers `500` instead of a retryable `503`.
-- Baileys: a call-link request WhatsApp never answers gets `503` instead of `500`; a retry can create a second link.
 - Dashboard Chats: reopening a chat after switching sessions or leaving the Chats page shows the messages that arrived meanwhile, also when the live event feed is unavailable.
 - Dashboard Chats: a chat marked unread shows an unread badge in the sidebar and keeps it when a new message arrives.
 - Dashboard Chats: sending while a picked file is still loading no longer discards the file or sends the file it replaced.

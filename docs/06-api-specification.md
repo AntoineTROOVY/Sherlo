@@ -6544,7 +6544,7 @@ Generate a shareable WhatsApp call link.
 > caller handed `{ "link": "" }` — or a bare prefix with nothing after it — would pass it to a user
 > before discovering it is dead.
 
-**Errors:** `400` session not ready, or an invalid `type`/`startTime` · `401` missing/invalid API key · `403` WhatsApp generated no link · `409` conflict or engine not ready (retryable) · `500` the whatsapp-web.js page died mid-request (on whatsapp-web.js deliberately not `503`: each call mints a new link, so a client replaying a `503` would create a second one) · `503` (Baileys only) WhatsApp did not answer within the request budget; a link may or may not have been minted, so a retry can create a second one
+**Errors:** `400` session not ready, or an invalid `type`/`startTime` · `401` missing/invalid API key · `403` WhatsApp generated no link · `409` conflict or engine not ready (retryable) · `500` the whatsapp-web.js page died mid-request, or on Baileys WhatsApp did not answer within the request budget; a link may have been minted on either engine, so this is deliberately not `503`: each call mints a new link, so a client replaying a `503` would create a second one
 
 #### POST /api/sessions/:sessionId/calls/:callId/reject
 
