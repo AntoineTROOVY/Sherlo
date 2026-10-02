@@ -12,9 +12,12 @@ npm install @rmyndharis/openwa
 
 Requires Node.js >= 18 (relies on the global `fetch`).
 
-This README describes `main`. The 0.5.0 release lacks `sessions.getProxy`,
-`sessions.updateProxy`, `messages.clickButton`, the `name` filter on
-`sessions.list`, `verifyWebhookSignature`, the `WebhookDelivery` types, the
+This README describes `main`. The 0.5.0 release lacks, among other additions,
+`sessions.getProxy`, `sessions.updateProxy`, `messages.clickButton`, the `name`
+filter on `sessions.list`, the `after` and `inlineMedia` keys of the
+`messages.list` query, the `archived`, `pinned`, `muted` and `muteExpiration`
+fields of `ChatSummary`, the `order` and `product` fields of
+`ChatHistoryMessage`, `verifyWebhookSignature`, the `WebhookDelivery` types, the
 `code`, `retryAfterSeconds` and `headers` error fields and the refusal of an
 empty, `.` or `..` id or path segment; they ship with the next SDK release. See
 [the SDK overview](../README.md#coverage).
