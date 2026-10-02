@@ -152,6 +152,16 @@ class TestClientCore:
         assert build_url("http://x", "/api/search", {"q": "%41"}).endswith("q=%2541")
         assert build_url("http://x", "/api/search", {"q": "50%"}).endswith("q=50%25")
 
+    @pytest.mark.parametrize("path", ["https://evil.example/x", ".evil.example/x", "@evil.example/x"])
+    def test_build_url_refuses_a_path_without_a_leading_slash(self, path):
+        # An absolute URL would replace the base host and carry the API key there.
+        with pytest.raises(ValueError):
+            build_url("http://x", path)
+        backend = MockBackend()
+        with pytest.raises(ValueError):
+            make_client(backend).request("GET", path)
+        assert backend.calls == []
+
     def test_build_url_omits_none_valued_params(self):
         # The behaviour a caller depends on: a None never reaches the wire as the literal "None".
         # Tested here because build_url is what implements it — the typed resource signatures
