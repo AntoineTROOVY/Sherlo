@@ -276,6 +276,15 @@ describe('production HTTP surface (configureApp)', () => {
     await request(app.getHttpServer()).get('/api/sessions/abc%2500').expect(200);
   });
 
+  it('refuses a body holding a NUL character at any depth', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/echo')
+      .set('Content-Type', 'application/json')
+      .send({ items: [{ variables: { name: 'a\u0000b' } }] });
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ statusCode: 400, error: 'Bad Request' });
+  });
+
   it('answers a compressed body with 415 rather than charging the budget its inflated size', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/echo')
