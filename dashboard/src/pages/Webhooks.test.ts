@@ -238,7 +238,7 @@ test('Create stays disabled with a hint while no event is selected', async () =>
   fireEvent.change(screen.getByLabelText('URL'), { target: { value: 'https://example.test/hook' } });
   const create = screen.getByRole<HTMLButtonElement>('button', { name: 'Create' });
   assert.equal(create.disabled, false);
-  assert.equal(screen.queryByText('Select at least one event.'), null);
+  assert.equal(screen.queryByText('Select at least one event.') === null, true);
 
   fireEvent.click(screen.getByRole('button', { name: 'message.received' }));
   assert.equal(create.disabled, true, 'no event selected');
@@ -550,7 +550,7 @@ test('a second click on the delete confirm while the first delete is in flight s
   assert.equal(deleteCalls.length, 1);
   releaseRequests();
   await screen.findByText('Webhook deleted successfully');
-  assert.equal(screen.queryByRole('alert'), null);
+  assert.equal(screen.queryByRole('alert') === null, true);
 });
 
 // A late success resets whichever modal is open by then, so a modal must not close and give way to
