@@ -270,7 +270,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - whatsapp-web.js: a stop and start during stuck-login recovery no longer races the removal of the session's browser profile.
 - whatsapp-web.js: a send whose retry to a lid address hits a dead browser page reports the session disconnected, as the first attempt does.
 - whatsapp-web.js: `message.revoked` names the peer or group as `chatId` when the account deletes its own message in a lid chat or group, instead of the account's own lid.
-- whatsapp-web.js: mute, unmute, pin and unpin answer `503` and report the session disconnected when the page dies or times out during the write, instead of `500`.
+- whatsapp-web.js: mute, unmute, pin and unpin answer `503` instead of `500` when the page dies or times out during the write, and a dead page reports the session disconnected.
 - whatsapp-web.js: revoking a group invite code without admin rights answers `403`, and approving or rejecting membership requests for an unknown or non-group id answers `404`, instead of `500`.
 - whatsapp-web.js: a stop, delete or force-kill while the session is still launching no longer marks it `failed`, sends a failed status webhook or runs the `session:error` hook.
 - whatsapp-web.js: a session waiting for operator action (`action_required`) no longer returns to `ready` on its own after a page reload.
