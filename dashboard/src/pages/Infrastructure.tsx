@@ -200,10 +200,7 @@ export function Infrastructure() {
     ) : null;
   const settingNote = (envKey: string, running: unknown, saved: unknown) => {
     if (infraStatus?.envPinned?.includes(envKey)) return pinNote(envKey);
-    // Suppressed only while the request is actually in flight. `saving` is that flag; `savePending` is
-    // a latch set once a save SUCCEEDS and cleared only by a restart's page reload, so gating on it
-    // hid this note for the whole life of the page from the first successful save — which is exactly
-    // the state it exists to report, and exactly what the operator who chose "Restart Later" is in.
+    // Hidden only while the save request is in flight (`configSave.saving`).
     const pendingRestart = !configSave.saving && !!infraStatus && !!savedConfig && running !== saved;
     return pendingRestart ? (
       <p className="env-pin-note">
