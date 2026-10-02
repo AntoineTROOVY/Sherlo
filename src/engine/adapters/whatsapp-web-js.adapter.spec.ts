@@ -1251,7 +1251,7 @@ describe('WhatsAppWebJsAdapter channels (#625 — wwebjs Client has no getChanne
 
     expect(getChannels).toHaveBeenCalled();
     expect(fetchMessages).toHaveBeenCalledWith({ limit: 10 });
-    expect(result).toEqual([{ id: 'M1', body: 'hello', timestamp: 1700000000, hasMedia: false, mediaUrl: undefined }]);
+    expect(result).toEqual([{ id: 'M1', body: 'hello', timestamp: 1700000000, hasMedia: false }]);
   });
 
   it('getChannelMessages surfaces a not-found channel as ChannelNotFoundError (→ 404), not a silent []', async () => {
