@@ -4,7 +4,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsObject,
-  ValidateIf,
   IsArray,
   ArrayMaxSize,
   MaxLength,
@@ -31,7 +30,6 @@ export class SendTemplateMessageDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @ValidateIf((o: SendTemplateMessageDto) => !o.templateName)
   templateId?: string;
 
   @ApiPropertyOptional({
@@ -41,7 +39,6 @@ export class SendTemplateMessageDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @ValidateIf((o: SendTemplateMessageDto) => !o.templateId)
   templateName?: string;
 
   @ApiPropertyOptional({

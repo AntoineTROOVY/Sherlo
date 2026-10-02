@@ -274,6 +274,28 @@ describe('SendMediaMessageDto base64', () => {
 
 // @nestjs/swagger derives no bounds from the validators, so each one is declared on the decorator;
 // without it the published schema advertises an unbounded field the server answers 400 for.
+describe('SendTemplateMessageDto identifiers', () => {
+  // TemplateService.resolve reads templateId first, so a templateName next to it must not switch the
+  // type check off.
+  it('rejects a non-string templateId even when a templateName is present', async () => {
+    const errors = await validateDto(SendTemplateMessageDto, {
+      chatId: 'c@c.us',
+      templateId: ['a'],
+      templateName: 'x',
+    });
+    expect(errors.map(e => e.property)).toContain('templateId');
+  });
+
+  it('rejects a non-string templateName even when a templateId is present', async () => {
+    const errors = await validateDto(SendTemplateMessageDto, {
+      chatId: 'c@c.us',
+      templateId: 'a',
+      templateName: ['x'],
+    });
+    expect(errors.map(e => e.property)).toContain('templateName');
+  });
+});
+
 describe('published schema bounds', () => {
   const published = (cls: new () => object, key: string): Record<string, unknown> | undefined =>
     Reflect.getMetadata(DECORATORS.API_MODEL_PROPERTIES, cls.prototype as object, key) as
