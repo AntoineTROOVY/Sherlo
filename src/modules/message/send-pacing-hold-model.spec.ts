@@ -9,7 +9,7 @@ import { computeSendPacingConfig } from './send-pacing.config';
 /**
  * Seeded interleavings of single sends, bulk items, hand-backs, unknown outcomes and rows landing late,
  * judged against the rows actually written. The hand-written cases in send-pacing-cold-query.spec.ts each
- * pin one ordering; this walks thousands of them, so a change to how admissions are held has to keep every
+ * pin one ordering; this walks 120 seeded ones, so a change to how admissions are held has to keep every
  * property below on all of them:
  *
  *  - no cap is passed: the rows written plus the rows still due never exceed either allowance;
