@@ -308,6 +308,7 @@ class CreateSessionRequest(TypedDict):
     name: str
     config: NotRequired[dict[str, Any]]
     proxyUrl: NotRequired[str]
+    # Deprecated and ignored by the server: the proxyUrl scheme selects the proxy protocol.
     proxyType: NotRequired[Literal['http', 'https', 'socks4', 'socks5']]
 
 
