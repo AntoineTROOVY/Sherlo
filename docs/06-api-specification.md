@@ -2793,7 +2793,7 @@ Get the group's picture URL.
 **Response** `200` — `{ "url": "https://…" }`, or `{ "url": null }` when the group has no picture or
 it is hidden by privacy settings.
 
-**Errors:** `400` the id does not name a group, or the session is not active · `401` missing/invalid API key · `409` engine not ready · `503` WhatsApp did not answer within the request budget — nothing could be read
+**Errors:** `400` the id does not name a group, or the session is not active · `401` missing/invalid API key · `409` engine not ready · `503` WhatsApp did not answer within the request budget — nothing could be read; on Baileys, also when WhatsApp rate-limits or times out the request (code 429 or 408): retry after a pause
 
 #### PUT /api/sessions/:sessionId/groups/:groupId/picture
 
@@ -2811,7 +2811,7 @@ Set the group's picture. The account must be a group admin.
 
 **Response** `200` — `{ "success": true, "message": "Group picture updated" }`
 
-**Errors:** `400` the id does not name a group, the session is not active, neither `url` nor `base64` was supplied, or the `url` answers non-2xx, times out or cannot be reached · `401` missing/invalid API key · `403` key lacks OPERATOR role, or the engine refused (admin rights required) · `404` no such group · `409` the session is not connected (engine exists but is not `ready`) · `413` base64 or downloaded media over the media cap (see §6.3) · `503` a `url` fetch through the session's egress proxy failed before any response, the proxy or the target at fault (retryable), or WhatsApp did not answer within the request budget — the change may or may not have been applied
+**Errors:** `400` the id does not name a group, the session is not active, neither `url` nor `base64` was supplied, or the `url` answers non-2xx, times out or cannot be reached · `401` missing/invalid API key · `403` key lacks OPERATOR role, or the engine refused (admin rights required) · `404` no such group · `409` the session is not connected (engine exists but is not `ready`) · `413` base64 or downloaded media over the media cap (see §6.3) · `503` a `url` fetch through the session's egress proxy failed before any response, the proxy or the target at fault (retryable), or WhatsApp did not answer within the request budget — the change may or may not have been applied; on Baileys, also when WhatsApp rate-limits or times out the request (code 429 or 408): retry after a pause
 
 #### DELETE /api/sessions/:sessionId/groups/:groupId/picture
 
@@ -2821,7 +2821,7 @@ Remove the group's picture. The account must be a group admin.
 
 **Response** `200` — `{ "success": true, "message": "Group picture removed" }`
 
-**Errors:** `400` the id does not name a group, or the session is not active · `401` missing/invalid API key · `403` key lacks OPERATOR role, or the engine refused (admin rights required) · `404` no such group · `409` the session is not connected (engine exists but is not `ready`) · `503` WhatsApp did not answer within the request budget — the change may or may not have been applied
+**Errors:** `400` the id does not name a group, or the session is not active · `401` missing/invalid API key · `403` key lacks OPERATOR role, or the engine refused (admin rights required) · `404` no such group · `409` the session is not connected (engine exists but is not `ready`) · `503` WhatsApp did not answer within the request budget — the change may or may not have been applied; on Baileys, also when WhatsApp rate-limits or times out the request (code 429 or 408): retry after a pause
 
 #### GET /api/sessions/:sessionId/groups/:groupId/invite-code
 
@@ -2889,7 +2889,7 @@ Returns the created `Group` directly (raw).
 }
 ```
 
-**Errors:** `400` validation (missing/empty `name` or `participants`, or any non-DTO field) / session not started, or a participant does not name an individual (phone, `<phone>@c.us` or `<lid>@lid`) · `401` missing/invalid `X-API-Key` · `403` key lacks OPERATOR role, or WhatsApp refused the create · `409` conflict or engine not ready (retryable) · `429` `SEND_PACING_LIMITED` when send pacing is enabled (cold-reachout cap, see Send pacing) · `501` not supported on the active engine
+**Errors:** `400` validation (missing/empty `name` or `participants`, or any non-DTO field) / session not started, or a participant does not name an individual (phone, `<phone>@c.us` or `<lid>@lid`) · `401` missing/invalid `X-API-Key` · `403` key lacks OPERATOR role, or WhatsApp refused the create · `409` conflict or engine not ready (retryable) · `429` `SEND_PACING_LIMITED` when send pacing is enabled (cold-reachout cap, see Send pacing) · `501` not supported on the active engine · `503` WhatsApp rate-limited the create on Baileys (code 429; nothing was created, so a retry is safe; a timed-out create is not answered `503`)
 
 #### POST /api/sessions/:sessionId/groups/:groupId/participants
 
@@ -3323,7 +3323,7 @@ Each entry is a `GroupMembershipRequest`: `participantId` (the user asking to jo
 `method` (`invite_link` | `non_admin_add` | `linked_group_join`), optional `requestedAt` (unix
 seconds).
 
-**Errors:** `400` session is not started · `401` missing/invalid `X-API-Key` · `403` the engine refused the read — admin rights required · `404` no such group · `409` engine not ready · `503` WhatsApp did not answer within the request budget
+**Errors:** `400` session is not started · `401` missing/invalid `X-API-Key` · `403` the engine refused the read — admin rights required · `404` no such group · `409` engine not ready · `503` WhatsApp did not answer within the request budget; on Baileys, also when WhatsApp rate-limits or times out the request (code 429 or 408): retry after a pause
 
 #### POST /api/sessions/:sessionId/groups/:groupId/membership-requests/approve
 
@@ -3367,14 +3367,14 @@ for every **named** requester is a `403`.
 }
 ```
 
-**Errors:** `400` validation / session not started · `401` missing/invalid `X-API-Key` · `403` key lacks OPERATOR role, or the engine refused (admin rights / every named requester failed) · `404` no such group · `409` engine not ready · `503` WhatsApp did not answer within the request budget
+**Errors:** `400` validation / session not started · `401` missing/invalid `X-API-Key` · `403` key lacks OPERATOR role, or the engine refused (admin rights / every named requester failed) · `404` no such group · `409` engine not ready · `503` WhatsApp did not answer within the request budget; on Baileys, also when WhatsApp rate-limits or times out the request (code 429 or 408): retry after a pause
 
 #### POST /api/sessions/:sessionId/groups/:groupId/membership-requests/reject
 
 Reject pending join requests. Same body, response shape, batch-guard contract and error map as
 `.../membership-requests/approve`; rejecting an empty queue is likewise a no-op.
 
-**Errors:** `400` validation / session not started · `401` missing/invalid `X-API-Key` · `403` key lacks OPERATOR role, or the engine refused (admin rights / every named requester failed) · `404` no such group · `409` engine not ready · `503` WhatsApp did not answer within the request budget
+**Errors:** `400` validation / session not started · `401` missing/invalid `X-API-Key` · `403` key lacks OPERATOR role, or the engine refused (admin rights / every named requester failed) · `404` no such group · `409` engine not ready · `503` WhatsApp did not answer within the request budget; on Baileys, also when WhatsApp rate-limits or times out the request (code 429 or 408): retry after a pause
 
 ```json
 {
@@ -3844,7 +3844,7 @@ engine can delete a channel it does not own.
 **Response** `201` — the created `Channel`, including its `inviteCode` (the code, not the full
 `https://whatsapp.com/channel/…` link — the code is what `POST /channels/subscribe` takes).
 
-**Errors:** `400` validation, or session not started · `401` · `403` the engine refused (on whatsapp-web.js this includes channel creation being disabled for the account) · `409` conflict or engine not ready (retryable)
+**Errors:** `400` validation, or session not started · `401` · `403` the engine refused (on whatsapp-web.js this includes channel creation being disabled for the account) · `409` conflict or engine not ready (retryable) · `503` WhatsApp rate-limited the create on Baileys (code 429; nothing was created, so a retry is safe; a timed-out create is not answered `503`)
 
 #### POST /api/sessions/:sessionId/channels/:channelId/delete
 
@@ -3905,7 +3905,7 @@ fails. Rather than ship a route that always errors on that engine, it answers `5
 
 **Response** `200` — `{ "success": true }`
 
-**Errors:** `400` validation, or session not started · `401` · `403` the engine refused (not the owner, or the user is not an admin) · `409` conflict or engine not ready (retryable) · `501` the whatsapp-web.js engine cannot perform this · `503` WhatsApp did not answer within the request budget
+**Errors:** `400` validation, or session not started · `401` · `403` the engine refused (not the owner, or the user is not an admin) · `409` conflict or engine not ready (retryable) · `501` the whatsapp-web.js engine cannot perform this · `503` WhatsApp did not answer within the request budget; on Baileys, also when WhatsApp rate-limits or times out the request (code 429 or 408): retry after a pause
 
 #### POST /api/sessions/:sessionId/channels/:channelId/owner/transfer
 
@@ -3934,7 +3934,7 @@ repopulate. Rather than ship a route that always fails on that engine, it answer
 
 **Response** `200` — `{ "success": true }`
 
-**Errors:** `400` validation, or session not started · `401` · `403` WhatsApp refused the transfer · `409` conflict or engine not ready (retryable) · `501` the whatsapp-web.js engine cannot perform this · `503` WhatsApp did not answer within the request budget, and the transfer may or may not have applied
+**Errors:** `400` validation, or session not started · `401` · `403` WhatsApp refused the transfer · `409` conflict or engine not ready (retryable) · `501` the whatsapp-web.js engine cannot perform this · `503` WhatsApp did not answer within the request budget, and the transfer may or may not have applied; on Baileys, also when WhatsApp rate-limits or times out the request (code 429 or 408): retry after a pause
 
 #### POST /api/sessions/:sessionId/channels/subscribe
 

@@ -105,3 +105,28 @@ describe('ChannelController OpenAPI 404 on delete and unsubscribe', () => {
     expect(responses['404']?.description).not.toContain('synced');
   });
 });
+
+describe('ChannelController OpenAPI 503 responses', () => {
+  const responsesOf = (name: string): Record<string, { description?: string }> =>
+    (Reflect.getMetadata(
+      'swagger/apiResponse',
+      Object.getOwnPropertyDescriptor(ChannelController.prototype, name)!.value as object,
+    ) ?? {}) as Record<string, { description?: string }>;
+
+  // Baileys answers 503 for WhatsApp's own rate limit (429) as well as for an unanswered query.
+  it('names the WhatsApp rate limit on every 503 it declares', () => {
+    const silent = Object.getOwnPropertyNames(ChannelController.prototype).filter(name => {
+      const description = responsesOf(name)['503']?.description;
+      return description !== undefined && !description.includes('429');
+    });
+    expect(silent).toEqual([]);
+  });
+
+  it('declares the rate-limited 503 on channel creation', () => {
+    expect(responsesOf('create')['503']?.description).toContain('429');
+  });
+
+  it('does not describe the lookup 503 as a change that may have applied', () => {
+    expect(responsesOf('findOne')['503']?.description).not.toContain('applied');
+  });
+});

@@ -20,6 +20,12 @@ import {
 const CHANNEL_ID_INVALID_404 =
   'The id is not a channel id (it does not end in `@newsletter`). Retrying the same id cannot succeed.';
 
+// Every Baileys channel call maps WhatsApp's own rate-limit and server-timeout answers to 503 as well,
+// so each 503 below ends with this sentence; a throttled caller should back off, not retry at once.
+const THROTTLED_503 =
+  ' On Baileys, also answered when WhatsApp rate-limits or times out the request (code 429 or 408); ' +
+  'retry after a pause.';
+
 @ApiTags('channels')
 @Controller('sessions/:sessionId/channels')
 export class ChannelController {
@@ -52,7 +58,7 @@ export class ChannelController {
   })
   @ApiResponse({
     status: 503,
-    description: 'WhatsApp did not answer within the request budget — the operation may or may not have applied.',
+    description: 'WhatsApp did not answer within the request budget — nothing could be read.' + THROTTLED_503,
   })
   @ApiResponse({
     status: 404,
@@ -110,6 +116,12 @@ export class ChannelController {
   @ApiResponse({ status: 201, description: 'The created channel', type: ChannelDto })
   @ApiResponse({ status: 400, description: 'Session not started, or validation failed' })
   @ApiResponse({ status: 403, description: 'The engine refused — channel creation may be disabled for this account' })
+  @ApiResponse({
+    status: 503,
+    description:
+      'WhatsApp rate-limited the create (code 429, Baileys); nothing was created, so retrying after a pause is ' +
+      'safe. A timed-out create is not answered 503, because the channel may have been created.',
+  })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
   async create(@Param('sessionId') sessionId: string, @Body() dto: CreateChannelDto) {
     return this.channelService.createChannel(sessionId, dto.name, dto.description);
@@ -130,7 +142,8 @@ export class ChannelController {
   @ApiResponse({ status: 200, description: 'Channel deleted', type: ChannelAckResponseDto })
   @ApiResponse({
     status: 503,
-    description: 'WhatsApp did not answer within the request budget — the operation may or may not have applied.',
+    description:
+      'WhatsApp did not answer within the request budget — the operation may or may not have applied.' + THROTTLED_503,
   })
   @ApiResponse({ status: 400, description: 'Session not started' })
   @ApiResponse({ status: 403, description: 'The engine refused — not found, or this account does not own it' })
@@ -157,7 +170,8 @@ export class ChannelController {
   @ApiResponse({ status: 200, description: 'Channel muted or unmuted', type: ChannelAckResponseDto })
   @ApiResponse({
     status: 503,
-    description: 'WhatsApp did not answer within the request budget — the operation may or may not have applied.',
+    description:
+      'WhatsApp did not answer within the request budget — the operation may or may not have applied.' + THROTTLED_503,
   })
   @ApiResponse({ status: 400, description: 'Session not started, or validation failed' })
   @ApiResponse({ status: 403, description: 'The engine refused' })
@@ -187,7 +201,8 @@ export class ChannelController {
   @ApiResponse({ status: 200, description: 'Admin demoted', type: ChannelAckResponseDto })
   @ApiResponse({
     status: 503,
-    description: 'WhatsApp did not answer within the request budget — the operation may or may not have applied.',
+    description:
+      'WhatsApp did not answer within the request budget — the operation may or may not have applied.' + THROTTLED_503,
   })
   @ApiResponse({ status: 400, description: 'Session not started, or validation failed' })
   @ApiResponse({ status: 403, description: 'The engine refused — not the owner, or the user is not an admin' })
@@ -225,7 +240,8 @@ export class ChannelController {
   @ApiResponse({ status: 200, description: 'Ownership transferred', type: ChannelAckResponseDto })
   @ApiResponse({
     status: 503,
-    description: 'WhatsApp did not answer within the request budget — the transfer may or may not have applied.',
+    description:
+      'WhatsApp did not answer within the request budget — the transfer may or may not have applied.' + THROTTLED_503,
   })
   @ApiResponse({ status: 400, description: 'Session not started, or validation failed' })
   @ApiResponse({
@@ -271,7 +287,8 @@ export class ChannelController {
   @ApiResponse({ status: 201, description: 'Successfully subscribed to channel', type: ChannelDto })
   @ApiResponse({
     status: 503,
-    description: 'WhatsApp did not answer within the request budget — the operation may or may not have applied.',
+    description:
+      'WhatsApp did not answer within the request budget — the operation may or may not have applied.' + THROTTLED_503,
   })
   @ApiResponse({
     status: 501,
@@ -293,7 +310,8 @@ export class ChannelController {
   @ApiResponse({ status: 200, description: 'Successfully unsubscribed from channel', type: ChannelAckResponseDto })
   @ApiResponse({
     status: 503,
-    description: 'WhatsApp did not answer within the request budget — the operation may or may not have applied.',
+    description:
+      'WhatsApp did not answer within the request budget — the operation may or may not have applied.' + THROTTLED_503,
   })
   @ApiResponse({ status: 400, description: 'Session not started' })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })

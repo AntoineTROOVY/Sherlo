@@ -151,4 +151,24 @@ describe('GroupController OpenAPI responses', () => {
     });
     expect(missing).toEqual([]);
   });
+
+  const responsesOf = (name: string): Record<string, { description?: string }> =>
+    (Reflect.getMetadata(
+      'swagger/apiResponse',
+      Object.getOwnPropertyDescriptor(GroupController.prototype, name)!.value as object,
+    ) ?? {}) as Record<string, { description?: string }>;
+
+  // Baileys answers 503 for WhatsApp's own rate limit (429) as well as for an unanswered query, and a
+  // throttled caller should back off rather than retry at once, so every 503 has to say so.
+  it('names the WhatsApp rate limit on every 503 it declares', () => {
+    const silent = Object.getOwnPropertyNames(GroupController.prototype).filter(name => {
+      const description = responsesOf(name)['503']?.description;
+      return description !== undefined && !description.includes('429');
+    });
+    expect(silent).toEqual([]);
+  });
+
+  it('declares the rate-limited 503 on group creation', () => {
+    expect(responsesOf('create')['503']?.description).toContain('429');
+  });
 });
