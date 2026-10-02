@@ -559,7 +559,7 @@ Resources are accessed as properties on the client (e.g. `client.messages`). All
 | `media`         | `media(session_id, chat_id, message_id) -> MessageMedia`               | Fetch a message's stored media bytes: the archived file when one exists, else the inline copy on the message row. `404` when neither holds bytes. |
 | `send_bulk`     | `send_bulk(session_id, body) -> BulkMessageResponse`                   | Enqueue a bulk send batch. **OPERATOR**                                                                                                           |
 | `batch_status`  | `batch_status(session_id, batch_id) -> BatchStatusResponse`            | Get bulk batch status.                                                                                                                            |
-| `cancel_batch`  | `cancel_batch(session_id, batch_id) -> BatchStatusResponse`            | Cancel a running batch. **OPERATOR**                                                                                                              |
+| `cancel_batch`  | `cancel_batch(session_id, batch_id) -> BatchCancelResponse`            | Cancel a running batch. **OPERATOR**                                                                                                              |
 
 #### `client.contacts`
 
