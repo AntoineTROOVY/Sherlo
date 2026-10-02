@@ -49,7 +49,7 @@ describe('IngressProcessor', () => {
   it('re-queues the delivery when the final-attempt DLQ write fails, and still rethrows the dispatch error', async () => {
     const loader = { dispatchWebhookForInstance: jest.fn().mockRejectedValue(new Error('boom')) };
     const failures = { save: jest.fn().mockRejectedValue(new Error('db down')), count: jest.fn().mockResolvedValue(0) };
-    const queue = { add: jest.fn().mockResolvedValue(undefined) };
+    const queue = { add: jest.fn().mockResolvedValue(undefined), remove: jest.fn().mockResolvedValue(1) };
     const proc = new IngressProcessor(
       loader as never,
       failures as never,
@@ -67,16 +67,24 @@ describe('IngressProcessor', () => {
     expect(data).toEqual((failed as { data: unknown }).data);
     expect(opts).toEqual(expect.objectContaining({ attempts: 3, delay: expect.any(Number) as unknown }));
     // A fresh id: the retained failed job still holds the original one, and BullMQ would dedup onto it.
-    expect(opts.jobId).toMatch(/^ing-abc-requeued-\d+$/);
+    // A fixed one, so the reconciler can look the copy up instead of dead-lettering the delivery.
+    expect(opts.jobId).toBe('ing-abc-requeued-1');
 
-    // Re-queued again through a long outage, the id keeps a single suffix.
-    queue.add.mockClear();
-    await expect(
-      proc.process(job({ id: opts.jobId, name: 'ingress', attemptsMade: 2, opts: { attempts: 3 } })),
-    ).rejects.toThrow('boom');
-    expect((queue.add.mock.calls[0] as [string, unknown, { jobId: string }])[2].jobId).toMatch(
-      /^ing-abc-requeued-\d+$/,
-    );
+    // Re-queued again through a long outage, the copies alternate between two ids, and the failed
+    // copy that held the next id is removed so the add is not resolved to it.
+    const requeueFrom = async (id: string): Promise<string> => {
+      queue.add.mockClear();
+      queue.remove.mockClear();
+      await expect(proc.process(job({ id, name: 'ingress', attemptsMade: 2, opts: { attempts: 3 } }))).rejects.toThrow(
+        'boom',
+      );
+      const next = (queue.add.mock.calls[0] as [string, unknown, { jobId: string }])[2].jobId;
+      expect(queue.remove).toHaveBeenCalledWith(next);
+      expect(queue.remove.mock.invocationCallOrder[0]).toBeLessThan(queue.add.mock.invocationCallOrder[0]);
+      return next;
+    };
+    expect(await requeueFrom('ing-abc-requeued-1')).toBe('ing-abc-requeued-2');
+    expect(await requeueFrom('ing-abc-requeued-2')).toBe('ing-abc-requeued-1');
   });
 
   // The original job of a re-queued delivery stays 'failed', which the reconciler reads as dead-lettered:
@@ -97,7 +105,7 @@ describe('IngressProcessor', () => {
     expect(events.update).not.toHaveBeenCalled();
     expect(failures.update).not.toHaveBeenCalled();
 
-    await proc.process(job({ id: 'ing-abc-requeued-1700000000000' }));
+    await proc.process(job({ id: 'ing-abc-requeued-1' }));
     expect(events.update).toHaveBeenCalledWith(
       { pluginId: 'chatwoot', instanceId: 'acct1', providerDeliveryId: 'd1' },
       { dispatchState: 'dispatched', payload: null },
@@ -109,7 +117,7 @@ describe('IngressProcessor', () => {
 
     // The delivery already reached the plugin: a failed bookkeeping write must not fail the job into a retry.
     events.update.mockRejectedValue(new Error('db down'));
-    await expect(proc.process(job({ id: 'ing-abc-requeued-1700000000001' }))).resolves.toBeUndefined();
+    await expect(proc.process(job({ id: 'ing-abc-requeued-2' }))).resolves.toBeUndefined();
   });
 
   it('does not add a second DLQ row when one is already open for the delivery', async () => {
@@ -119,7 +127,7 @@ describe('IngressProcessor', () => {
     const queue = { add: jest.fn() };
     const proc = new IngressProcessor(loader as never, failures as never, hooks as never, queue as never, {} as never);
     await expect(
-      proc.process(job({ id: 'ing-abc-requeued-1700000000000', attemptsMade: 2, opts: { attempts: 3 } })),
+      proc.process(job({ id: 'ing-abc-requeued-1', attemptsMade: 2, opts: { attempts: 3 } })),
     ).rejects.toThrow('boom');
     expect(failures.count).toHaveBeenCalledWith({
       where: { direction: 'inbound', pluginId: 'chatwoot', instanceId: 'acct1', deliveryId: 'd1', redriven: false },
@@ -224,7 +232,7 @@ describe('IngressProcessor stall exhaustion (worker failed event)', () => {
   const setup = () => {
     const failures = { save: jest.fn().mockResolvedValue(undefined), count: jest.fn().mockResolvedValue(0) };
     const hooks = { execute: jest.fn().mockResolvedValue({ continue: true }) };
-    const queue = { add: jest.fn().mockResolvedValue(undefined) };
+    const queue = { add: jest.fn().mockResolvedValue(undefined), remove: jest.fn().mockResolvedValue(0) };
     const proc = new IngressProcessor({} as never, failures as never, hooks as never, queue as never, {} as never);
     return { proc, failures, hooks, queue };
   };

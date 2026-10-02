@@ -57,8 +57,8 @@ export interface IngressReconcileStats {
  * The reconciler sweeps small batches of stale 'pending' rows and re-dispatches them through the
  * exact same IngressEnqueueService the live path uses (same deliveryId as BullMQ jobId, so a replay
  * is idempotent against a job that did get enqueued; one that already failed is left to the DLQ,
- * never counted as delivered, and a copy IngressProcessor re-queued under a fresh id settles that DLQ
- * row and the event itself once it delivers). Re-dispatch from the row is sound because a 'pending'
+ * never counted as delivered, unless a copy IngressProcessor re-queued under a fresh id still owns
+ * the delivery, which then counts as that job). Re-dispatch from the row is sound because a 'pending'
  * row IS the full verified request: payload carries headers/query/body/rawBody,
  * providerDeliveryId is the delivery id, and the manifest route re-derives the conversation lane.
  * (The payload is retired to NULL the moment an outcome is recorded — 'dispatched' rows and DLQ'd
@@ -199,15 +199,15 @@ export class IngressReconcilerService implements OnModuleInit, OnModuleDestroy {
     // first: a live job already owns the delivery, and a failed one would swallow the replay.
     const existing = await this.ingressEnqueue.existingJobState(jobData, row.providerDeliveryId);
     if (existing === 'failed') {
-      // Every queue attempt already ran and IngressProcessor dead-lettered the delivery, or re-queued
-      // it under a fresh id when that write failed. Nothing is dispatched: the DLQ row stays redrivable
-      // (written here if the processor's write was lost, and before the payload is retired, since it
-      // becomes the payload's only home). A re-queued copy that delivers retires the row and marks the
-      // event 'dispatched'; one that fails again finds the row and adds no second one. The copy can
-      // settle mid-sweep, before this row exists, so the mark only lands on a still-'pending' event,
-      // and the row this sweep wrote for an event the copy already dispatched is retired again. Only
-      // that row: 'dispatched' is also the mark for a job that was still live, and a row written
-      // before this sweep can be the dead letter of a delivery that never arrived.
+      // Every queue attempt already ran and IngressProcessor dead-lettered the delivery, or re-queued it
+      // and every copy failed too: a live or completed copy answers for the job (see existingJobState).
+      // Nothing is dispatched: the DLQ row stays redrivable (written here if the processor's write was
+      // lost, and before the payload is retired, since it becomes the payload's only home). A copy the
+      // lookup missed (one pruned once completed) has already marked the event 'dispatched', so the mark
+      // only lands on a still-'pending' event, and the row this sweep wrote for an event a copy already
+      // dispatched is retired again. Only that row: 'dispatched' is also the mark for a job that was
+      // still live, and a row written before this sweep can be the dead letter of a delivery that never
+      // arrived.
       const written = await this.ensureDeadLetterRow(
         jobData,
         resolveIngressJobOptions().attempts,
@@ -240,8 +240,8 @@ export class IngressReconcilerService implements OnModuleInit, OnModuleDestroy {
       // BullMQ job data, or a DLQ row on an in-tier failure), so the dedup row slims to its marker.
       await this.events.update({ id: row.id }, { dispatchState: 'dispatched', lastDispatchAt: now, payload: null });
       // Retire any dead-letter row the live path already wrote for this delivery (the inline-failure
-      // case): the replay, or the job still live in the queue, delivers it, so a later manual redrive
-      // must not deliver it again.
+      // case): the replay, or the job or re-queued copy still live in the queue, delivers it, so a later
+      // manual redrive must not deliver it again.
       await this.failures.update(
         {
           direction: 'inbound',

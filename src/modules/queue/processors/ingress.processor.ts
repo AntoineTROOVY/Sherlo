@@ -10,6 +10,7 @@ import { PluginLoaderService } from '../../../core/plugins/plugin-loader.service
 import { HookManager } from '../../../core/hooks';
 import { createLogger } from '../../../common/services/logger.service';
 import { KeyedAsyncLock, orderingKeyFor } from '../../integration/ordering-lock';
+import { requeuedJobIds } from '../../integration/ingress-enqueue.service';
 
 // BullMQ's failedReason for a job that stalled more than maxStalledCount (see WebhookProcessor).
 const STALL_EXHAUSTION_MESSAGE = 'job stalled more than allowable limit';
@@ -17,8 +18,8 @@ const STALL_EXHAUSTION_MESSAGE = 'job stalled more than allowable limit';
 // How long a delivery whose dead-letter row could not be written waits before it runs again.
 const REQUEUE_DELAY_MS = 60_000;
 
-// The id suffix deadLetterOrRequeue gives a re-queued delivery.
-const REQUEUED_JOB_ID = /-requeued-\d+$/;
+// The id suffix deadLetterOrRequeue gives a re-queued delivery (see requeuedJobIds).
+const REQUEUED_JOB_ID = /-requeued-[12]$/;
 
 export interface IngressJobData {
   pluginId: string;
@@ -95,11 +96,11 @@ export class IngressProcessor extends WorkerHost {
   }
 
   /**
-   * A re-queued copy runs while the original job stays 'failed' under the original id, which the
-   * reconciler reads as dead-lettered: for an event still 'pending' it writes a DLQ row and marks the
-   * event 'failed', before or after this copy runs. Record the delivery on both so neither is left
-   * redrivable for an event the plugin already received. Never rejects: the dispatch succeeded, and a
-   * retry would deliver it again.
+   * A re-queued copy runs while the original job stays 'failed' under the original id. The reconciler
+   * takes a live or completed copy for the job, but one it misses (pruned once completed) reads as
+   * dead-lettered: for an event still 'pending' it writes a DLQ row and marks the event 'failed'.
+   * Record the delivery on both so neither is left redrivable for an event the plugin already
+   * received. Never rejects: the dispatch succeeded, and a retry would deliver it again.
    */
   private async settleRequeued(d: IngressJobData): Promise<void> {
     try {
@@ -159,7 +160,9 @@ export class IngressProcessor extends WorkerHost {
    * data database refuses it too (an outage longer than the retry window fails dispatch and the write
    * alike), the delivery goes back on the queue, which still works, and runs again once the database
    * is back. A fresh job id, because the failed job keeps the original one until removeOnFail prunes it
-   * and BullMQ would resolve an add under that id to the existing job. Never rejects.
+   * and BullMQ would resolve an add under that id to the existing job. A copy that fails the same way
+   * takes the other of the two copy ids, removing the failed copy before it that still holds it, so the
+   * reconciler can find the live one by id. Never rejects.
    */
   private async deadLetterOrRequeue(job: Job<IngressJobData>, attempts: number, errorMessage: string): Promise<void> {
     const d = job.data;
@@ -169,9 +172,11 @@ export class IngressProcessor extends WorkerHost {
       const meta = { jobId: job.id, pluginId: d.pluginId, instanceId: d.instanceId, deliveryId: d.deliveryId };
       const reason = err instanceof Error ? err.message : String(err);
       try {
+        const [first, second] = requeuedJobIds(String(job.id).replace(REQUEUED_JOB_ID, ''));
+        const jobId = String(job.id) === first ? second : first;
+        await this.ingressQueue.remove(jobId);
         await this.ingressQueue.add(job.name, d, {
-          // The base id, so a delivery re-queued through a long outage keeps one suffix, not a chain.
-          jobId: `${String(job.id).replace(REQUEUED_JOB_ID, '')}-requeued-${Date.now()}`,
+          jobId,
           attempts: job.opts.attempts,
           backoff: job.opts.backoff,
           delay: REQUEUE_DELAY_MS,
