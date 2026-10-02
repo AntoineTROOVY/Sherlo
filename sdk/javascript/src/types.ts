@@ -277,7 +277,10 @@ export interface SendMediaRequest {
   /** Requires `mimetype`. */
   base64?: string;
   mimetype?: string;
-  /** Required for documents; max 255 chars. */
+  /**
+   * Shown only on document sends; defaults to `file` when omitted (whatsapp-web.js first tries the URL basename).
+   * Max 255 chars.
+   */
   filename?: string;
   /** Max 1024 chars. */
   caption?: string;
