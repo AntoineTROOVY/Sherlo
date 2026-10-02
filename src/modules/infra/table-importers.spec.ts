@@ -105,3 +105,34 @@ describe('automationRules table importer', () => {
     expect(skip({ conditions })).toMatch(/Skipped automation rule rule-1: invalid conditions/);
   });
 });
+
+/**
+ * A restore writes with raw SQL, so the NUL drop the entities apply to their free-text columns never
+ * runs. PostgreSQL rejects U+0000 in a bound parameter, and an older SQLite backup may hold one, so
+ * the importers drop it from exactly those columns and leave ids and lookup keys as they are.
+ */
+describe('table importers: NUL in free text', () => {
+  const nul = 'a\u0000b';
+  const mapped = (key: string, row: Record<string, unknown>): unknown[] =>
+    TABLE_IMPORTERS.find(importer => importer.key === key)!.map(row as never);
+
+  it.each([
+    ['sessions', { id: 's1', name: 'my-bot', pushName: nul }, [4]],
+    ['messages', { id: 'm1', chatId: nul, chatName: nul, body: nul, mediaMimetype: nul }, [4, 8, 16]],
+    [
+      'statusUpdates',
+      { id: 'su1', contactJid: nul, contactName: nul, contactPushName: nul, caption: nul, mediaMimetype: nul },
+      [3, 4, 7, 9],
+    ],
+    ['webhookDeliveryFailures', { id: 'wf1', lastError: nul }, [9]],
+    ['integrationDeliveryFailures', { id: 'df1', lastError: nul }, [7]],
+  ])('drops it from the %s text columns', (key, row, columns) => {
+    const params = mapped(key, row);
+    columns.forEach(index => expect(params[index]).toBe('ab'));
+  });
+
+  it('keeps it in a lookup column', () => {
+    expect(mapped('messages', { id: 'm1', chatId: nul })[3]).toBe(nul);
+    expect(mapped('statusUpdates', { id: 'su1', contactJid: nul })[2]).toBe(nul);
+  });
+});

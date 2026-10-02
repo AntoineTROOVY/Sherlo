@@ -1,3 +1,4 @@
+import { NulFreeTransformer } from '../../common/transformers/nul-free.transformer';
 import { isSafeSessionName } from '../../common/utils/path-safety';
 import { collectFilterErrors } from '../webhook/filters/filter-validation';
 import type {
@@ -66,6 +67,13 @@ function decodeJsonColumn(value: unknown): unknown {
   }
 }
 
+// The entity columns that drop U+0000 do it in a TypeORM transformer, which raw SQL never runs. An
+// older SQLite backup may still hold one, and PostgreSQL refuses it in a bound parameter, failing the
+// whole restore. Apply the same drop here, to those same free-text columns only, never to an id.
+function nulFree(value: unknown): unknown {
+  return NulFreeTransformer.to(value);
+}
+
 // Restore order is FK order: sessions first (webhooks/messages/templates/etc. reference it), the
 // standalone cache/DLQ tables after. The per-block comments from the former inline import blocks
 // live on their descriptor entries.
@@ -94,7 +102,7 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       session.name,
       session.status,
       session.phone,
-      session.pushName,
+      nulFree(session.pushName),
       typeof session.config === 'string' ? session.config : JSON.stringify(session.config || {}),
       session.proxyUrl,
       session.proxyType,
@@ -162,13 +170,13 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       msg.sessionId,
       msg.waMessageId ?? null,
       msg.chatId,
-      msg.chatName ?? null,
+      nulFree(msg.chatName ?? null),
       // Rows exported before the author column existed simply restore to NULL (legacy
       // behavior) instead of failing the whole import on an unknown key.
       msg.author ?? null,
       msg.from,
       msg.to,
-      msg.body ?? null,
+      nulFree(msg.body ?? null),
       msg.type,
       msg.direction,
       msg.timestamp ?? null,
@@ -179,7 +187,7 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       // them matters because the media FILES ride along in the storage export: restoring the rows
       // without their pointers would turn every archived file into an orphan the sweep then reaps.
       msg.mediaPath ?? null,
-      msg.mediaMimetype ?? null,
+      nulFree(msg.mediaMimetype ?? null),
     ],
   }),
 
@@ -359,7 +367,7 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       wf.deliveryId,
       wf.attempts,
       wf.lastStatusCode,
-      wf.lastError,
+      nulFree(wf.lastError),
       wf.createdAt,
     ],
   }),
@@ -403,7 +411,7 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       df.sessionId,
       df.deliveryId,
       df.attempts,
-      df.lastError,
+      nulFree(df.lastError),
       df.payload == null ? null : typeof df.payload === 'string' ? df.payload : JSON.stringify(df.payload),
       df.redriven,
       df.createdAt,
@@ -421,13 +429,13 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       su.id,
       su.sessionId,
       su.contactJid,
-      su.contactName ?? null,
-      su.contactPushName ?? null,
+      nulFree(su.contactName ?? null),
+      nulFree(su.contactPushName ?? null),
       su.waStatusId,
       su.type,
-      su.caption ?? null,
+      nulFree(su.caption ?? null),
       su.mediaPath ?? null,
-      su.mediaMimetype ?? null,
+      nulFree(su.mediaMimetype ?? null),
       su.mediaOmitted ?? false,
       su.omitReason ?? null,
       su.backgroundColor ?? null,
