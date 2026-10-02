@@ -176,8 +176,8 @@ const MAPPINGS = {
 const MINIMUM_MAPPED = {
   'sdk/javascript/src/types.ts': 85,
   'dashboard/src/services/api.ts': 21,
-  'sdk/python/openwa/types.py': 79,
-  'sdk/go': 79,
+  'sdk/python/openwa/types.py': 80,
+  'sdk/go': 80,
   'sdk/java': 84,
 };
 
@@ -242,6 +242,7 @@ const PYTHON_MAPPING = {
   GroupMembershipRequest: 'GroupMembershipRequestDto',
   GroupParticipant: 'GroupParticipantDto',
   GroupSummary: 'GroupSummaryDto',
+  HealthReadyResponse: 'ReadinessResponseDto',
   JoinGroupRequest: 'JoinGroupDto',
   MarkChatReadRequest: 'MarkChatReadDto',
   MarkChatRequest: 'MarkChatUnreadDto',
@@ -324,6 +325,7 @@ const GO_MAPPING = {
   GroupMembershipRequest: 'GroupMembershipRequestDto',
   GroupParticipant: 'GroupParticipantDto',
   GroupSummary: 'GroupSummaryDto',
+  HealthReadyResponse: 'ReadinessResponseDto',
   JoinGroupRequest: 'JoinGroupDto',
   MarkChatReadRequest: 'MarkChatReadDto',
   MarkChatRequest: 'MarkChatUnreadDto',
