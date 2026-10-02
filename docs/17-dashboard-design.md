@@ -100,7 +100,10 @@ flowchart TB
 
 The route table lives in `src/App.tsx`; the sidebar items in `src/components/Layout.tsx`. Routes
 guarded by `role === 'admin'` are only mounted (and only shown in the sidebar) for an admin key —
-a non-admin hitting the path falls through to the `*` redirect.
+a non-admin hitting the path falls through to the `*` redirect. API Keys, Infrastructure and Plugins
+also need a key not restricted to selected sessions (`role === 'admin' && !scoped`, with `scoped`
+from `POST /api/auth/validate`), because their routes refuse a session-scoped key; `/logs` is
+mounted for any admin key.
 
 ```
 /                  → Dashboard (overview + charts)
@@ -112,9 +115,9 @@ a non-admin hitting the path falls through to the `*` redirect.
 /templates         → Message Templates
 /message-tester    → Message Tester (ad-hoc send-* + check-number)
 /logs              → Activity / Audit Logs            [admin only]
-/api-keys          → API Keys Management              [admin only]
-/infrastructure    → Infrastructure status & config   [admin only]
-/plugins           → Plugins (install / enable / configure) [admin only]
+/api-keys          → API Keys Management              [admin, unscoped key only]
+/infrastructure    → Infrastructure status & config   [admin, unscoped key only]
+/plugins           → Plugins (install / enable / configure) [admin, unscoped key only]
 *                  → redirect to /
 ```
 
