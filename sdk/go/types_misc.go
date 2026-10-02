@@ -19,7 +19,7 @@ type DependencyStatus struct {
 // name (e.g. "mainDatabase", "dataDatabase") to its DependencyStatus.
 type HealthReadyResponse struct {
 	Status  string                      `json:"status"`
-	Details map[string]DependencyStatus `json:"details,omitempty"`
+	Details map[string]DependencyStatus `json:"details"`
 }
 
 // ── Auth ─────────────────────────────────────────────────

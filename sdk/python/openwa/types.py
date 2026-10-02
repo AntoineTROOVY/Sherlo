@@ -1235,7 +1235,7 @@ class HealthDependencyStatus(TypedDict):
     status: str
 
 
-class HealthReadyResponse(TypedDict, total=False):
+class HealthReadyResponse(TypedDict):
     status: str
     details: dict[str, HealthDependencyStatus]
 
