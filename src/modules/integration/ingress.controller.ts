@@ -60,6 +60,10 @@ export class IngressController {
     status: 202,
     description: 'Webhook accepted and queued for async plugin processing (the primary success path).',
   })
+  @ApiResponse({
+    status: 400,
+    description: 'The path or query contains an encoded NUL (`%00`), or a JSON body does not parse.',
+  })
   @ApiResponse({ status: 401, description: 'Signature verification failed (missing, stale, or wrong secret).' })
   @ApiResponse({ status: 403, description: 'GET verification challenge failed (verifyToken mismatch).' })
   @ApiResponse({ status: 404, description: 'Unknown pluginId/instanceId, or no route claimed by the plugin.' })
