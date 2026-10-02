@@ -766,6 +766,16 @@
               }
             }
           },
+          "400": {
+            "description": "The session id is not a UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -818,6 +828,16 @@
         "responses": {
           "204": {
             "description": "Session deleted"
+          },
+          "400": {
+            "description": "The session id is not a UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
@@ -887,6 +907,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SessionConfigResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The session id is not a UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1001,6 +1031,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The session config kept changing under concurrent requests; retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Update the tunable configuration for a session",
@@ -1030,6 +1070,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SessionProxyResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The session id is not a UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -1265,6 +1315,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SessionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The session id is not a UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -2323,7 +2383,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ChatPresenceResponseDto"
+                  "nullable": true,
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ChatPresenceResponseDto"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The session id is not a UUID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3013,6 +3088,16 @@
               }
             }
           },
+          "400": {
+            "description": "Session is not started, or validation failed (an empty chatId, a state other than typing, recording or paused, or a body field the DTO does not declare).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -3564,7 +3649,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Deliveries that exhausted their retries (attempts > 0) and deliveries not sent (attempts 0: shed, refused at shutdown, oversize or a preflight failure; the outbox replays them). A later successful delivery removes the row. Most recent first.",
+            "description": "Deliveries that exhausted their retries (attempts > 0) and deliveries not sent (attempts 0: shed, refused at shutdown, oversize or a preflight failure). A direct delivery that shutdown stops in a retry backoff also records attempts 0, although its earlier attempts were sent. The outbox replays shed deliveries and those stopped by shutdown; oversize and preflight-failed ones on a first dispatch are final. A later successful delivery removes the row. Most recent first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3703,7 +3788,7 @@
             }
           },
           "400": {
-            "description": "Invalid rule (bad conditions, over-limit text).",
+            "description": "Invalid rule (bad conditions, over-limit text, out-of-range cooldown), or the per-session rule limit is reached.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3911,6 +3996,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AutomationRuleResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid rule (bad conditions, over-limit text, out-of-range cooldown).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -5867,6 +5962,16 @@
               }
             }
           },
+          "400": {
+            "description": "Session not active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -5966,6 +6071,16 @@
                   "items": {
                     "$ref": "#/components/schemas/MessageReactionDto"
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Session not active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6867,6 +6982,16 @@
               }
             }
           },
+          "400": {
+            "description": "Validation failed, or the body carries a field the DTO does not declare.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -7080,6 +7205,16 @@
               }
             }
           },
+          "400": {
+            "description": "Validation failed, or the body carries a field the DTO does not declare.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -7251,7 +7386,14 @@
             }
           },
           "503": {
-            "description": "A required dependency is down"
+            "description": "A required dependency is down, or the node is draining for shutdown (details.shutdown.status = draining)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Readiness probe — verifies the auth/audit + data databases respond",
@@ -7555,11 +7697,21 @@
         },
         "responses": {
           "200": {
-            "description": "Save outcome. A failed write also answers 200 with `saved: false` — read the flag, not the status.",
+            "description": "Save outcome. A failed disk write answers 200 with `saved: false`, so read the flag, not the status.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InfraConfigSaveResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Rejected before anything was written: an invalid or unknown field, an unknown engine type, a value with a line break or one that cannot be stored, or a configuration that would not boot in production.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7612,6 +7764,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InfraRestartResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body is malformed, fails validation, or carries a field the DTO does not declare",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -7992,7 +8154,7 @@
             }
           },
           "400": {
-            "description": "Session not ready",
+            "description": "Session is not started",
             "content": {
               "application/json": {
                 "schema": {
@@ -8083,6 +8245,16 @@
               }
             }
           },
+          "400": {
+            "description": "Session is not started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -8145,6 +8317,16 @@
                   "items": {
                     "type": "string"
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Session is not started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8226,6 +8408,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContactDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Session is not started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8330,7 +8522,7 @@
             }
           },
           "400": {
-            "description": "Session not active or invalid request",
+            "description": "Session is not started, an invalid body, or a contact id that is not a phone-based individual id",
             "content": {
               "application/json": {
                 "schema": {
@@ -8419,7 +8611,7 @@
             }
           },
           "400": {
-            "description": "Session not active",
+            "description": "Session is not started, or a contact id that is not a phone-based individual id",
             "content": {
               "application/json": {
                 "schema": {
@@ -8477,7 +8669,7 @@
     },
     "/api/sessions/{sessionId}/contacts/check/{number}": {
       "get": {
-        "description": "Returns whether the number is a registered WhatsApp account and its canonical id. Use this to pre-validate a recipient before sending: the send endpoints return 201 on accepting a message even for numbers that are not on WhatsApp, so this is the only way to confirm a new number is reachable before you send to it. Requires an OPERATOR key.",
+        "description": "Returns whether the number is a registered WhatsApp account and its canonical id. Use this to pre-validate a recipient before sending: the Baileys send endpoints can return 201 for a number that is not on WhatsApp (whatsapp-web.js answers 400), so this is the way to confirm a new number is reachable before you send to it. Requires an OPERATOR key.",
         "operationId": "ContactController_checkNumber",
         "parameters": [
           {
@@ -8506,6 +8698,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NumberCheckResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Session is not started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8591,6 +8793,16 @@
               }
             }
           },
+          "400": {
+            "description": "Session is not started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -8672,6 +8884,16 @@
               }
             }
           },
+          "400": {
+            "description": "Session is not started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -8739,6 +8961,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContactAckResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Session is not started, or the id does not name an individual. On Baileys also an id the session cannot map between phone and privacy-id form (a `@lid` with no known phone to block, a phone-based id with no known `@lid`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8818,6 +9050,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContactAckResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Session is not started, or the id does not name an individual. On Baileys also a phone-based id the session cannot map to its privacy id (`@lid`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -9005,6 +9247,16 @@
               }
             }
           },
+          "400": {
+            "description": "The session is not started: no engine is running for it (never started, stopped, or logged out). Start the session and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -9184,6 +9436,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GroupSettingsResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The session is not started: no engine is running for it (never started, stopped, or logged out). Start the session and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -9844,6 +10106,16 @@
               }
             }
           },
+          "400": {
+            "description": "The session is not started: no engine is running for it (never started, stopped, or logged out). Start the session and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -9942,6 +10214,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ParticipantsOperationResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body failed validation, or the session is not started (no engine is running for it).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -10048,6 +10330,16 @@
               }
             }
           },
+          "400": {
+            "description": "The body failed validation, or the session is not started (no engine is running for it).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -10145,6 +10437,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GroupAckResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body failed validation, or the session is not started (no engine is running for it).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -10250,6 +10552,16 @@
               }
             }
           },
+          "400": {
+            "description": "The body failed validation, or the session is not started (no engine is running for it).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -10337,6 +10649,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GroupAckResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The session is not started: no engine is running for it (never started, stopped, or logged out). Start the session and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -10741,6 +11063,16 @@
               }
             }
           },
+          "400": {
+            "description": "The session is not started: no engine is running for it (never started, stopped, or logged out). Start the session and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -10828,6 +11160,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GroupInviteCodeRevokedResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The session is not started: no engine is running for it (never started, stopped, or logged out). Start the session and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -11329,6 +11671,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Baileys only: WhatsApp did not answer within the request budget. A link may or may not have been minted, so a retry can create a second one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "summary": "Generate a shareable WhatsApp call link",
@@ -11573,6 +11925,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LabelDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Session not started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -12006,6 +12368,16 @@
               }
             }
           },
+          "400": {
+            "description": "Session not started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -12110,6 +12482,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LabelAckResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Session not started, or validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -12224,6 +12606,16 @@
               }
             }
           },
+          "400": {
+            "description": "Session not started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -12320,7 +12712,7 @@
             }
           },
           "400": {
-            "description": "Session not ready",
+            "description": "Session not started",
             "content": {
               "application/json": {
                 "schema": {
@@ -12491,6 +12883,16 @@
               }
             }
           },
+          "400": {
+            "description": "Session not started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -12580,6 +12982,16 @@
               }
             }
           },
+          "400": {
+            "description": "Session not started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -12592,6 +13004,16 @@
           },
           "403": {
             "description": "WhatsApp refused the operation. The request was well formed — the refusal happened WhatsApp-side, most often because the account lacks the admin rights the operation requires. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such channel — the id is not among the session's subscribed channels, either because it is wrong or because the channel has not synced into the local collection yet.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12669,6 +13091,16 @@
                   "items": {
                     "$ref": "#/components/schemas/ChannelMessageDto"
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Session not started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -12787,6 +13219,16 @@
           },
           "403": {
             "description": "The engine refused — not found, or this account does not own it. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such channel — the id is not among the session's subscribed channels, either because it is wrong or because the channel has not synced into the local collection yet.",
             "content": {
               "application/json": {
                 "schema": {
@@ -13203,6 +13645,16 @@
               }
             }
           },
+          "400": {
+            "description": "Session not started, or validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -13339,6 +13791,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MessageStatsResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A query value is invalid, or the query carries a field the DTO does not declare.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -14330,7 +14792,7 @@
         },
         "responses": {
           "200": {
-            "description": "Converted bytes: baseline H.264 with AAC audio, long edge bounded at 1280, index moved to the front so the recipient can start playing before the whole file arrives.",
+            "description": "Converted bytes: baseline H.264 with AAC audio, fitted inside 1280x720 (720x1280 portrait), index moved to the front so the recipient can start playing before the whole file arrives.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14431,7 +14893,7 @@
             }
           },
           "403": {
-            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "description": "WhatsApp refused the catalog query. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14471,7 +14933,7 @@
             }
           },
           "503": {
-            "description": "WhatsApp did not answer the catalog query within the request budget — retry shortly.",
+            "description": "WhatsApp did not answer the catalog query within the request budget, or rate-limited it. For some business accounts WhatsApp never answers it, so a retry may not help.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14507,7 +14969,7 @@
             "schema": {
               "minimum": 1,
               "example": 1,
-              "type": "number"
+              "type": "integer"
             }
           },
           {
@@ -14518,7 +14980,7 @@
             "schema": {
               "minimum": 1,
               "example": 20,
-              "type": "number"
+              "type": "integer"
             }
           }
         ],
@@ -14529,6 +14991,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PaginatedProductsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A query value is invalid, or the query carries a field the DTO does not declare.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -14544,7 +15016,7 @@
             }
           },
           "403": {
-            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "description": "WhatsApp refused the catalog query. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14584,7 +15056,7 @@
             }
           },
           "503": {
-            "description": "WhatsApp did not answer the catalog query within the request budget — retry shortly.",
+            "description": "WhatsApp did not answer the catalog query within the request budget, or rate-limited it. For some business accounts WhatsApp never answers it, so a retry may not help.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14643,7 +15115,7 @@
             }
           },
           "403": {
-            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "description": "WhatsApp refused the catalog query. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14683,7 +15155,7 @@
             }
           },
           "503": {
-            "description": "WhatsApp did not answer the catalog query within the request budget — retry shortly.",
+            "description": "WhatsApp did not answer the catalog query within the request budget, or rate-limited it. For some business accounts WhatsApp never answers it, so a retry may not help.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14754,7 +15226,7 @@
             }
           },
           "403": {
-            "description": "The API key's role, session or chat scope, or IP allow-list does not allow this operation",
+            "description": "WhatsApp refused the catalog query. Also returned when the API key's role, session or chat scope, or IP allow-list does not allow this operation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14764,7 +15236,7 @@
             }
           },
           "404": {
-            "description": "Product id not found in the session catalog.",
+            "description": "Product id not found in the session catalog. No session is running under that id — it was never started, was stopped, or does not exist. These routes report an unstarted session as `404`, where the message and group routes report it as `400`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14794,7 +15266,7 @@
             }
           },
           "503": {
-            "description": "WhatsApp did not answer the catalog query within the request budget — retry shortly.",
+            "description": "WhatsApp did not answer the catalog query within the request budget, or rate-limited it. For some business accounts WhatsApp never answers it, so a retry may not help.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14922,6 +15394,16 @@
           },
           "409": {
             "description": "Plugin already installed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Package exceeds the 5 MB upload limit",
             "content": {
               "application/json": {
                 "schema": {
@@ -15350,6 +15832,16 @@
               }
             }
           },
+          "400": {
+            "description": "Validation failed, or the body carries a field the DTO does not declare.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "The API key is missing, unknown, revoked, or expired",
             "content": {
@@ -15491,7 +15983,7 @@
             }
           },
           "400": {
-            "description": "Plugin is global (not session-scoped)",
+            "description": "Plugin is global (not session-scoped), or the body failed validation",
             "content": {
               "application/json": {
                 "schema": {
@@ -15572,7 +16064,7 @@
             }
           },
           "400": {
-            "description": "Plugin is global (not session-scoped)",
+            "description": "Plugin is global (not session-scoped), or the body failed validation",
             "content": {
               "application/json": {
                 "schema": {
@@ -15817,7 +16309,7 @@
             "description": "Rate limit exceeded: the per-instance bucket (INGRESS_INSTANCE_LIMIT) or the per-client-IP bucket (INGRESS_IP_LIMIT). The `Retry-After-instance` / `Retry-After-ingress-ip` header names which one shed the request, and a plain `Retry-After` carries the same delay for a client that reads only the standard name."
           },
           "503": {
-            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session's engine is not connected. The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
+            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session has no running engine or its engine has failed (a starting, reconnecting or QR-pending session is answered with the route's ack). The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
           }
         },
         "tags": [
@@ -15881,7 +16373,7 @@
             "description": "Rate limit exceeded: the per-instance bucket (INGRESS_INSTANCE_LIMIT) or the per-client-IP bucket (INGRESS_IP_LIMIT). The `Retry-After-instance` / `Retry-After-ingress-ip` header names which one shed the request, and a plain `Retry-After` carries the same delay for a client that reads only the standard name."
           },
           "503": {
-            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session's engine is not connected. The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
+            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session has no running engine or its engine has failed (a starting, reconnecting or QR-pending session is answered with the route's ack). The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
           }
         },
         "tags": [
@@ -15945,7 +16437,7 @@
             "description": "Rate limit exceeded: the per-instance bucket (INGRESS_INSTANCE_LIMIT) or the per-client-IP bucket (INGRESS_IP_LIMIT). The `Retry-After-instance` / `Retry-After-ingress-ip` header names which one shed the request, and a plain `Retry-After` carries the same delay for a client that reads only the standard name."
           },
           "503": {
-            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session's engine is not connected. The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
+            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session has no running engine or its engine has failed (a starting, reconnecting or QR-pending session is answered with the route's ack). The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
           }
         },
         "tags": [
@@ -16009,7 +16501,7 @@
             "description": "Rate limit exceeded: the per-instance bucket (INGRESS_INSTANCE_LIMIT) or the per-client-IP bucket (INGRESS_IP_LIMIT). The `Retry-After-instance` / `Retry-After-ingress-ip` header names which one shed the request, and a plain `Retry-After` carries the same delay for a client that reads only the standard name."
           },
           "503": {
-            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session's engine is not connected. The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
+            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session has no running engine or its engine has failed (a starting, reconnecting or QR-pending session is answered with the route's ack). The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
           }
         },
         "tags": [
@@ -16073,7 +16565,7 @@
             "description": "Rate limit exceeded: the per-instance bucket (INGRESS_INSTANCE_LIMIT) or the per-client-IP bucket (INGRESS_IP_LIMIT). The `Retry-After-instance` / `Retry-After-ingress-ip` header names which one shed the request, and a plain `Retry-After` carries the same delay for a client that reads only the standard name."
           },
           "503": {
-            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session's engine is not connected. The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
+            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session has no running engine or its engine has failed (a starting, reconnecting or QR-pending session is answered with the route's ack). The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
           }
         },
         "tags": [
@@ -16137,7 +16629,7 @@
             "description": "Rate limit exceeded: the per-instance bucket (INGRESS_INSTANCE_LIMIT) or the per-client-IP bucket (INGRESS_IP_LIMIT). The `Retry-After-instance` / `Retry-After-ingress-ip` header names which one shed the request, and a plain `Retry-After` carries the same delay for a client that reads only the standard name."
           },
           "503": {
-            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session's engine is not connected. The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
+            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session has no running engine or its engine has failed (a starting, reconnecting or QR-pending session is answered with the route's ack). The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
           }
         },
         "tags": [
@@ -16201,7 +16693,7 @@
             "description": "Rate limit exceeded: the per-instance bucket (INGRESS_INSTANCE_LIMIT) or the per-client-IP bucket (INGRESS_IP_LIMIT). The `Retry-After-instance` / `Retry-After-ingress-ip` header names which one shed the request, and a plain `Retry-After` carries the same delay for a client that reads only the standard name."
           },
           "503": {
-            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session's engine is not connected. The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
+            "description": "A route whose response contract declares a `session-alive` preflight, when the bound session has no running engine or its engine has failed (a starting, reconnecting or QR-pending session is answered with the route's ack). The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay."
           }
         },
         "tags": [
@@ -16796,6 +17288,7 @@
             "in": "query",
             "description": "Max hits to return",
             "schema": {
+              "minimum": 1,
               "type": "number"
             }
           },
@@ -16805,6 +17298,8 @@
             "in": "query",
             "description": "Pagination offset, at most 100000",
             "schema": {
+              "minimum": 0,
+              "maximum": 100000,
               "type": "number"
             }
           }
@@ -17145,7 +17640,9 @@
           "name": {
             "type": "string",
             "description": "Friendly name for the API key",
-            "example": "Production Bot"
+            "example": "Production Bot",
+            "minLength": 3,
+            "maxLength": 100
           },
           "role": {
             "type": "string",
@@ -17346,7 +17843,9 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100
           },
           "role": {
             "type": "string",
@@ -17402,6 +17901,11 @@
             "type": "string",
             "description": "Engine the process resolved at boot; present only when valid.",
             "example": "baileys"
+          },
+          "scoped": {
+            "type": "boolean",
+            "description": "Whether the key is restricted to selected sessions; present only when valid.",
+            "example": false
           }
         },
         "required": [
@@ -17429,7 +17933,8 @@
           },
           "proxyUrl": {
             "type": "string",
-            "description": "Optional per-session egress proxy URL (http/https/socks4/socks5; credentialed form \"http://user:pass@host\" allowed). Must be a REAL, REACHABLE proxy — an unreachable value silently blocks the WhatsApp WebSocket (no QR is ever delivered) and the session start times out (~30s → 504 Gateway Timeout). Leave unset unless your network cannot reach WhatsApp directly. Setting it requires an ADMIN key (403 otherwise)."
+            "description": "Optional per-session egress proxy URL (http/https/socks4/socks5; credentialed form \"http://user:pass@host\" allowed). Must be a REAL, REACHABLE proxy — an unreachable value silently blocks the WhatsApp WebSocket (no QR is ever delivered). On whatsapp-web.js the session start then times out (~30s → 504 Gateway Timeout); on Baileys the start succeeds and the session keeps retrying the connection. Leave unset unless your network cannot reach WhatsApp directly. Setting it requires an ADMIN key (403 otherwise).",
+            "maxLength": 255
           },
           "proxyType": {
             "type": "string",
@@ -17664,8 +18169,9 @@
         "properties": {
           "proxyUrl": {
             "type": "string",
-            "description": "Per-session egress proxy URL (http/https/socks4/socks5; credentialed form allowed). Send `null` to clear the proxy. Must be a real, reachable proxy — an unreachable value blocks the WhatsApp WebSocket and session start times out (~30s).",
+            "description": "Per-session egress proxy URL (http/https/socks4/socks5; credentialed form allowed). Send `null` to clear the proxy. Must be a real, reachable proxy — an unreachable value blocks the WhatsApp WebSocket (no QR is delivered). On whatsapp-web.js the session start then times out (~30s); on Baileys the start succeeds and the session keeps retrying the connection.",
             "nullable": true,
+            "maxLength": 255,
             "example": "http://user:pass@proxy.example.com:8080"
           }
         }
@@ -17704,7 +18210,8 @@
           "phoneNumber": {
             "type": "string",
             "description": "Phone number to link, digits only in international format (country code + number).",
-            "example": "628123456789"
+            "example": "628123456789",
+            "pattern": "^[0-9]{6,15}$"
           }
         },
         "required": [
@@ -17997,10 +18504,11 @@
             "example": "1234567890-123@g.us"
           },
           "muteUntil": {
-            "type": "number",
+            "type": "integer",
             "description": "Absolute epoch-MILLISECONDS timestamp at which the mute expires, or `null` to unmute now. Required — omitting it is rejected rather than guessed, because the two plausible readings (unmute vs mute forever) are opposites. To mute indefinitely, send a far-future timestamp. Milliseconds, not seconds: a seconds-scale value is an instant in 1970, so the mute expires immediately while the request still answers 200.",
             "example": 1800000000000,
-            "nullable": true
+            "nullable": true,
+            "minimum": 1
           }
         },
         "required": [
@@ -18554,7 +19062,7 @@
           },
           "attempts": {
             "type": "number",
-            "description": "Attempts recorded for the delivery; 0 when it was shed, refused or failed before sending.",
+            "description": "Attempts recorded for the delivery; 0 when it was shed, refused or failed before sending. With the queue disabled, a delivery that shutdown caught in a retry backoff also records 0, although earlier attempts were sent.",
             "example": 5
           },
           "lastStatusCode": {
@@ -18565,7 +19073,7 @@
           },
           "lastError": {
             "type": "string",
-            "example": "connect ECONNREFUSED 10.0.0.1:443"
+            "example": "fetch failed"
           },
           "createdAt": {
             "type": "string",
@@ -18720,7 +19228,7 @@
           "chatName": {
             "type": "string",
             "nullable": true,
-            "description": "Push name of the message sender as the engine reported it; in a group this is the member who posted, not the group subject. Null when no contact name was known.",
+            "description": "Sender's push name, or their saved contact name when the engine reported no push name; in a group this is the member who posted, not the group subject. Null when neither was known.",
             "example": "Alice"
           },
           "author": {
@@ -18834,7 +19342,8 @@
           "url": {
             "type": "string",
             "description": "The URL as it appears in the message text — WhatsApp anchors the preview to it.",
-            "example": "https://example.com/launch"
+            "example": "https://example.com/launch",
+            "maxLength": 2048
           },
           "title": {
             "type": "string",
@@ -18873,10 +19382,12 @@
             "example": [
               "628123456789@c.us"
             ],
-            "type": "array",
+            "maxItems": 1024,
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 64
+            },
+            "type": "array"
           },
           "linkPreview": {
             "type": "boolean",
@@ -18952,10 +19463,12 @@
             "example": [
               "628123456789@c.us"
             ],
-            "type": "array",
+            "maxItems": 1024,
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 64
+            },
+            "type": "array"
           },
           "linkPreview": {
             "type": "boolean",
@@ -18992,7 +19505,8 @@
           "filename": {
             "type": "string",
             "description": "Filename for the media. Only rendered on document sends — defaults to 'file' when omitted (a URL-based document send on whatsapp-web.js first derives the URL basename)",
-            "example": "image.jpg"
+            "example": "image.jpg",
+            "maxLength": 255
           },
           "caption": {
             "type": "string",
@@ -19005,10 +19519,12 @@
             "example": [
               "628123456789@c.us"
             ],
-            "type": "array",
+            "maxItems": 1024,
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 64
+            },
+            "type": "array"
           },
           "quotedMessageId": {
             "type": "string",
@@ -19045,7 +19561,8 @@
           "filename": {
             "type": "string",
             "description": "Filename for the media. Only rendered on document sends — defaults to 'file' when omitted (a URL-based document send on whatsapp-web.js first derives the URL basename)",
-            "example": "image.jpg"
+            "example": "image.jpg",
+            "maxLength": 255
           },
           "caption": {
             "type": "string",
@@ -19058,10 +19575,12 @@
             "example": [
               "628123456789@c.us"
             ],
-            "type": "array",
+            "maxItems": 1024,
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 64
+            },
+            "type": "array"
           },
           "quotedMessageId": {
             "type": "string",
@@ -19153,15 +19672,18 @@
           },
           "options": {
             "description": "Options to vote on (WhatsApp allows between 2 and 12)",
+            "minItems": 2,
+            "maxItems": 12,
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            },
             "example": [
               "Park",
               "Beach",
               "Downtown"
             ],
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "type": "array"
           },
           "allowMultipleAnswers": {
             "type": "boolean",
@@ -19197,10 +19719,12 @@
             "example": [
               "628123456789@c.us"
             ],
-            "type": "array",
+            "maxItems": 1024,
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 64
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -19999,10 +20523,12 @@
             "example": [
               "628123456789@c.us"
             ],
-            "type": "array",
+            "maxItems": 1024,
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 64
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -20086,10 +20612,12 @@
             "example": [
               "628123456789@c.us"
             ],
-            "type": "array",
+            "maxItems": 1024,
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 64
+            },
+            "type": "array"
           }
         }
       },
@@ -20162,6 +20690,7 @@
           },
           "messages": {
             "description": "Array of messages (max 100 per request; exact duplicate entries are collapsed — first occurrence wins)",
+            "maxItems": 100,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BulkMessageItemDto"
@@ -20381,7 +20910,7 @@
           },
           "autoReconnect": {
             "type": "boolean",
-            "description": "Always true: the engine auto-reconnects on a transient disconnect and there is no global off switch. Attempts are unlimited by default; cap them per session with config.maxReconnectAttempts (0-20, PATCH /api/sessions/{sessionId}/config).",
+            "description": "Always true: the engine auto-reconnects on a transient disconnect and there is no global off switch. Attempts are unlimited by default; cap them per session with config.maxReconnectAttempts (0-20, PATCH /api/sessions/{sessionId}/config). The cap bounds every reconnect on whatsapp-web.js; on Baileys it bounds only the reconnect after a logged-out close, and the engine retries a transient drop itself with no cap.",
             "example": true
           },
           "debugMode": {
@@ -20426,15 +20955,18 @@
         "properties": {
           "emailEnabled": {
             "type": "boolean",
+            "description": "Always false. Fixed placeholder: no notification feature exists, and the value is not configurable.",
             "example": false
           },
           "notificationEmail": {
             "type": "string",
+            "description": "Always empty. Fixed placeholder: no notification feature exists, and the value is not configurable.",
             "example": ""
           },
           "webhookAlerts": {
             "type": "boolean",
-            "example": true
+            "description": "Always false. Fixed placeholder: no notification feature exists, and the value is not configurable.",
+            "example": false
           }
         },
         "required": [
@@ -20630,8 +21162,8 @@
           },
           "browserArgs": {
             "type": "string",
-            "description": "Extra Chromium arguments, as configured.",
-            "example": ""
+            "description": "Effective Chromium launch arguments: PUPPETEER_ARGS or the defaults, with --lang=en-US appended unless a --lang flag is already present.",
+            "example": "--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --lang=en-US"
           },
           "webVersion": {
             "type": "string",
@@ -21681,7 +22213,7 @@
             ]
           },
           "warnings": {
-            "description": "Why the restore was rolled back (per-row failures, or a backup with no rows). Non-empty only when `imported` is false; non-fatal messages are in `notices`.",
+            "description": "Why the restore was rolled back (per-row failures, a failed session ownership restore, chat-state re-key or restored-row cleanup, or a backup with no rows). Non-empty only when `imported` is false; non-fatal messages are in `notices`.",
             "example": [],
             "type": "array",
             "items": {
@@ -21698,7 +22230,7 @@
           },
           "restartRequired": {
             "type": "boolean",
-            "description": "True when an engine may still be writing into the restored tables (orphans left running by `force`, a failed `stopOrphans` teardown, sessions held by another node, or plugin bindings not re-applied). Restart to reconcile. Can be true even when `imported` is false.",
+            "description": "True when an engine may still be writing into the restored tables (orphans left running by `force`, a failed `stopOrphans` teardown, sessions held by another node; restart to reconcile), or when plugin instance bindings could not be re-synced after the commit (a restart does not repair this; follow the manual check named in `notices`). Can be true even when `imported` is false.",
             "example": false
           },
           "orphanedEngines": {
@@ -21869,8 +22401,8 @@
           },
           "profilePicUrl": {
             "type": "string",
-            "description": "Profile picture URL. Absent when the contact has none or their privacy settings hide it.",
-            "example": "https://pps.whatsapp.net/v/t61.24694-24/12345_678_910_n.jpg"
+            "description": "Not a usable URL. On Baileys it holds only the picture-change marker `changed` or `removed` from a contact notification; whatsapp-web.js never sets it. Neither its value nor its absence says whether the contact has a picture; fetch the URL from GET /contacts/{contactId}/profile-picture.",
+            "example": "changed"
           }
         },
         "required": [
@@ -21965,6 +22497,7 @@
           "firstName": {
             "type": "string",
             "description": "The contact's first name.",
+            "minLength": 1,
             "maxLength": 100
           },
           "lastName": {
@@ -22614,9 +23147,11 @@
             "example": "video"
           },
           "startTime": {
-            "type": "number",
+            "type": "integer",
             "description": "Absolute epoch-MILLISECONDS timestamp the call is scheduled to start at. Required: whatsapp-web.js generates an event-linked call and has no notion of \"no start time\", so a link for right now is `Date.now()` rather than an omitted field.",
-            "example": 1800000000000
+            "example": 1800000000000,
+            "minimum": 1,
+            "maximum": 8640000000000000
           }
         },
         "required": [
@@ -22801,7 +23336,8 @@
           "description": {
             "type": "string",
             "description": "Channel description",
-            "example": "Release notes and downtime notices"
+            "example": "Release notes and downtime notices",
+            "maxLength": 2048
           }
         },
         "required": [
@@ -23576,7 +24112,7 @@
           },
           "productCount": {
             "type": "number",
-            "description": "How many products the first collection holds.",
+            "description": "How many products the first collection holds, counting at most the first 51 on Baileys.",
             "example": 12
           },
           "url": {
@@ -23622,7 +24158,7 @@
           "priceFormatted": {
             "type": "string",
             "description": "Price rendered for display. Synthesized by the gateway from price + currency, so an unrecognised currency code falls back to a plain \"CODE amount\" pair, and a product with no currency shows the bare amount. Present only when price is.",
-            "example": "IDR 85,000.00"
+            "example": "IDR 85,000"
           },
           "imageUrl": {
             "type": "string",
@@ -24062,22 +24598,28 @@
           "instanceId": {
             "type": "string",
             "description": "Operator-chosen instance id (unique within the plugin). Namespaces the ingress URL and the instance secret.",
+            "pattern": "^[a-zA-Z0-9_-]{1,64}$",
             "example": "chatwoot-prod-1"
           },
           "sessionScope": {
             "type": "string",
             "description": "Session id the instance is scoped to. Omit for all sessions.",
+            "minLength": 1,
+            "maxLength": 256,
             "example": "8f3c2b1a-9d4e-4c7a-8b2f-1e6d5a4c3b2a"
           },
           "verifyToken": {
             "type": "string",
             "description": "Token echoed back for the provider webhook verification handshake. Auto-generated when omitted.",
+            "maxLength": 512,
             "example": "a1b2c3d4e5f6"
           },
           "secret": {
             "type": "string",
-            "description": "Ingress HMAC secret shared with the provider. Omit to auto-generate a random 64-hex secret. Masked (****) on every read.",
+            "description": "Ingress HMAC secret shared with the provider. Omit to auto-generate a random 64-hex secret. Masked ('***') on every later read; plaintext returned only once on create/regenerate-secret.",
             "writeOnly": true,
+            "minLength": 16,
+            "maxLength": 512,
             "example": "super-secret-provider-webhook-key"
           },
           "config": {
@@ -24188,7 +24730,9 @@
           "sessionScope": {
             "type": "string",
             "description": "Session id to bind the instance to, or null for all sessions. Omit to leave the scope unchanged.",
-            "nullable": true
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 256
           },
           "config": {
             "type": "object",
