@@ -693,8 +693,12 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
       await setTimeout(SESSION_START_RETRY_DELAY_MS);
       // Retrying would bring back a session that a stop() issued since this start began just took
       // down. A mark alone does not prove that: an earlier stop's mark survives until start() clears
-      // it, and a first attempt failing before that point would otherwise lose its retry.
-      if (this.stopRequests.get(id) !== stopRequestsBefore) throw error;
+      // it, and a first attempt failing before that point would otherwise lose its retry. Answered
+      // as the stop it yielded to, like the check above: a 503 reads as retryable, and a client that
+      // replays the start would bring the session back.
+      if (this.stopRequests.get(id) !== stopRequestsBefore) {
+        throw new SessionStoppedException(`Session ${id} was stopped`);
+      }
       // The lease may have lapsed while the first attempt ran; the retry must keep holding the
       // claim, never 409 on the session it already owns.
       if (this.ownership && !(await this.ownership.claim(id))) {
@@ -702,7 +706,9 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
         throw new ConflictException(`Session ${id} is running on another node`);
       }
       // Checked again: a stop that landed during the re-claim has already released it.
-      if (this.stopRequests.get(id) !== stopRequestsBefore) throw error;
+      if (this.stopRequests.get(id) !== stopRequestsBefore) {
+        throw new SessionStoppedException(`Session ${id} was stopped`);
+      }
       return this.engineLifecycle.start(id, { explicit });
     }
   }

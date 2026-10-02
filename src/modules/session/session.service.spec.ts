@@ -1476,7 +1476,7 @@ describe('SessionService', () => {
       await service.stop('sess-uuid-1');
       finishClaim();
 
-      expect(await outcome).toBeInstanceOf(EngineTransportError);
+      expect(await outcome).toBeInstanceOf(SessionStoppedException);
       expect(mockEngine.initialize).toHaveBeenCalledTimes(1);
       expect(lifecycle.isEngineActive('sess-uuid-1')).toBe(false);
       expect(desired()).toBe('stopped');
@@ -1998,7 +1998,7 @@ describe('SessionService', () => {
         await until(() => mockEngine.initialize.mock.calls.length === 1 && !lifecycle.isEngineActive(row.id));
         await service.stop(row.id);
 
-        expect(await outcome).toBeInstanceOf(EngineTransportError);
+        expect(await outcome).toBeInstanceOf(SessionStoppedException);
         expect(mockEngine.initialize).toHaveBeenCalledTimes(1);
         expect(lifecycle.isEngineActive(row.id)).toBe(false);
         expect(await nodeIdOf(row.id)).toBeNull();
@@ -2054,7 +2054,7 @@ describe('SessionService', () => {
         jest.spyOn(ownership, 'isHeldByOtherNode').mockResolvedValueOnce(true);
         await expect(service.stop(row.id)).rejects.toThrow(ConflictException);
 
-        expect(await outcome).toBeInstanceOf(EngineTransportError);
+        expect(await outcome).toBeInstanceOf(SessionStoppedException);
         expect(mockEngine.initialize).toHaveBeenCalledTimes(1);
         expect(lifecycle.isEngineActive(row.id)).toBe(false);
       });
