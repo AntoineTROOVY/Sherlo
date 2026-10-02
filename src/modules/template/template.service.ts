@@ -71,6 +71,11 @@ export class TemplateService {
     }
 
     if (templateName) {
+      // PostgreSQL rejects a NUL in a bound text parameter (a 500), and the write DTOs refuse one, so no
+      // stored name can match: answer 404 without querying.
+      if (templateName.includes('\u0000')) {
+        throw new NotFoundException(`Template with name '${templateName}' not found`);
+      }
       // Order by createdAt ASC so resolution is deterministic if more than one row shares a name
       // (possible only on a DB predating the unique index); the migration keeps the earliest too.
       const template = await this.templateRepository.findOne({
