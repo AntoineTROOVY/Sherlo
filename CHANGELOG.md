@@ -201,6 +201,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MCP no longer logs an info line on every request, and logs a tool call refused with a `4xx` as a one-line warning instead of an error with a stack.
 - Video conversion no longer fails on an odd-width input such as a GIF, and fits its output inside 1280x720, or 720x1280 for portrait, so square and 4:3 inputs also stay within the H.264 level older Android clients play.
 - Media conversion answers `503` instead of `400` when ffmpeg cannot be started, and a failed ffmpeg availability check is retried on the next call instead of disabling conversion until a restart.
+- Video conversion caps the frame rate at 30 fps, so a 60 fps clip no longer comes out above the H.264 level its file declares.
 - A plugin search provider's fractional `tookMs`, `total` or hit `timestamp` is returned as a whole number, so the Go and Java SDKs can decode the search reply.
 - `GET /api/infra/export-data` and `POST /api/infra/import-data` answer `409` while the other runs; on SQLite an export taken during an import could archive a half-restored database.
 - A data export taken while a session is being created no longer produces a backup whose restore rolls back on an orphaned child row.
@@ -241,15 +242,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A failed reconnect attempt no longer arms another attempt that tears down the next attempt's engine, which repeated until the session ended `failed`.
 - A failed write of an engine-reported session status, such as on a disconnect or when reconnects run out, is logged as a warning instead of raising an unhandled promise rejection.
 - `POST /api/infra/import-data` with `stopOrphans: true` refuses a backup with no rows before stopping any engine, where it stopped every running session first, and no longer lets a start still reading its session row launch an engine for a session the import removes.
+- A full-replace `POST /api/infra/import-data` treats a session waiting to relaunch after a failed reconnect as a running engine, instead of deleting it while its relaunch is pending.
 - Dashboard Infrastructure: saves are no longer refused with `400` when external PostgreSQL or S3 credentials come from the project `.env` or use the legacy `S3_ACCESS_KEY` and `S3_SECRET_KEY` names, and the config read no longer reports those S3 credentials as unset.
 - S3 requests time out against a store that accepts connections but never answers, after 5 s to connect or 30 s without data, and a bucket probe is abandoned after 10 s, so media reads and writes and `GET /api/infra/status` no longer hang and S3 recovers without a restart.
 - Outbound media archived from both the engine echo and the REST send at once no longer leaves a second copy in storage.
-- Lowering or raising an automation rule's `cooldownSeconds` applies to a quiet period already running in a chat, also on a gateway tracking 10,000 or more chats.
+- Lowering or raising an automation rule's `cooldownSeconds` applies to a quiet period already running in a chat, also on a gateway tracking 10,000 or more chats, and such a gateway no longer rescans every tracked chat on each automated reply.
 - `POST /api/sessions/:sessionId/calls/link` answers `400` for a `startTime` past the largest date JavaScript can hold, instead of `403` or `500`.
 - Channel delete and unsubscribe answer `404` for an id that is not a channel; on whatsapp-web.js they created a chat for it and failed with `500`.
 - Group and profile picture writes and media sends answer `400` for a non-string `base64` sent next to a `url`, and `send-template` for a non-string `templateId` or `templateName` sent next to the other, instead of `500`.
 - `POST /api/sessions/:sessionId/groups/join` trims whitespace around the invite code, as the join preview does.
-- A template name, body, header or footer, or an automation rule name or reply text, containing a NUL character is refused with `400`, and a `send-template` naming a template with one answers `404`, instead of failing with `500` on PostgreSQL.
+- A template name, body, header or footer, or an automation rule name or reply text, containing a NUL character is refused with `400`, and a `send-template` naming a template by such a name or id, or a `/templates/:id` route given such an id, answers `404`, instead of failing with `500` on PostgreSQL.
 - A replica that starts while Redis is unreachable subscribes to cross-replica WebSocket events once Redis returns, instead of missing them until a restart.
 - Status media received without a type is served as `application/octet-stream` instead of answering `404` on the `mediaUrl` it was advertised with.
 - SQLite search no longer returns other messages after `DATABASE_SYNCHRONIZE=true` rebuilt the messages table; the next boot rebuilds the search index.
@@ -478,6 +480,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⚠️ **Breaking (API).** Webhook filters and automation rule conditions with a key other than `conditions`, or a condition key other than `field`, `operator`, `value` and `caseSensitive`, are now refused with `400`, and `POST /api/infra/import-data` refuses a backup holding such a webhook or automation rule; remove the extra keys.
 - ⚠️ **Breaking (API).** A group create or participant add naming more new contacts than a whole day's cold-reachout allowance gets `400` without `retryAfterSeconds` instead of `429`; split the batch.
 - ⚠️ **Breaking (API).** Media conversion answers `503` instead of `400` when ffmpeg cannot be started, and on Baileys a rate-limited or timed-out group, channel or catalog call answers `503` instead of `403`, except a group or channel create that WhatsApp times out (code 408), which may have succeeded and answers `500` instead of `403`; a profile-picture lookup whose connection drops, or that WhatsApp rate-limits or times out (code 429 or 408), answers `503` instead of `200` with a null `url`; a client that branched on the old code needs updating.
+- Media conversion on a source install needs ffmpeg 4.4 or newer: an older binary fails every video conversion with `400`.
 - ⚠️ **Breaking (API).** `POST /api/sessions` refuses an out-of-range or mistyped `config.maxReconnectAttempts`, `config.reconnectBaseDelay` or `config.autoRejectCalls` with `400` instead of storing it; a string such as `"true"` or `"5"` is still accepted and stored typed.
 - `PATCH /api/sessions/:sessionId/config` answers `409` when concurrent updates to the same session keep conflicting; retry it.
 - ⚠️ **Breaking (API).** API key create and update refuse with `400` an `expiresAt` that is valid ISO 8601 but not a date the gateway can read, such as the week form `2026-W40-1`, and a key already stored with such an expiry is treated as expired; give it a new expiry with `PUT /api/auth/api-keys/:id`.
