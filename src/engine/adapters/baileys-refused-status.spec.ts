@@ -3,6 +3,7 @@ import { refusedStatusCode, mapServerRefusal } from './baileys-groups';
 import { wmexRefusalCode } from './baileys-channels';
 import { EngineRefusedError } from '../../common/errors/engine-refused.error';
 import { EngineTransportError } from '../../common/errors/engine-transport.error';
+import { EngineThrottledError } from '../../common/errors/engine-throttled.error';
 
 /**
  * `refusedStatusCode` decides whether a Baileys failure was a SERVER refusal (map to 403/404) or a
@@ -84,5 +85,12 @@ describe('mapServerRefusal', () => {
         mapServerRefusal('Deleting the channel', () => Promise.reject(graphQl(code)), wmexRefusalCode),
       ).rejects.toBeInstanceOf(EngineTransportError);
     }
+  });
+
+  it('marks only a rate limit as throttled, so a pre-charged budget can be given back', async () => {
+    const reject = (code: number) => () => Promise.reject(new Boom('refused', { data: code }));
+    await expect(mapServerRefusal('Creating the group', reject(429))).rejects.toBeInstanceOf(EngineThrottledError);
+    // A server timeout leaves the outcome unknown: it stays a plain transport error.
+    await expect(mapServerRefusal('Creating the group', reject(408))).rejects.not.toBeInstanceOf(EngineThrottledError);
   });
 });

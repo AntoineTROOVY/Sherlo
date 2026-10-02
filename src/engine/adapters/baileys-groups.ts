@@ -14,6 +14,7 @@ import { GroupNotFoundError } from '../../common/errors/group-not-found.error';
 import { resolveMediaBuffer } from './baileys-messaging';
 import { EngineRefusedError } from '../../common/errors/engine-refused.error';
 import { EngineTransportError } from '../../common/errors/engine-transport.error';
+import { EngineThrottledError } from '../../common/errors/engine-throttled.error';
 import { InvalidInviteCodeError } from '../../common/errors/invalid-invite-code.error';
 import { type createLogger } from '../../common/services/logger.service';
 import { BAILEYS_QUERY_BUDGET_MS, withQueryDeadline } from './baileys-query-deadline';
@@ -74,7 +75,8 @@ export function refusedStatusCode(error: unknown): number | undefined {
  * connection as a permissions problem.
  *
  * WA codes 408 and 429 (timed out, rate limited) become EngineTransportError (503) instead: a
- * throttled caller has not been refused, and a retry may succeed.
+ * throttled caller has not been refused, and a retry may succeed. A 429 is the EngineThrottledError
+ * subclass, since a throttled request was not applied and a paced write can give its budget back.
  *
  * `notFound`, when given, takes WA code 404 (item-not-found) instead: a caller whose request names a
  * single resource maps it to that resource's not-found error rather than a permissions refusal.
@@ -92,8 +94,11 @@ export async function mapServerRefusal<T>(
     if (code === 404 && notFound) {
       throw notFound();
     }
-    if (code === 408 || code === 429) {
-      throw new EngineTransportError(`${operation} was rate-limited or timed out by WhatsApp (code ${code})`);
+    if (code === 429) {
+      throw new EngineThrottledError(`${operation} was rate-limited by WhatsApp (code ${code})`);
+    }
+    if (code === 408) {
+      throw new EngineTransportError(`${operation} was timed out by WhatsApp (code ${code})`);
     }
     if (code !== undefined && code >= 400 && code < 500) {
       throw new EngineRefusedError(
