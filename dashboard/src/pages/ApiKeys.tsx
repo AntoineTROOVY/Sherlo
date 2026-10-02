@@ -580,7 +580,9 @@ export function ApiKeys() {
                 <span className="key-field-hint">{t('apiKeys.nameTooShort')}</span>
               )}
               {nameTooLong && (
-                <span className="key-field-hint">{t('common.fieldTooLong', { max: 100, count: nameLength })}</span>
+                <span className="key-field-hint" role="status">
+                  {t('common.fieldTooLong', { max: 100, count: nameLength })}
+                </span>
               )}
               <label htmlFor="ak-2">{t('common.role')}</label>
               <select
