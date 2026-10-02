@@ -152,7 +152,7 @@ jest.mock('@whiskeysockets/baileys', () => ({
 }));
 
 import { HttpsProxyAgent } from 'https-proxy-agent';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { Dispatcher1Wrapper } from 'undici';
 import { BaileysAdapter, createProxyAgent } from './baileys.adapter';
@@ -176,6 +176,7 @@ import { ChatLabelsUnsupportedError } from '../../common/errors/chat-labels-unsu
 import { Boom } from '@hapi/boom';
 import { EngineTransportError } from '../../common/errors/engine-transport.error';
 import { LidNotMappedError } from '../../common/errors/lid-not-mapped.error';
+import { countsTowardSendBreaker } from '../../modules/message/send-pacing.service';
 import { loadRemoteMediaBuffer } from '../../common/media/load-remote-media';
 import * as safeLinkPreview from './safe-link-preview';
 
@@ -7350,6 +7351,18 @@ describe('BaileysAdapter catalog (#905)', () => {
     fakeSock.getCatalog.mockResolvedValue({ products: [baileysProduct({ imageUrls: {} })], nextPageCursor: undefined });
 
     await expect(adapter.sendProduct('628111@s.whatsapp.net', 'p1')).rejects.toThrow(BadRequestException);
+    expect(fakeSock.sendMessage).not.toHaveBeenCalled();
+  });
+
+  // The breaker measures WhatsApp refusing this account's sends; a catalog read it refused is not one.
+  it('sendProduct answers 403 for a refused catalog lookup without feeding the send breaker', async () => {
+    const adapter = await ready();
+    fakeSock.getCatalog.mockRejectedValue(new Boom('refused', { data: 403 }));
+
+    const error: unknown = await adapter.sendProduct('628111@s.whatsapp.net', 'p1').catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ForbiddenException);
+    expect(countsTowardSendBreaker(error)).toBe(false);
     expect(fakeSock.sendMessage).not.toHaveBeenCalled();
   });
 });

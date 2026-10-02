@@ -49,7 +49,8 @@ import {
   StatusPostOptions,
 } from '../interfaces/whatsapp-engine.interface';
 import { EngineNotSupportedError } from '../../common/errors/engine-not-supported.error';
-import { NotFoundException } from '@nestjs/common';
+import { EngineRefusedError } from '../../common/errors/engine-refused.error';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { createLogger } from '../../common/services/logger.service';
 import { BaileysAdapterConfig } from '../types/baileys.types';
 import { baileysAuthDir } from '../auth-dir-paths';
@@ -753,7 +754,12 @@ export class BaileysAdapter implements IWhatsAppEngine {
     return this.catalog.getProduct(productId);
   }
   async sendProduct(chatId: string, productId: string, body?: string): Promise<MessageResult> {
-    const product = await this.catalog.getProduct(productId);
+    const product = await this.catalog.getProduct(productId).catch((error: unknown) => {
+      // Still 403, but no longer an EngineRefusedError: the send breaker counts WhatsApp refusing a
+      // send, and a catalog read it refused says nothing about the account's send standing.
+      if (error instanceof EngineRefusedError) throw new ForbiddenException(error.message);
+      throw error;
+    });
     if (!product) {
       throw new NotFoundException(`Product ${productId} not found in the session catalog`);
     }
