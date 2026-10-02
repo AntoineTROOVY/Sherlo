@@ -163,6 +163,7 @@ export class SessionController {
     description: 'Session details',
     type: SessionResponseDto,
   })
+  @ApiResponse({ status: 400, description: 'The session id is not a UUID' })
   @ApiResponse({ status: 404, description: 'Session not found' })
   async findOne(@Param('sessionId', ParseUUIDPipe) id: string): Promise<SessionResponseDto> {
     const session = await this.sessionService.findOne(id);
@@ -177,6 +178,7 @@ export class SessionController {
     description: 'Effective session configuration',
     type: SessionConfigResponseDto,
   })
+  @ApiResponse({ status: 400, description: 'The session id is not a UUID' })
   @ApiResponse({ status: 404, description: 'Session not found' })
   async getConfig(@Param('sessionId', ParseUUIDPipe) id: string): Promise<SessionConfigResponseDto> {
     return this.sessionService.getConfig(id);
@@ -222,6 +224,7 @@ export class SessionController {
     description: 'Effective proxy configuration',
     type: SessionProxyResponseDto,
   })
+  @ApiResponse({ status: 400, description: 'The session id is not a UUID' })
   @ApiResponse({ status: 404, description: 'Session not found' })
   async getProxy(@Param('sessionId', ParseUUIDPipe) id: string): Promise<SessionProxyResponseDto> {
     return this.sessionService.getProxy(id);
@@ -267,6 +270,7 @@ export class SessionController {
   @ApiOperation({ summary: 'Delete a session' })
   @ApiParam({ name: 'sessionId', description: 'Session ID' })
   @ApiResponse({ status: 204, description: 'Session deleted' })
+  @ApiResponse({ status: 400, description: 'The session id is not a UUID' })
   @ApiResponse({ status: 404, description: 'Session not found' })
   @ApiResponse({
     status: 409,
@@ -337,6 +341,7 @@ export class SessionController {
     description: 'Session stopped',
     type: SessionResponseDto,
   })
+  @ApiResponse({ status: 400, description: 'The session id is not a UUID' })
   @ApiResponse({ status: 404, description: 'Session not found' })
   @ApiResponse({
     status: 409,
@@ -686,6 +691,7 @@ export class SessionController {
     description: 'Last reported presence, or null',
     schema: { nullable: true, allOf: [{ $ref: getSchemaPath(ChatPresenceResponseDto) }] },
   })
+  @ApiResponse({ status: 400, description: 'The session id is not a UUID' })
   @ApiResponse({ status: 404, description: 'Session not found' })
   async getPresence(
     @Param('sessionId', ParseUUIDPipe) id: string,
@@ -898,6 +904,12 @@ export class SessionController {
   @ApiOperation({ summary: "Send a typing/recording presence indicator to a chat (or clear it with 'paused')" })
   @ApiParam({ name: 'sessionId', description: 'Session ID' })
   @ApiResponse({ status: 200, description: 'Presence sent', type: SessionActionResponseDto })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Session is not started, or validation failed (an empty chatId, a state other than typing, ' +
+      'recording or paused, or a body field the DTO does not declare).',
+  })
   @ApiResponse({ status: 404, description: 'Session not found' })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
   async sendChatState(
