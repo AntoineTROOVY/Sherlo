@@ -200,6 +200,7 @@ export class BaileysAdapter implements IWhatsAppEngine {
       handleGroupJoinRequest: event => this.events.handleGroupJoinRequest(event),
       handleCallEvents: calls => this.events.handleCallEvents(calls),
       handlePresenceUpdate: update => this.events.handlePresenceUpdate(update),
+      fenceStoredWrites: () => this.events.fenceStoredWrites(),
       captureHistoryMessages: messages => this.history.captureHistoryMessages(messages),
       hydrateNames: () => this.history.hydrateNames(),
       restoreAddressbookSnapshot: () => this.history.restoreAddressbookSnapshot(),
