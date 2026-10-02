@@ -128,7 +128,7 @@ describe('CatalogService', () => {
 
       await expect(svc.sendProduct('s1', '628123@c.us', 'prod-1', 'Back in stock!')).resolves.toBe(sent);
       expect(order).toEqual(['pace', 'send']);
-      expect(pacing.assertSendAllowed).toHaveBeenCalledWith('s1', '628123@c.us');
+      expect(pacing.assertSendAllowed).toHaveBeenCalledWith('s1', '628123@c.us', { untilSettled: true });
       expect(sendProduct).toHaveBeenCalledWith('628123@c.us', 'prod-1', 'Back in stock!');
     });
 
@@ -216,7 +216,25 @@ describe('CatalogService', () => {
       const { svc } = makeService(noEngine ? undefined : { sendProduct }, pacing, hookManager);
 
       await expect(svc.sendProduct('s1', '628123@c.us', 'prod-1')).rejects.toBeDefined();
-      expect(release).toHaveBeenCalledTimes(released ? 1 : 0);
+      // Held otherwise for a window from the engine's answer, while the own-send echo may still land.
+      expect(release.mock.calls).toEqual([[!released]]);
+    });
+
+    // No row exists until the own-send echo, after the engine call, which a catalog query and an image
+    // fetch can stretch past the hold window: the admission is held until the engine returns.
+    it('holds its pacing admission until the engine call returns', async () => {
+      const release = jest.fn();
+      const pacing = { assertSendAllowed: jest.fn().mockResolvedValue(release) };
+      let settledDuringSend = -1;
+      const sendProduct = jest.fn().mockImplementation(() => {
+        settledDuringSend = release.mock.calls.length;
+        return Promise.resolve(sent);
+      });
+      const { svc } = makeService({ sendProduct }, pacing, passThroughHooks());
+
+      await expect(svc.sendProduct('s1', '628123@c.us', 'prod-1')).resolves.toBe(sent);
+      expect(settledDuringSend).toBe(0);
+      expect(release.mock.calls).toEqual([[true]]);
     });
 
     it('propagates an engine failure from sendProduct', async () => {

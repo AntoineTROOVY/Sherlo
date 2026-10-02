@@ -1044,6 +1044,7 @@ describe('BulkMessageService.processBatch', () => {
     await runProcessBatch();
 
     expect(release).toHaveBeenCalledTimes(1);
+    expect(release).not.toHaveBeenCalledWith(true);
   });
 
   it.each([
@@ -1056,7 +1057,7 @@ describe('BulkMessageService.processBatch', () => {
       'the engine transport fails',
       () => engine.sendTextMessage.mockRejectedValueOnce(new EngineTransportError('timeout')),
     ],
-  ])('keeps the pacing admission held when %s', async (_label, arrange) => {
+  ])('keeps the pacing admission held for a window from the engine return when %s', async (_label, arrange) => {
     const release = jest.fn();
     pacing.assertSendAllowed.mockResolvedValue(release);
     repo.findOne.mockResolvedValue(makeBatch(1));
@@ -1064,7 +1065,26 @@ describe('BulkMessageService.processBatch', () => {
 
     await runProcessBatch();
 
-    expect(release).not.toHaveBeenCalled();
+    expect(release.mock.calls).toEqual([[true]]);
+  });
+
+  // The item's row lands only after the engine call, which a media URL fetch or an upload can stretch past
+  // the hold window, so the admission is held until the engine returns rather than from the check.
+  it('holds the pacing admission until the engine call returns', async () => {
+    const release = jest.fn();
+    pacing.assertSendAllowed.mockResolvedValue(release);
+    repo.findOne.mockResolvedValue(makeBatch(1));
+    let settledDuringSend = -1;
+    engine.sendTextMessage.mockImplementationOnce(() => {
+      settledDuringSend = release.mock.calls.length;
+      return Promise.resolve({ id: 'wa1', timestamp: 111 });
+    });
+
+    await runProcessBatch();
+
+    expect(pacing.assertSendAllowed).toHaveBeenCalledWith('s1', expect.any(String), { untilSettled: true });
+    expect(settledDuringSend).toBe(0);
+    expect(release.mock.calls).toEqual([[true]]);
   });
 
   it('sends a bulk audio item with ptt as a voice note and persists type "voice"', async () => {

@@ -93,10 +93,13 @@ interface BreakerState {
  * the caller after the check returns (after the plugin gate), so a burst of parallel requests would
  * otherwise all read the same persisted count and all pass. Each cap is judged by the larger of the
  * persisted count and, for every held admission, the count it read plus the admissions held from it
- * on: none of those rows can be in the count it read, so nothing is counted twice.
+ * on: none of those rows can be in the count it read, so nothing is counted twice. A send held until it
+ * settles is credited to the counts of the admissions taken after it when it settles, since they read
+ * before its row could land and would otherwise miss it once it stops being held.
  */
 interface Admission {
-  at: number;
+  /** Epoch ms the admission stops being held, so only its row counts from then on. */
+  until: number;
   sentToday: number;
   /** Set for a cold send; the key is folded the way the cold count folds dialects. */
   cold: { key: string; coldToday: number } | null;
@@ -109,12 +112,29 @@ interface AdmissionHold {
 }
 
 /**
- * How long each admitted send is held against the caps, from its own admission, before only its row
- * counts. It only has to outlast the gap between the check and the row insert. A send that fails before
- * writing a row hands its admission back (see assertSendAllowed), so only one that may still have gone
- * out is over-counted, and for at most this long.
+ * How long each admitted send is held against the caps before only its row counts: from its own
+ * admission, or for one taken `untilSettled`, from the moment its caller settles it. It only has to
+ * outlast the gap between that moment and the row insert. A send that fails before writing a row hands
+ * its admission back (see assertSendAllowed), so only one that may still have gone out is over-counted,
+ * and for at most this long.
  */
 const ADMISSION_WINDOW_MS = 10_000;
+
+/**
+ * Safety bound on an admission taken `untilSettled` that its caller never settles. Far longer than an
+ * engine send normally runs (a media URL fetch is bounded by MEDIA_DOWNLOAD_TIMEOUT_MS, 30 s by default),
+ * so it only matters if a caller loses track of one, which then holds the caps for this long instead of
+ * for the rest of the day. A send still running past it stops being held.
+ */
+const UNSETTLED_ADMISSION_MAX_MS = 5 * 60_000;
+
+/**
+ * Settles the admission assertSendAllowed held. Called with nothing, for a send that provably never went
+ * out, it hands the admission back at once. Called with `true`, once the engine returned or failed with an
+ * unknown outcome, it holds the admission for ADMISSION_WINDOW_MS from now, while the row or the own-send
+ * echo lands.
+ */
+export type SettleAdmission = (mayHaveSent?: boolean) => void;
 
 /** Refusals suppressed since the last audited one, per session. */
 interface RefusalSample {
@@ -161,7 +181,9 @@ const MAX_REFUSAL_KEYS = 1000;
  * (MessageProjector.handleOwnSendEcho) shortly after the send returns. Deliberate, and documented in
  * .env.example and docs/06 so the number an operator reads is the number they get.
  * Because the row lands only after the check returns, sends admitted in the last few seconds are
- * also held in memory (see Admission), or a parallel burst would pass against one stale count.
+ * also held in memory (see Admission), or a parallel burst would pass against one stale count. A bulk
+ * item and a product send write their row only after the engine call, which can outlast that window
+ * (a media URL fetch, an upload), so they are held until they settle (see `untilSettled`).
  * The breaker, by contrast, is in memory on purpose: it describes live conditions, and a restart
  * clearing it is the correct behaviour.
  */
@@ -205,15 +227,20 @@ export class SendPacingService {
    * `hold: false` judges the send without holding it in the admission window, for a gated send that
    * never writes a row (an edit): holding it would charge the caps for a message that is never sent.
    *
-   * Returns the release for the admission it held, or undefined when it held none. A caller whose send
-   * fails before writing a row, and before WhatsApp may have taken it, calls the release so that send
-   * stops counting against the caps at once instead of refusing the next one.
+   * `untilSettled` holds the admission for as long as the send runs, for a caller whose row lands only
+   * after the engine call (a bulk item, a product send): the window starts when the caller settles it
+   * with `true`, bounded by UNSETTLED_ADMISSION_MAX_MS if it never does. Without it the window starts
+   * now, for a caller that writes its PENDING row before asking the engine.
+   *
+   * Returns the settle for the admission it held, or undefined when it held none. A caller whose send
+   * fails before writing a row, and before WhatsApp may have taken it, calls it with nothing so that
+   * send stops counting against the caps at once instead of refusing the next one.
    */
   async assertSendAllowed(
     sessionId: string,
     chatId?: string,
-    opts: { hold?: boolean } = {},
-  ): Promise<(() => void) | undefined> {
+    opts: { hold?: boolean; untilSettled?: boolean } = {},
+  ): Promise<SettleAdmission | undefined> {
     const config = resolveSendPacingConfig(this.configService);
     if (!config.enabled) return;
 
@@ -246,17 +273,29 @@ export class SendPacingService {
     }
     if (opts.hold !== false) {
       const admission: Admission = {
-        at: Date.now(),
+        until: Date.now() + (opts.untilSettled ? UNSETTLED_ADMISSION_MAX_MS : ADMISSION_WINDOW_MS),
         sentToday,
         cold: cold ? { key, coldToday: cold.coldToday } : null,
       };
       const hold = this.holds.get(sessionId);
       if (hold?.dayStartMs === dayStart.getTime()) hold.admissions.push(admission);
       else this.holds.set(sessionId, { dayStartMs: dayStart.getTime(), admissions: [admission] });
-      return () => {
+      return (mayHaveSent = false) => {
         const admissions = this.holds.get(sessionId)?.admissions;
         const index = admissions?.indexOf(admission) ?? -1;
-        if (admissions && index !== -1) admissions.splice(index, 1);
+        if (!mayHaveSent) {
+          if (admissions && index !== -1) admissions.splice(index, 1);
+          return;
+        }
+        admission.until = Date.now() + ADMISSION_WINDOW_MS;
+        if (!admissions || index === -1) return;
+        // Every admission held after this one was taken while it was in flight, so the counts it read
+        // cannot include this send's coming row; credit it there, or once this one lapses a send still
+        // running would be judged without it.
+        for (const later of admissions.slice(index + 1)) {
+          later.sentToday += 1;
+          if (admission.cold && later.cold && later.cold.key !== admission.cold.key) later.cold.coldToday += 1;
+        }
       };
     }
   }
@@ -281,7 +320,7 @@ export class SendPacingService {
     const hold = this.holds.get(sessionId);
     if (!hold) return [];
     const now = Date.now();
-    const live = hold.admissions.findIndex(a => now - a.at < ADMISSION_WINDOW_MS);
+    const live = hold.admissions.findIndex(a => a.until > now);
     if (hold.dayStartMs === dayStart.getTime() && live !== -1) {
       hold.admissions.splice(0, live);
       return hold.admissions;
@@ -711,12 +750,14 @@ function startOfUtcDay(at: Date): Date {
 }
 
 /**
- * Seconds until every one of these held admissions has lapsed: when the persisted count alone is under
- * the cap, the refusal lifts then, not at the next UTC day.
+ * Seconds until every one of these held admissions could have lapsed: when the persisted count alone is
+ * under the cap, the refusal lifts then, not at the next UTC day. One still unsettled lapses a window
+ * after its settle at the earliest, so it is hinted as if it settled now.
  */
 function secondsUntilLapsed(held: Admission[]): number {
-  const newest = held.at(-1)?.at ?? Date.now();
-  return Math.max(1, Math.ceil((newest + ADMISSION_WINDOW_MS - Date.now()) / 1000));
+  const now = Date.now();
+  const last = held.reduce((max, a) => Math.max(max, Math.min(a.until, now + ADMISSION_WINDOW_MS)), now);
+  return Math.max(1, Math.ceil((last - now) / 1000));
 }
 
 function secondsUntilNextUtcDay(): number {

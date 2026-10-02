@@ -472,6 +472,13 @@ describe('concurrent sends against a real database', () => {
           : undefined,
     } as unknown as ConfigService);
 
+  const insertRow = (id: string, chatId: string): Promise<unknown> =>
+    ds.query(
+      `INSERT INTO "messages" ("id","sessionId","chatId","from","to","type","direction","createdAt")
+       VALUES (?,?,?,'a','b','text','outgoing',?)`,
+      [id, 's1', chatId, new Date().toISOString()],
+    );
+
   // Check, then persist the row the way a send path does; resolves true when the send went out.
   const send = async (service: SendPacingService, chatId: string, i: number): Promise<boolean> => {
     try {
@@ -479,11 +486,7 @@ describe('concurrent sends against a real database', () => {
     } catch {
       return false;
     }
-    await ds.query(
-      `INSERT INTO "messages" ("id","sessionId","chatId","from","to","type","direction","createdAt")
-       VALUES (?,?,?,'a','b','text','outgoing',?)`,
-      [`m${i}`, 's1', chatId, new Date().toISOString()],
-    );
+    await insertRow(`m${i}`, chatId);
     return true;
   };
 
@@ -664,6 +667,84 @@ describe('concurrent sends against a real database', () => {
       status: 429,
       response: { code: SEND_PACING_LIMITED, retryAfterSeconds: 6 },
     });
+  });
+
+  it('keeps holding a send taken until settled while it is still running, then for a window from the settle', async () => {
+    const service = build([2], []);
+    expect(await send(service, 'known@c.us', 1)).toBe(true);
+    // A bulk item whose engine call (a media URL fetch, an upload) outlasts the window.
+    const settle = await service.assertSendAllowed('s1', 'known@c.us', { untilSettled: true });
+    jest.setSystemTime(NOW.getTime() + 11_000);
+
+    await expect(service.assertSendAllowed('s1', 'known@c.us')).rejects.toMatchObject({
+      status: 429,
+      response: { code: SEND_PACING_LIMITED, retryAfterSeconds: 10 },
+    });
+
+    settle?.(true);
+    jest.setSystemTime(NOW.getTime() + 20_000);
+    await expect(service.assertSendAllowed('s1', 'known@c.us')).rejects.toMatchObject({ status: 429 });
+    jest.setSystemTime(NOW.getTime() + 21_010);
+    await expect(service.assertSendAllowed('s1', 'known@c.us')).resolves.toBeDefined();
+  });
+
+  it('keeps holding a cold send taken until settled while it is still running', async () => {
+    const service = build([10_000], [2]);
+    expect(await send(service, 'first@c.us', 1)).toBe(true);
+    await service.assertSendAllowed('s1', 'second@c.us', { untilSettled: true });
+    jest.setSystemTime(NOW.getTime() + 11_000);
+
+    await expect(service.assertSendAllowed('s1', 'third@c.us')).rejects.toMatchObject({ status: 429 });
+    await expect(service.assertReachoutAllowed('s1', ['third@c.us'])).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('counts a settled send for one still running that was admitted before its row landed', async () => {
+    const service = build([3], []);
+    expect(await send(service, 'known@c.us', 1)).toBe(true);
+    const settleFirst = await service.assertSendAllowed('s1', 'known@c.us', { untilSettled: true });
+    jest.setSystemTime(NOW.getTime() + 5_000);
+    // Admitted while the first is in flight, so the count it read cannot include the first's row.
+    await service.assertSendAllowed('s1', 'known@c.us', { untilSettled: true });
+    jest.setSystemTime(NOW.getTime() + 30_000);
+    settleFirst?.(true);
+    await insertRow('m2', 'known@c.us');
+    jest.setSystemTime(NOW.getTime() + 41_000);
+
+    await expect(service.assertSendAllowed('s1', 'known@c.us')).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('counts a settled cold send for one still running that was admitted before its row landed', async () => {
+    const service = build([10_000], [3]);
+    expect(await send(service, 'first@c.us', 1)).toBe(true);
+    const settleFirst = await service.assertSendAllowed('s1', 'second@c.us', { untilSettled: true });
+    jest.setSystemTime(NOW.getTime() + 5_000);
+    await service.assertSendAllowed('s1', 'third@c.us', { untilSettled: true });
+    jest.setSystemTime(NOW.getTime() + 30_000);
+    settleFirst?.(true);
+    await insertRow('m2', 'second@c.us');
+    jest.setSystemTime(NOW.getTime() + 41_000);
+
+    await expect(service.assertSendAllowed('s1', 'fourth@c.us')).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('hands back a send taken until settled at once when it is settled as never sent', async () => {
+    const service = build([2], []);
+    expect(await send(service, 'known@c.us', 1)).toBe(true);
+    const settle = await service.assertSendAllowed('s1', 'known@c.us', { untilSettled: true });
+    settle?.();
+
+    expect(await send(service, 'known@c.us', 2)).toBe(true);
+  });
+
+  it('stops holding a send never settled after the safety bound', async () => {
+    const service = build([2], []);
+    expect(await send(service, 'known@c.us', 1)).toBe(true);
+    await service.assertSendAllowed('s1', 'known@c.us', { untilSettled: true });
+    jest.setSystemTime(NOW.getTime() + 5 * 60_000 - 1_000);
+    await expect(service.assertSendAllowed('s1', 'known@c.us')).rejects.toMatchObject({ status: 429 });
+    jest.setSystemTime(NOW.getTime() + 5 * 60_000);
+
+    expect(await send(service, 'known@c.us', 2)).toBe(true);
   });
 
   it('judges by the persisted rows alone once the hold has lapsed', async () => {

@@ -364,7 +364,7 @@ describe('send paths consult the governor', () => {
 
     await expect(service.sendProduct('s1', 'c@c.us', 'p1')).rejects.toBeInstanceOf(HttpException);
 
-    expect(pacing.assertSendAllowed).toHaveBeenCalledWith('s1', 'c@c.us');
+    expect(pacing.assertSendAllowed).toHaveBeenCalledWith('s1', 'c@c.us', { untilSettled: true });
     expect(hookManager.execute).not.toHaveBeenCalled();
     expect(engine.sendProduct).not.toHaveBeenCalled();
   });
@@ -423,7 +423,7 @@ describe('send paths consult the governor', () => {
 
     await (service as unknown as { processBatch: (id: string) => Promise<void> }).processBatch('b1');
 
-    expect(pacing.assertSendAllowed).toHaveBeenCalledWith('s1', 'c@c.us');
+    expect(pacing.assertSendAllowed).toHaveBeenCalledWith('s1', 'c@c.us', { untilSettled: true });
     expect(hookManager.execute).not.toHaveBeenCalledWith('message:sending', expect.anything(), expect.anything());
     expect(engine.sendTextMessage).not.toHaveBeenCalled();
   });

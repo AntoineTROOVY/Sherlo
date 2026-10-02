@@ -33,6 +33,7 @@ import {
   countsTowardSendBreaker,
   sentNothing,
   SEND_PACING_LIMITED,
+  type SettleAdmission,
 } from './send-pacing.service';
 import { SessionOwnershipService } from '../session/session-ownership.service';
 import { HookManager } from '../../core/hooks';
@@ -554,9 +555,10 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap,
     // decision (not a delivery failure) and skips message:failed — matching the single-send path,
     // where a block is a 400 with no failure hook.
     let blockedByPlugin = false;
-    // The pacing admission's release. Bulk writes an item's row only after the engine accepts it, so an
-    // item that fails first gives its admission back, or it would refuse the next item for the hold.
-    let releaseAdmission: (() => void) | undefined;
+    // The pacing admission's settle. Bulk writes an item's row only after the engine accepts it, so the
+    // admission is held until the engine answers, and an item that fails first gives it back, or it
+    // would refuse the next item for the hold.
+    let settleAdmission: SettleAdmission | undefined;
     let engineAsked = false;
     try {
       // Apply template variables
@@ -565,7 +567,7 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap,
       // Pacing runs BEFORE the moderation gate, matching MessageService: a send policy forbids is not
       // offered to plugins at all. A refusal is a 429 that fails THIS item (honouring stopOnError),
       // not the batch — the allowance may free up, and a batch killed outright could not resume.
-      releaseAdmission = await this.pacing.assertSendAllowed(batch.sessionId, msg.chatId);
+      settleAdmission = await this.pacing.assertSendAllowed(batch.sessionId, msg.chatId, { untilSettled: true });
 
       // Per-message moderation gate — the SAME message:sending hook single sends use, so a
       // compliance/moderation plugin sees bulk traffic too (bulk previously bypassed it entirely).
@@ -628,10 +630,12 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap,
         if (countsTowardSendBreaker(engineError)) {
           this.pacing.recordSendFailure(batch.sessionId);
         }
-        // A failure that may still have sent the message keeps its admission until the echo row lands.
-        if (sentNothing(engineError)) releaseAdmission?.();
+        // A failure that may still have sent the message keeps its admission for a window from now, while
+        // the echo row lands.
+        settleAdmission?.(!sentNothing(engineError));
         throw engineError;
       }
+      settleAdmission?.(true);
       this.pacing.recordSendSuccess(batch.sessionId);
 
       result.status = BatchMessageStatus.SENT;
@@ -648,7 +652,7 @@ export class BulkMessageService implements OnModuleInit, OnApplicationBootstrap,
 
       this.logger.debug(`Batch ${batch.batchId}: Sent message ${i + 1}/${batch.messages.length} to ${msg.chatId}`);
     } catch (error) {
-      if (!engineAsked) releaseAdmission?.();
+      if (!engineAsked) settleAdmission?.();
       result.status = BatchMessageStatus.FAILED;
       // Sanitize: an SSRF block names an internal address — never store/return/log it verbatim.
       const sanitized = sanitizeBatchError(error);

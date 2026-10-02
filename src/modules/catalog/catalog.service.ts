@@ -50,10 +50,11 @@ export class CatalogService {
    * API key's chat scope was checked against. No PENDING row is written up front. On Baileys the
    * own-send echo (MessageProjector.handleOwnSendEcho) persists the OUTGOING row afterwards and fires
    * `message:sent` and `message:persisted`, so the send is counted into the pacing daily cap once
-   * that row lands.
+   * that row lands. Until then its pacing admission is held: for as long as the engine call runs, and for
+   * the hold window after it returns.
    */
   async sendProduct(sessionId: string, chatId: string, productId: string, body?: string): Promise<MessageResult> {
-    const release = await this.pacing.assertSendAllowed(sessionId, chatId);
+    const settle = await this.pacing.assertSendAllowed(sessionId, chatId, { untilSettled: true });
     let engineAsked = false;
     try {
       const gated = await applySendingGate(
@@ -78,11 +79,14 @@ export class CatalogService {
         () => new NotFoundException(`Session ${sessionId} not found or not connected`),
       );
       engineAsked = true;
-      return await this.recordedSend(sessionId, () => engine.sendProduct(chatId, gatedProductId, gatedBody));
+      const result = await this.recordedSend(sessionId, () => engine.sendProduct(chatId, gatedProductId, gatedBody));
+      settle?.(true);
+      return result;
     } catch (error) {
       // No row is written here, so a send that provably never went out gives its pacing admission back.
-      // One whose outcome is unknown stays held: its own-send echo may still write the row.
-      if (!engineAsked || sentNothing(error)) release?.();
+      // One whose outcome is unknown stays held for a window from now: its own-send echo may still write
+      // the row.
+      settle?.(engineAsked && !sentNothing(error));
       throw error;
     }
   }
