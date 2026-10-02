@@ -823,8 +823,9 @@ jobs:
   # the staging tag would otherwise leak. On the happy path the release tags share the staging
   # version, so the step below does not run at all (the deliberate retention documented above): the
   # package-versions API is eventually consistent, and a read that does not list the new release
-  # tags yet would count the staging tag alone and delete the version just published. On a failed
-  # run the staging tag is alone and gets removed.
+  # tags yet would count the staging tag alone and delete the version just published. The same
+  # holds for a promote that failed after re-pointing some tags, so the step runs only when promote
+  # never ran, which is the one case where the staging tag is alone and gets removed.
   cleanup-staging:
     name: Clean up the staging tag
     runs-on: ubuntu-latest
@@ -835,10 +836,10 @@ jobs:
     needs: [docker, boot-smoke, image-scan, promote]
     steps:
       - name: Remove the staging tag (only when it is alone on its version)
-        # Never after a successful promote: the release tags share this version by construction, so
-        # a tag count of 1 there can only be a stale read. The count below still guards a promote
-        # that failed after attaching some release tags.
-        if: needs.promote.result != 'success'
+        # Only when promote never ran: once it has started re-pointing tags, the version can carry
+        # release tags that a stale read does not list yet. A failed or cancelled promote leaves the
+        # stray staging tag behind, the same retention as the happy path.
+        if: needs.promote.result == 'skipped'
         # Best-effort: a failed tidy-up must not turn an otherwise successful release red.
         continue-on-error: true
         env:
