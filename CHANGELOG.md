@@ -94,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A node that adopts a session no longer marks FAILED the bulk batches it started itself while the adopted engine was still initializing, or a batch that finished while the reap was reading it.
 - When a stop and start, or a reconnect, replaces an engine that is still starting, the old start's timeout or failure no longer untracks or tears down the new engine, or marks the session `disconnected` or `failed`.
 - An engine whose graceful shutdown fails is force-killed instead of left running with no handle when its node loses the session's claim, `POST /api/infra/import-data` stops orphan engines, or a stop or delete retires a start or reconnect.
-- With `AUTO_START_SESSIONS=true`, a session stopped with `POST /api/sessions/:sessionId/stop` or `POST /api/sessions/:sessionId/force-kill` stays down across restarts and is not adopted by another node until `POST /api/sessions/:sessionId/start`; a stop or delete whose session read fails records no stop.
+- With `AUTO_START_SESSIONS=true`, a session stopped with `POST /api/sessions/:sessionId/stop` or `POST /api/sessions/:sessionId/force-kill` stays down across restarts and is not adopted by another node until `POST /api/sessions/:sessionId/start`; a stop, delete or force-kill whose session read fails records no stop.
 - Two gateway processes sharing one `NODE_ID` (by default the hostname, as with host networking or pm2 cluster mode) log a `duplicate_node_id` error while either holds a session; give each process its own `NODE_ID`.
 - An inbound message, or one the account sent outside the API, is inserted once more after a transient database error (a SQLite lock, a dropped connection, a PostgreSQL pool timeout or connection limit), instead of reaching webhooks with no stored row.
 - Messages in one chat are stored, emitted over the WebSocket and handed to webhook dispatch in arrival order, even when a plugin's `message:received` or `message:sent` handler is slower on an earlier one. Webhook deliveries themselves can still arrive out of order.
@@ -247,6 +247,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - On a multi-node deployment, a stop, logout or force-kill that finishes while a start of the same session is still claiming it no longer releases that start's claim, which let its engine be torn down as a lost lease and a peer start the session a second time.
 - A full-replace `POST /api/infra/import-data` treats a session waiting to relaunch after a failed reconnect as a running engine, instead of deleting it while its relaunch is pending.
 - Dashboard Infrastructure: saves are no longer refused with `400` when external PostgreSQL or S3 credentials come from the project `.env` or use the legacy `S3_ACCESS_KEY` and `S3_SECRET_KEY` names, and the config read no longer reports those S3 credentials as unset.
+- Dashboard Infrastructure: a key left blank in the project `.env` counts as blank in the save check and the config read, as it does at boot, so a save whose credential the next production boot would refuse as empty answers `400`.
 - S3 requests time out against a store that accepts connections but never answers, after 5 s to connect or 30 s without data, and a bucket probe is abandoned after 10 s, so media reads and writes and `GET /api/infra/status` no longer hang and S3 recovers without a restart.
 - Outbound media archived from both the engine echo and the REST send at once no longer leaves a second copy in storage.
 - Lowering or raising an automation rule's `cooldownSeconds` applies to a quiet period already running in a chat, also on a gateway tracking 10,000 or more chats, and such a gateway no longer rescans every tracked chat on each automated reply.
@@ -418,6 +419,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The API reference and the OpenAPI contract say `profilePicUrl` is never set on whatsapp-web.js and that its absence does not mean the contact has no picture.
 - The API reference says link-preview fetches are always SSRF-guarded whatever `WEBHOOK_SSRF_PROTECT` says, that Baileys block and unblock answer `400` for an id with no phone or lid mapping, and that an unreachable `proxyUrl` makes a start answer `504` only on whatsapp-web.js, while a Baileys start succeeds and keeps retrying; the OpenAPI `proxyUrl` description, the API collection and the dashboard proxy hint say the same.
 - The JavaScript and Java SDKs describe `MessageRecord.chatName` as the sender's push name, `author` as the sender of a group, status or broadcast-list message, and `StatusMediaInput.mimetype` as defaulting to the route's type.
+- The API reference says `PUT /api/plugins/:id/config` merges the keys sent over the stored config, and that each stored key overrides a built-in engine plugin's `.env` setting on later boots.
 
 ### Dependencies
 
