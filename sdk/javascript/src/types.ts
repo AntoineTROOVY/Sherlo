@@ -66,9 +66,9 @@ export interface SessionResponse {
   createdAt: string;
   updatedAt: string;
   /**
-   * Human-readable reason while `status` is `'failed'` or `'action_required'`, or `'initializing'` during
-   * a prolonged automatic reconnect (fifth attempt onward, or while a failed relaunch waits to retry);
-   * `null` otherwise.
+   * Human-readable reason while `status` is `'failed'` or `'action_required'`, or `'initializing'` from the
+   * fifth attempt of a reconnect the engine runs itself (Baileys), or while a reconnect waits to retry after a
+   * failed relaunch (either engine); `null` otherwise.
    */
   lastError?: string | null;
   /**
