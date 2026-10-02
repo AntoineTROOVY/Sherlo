@@ -176,7 +176,8 @@ export class ContactController {
     status: 503,
     description:
       'WhatsApp did not answer the lookup. Deliberately not reported as `url: null` — that is the ' +
-      'same answer a contact with no picture gives, and a caller cannot tell them apart.',
+      'same answer a contact with no picture gives, and a caller cannot tell them apart. On Baileys, also ' +
+      'answered when WhatsApp rate-limits or times out the lookup (code 429 or 408); retry after a pause.',
   })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
   async getProfilePicture(@Param('sessionId') sessionId: string, @Param('contactId') contactId: string) {
