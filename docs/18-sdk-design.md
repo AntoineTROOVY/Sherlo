@@ -286,12 +286,12 @@ Media bodies share the `SendMediaRequest` shape: `{ chatId, url? | base64?, mime
 
 #### `catalog` _(WhatsApp Business)_
 
-| Method        | Signature                       | Description                                                |
-| ------------- | ------------------------------- | ---------------------------------------------------------- |
-| `info`        | `info(sessionId)`               | Get the business catalog info.                             |
-| `products`    | `products(sessionId, query?)`   | List catalog products; returns `{ products, pagination }`. |
-| `product`     | `product(sessionId, productId)` | Get a single product by id.                                |
-| `sendProduct` | `sendProduct(sessionId, body)`  | Send a product message. **OPERATOR**                       |
+| Method        | Signature                       | Description                                                                         |
+| ------------- | ------------------------------- | ----------------------------------------------------------------------------------- |
+| `info`        | `info(sessionId)`               | Get the business catalog info, or null when the account has no catalog.             |
+| `products`    | `products(sessionId, query?)`   | List catalog products; returns `{ products, pagination }`.                          |
+| `product`     | `product(sessionId, productId)` | Get a single product by id, or null when no product in the catalog carries that id. |
+| `sendProduct` | `sendProduct(sessionId, body)`  | Send a product message. **OPERATOR**                                                |
 
 #### `status` _(Stories)_
 
@@ -663,12 +663,12 @@ Resources are accessed as properties on the client (e.g. `client.messages`). All
 
 #### `client.catalog` _(WhatsApp Business)_
 
-| Method         | Signature                                                  | Description                                                                         |
-| -------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `info`         | `info(session_id) -> CatalogInfo`                          | Get catalog info.                                                                   |
-| `products`     | `products(session_id, query=None) -> PaginatedProducts`    | List products (paginated).                                                          |
-| `product`      | `product(session_id, product_id) -> CatalogProduct`        | Get one product.                                                                    |
-| `send_product` | `send_product(session_id, body) -> ProductMessageResponse` | Send a product message; the message id is under `id`, not `messageId`. **OPERATOR** |
+| Method         | Signature                                                   | Description                                                                         |
+| -------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `info`         | `info(session_id) -> CatalogInfo \| None`                   | Get catalog info, or None when the account has no catalog.                          |
+| `products`     | `products(session_id, query=None) -> PaginatedProducts`     | List products (paginated).                                                          |
+| `product`      | `product(session_id, product_id) -> CatalogProduct \| None` | Get one product, or None when no product has that id.                               |
+| `send_product` | `send_product(session_id, body) -> ProductMessageResponse`  | Send a product message; the message id is under `id`, not `messageId`. **OPERATOR** |
 
 #### `client.status` _(Stories)_
 
