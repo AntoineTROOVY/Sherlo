@@ -629,9 +629,13 @@ curl -H "X-API-Key: $API_KEY" http://localhost:2785/api/health
 
 **Trigger:** Daily schedule, before maintenance, before upgrade
 
-**Impact:** The databases are snapshotted consistently online (`sqlite3 .backup`, `pg_dump`). On
-SQLite, app writes wait while each database file is copied, and fail if the copy outlasts their 30 s
-busy timeout. Engine authentication state (`sessions/`, `baileys/`) is copied while the engines write
+**Impact:** The databases are snapshotted consistently online (`sqlite3 .backup`, `pg_dump`). Each
+SQLite file (`main.sqlite` on every deployment, plus the data database with `DATABASE_TYPE=sqlite`)
+is copied under a read lock, and an app write that meets it waits for the copy to end, failing if the
+copy outlasts the 30 s busy timeout. The SQLite driver waits synchronously, so while a write waits the
+whole gateway stalls with it (API, WebSocket, engine events, health probes), not only that write; run
+the backup in a quiet window, or stop the container for a large database.
+Engine authentication state (`sessions/`, `baileys/`) is copied while the engines write
 it, so a restored session can need re-pairing; for a copy that is consistent by construction, stop
 the sessions first (`POST /api/sessions/:id/stop`), or stop the container and archive the volume.
 A stopped session stays down across restarts, even with `AUTO_START_SESSIONS=true`, so start each
