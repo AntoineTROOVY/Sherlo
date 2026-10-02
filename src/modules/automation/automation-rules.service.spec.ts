@@ -309,6 +309,28 @@ describe('AutomationRulesService', () => {
       expect(sends.map(s => s.chatId)).toEqual(['628111@c.us', '628333@c.us']);
     });
 
+    it('cooldown: a sweep that frees nothing is not repeated on the next reply', async () => {
+      await service.create('sessA', { name: 'all', replyText: 'ack', cooldownSeconds: 60 });
+      const cooldowns = (service as unknown as { cooldowns: Map<string, number> }).cooldowns;
+      for (let i = 0; i < 10_000; i++) cooldowns.set(`pad:${i}`, Date.now());
+      const entries = cooldowns[Symbol.iterator].bind(cooldowns);
+      let scans = 0;
+      cooldowns[Symbol.iterator] = () => {
+        scans++;
+        return entries();
+      };
+
+      for (let i = 0; i < 5; i++) {
+        await service.evaluateInbound(
+          'sessA',
+          inbound({ id: `wamid.${i}`, chatId: `62800${i}@c.us`, from: `62800${i}@c.us` }),
+        );
+      }
+
+      expect(sends).toHaveLength(5);
+      expect(scans).toBe(1);
+    });
+
     it('cooldownSeconds 0 disables the quiet period', async () => {
       await service.create('sessA', { name: 'all', replyText: 'ack', cooldownSeconds: 0 });
 

@@ -16,7 +16,11 @@ import {
   UpdateAutomationRuleDto,
 } from './dto/automation-rule.dto';
 
-/** Entries above this size trigger a sweep of expired cooldowns before inserting the next one. */
+/**
+ * The cooldown map is swept of entries older than the longest allowed cooldown once it reaches this
+ * size, and after a sweep only once it doubles again, so a sweep that frees nothing is not repeated
+ * on every reply.
+ */
 const COOLDOWN_SWEEP_THRESHOLD = 10_000;
 
 /**
@@ -55,6 +59,7 @@ export class AutomationRulesService {
    * only drops an entry older than the longest cooldown a rule may have. Per-process.
    */
   private readonly cooldowns = new Map<string, number>();
+  private nextCooldownSweepAt = COOLDOWN_SWEEP_THRESHOLD;
 
   private messagePort?: PluginMessagePort;
 
@@ -256,10 +261,11 @@ export class AutomationRulesService {
   private enterCooldown(rule: AutomationRule, chatId: string): void {
     if (!rule.cooldownSeconds) return;
     const now = Date.now();
-    if (this.cooldowns.size >= COOLDOWN_SWEEP_THRESHOLD) {
+    if (this.cooldowns.size >= this.nextCooldownSweepAt) {
       for (const [key, firedAt] of this.cooldowns) {
         if (firedAt + AUTOMATION_COOLDOWN_MAX_SECONDS * 1000 <= now) this.cooldowns.delete(key);
       }
+      this.nextCooldownSweepAt = Math.max(COOLDOWN_SWEEP_THRESHOLD, this.cooldowns.size * 2);
     }
     this.cooldowns.set(`${rule.id}:${chatId}`, now);
   }
