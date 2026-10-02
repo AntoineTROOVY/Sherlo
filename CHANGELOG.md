@@ -255,6 +255,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A request body holding a NUL character is refused with `400` instead of failing with `500` on PostgreSQL, and an MCP tool input holding one gets a `BadRequestException` tool error instead of `Internal error`; `POST /api/infra/import-data` and the ingress route still accept one.
 - On PostgreSQL, a NUL character in received message text, a status, an archived media type or a dead-letter error is dropped when stored instead of failing the write, so a history sync no longer loses the rest of its batch.
 - On PostgreSQL, a NUL character in the account's own profile name is dropped when a session turns ready, instead of failing the write that binds its phone number.
+- `POST /api/infra/import-data` drops a NUL character from the message, status, profile-name and dead-letter text it restores, so a SQLite backup with one in that text restores on PostgreSQL instead of rolling back.
 - An ingress delivery whose plugin error holds a NUL character is dead-lettered on PostgreSQL instead of being re-queued or replayed without end.
 - A replica that starts while Redis is unreachable subscribes to cross-replica WebSocket events once Redis returns, instead of missing them until a restart.
 - Status media received without a type is served as `application/octet-stream` instead of answering `404` on the `mediaUrl` it was advertised with.
