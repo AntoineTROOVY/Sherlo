@@ -34,7 +34,7 @@ import {
   SessionEngineEventWiring,
   SessionEngineWiringHost,
 } from './session-engine-event-wiring';
-import { SessionEngineControls } from './session-engine-controls';
+import { SessionEngineControls, type StopHooks } from './session-engine-controls';
 import { SessionOwnershipService, nodeOwnsSession } from './session-ownership.service';
 
 /**
@@ -436,8 +436,8 @@ export class SessionEngineLifecycle {
   }
 
   /** Delegate: SessionEngineControls.stop. */
-  stop(id: string): Promise<Session> {
-    return this.controls.stop(id);
+  stop(id: string, hooks?: StopHooks): Promise<Session> {
+    return this.controls.stop(id, hooks);
   }
 
   /** Delegate: SessionEngineControls.logout. */
@@ -451,8 +451,8 @@ export class SessionEngineLifecycle {
   }
 
   /** Delegate: SessionEngineControls.delete. */
-  delete(id: string): Promise<void> {
-    return this.controls.delete(id);
+  delete(id: string, hooks?: StopHooks): Promise<void> {
+    return this.controls.delete(id, hooks);
   }
 
   /** Delegate: SessionEngineControls.shutdown. */

@@ -236,6 +236,60 @@ describe('SessionEngineLifecycle races', () => {
     });
   });
 
+  describe('stop hooks', () => {
+    it('records the stop after the session read and before the teardown', async () => {
+      await lifecycle.start(ID);
+      const engine = (engineFactory.create.mock.results[0] as { value: Record<string, jest.Mock> }).value;
+      const order: string[] = [];
+      repository.findOne.mockImplementationOnce(() => {
+        order.push('read');
+        return Promise.resolve(session());
+      });
+      engine.disconnect.mockImplementation(() => {
+        order.push('teardown');
+        return Promise.resolve();
+      });
+
+      await lifecycle.stop(ID, {
+        afterRead: () => {
+          order.push('record');
+          return Promise.resolve();
+        },
+      });
+
+      expect(order).toEqual(['read', 'record', 'teardown']);
+    });
+
+    it('takes nothing down when recording the stop fails', async () => {
+      await lifecycle.start(ID);
+      const engine = (engineFactory.create.mock.results[0] as { value: Record<string, jest.Mock> }).value;
+
+      await expect(lifecycle.stop(ID, { afterRead: () => Promise.reject(new Error('SQLITE_BUSY')) })).rejects.toThrow(
+        'SQLITE_BUSY',
+      );
+
+      expect(engine.disconnect).not.toHaveBeenCalled();
+      expect(internals.engines.has(ID)).toBe(true);
+    });
+
+    it.each([
+      [
+        'stop',
+        (onReadFailed: () => void, afterRead: () => Promise<void>) => lifecycle.stop(ID, { afterRead, onReadFailed }),
+      ],
+      ['delete', (onReadFailed: () => void) => lifecycle.delete(ID, { onReadFailed })],
+    ])('%s() reports a failed session read and records nothing', async (_verb, call) => {
+      const onReadFailed = jest.fn();
+      const afterRead = jest.fn().mockResolvedValue(undefined);
+      repository.findOne.mockRejectedValueOnce(new Error('Connection terminated unexpectedly'));
+
+      await expect(call(onReadFailed, afterRead)).rejects.toThrow('Connection terminated unexpectedly');
+
+      expect(onReadFailed).toHaveBeenCalledTimes(1);
+      expect(afterRead).not.toHaveBeenCalled();
+    });
+  });
+
   describe('engine-driven status writes', () => {
     const rejectStatus = (status: SessionStatus): void => {
       repository.update.mockImplementation((_id: unknown, patch: { status?: unknown }) =>

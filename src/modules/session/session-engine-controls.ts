@@ -56,6 +56,14 @@ export class SessionStoppedException extends ConflictException {}
  * lifecycle's dataSource on the instance after construction (logout-teardown-race.spec) and
  * delete()'s transaction must observe the current one at call time.
  */
+/** Caller callbacks for stop()/delete(), run around the session read that opens each verb. */
+export interface StopHooks {
+  /** stop() only: runs once the session read succeeds and before any teardown; records the stop. */
+  afterRead?: () => Promise<void>;
+  /** Runs when the session read fails, after the stop mark is dropped: undoes the caller's request count. */
+  onReadFailed?: () => void;
+}
+
 export interface SessionEngineControlsHost {
   sessionRepository: Repository<Session>;
   engineFactory: EngineFactory;
@@ -149,11 +157,12 @@ export class SessionEngineControls {
    * that fails has retired nothing, so the mark must not outlive it: left on a running session, its
    * next disconnect would never reconnect and start() would keep refusing it as already started.
    */
-  private async requireSessionOrDropStopMark(id: string): Promise<Session> {
+  private async requireSessionOrDropStopMark(id: string, onReadFailed?: () => void): Promise<Session> {
     try {
       return await this.requireSession(id);
     } catch (error) {
       this.stoppingSessions.delete(id);
+      onReadFailed?.();
       throw error;
     }
   }
@@ -336,8 +345,10 @@ export class SessionEngineControls {
     }
   }
 
-  async stop(id: string): Promise<Session> {
-    const session = await this.requireSessionOrDropStopMark(id);
+  async stop(id: string, hooks: StopHooks = {}): Promise<Session> {
+    const session = await this.requireSessionOrDropStopMark(id, hooks.onReadFailed);
+    // Recorded only once the row is known to exist, and before anything is torn down.
+    await hooks.afterRead?.();
 
     // Mark as tearing down BEFORE cleanup so an in-flight reconnect can't resurrect it.
     this.stoppingSessions.add(id);
@@ -574,8 +585,8 @@ export class SessionEngineControls {
     return this.requireSession(id);
   }
 
-  async delete(id: string): Promise<void> {
-    const session = await this.requireSessionOrDropStopMark(id);
+  async delete(id: string, hooks: StopHooks = {}): Promise<void> {
+    const session = await this.requireSessionOrDropStopMark(id, hooks.onReadFailed);
 
     // FENCE #1 — fail-fast on an ALREADY-PENDING credential teardown for this session NAME, BEFORE
     // any lifecycle mutation. A logout teardown that lost its deadline race is still running and ends
