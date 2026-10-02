@@ -5,7 +5,7 @@ import { NestFactory } from '@nestjs/core';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { mkdtempSync, mkdirSync, writeFileSync, realpathSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, realpathSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, sep } from 'path';
 
@@ -32,8 +32,15 @@ const osTmp = realpathSync(tmpdir());
 // dot-free, and using it blindly would make BOTH cases dotted - which is exactly how this gap
 // stayed hidden. node_modules is gitignored, so nothing strays into the working tree.
 const dotFreeBase = hasDotSegment(osTmp) ? join(__dirname, '..', 'node_modules') : osTmp;
-const plainDist = makeBuild(join(mkdtempSync(join(dotFreeBase, 'openwa-dash-plain-')), 'dashboard', 'dist'));
-const dottedDist = makeBuild(join(mkdtempSync(join(osTmp, 'openwa-dash-')), '.dotted', 'dashboard', 'dist'));
+const plainRoot = mkdtempSync(join(dotFreeBase, 'openwa-dash-plain-'));
+const dottedRoot = mkdtempSync(join(osTmp, 'openwa-dash-'));
+const plainDist = makeBuild(join(plainRoot, 'dashboard', 'dist'));
+const dottedDist = makeBuild(join(dottedRoot, '.dotted', 'dashboard', 'dist'));
+// The e2e globalTeardown sweeps only openwa-e2e-* entries in the temp dir, and the plain root can sit
+// under node_modules, so this suite removes its own fixtures.
+afterAll(() => {
+  for (const root of [plainRoot, dottedRoot]) rmSync(root, { recursive: true, force: true });
+});
 
 @Controller()
 class PingController {
