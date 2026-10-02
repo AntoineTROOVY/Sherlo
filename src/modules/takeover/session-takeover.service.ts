@@ -160,9 +160,8 @@ export class SessionTakeoverService implements OnApplicationBootstrap, OnModuleD
       // stagger, so the loop spans a large part of the sweep interval and shutdown can begin partway
       // through. Everything already adopted is left to the normal teardown; nothing further starts.
       if (this.stopping) return;
-      // start() claims the lapsed lease before the cap check refuses the launch, and that refusal
-      // releases the claim to nobody: a row with no holder is never adopted again, by this node or a
-      // peer. A node at its cap therefore leaves the lease where it is, for a peer with room.
+      // start() refuses at the cap without touching the lease, so stopping here only saves a refused
+      // launch per remaining row; the lease stays where a peer with room adopts it.
       if (!this.hasStartCapacity()) {
         this.logger.debug('Takeover paused: this node is at MAX_CONCURRENT_SESSIONS', {
           pending: eligible.length - i,
