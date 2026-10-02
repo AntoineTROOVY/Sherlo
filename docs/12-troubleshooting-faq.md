@@ -661,15 +661,15 @@ The reconnect backoff is configured **per session**, not by environment variable
 }
 ```
 
-`reconnectBaseDelay` is the exponential-backoff base in milliseconds (clamped to 1000–300000,
-default 5000). `maxReconnectAttempts` is clamped to 0–20 — `0` disables auto-reconnect entirely, and
-leaving it unset means unlimited retries with the delay parking at a 5-minute cap. Both keys bound
-the gateway's own reconnect, whose attempt count restarts only once the session has stayed READY for
-5 minutes, so a session that keeps dropping sooner than that spends a finite cap and ends FAILED. On
-Baileys that is only the reconnect after a logged-out close: every other drop is retried inside the
-engine, with a fixed 1s to 60s backoff and no attempt cap, so a session behind an unreachable network
-keeps retrying there whatever these keys say. Subscribe to the `session.reconnect_loop` webhook to be
-alerted on every 5th consecutive attempt.
+`reconnectBaseDelay` is the exponential-backoff base in milliseconds (1000–300000, default 5000).
+`maxReconnectAttempts` accepts 0–20 (a value outside the range is refused with a 400) — `0` disables
+auto-reconnect entirely, and leaving it unset means unlimited retries with the delay parking at a
+5-minute cap. Both keys bound the gateway's own reconnect, whose attempt count restarts only once
+the session has stayed READY for 5 minutes, so a session that keeps dropping sooner than that spends
+a finite cap and ends FAILED. On Baileys that is only the reconnect after a logged-out close: every
+other drop is retried inside the engine, with a fixed 1s to 60s backoff and no attempt cap, so a
+session behind an unreachable network keeps retrying there whatever these keys say. Subscribe to the
+`session.reconnect_loop` webhook to be alerted on every 5th consecutive attempt.
 
 On a slow host, raise the first-boot init wait with `WWEBJS_AUTH_TIMEOUT_MS` (see _QR generation
 times out on slow first boot_ above).
