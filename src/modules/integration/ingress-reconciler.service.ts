@@ -86,7 +86,7 @@ export class IngressReconcilerService implements OnModuleInit, OnModuleDestroy {
   onModuleInit(): void {
     const opts = resolveIngressReconcilerOptions();
     if (opts.intervalMs <= 0) {
-      this.logger.log('Ingress event reconciler disabled (INGRESS_RECONCILE_INTERVAL_MS <= 0)');
+      this.logger.log('Ingress event reconciler disabled (INGRESS_RECONCILE_INTERVAL_MS=0)');
       return;
     }
     this.timer = setInterval(() => {
