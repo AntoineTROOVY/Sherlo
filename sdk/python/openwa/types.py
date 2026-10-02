@@ -787,11 +787,13 @@ class GroupParticipant(TypedDict):
 
 
 class GroupSummary(TypedDict):
-    """Item returned by ``GET /sessions/:id/groups`` (the slim list shape)."""
+    """Item returned by ``GET /sessions/:id/groups`` (the slim list shape), and the ``groups.create`` response."""
 
     id: Jid
     name: str
+    # Only in a groups.create response, never in groups.list; groups.get carries the participants.
     participantsCount: NotRequired[int]
+    # Only in a groups.create response, never in groups.list; groups.get carries each participant's role.
     isAdmin: NotRequired[bool]
     linkedParentJID: NotRequired[str | None]
 
