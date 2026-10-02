@@ -584,6 +584,29 @@ test('an operator key is not offered proxy writes, in the create modal or the pr
   }
 });
 
+// Creating a session and changing its proxy are refused for any session-scoped key, admin included,
+// so neither is offered; the proxy settings stay readable.
+test('a session-scoped admin key is offered neither New Session nor a proxy Save', async () => {
+  const { screen, fireEvent, within, waitFor } = rtl;
+  resetFetchCalls();
+  window.sessionStorage.setItem('openwa_key_scoped', 'true');
+  try {
+    renderSessions();
+    await screen.findByText('new-device');
+    assert.equal(screen.queryByRole('button', { name: 'New Session' }) === null, true);
+
+    const qrCard = screen.getByText('new-device').closest('.session-card') as HTMLElement;
+    fireEvent.click(within(qrCard).getByRole('button', { name: 'Proxy' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => assert.ok(findFetchCall('GET', '/api/sessions/sess-qr-1/proxy')));
+    const toggle = (await within(dialog).findByRole('checkbox')) as HTMLInputElement;
+    assert.equal(toggle.disabled, true);
+    assert.equal(within(dialog).queryByRole('button', { name: 'Save' }) === null, true);
+  } finally {
+    window.sessionStorage.removeItem('openwa_key_scoped');
+  }
+});
+
 test('a typed pairing phone number survives toggling to the QR tab and back', async () => {
   const { screen, fireEvent, within } = rtl;
   resetFetchCalls();
