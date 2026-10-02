@@ -53,7 +53,9 @@ func (s *ChatsService) MarkUnread(ctx context.Context, sessionID string, body Ma
 	return s.post(ctx, sessionID, "/unread", body)
 }
 
-// Delete deletes a chat.
+// Delete deletes a chat. On success the gateway also deletes its stored copy of
+// the chat's messages (rows, inline and archived media, search entries); export
+// the history first if you need it.
 func (s *ChatsService) Delete(ctx context.Context, sessionID string, body DeleteChatRequest) (*SuccessResult, error) {
 	return s.post(ctx, sessionID, "/delete", body)
 }
@@ -82,7 +84,9 @@ func (s *ChatsService) Mute(ctx context.Context, sessionID string, body MuteChat
 
 // ClearMessages deletes every message in a chat, keeping the chat itself. A
 // false Success means the engine declined — an unknown chat, or on Baileys a
-// chat with no known history.
+// chat with no known history. On success the gateway also deletes its stored
+// copy of the chat's messages (rows, inline and archived media, search
+// entries); export the history first if you need it.
 func (s *ChatsService) ClearMessages(ctx context.Context, sessionID, chatID string) (*SuccessResult, error) {
 	var out SuccessResult
 	path := s.base(sessionID) + "/" + pathEscape(chatID) + "/messages"
