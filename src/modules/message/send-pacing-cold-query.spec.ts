@@ -606,20 +606,18 @@ describe('concurrent sends against a real database', () => {
     expect(sent.filter(Boolean)).toHaveLength(1);
   });
 
-  it('stops holding a send that wrote no row once its own window ends, however busy the session', async () => {
+  it('stops holding a send that wrote no row once no send admitted after it is held', async () => {
     const service = build([5], []);
     // Three admitted sends that never write a row (an engine failure in a bulk batch), 3 s apart.
     for (let i = 0; i < 3; i++) {
       jest.setSystemTime(NOW.getTime() + i * 3_000);
       await service.assertSendAllowed('s1', 'known@c.us');
     }
+    jest.setSystemTime(NOW.getTime() + 16_000);
     const sent: boolean[] = [];
-    for (let i = 3; i < 7; i++) {
-      jest.setSystemTime(NOW.getTime() + i * 3_000);
-      sent.push(await send(service, 'known@c.us', i));
-    }
+    for (let i = 0; i < 6; i++) sent.push(await send(service, 'known@c.us', i));
 
-    expect(sent).toEqual([true, true, true, true]);
+    expect(sent).toEqual([true, true, true, true, true, false]);
   });
 
   it('stops counting an admitted send against the caps once it is released', async () => {
@@ -725,6 +723,45 @@ describe('concurrent sends against a real database', () => {
     jest.setSystemTime(NOW.getTime() + 41_000);
 
     await expect(service.assertSendAllowed('s1', 'fourth@c.us')).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('holds a send for as long as a send admitted after it, whose count missed its row, is held', async () => {
+    const service = build([2], []);
+    // A single send and a bulk item read the count together; the single send is admitted first.
+    await Promise.all([
+      service.assertSendAllowed('s1', 'known@c.us'),
+      service.assertSendAllowed('s1', 'known@c.us', { untilSettled: true }),
+    ]);
+    // The single send's row lands while the bulk item is still in flight (a media URL fetch).
+    await insertRow('m1', 'known@c.us');
+    jest.setSystemTime(NOW.getTime() + 11_000);
+
+    // Two sends of two made.
+    await expect(service.assertSendAllowed('s1', 'known@c.us')).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('holds a cold send for as long as a send admitted after it, whose count missed its row, is held', async () => {
+    const service = build([10_000], [2]);
+    await Promise.all([
+      service.assertSendAllowed('s1', 'x@c.us'),
+      service.assertSendAllowed('s1', 'y@c.us', { untilSettled: true }),
+    ]);
+    await insertRow('m1', 'x@c.us');
+    jest.setSystemTime(NOW.getTime() + 11_000);
+
+    await expect(service.assertSendAllowed('s1', 'z@c.us')).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('holds a settled send for a send admitted after the settle but before its row landed', async () => {
+    const service = build([2], []);
+    const settleFirst = await service.assertSendAllowed('s1', 'known@c.us', { untilSettled: true });
+    settleFirst?.(true);
+    // Admitted after the settle, while the first send's row (written after the engine call) is still due.
+    await service.assertSendAllowed('s1', 'known@c.us', { untilSettled: true });
+    await insertRow('m1', 'known@c.us');
+    jest.setSystemTime(NOW.getTime() + 11_000);
+
+    await expect(service.assertSendAllowed('s1', 'known@c.us')).rejects.toMatchObject({ status: 429 });
   });
 
   it('counts a settled send once for a send admitted after its row landed', async () => {
