@@ -45,6 +45,8 @@ export interface BaileysMessagingHost {
   ensureReady(): void;
   /** Post-ensureReady socket handle — call host.ensureReady() first. */
   getSocket(): WASocket;
+  /** The live socket, or null once a stop or logout has torn it down. */
+  getSocketOrNull(): WASocket | null;
   readonly logger: ReturnType<typeof createLogger>;
   toNeutralJid(jid: string): string;
   toEngineJid(jid: string): string;
@@ -790,15 +792,23 @@ export class BaileysMessaging {
    * same tag WhatsApp uses to replay what the account typed on its phone while the gateway was
    * down, and the id is the only thing that tells the two apart (see handleMessagesUpsert). The
    * record is synchronous on the send's own continuation, ahead of the library's buffered echo.
+   *
+   * A send that fails after a stop or logout has torn its socket down is not ready (409), the same as
+   * one interrupted before it reached the socket; a failure on a socket still in place propagates.
    */
   private async send(
     jid: string,
     content: Parameters<WASocket['sendMessage']>[1],
     options?: Parameters<WASocket['sendMessage']>[2],
   ): Promise<WAMessage | undefined> {
-    const sent = options
-      ? await this.sock().sendMessage(jid, content, options)
-      : await this.sock().sendMessage(jid, content);
+    const sock = this.sock();
+    let sent: WAMessage | undefined;
+    try {
+      sent = options ? await sock.sendMessage(jid, content, options) : await sock.sendMessage(jid, content);
+    } catch (error) {
+      if (this.host.getSocketOrNull() !== sock) throw new EngineNotReadyError();
+      throw error;
+    }
     this.host.rememberOwnSend(sent?.key?.id);
     return sent;
   }

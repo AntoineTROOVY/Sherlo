@@ -1821,6 +1821,26 @@ describe('BaileysAdapter messaging', () => {
     expect(res).toEqual({ id: 'OUT1', timestamp: 1700000001 });
   });
 
+  // The socket a send is handed to can be torn down while the library is still writing to it: a
+  // stop or logout then answers 409 like any other interrupted send, not a raw Connection Closed 500.
+  it('a send whose socket is torn down while it is in flight reads as not ready', async () => {
+    const adapter = await readyAdapter();
+    fakeSock.sendMessage.mockImplementation(() => {
+      (adapter as unknown as { sock: unknown }).sock = null;
+      return Promise.reject(new Error('Connection Closed'));
+    });
+    await expect(adapter.sendTextMessage('628111@s.whatsapp.net', 'hello')).rejects.toBeInstanceOf(
+      EngineNotReadyError,
+    );
+  });
+
+  it('a send that fails on a socket still in place rethrows the failure as is', async () => {
+    const adapter = await readyAdapter();
+    const failure = new Error('not-acceptable');
+    fakeSock.sendMessage.mockRejectedValue(failure);
+    await expect(adapter.sendTextMessage('628111@s.whatsapp.net', 'hello')).rejects.toBe(failure);
+  });
+
   /** An adapter for a session started behind a proxy, which every fetch it makes must leave through. */
   const proxiedAdapter = async (): Promise<BaileysAdapter> => {
     const adapter = new BaileysAdapter({
