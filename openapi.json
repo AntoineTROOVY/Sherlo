@@ -9511,7 +9511,7 @@
             }
           },
           "503": {
-            "description": "WhatsApp did not answer within the request budget — nothing could be read. On Baileys, also answered when WhatsApp rate-limits or times out the request (code 429 or 408); retry after a pause. On Baileys, a WhatsApp server error (5xx) on the lookup also answers 503.",
+            "description": "WhatsApp did not answer within the request budget — nothing could be read. On Baileys, also answered when WhatsApp rate-limits or times out the request (code 429 or 408); retry after a pause.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10815,7 +10815,7 @@
             }
           },
           "503": {
-            "description": "WhatsApp did not answer within the request budget — nothing could be read. On Baileys, also answered when WhatsApp rate-limits or times out the request (code 429 or 408); retry after a pause.",
+            "description": "WhatsApp did not answer within the request budget — nothing could be read. On Baileys, also answered when WhatsApp rate-limits or times out the request (code 429 or 408); retry after a pause. On Baileys, a WhatsApp server error (5xx) on the lookup also answers 503.",
             "content": {
               "application/json": {
                 "schema": {
