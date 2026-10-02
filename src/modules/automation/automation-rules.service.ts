@@ -171,12 +171,24 @@ export class AutomationRulesService {
 
     // First match wins: one inbound message never produces more than one automated reply, and rule
     // order (creation order) is the tiebreak the operator can reason about. A rule without a `kind`
-    // condition skips the opt-in chat kinds; naming the kind is how a rule reaches them.
-    const rule = rules.find(
-      candidate =>
-        (!optInOnly || candidate.conditions?.conditions?.some(c => c.field === 'kind')) &&
-        evaluateFilters(candidate.conditions, 'message.received', message, resolveLid),
-    );
+    // condition skips the opt-in chat kinds; naming the kind is how a rule reaches them. A rule whose
+    // stored conditions are malformed (a restore bypasses the DTO) is skipped on its own, so it cannot
+    // silence every other rule of the session.
+    const rule = rules.find(candidate => {
+      try {
+        return (
+          (!optInOnly || candidate.conditions?.conditions?.some(c => c.field === 'kind')) &&
+          evaluateFilters(candidate.conditions, 'message.received', message, resolveLid)
+        );
+      } catch (error) {
+        this.logger.warn('Skipping automation rule with malformed conditions', {
+          sessionId,
+          ruleId: candidate.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return false;
+      }
+    });
     if (!rule) return;
     if (this.inCooldown(rule, chatId)) return;
     // Enter the cooldown BEFORE the send: a burst of matching messages must collapse to one reply

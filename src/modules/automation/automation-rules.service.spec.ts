@@ -236,6 +236,27 @@ describe('AutomationRulesService', () => {
       expect(sends.map(s => s.text)).toEqual(['first-reply']);
     });
 
+    it.each([
+      ['a null condition', { conditions: [null] }, inbound()],
+      ['a non-list conditions value on a broadcast message', { conditions: 'x' }, inbound({ kind: 'broadcast' })],
+    ])('a rule with %s is skipped on its own; later rules still answer', async (_label, conditions, message) => {
+      const broken = await service.create('sessA', { name: 'broken', replyText: 'broken-reply', cooldownSeconds: 0 });
+      // Stored the way a restore writes it: the DTO would refuse this value.
+      await ds
+        .getRepository(AutomationRule)
+        .update(broken.id, { conditions: conditions as never, createdAt: new Date('2026-01-01T00:00:00Z') });
+      await service.create('sessA', {
+        name: 'valid',
+        replyText: 'valid-reply',
+        cooldownSeconds: 0,
+        conditions: { conditions: [{ field: 'kind', operator: 'is', value: ['individual', 'broadcast'] }] },
+      });
+
+      await expect(service.evaluateInbound('sessA', message)).resolves.toBeUndefined();
+
+      expect(sends.map(s => s.text)).toEqual(['valid-reply']);
+    });
+
     it('cooldown: the same rule stays quiet in the same chat, other chats unaffected', async () => {
       await service.create('sessA', { name: 'all', replyText: 'ack', cooldownSeconds: 300 });
 
