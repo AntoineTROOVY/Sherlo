@@ -14,6 +14,7 @@
 import '../test-helpers/register-hooks.ts';
 import { test, before, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Session } from '../services/api';
@@ -1984,3 +1985,10 @@ for (const [label, cardButton, confirmButton, method, path] of [
     assert.equal(fetchCalls.filter(c => c.method === method && c.path === path).length, 1);
   });
 }
+
+// Hebrew and Arabic mirror the page: left-aligned pairing instructions read backwards, and a value
+// aligned right sits on the start side of its row instead of against the end.
+test('Sessions.css aligns text to the text direction, not a physical side', () => {
+  const css = readFileSync(new URL('./Sessions.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.doesNotMatch(css, /text-align\s*:\s*(left|right)\b/, 'text is aligned to a physical side');
+});
