@@ -1020,7 +1020,10 @@ export function parseJavaTypes(sources) {
           members.push(serialized[1]);
           continue;
         }
-        const bare = part.replace(/@\w+\([^)]*\)/g, '').trim().match(/^([A-Z][A-Z0-9_]*)$/);
+        const bare = part
+          .replace(/@\w+\([^)]*\)/g, '')
+          .trim()
+          .match(/^([A-Z][A-Z0-9_]*)$/);
         // A bare UNKNOWN is the client-side sentinel the SDK decodes an unrecognised token to, not
         // a wire member. An annotated @SerializedName("unknown") is a real member and counts above.
         if (bare && bare[1] !== 'UNKNOWN') members.push(bare[1]);
