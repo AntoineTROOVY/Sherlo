@@ -6990,6 +6990,30 @@ describe('BaileysAdapter status posting', () => {
     );
     expect(fakeStore.getMessage).not.toHaveBeenCalled();
   });
+
+  // A status send torn down by a stop or logout while the library is still writing it answers 409,
+  // as a chat send does, rather than a raw Connection Closed 500 that the send breaker would count.
+  it('a status post or revoke whose socket is torn down in flight reads as not ready', async () => {
+    fakeSock.sendMessage.mockResolvedValueOnce({ key: { id: 'STATUS1' } });
+    const adapter = await ready();
+    await adapter.postTextStatus('hello', { recipients: ['628111@c.us'] });
+    fakeSock.sendMessage.mockImplementation(() => {
+      (adapter as unknown as { sock: unknown }).sock = null;
+      return Promise.reject(new Error('Connection Closed'));
+    });
+    await expect(adapter.deleteStatus('STATUS1')).rejects.toBeInstanceOf(EngineNotReadyError);
+    (adapter as unknown as { sock: unknown }).sock = fakeSock;
+    await expect(adapter.postTextStatus('hello', { recipients: ['628111@c.us'] })).rejects.toBeInstanceOf(
+      EngineNotReadyError,
+    );
+  });
+
+  it('a status post that fails on a socket still in place rethrows the failure as is', async () => {
+    const adapter = await ready();
+    const failure = new Error('not-acceptable');
+    fakeSock.sendMessage.mockRejectedValue(failure);
+    await expect(adapter.postTextStatus('hello', { recipients: ['628111@c.us'] })).rejects.toBe(failure);
+  });
 });
 
 describe('BaileysAdapter proxy support', () => {
