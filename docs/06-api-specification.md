@@ -957,7 +957,7 @@ reporting success.
 { "success": true }
 ```
 
-**Errors:** `400` session not started / validation · `401` · `403` key lacks OPERATOR role · `404` session not found · `409` engine not ready
+**Errors:** `400` session not started / validation · `401` · `403` key lacks OPERATOR role · `404` session not found · `409` engine not ready · `503` the whatsapp-web.js page died or did not answer within the protocol timeout (retryable)
 
 #### POST /api/sessions/:sessionId/chats/read
 

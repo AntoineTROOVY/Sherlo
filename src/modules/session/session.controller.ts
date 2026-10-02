@@ -522,7 +522,8 @@ export class SessionController {
     description:
       'WhatsApp did not answer the group-list query. Deliberately not reported as an empty list — ' +
       'the engine returns the same empty value for "you are in no groups", and a caller cannot tell ' +
-      'those apart from the body.',
+      'those apart from the body. On Baileys, also answered when WhatsApp rate-limits or times out the ' +
+      'request (code 429 or 408); retry after a pause.',
   })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
   @ApiQuery({ name: 'limit', required: false, description: 'Max groups to return (1–1000, default 1000)' })
@@ -664,6 +665,12 @@ export class SessionController {
       ENGINE_NOT_READY_409 +
       ' On Baileys this route also answers `409` for a `ready` session whose account push name has ' +
       'not synced yet. Nothing was sent, and a retry succeeds only once the name has synced.',
+  })
+  @ApiResponse({
+    status: 503,
+    description:
+      'The whatsapp-web.js page connection died, or WhatsApp Web did not answer within the protocol ' +
+      'timeout. Nothing was confirmed; setting presence converges when repeated, so a retry is safe.',
   })
   async setOnlinePresence(
     @Param('sessionId', ParseUUIDPipe) id: string,

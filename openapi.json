@@ -1836,7 +1836,7 @@
             }
           },
           "503": {
-            "description": "WhatsApp did not answer the group-list query. Deliberately not reported as an empty list — the engine returns the same empty value for \"you are in no groups\", and a caller cannot tell those apart from the body.",
+            "description": "WhatsApp did not answer the group-list query. Deliberately not reported as an empty list — the engine returns the same empty value for \"you are in no groups\", and a caller cannot tell those apart from the body. On Baileys, also answered when WhatsApp rate-limits or times out the request (code 429 or 408); retry after a pause.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2348,6 +2348,16 @@
           },
           "409": {
             "description": "The session is not connected: an engine exists for it but is not `ready`, meaning disconnected, reconnecting, or still initializing, so the request never reached WhatsApp. Wait for `ready` and retry. A session that was never started answers `400` instead, and the session lifecycle routes answer `409` for a conflicting state rather than this. One window answers this while the session still reads `ready`: WhatsApp Web periodically reloads its own page and the engine re-injects into it, and for those few seconds the answer is a `409` naming the reload; retry shortly. On Baileys this route also answers `409` for a `ready` session whose account push name has not synced yet. Nothing was sent, and a retry succeeds only once the name has synced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The whatsapp-web.js page connection died, or WhatsApp Web did not answer within the protocol timeout. Nothing was confirmed; setting presence converges when repeated, so a retry is safe.",
             "content": {
               "application/json": {
                 "schema": {
