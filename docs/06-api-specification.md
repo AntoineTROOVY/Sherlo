@@ -2793,7 +2793,7 @@ Get the group's picture URL.
 **Response** `200` — `{ "url": "https://…" }`, or `{ "url": null }` when the group has no picture or
 it is hidden by privacy settings.
 
-**Errors:** `400` the id does not name a group, or the session is not active · `401` missing/invalid API key · `409` engine not ready · `503` WhatsApp did not answer within the request budget — nothing could be read; on Baileys, also when WhatsApp rate-limits or times out the request (code 429 or 408): retry after a pause
+**Errors:** `400` the id does not name a group, or the session is not active · `401` missing/invalid API key · `409` engine not ready · `503` WhatsApp did not answer within the request budget — nothing could be read; on Baileys, also when WhatsApp rate-limits or times out the request (code 429 or 408) or fails on its side (code 500 or above): retry after a pause
 
 #### PUT /api/sessions/:sessionId/groups/:groupId/picture
 
