@@ -90,12 +90,13 @@ lifts when its window expires (seconds for the per-second tier, up to an hour fo
 tier by default), and `.retry_after_seconds` carries its `Retry-After` header. A 429 whose
 `.code` is `"SEND_PACING_LIMITED"` is usually not transient: do not retry it before
 `.retry_after_seconds`, which then comes from the body: a few seconds when only sends still in
-flight caused it, otherwise up to the next UTC day. Every API error also exposes the response
-`.headers`. A 503 does not prove a write was never carried out: the engine
-answers it when WhatsApp did not confirm in time, and the change may still have been applied, so
-re-read the state before repeating it. In a routed deployment a forward that fails before reaching
-the owner node answers 503, one that fails after the request reached it answers 502 or 504, and a
-503 from the owner itself is relayed unchanged.
+flight caused it, the rest of the failure breaker's cooldown (`SEND_PACING_BREAKER_COOLDOWN_MS`,
+15 minutes by default) after a run of send failures, otherwise up to the next UTC day. Every API
+error also exposes the response `.headers`. A 503 does not prove a write was never carried out: the
+engine answers it when WhatsApp did not confirm in time, and the change may still have been applied,
+so re-read the state before repeating it. In a routed deployment a forward that fails before
+reaching the owner node answers 503, one that fails after the request reached it answers 502 or 504,
+and a 503 from the owner itself is relayed unchanged.
 
 ```python
 from openwa import OpenWANotFoundError

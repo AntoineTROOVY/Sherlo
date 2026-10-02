@@ -126,9 +126,11 @@ per-second tier, up to an hour for the hourly tier by default);
 `APIError.RetryAfter` carries its `Retry-After` header, which `WithRetry` also
 honors. A 429 whose `APIError.Code` is `"SEND_PACING_LIMITED"` is usually not
 transient: do not retry it before `RetryAfter`, which then comes from the body:
-a few seconds when only sends still in flight caused it, otherwise up to the
-next UTC day. `APIError.Header` holds the response headers. A timeout surfaces as
-`*openwa.TimeoutError`. A 503 does not prove a write was never carried out: the
+a few seconds when only sends still in flight caused it, the rest of the failure
+breaker's cooldown (`SEND_PACING_BREAKER_COOLDOWN_MS`, 15 minutes by default)
+after a run of send failures, otherwise up to the next UTC day. `APIError.Header`
+holds the response headers. A timeout surfaces as `*openwa.TimeoutError`. A 503
+does not prove a write was never carried out: the
 engine answers it when WhatsApp did not confirm in time, and the change may still
 have been applied, so re-read the state before repeating it. In a routed
 deployment a forward that fails before reaching the owner node answers 503, one
