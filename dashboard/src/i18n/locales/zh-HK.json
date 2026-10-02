@@ -347,7 +347,7 @@
       "configured": "{{host}} ({{type}})",
       "noProxy": "未設定代理",
       "hasCredentials": "憑證已儲存，但不會顯示。輸入完整的 URL 即可更改。",
-      "hint": "變更會在下次啟動工作階段時生效，不會套用至正在運作的連線。代理必須真實且可連線：無法連線的代理會令 QR 碼無法送達，啟動請求會傳回 504。",
+      "hint": "變更會在下次啟動工作階段時生效，不會套用至正在運作的連線。代理必須真實且可連線：無法連線的代理會令 QR 碼無法送達：在 whatsapp-web.js 上啟動請求會傳回 504，在 Baileys 上啟動會成功，但工作階段會持續重試。",
       "createHint": "只有在你的網絡無法直接連線 WhatsApp 時才需要。必須是真實且可連線的代理。",
       "invalidUrl": "請輸入有效的 http、https、socks4 或 socks5 代理 URL。",
       "saveSuccessTitle": "代理已儲存",

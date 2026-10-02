@@ -347,7 +347,7 @@
       "configured": "{{host}} ({{type}})",
       "noProxy": "未配置代理",
       "hasCredentials": "凭据已保存，但不会显示。输入完整的 URL 即可更改。",
-      "hint": "更改将在下次启动会话时生效，不会作用于正在运行的连接。代理必须真实且可访问：无法访问的代理会导致 QR 码无法送达，启动请求将返回 504。",
+      "hint": "更改将在下次启动会话时生效，不会作用于正在运行的连接。代理必须真实且可访问：无法访问的代理会导致 QR 码无法送达：在 whatsapp-web.js 上启动请求将返回 504，在 Baileys 上启动会成功，但会话会持续重试。",
       "createHint": "仅当你的网络无法直接访问 WhatsApp 时才需要。必须是真实且可访问的代理。",
       "invalidUrl": "请输入有效的 http、https、socks4 或 socks5 代理 URL。",
       "saveSuccessTitle": "代理已保存",

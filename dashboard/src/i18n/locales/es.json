@@ -352,7 +352,7 @@
       "configured": "{{host}} ({{type}})",
       "noProxy": "No hay ningún proxy configurado",
       "hasCredentials": "Las credenciales están guardadas, pero no se muestran. Introduce una URL completa para cambiarlas.",
-      "hint": "Los cambios se aplican en el próximo inicio de la sesión, no a una conexión en curso. El proxy debe ser real y accesible: un valor inaccesible bloquea la entrega del QR y el inicio devuelve 504.",
+      "hint": "Los cambios se aplican en el próximo inicio de la sesión, no a una conexión en curso. El proxy debe ser real y accesible: un valor inaccesible bloquea la entrega del QR: con whatsapp-web.js el inicio devuelve 504; con Baileys el inicio se completa y la sesión sigue reintentando.",
       "createHint": "Solo es necesario cuando tu red no puede llegar a WhatsApp directamente. Debe ser un proxy real y accesible.",
       "invalidUrl": "Introduce una URL de proxy http, https, socks4 o socks5 válida.",
       "saveSuccessTitle": "Proxy guardado",

@@ -352,7 +352,7 @@
       "configured": "{{host}} ({{type}})",
       "noProxy": "Aucun proxy configuré",
       "hasCredentials": "Les identifiants sont enregistrés mais ne sont pas affichés. Saisissez une URL complète pour les modifier.",
-      "hint": "Les modifications s'appliquent au prochain démarrage de la session, pas à une connexion en cours. Le proxy doit être réel et joignable : une valeur injoignable bloque l'envoi du QR code et le démarrage renvoie 504.",
+      "hint": "Les modifications s'appliquent au prochain démarrage de la session, pas à une connexion en cours. Le proxy doit être réel et joignable : une valeur injoignable bloque l'envoi du QR code : avec whatsapp-web.js, le démarrage renvoie 504 ; avec Baileys, le démarrage réussit et la session continue de réessayer.",
       "createHint": "Nécessaire uniquement si votre réseau ne peut pas joindre WhatsApp directement. Doit être un proxy réel et joignable.",
       "invalidUrl": "Saisissez une URL de proxy http, https, socks4 ou socks5 valide.",
       "saveSuccessTitle": "Proxy enregistré",
