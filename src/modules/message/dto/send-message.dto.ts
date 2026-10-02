@@ -343,9 +343,9 @@ export class MessageResponseDto {
   @ApiProperty({
     description:
       'The message id, assigned when the gateway accepts the message for sending. A 201 here means the ' +
-      'message was handed to the WhatsApp client — it does NOT confirm delivery. WhatsApp does not reject ' +
-      'an unregistered recipient synchronously, so a message to a number that is not on WhatsApp still ' +
-      'returns 201 with a valid messageId; whether it later delivers, stalls, or is reported as an error ' +
+      'message was handed to the WhatsApp client — it does NOT confirm delivery. On Baileys a message to a ' +
+      'number that is not on WhatsApp still returns 201 with a valid messageId (whatsapp-web.js answers ' +
+      '400); whether it later delivers, stalls, or is reported as an error ' +
       'reaches you asynchronously, if at all. To confirm a number is on WhatsApp before ' +
       'sending, use GET /api/sessions/{sessionId}/contacts/check/{number}; track real delivery via the ' +
       'message `status` field (sent → delivered → read, or failed if WhatsApp reports an error for it). ' +
