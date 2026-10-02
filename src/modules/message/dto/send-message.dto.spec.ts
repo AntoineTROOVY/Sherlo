@@ -15,10 +15,13 @@ import {
   SEND_POLL_BODY_EXAMPLES,
 } from './send-message.dto';
 import { SendLocationDto, SendContactDto, SendPollDto } from './message-actions.dto';
+import { GLOBAL_VALIDATION_OPTIONS } from '../../../config/app-validation';
 
-// Mirror the global ValidationPipe (main.ts): whitelist + forbidNonWhitelisted strip/reject unknown props.
+// Read the production pipe's own options rather than restating them, so these cases cannot assert a
+// contract the running app does not apply (a restated copy left out implicit conversion). Validated
+// directly instead of through pipe.transform so the cases can name the property that failed.
 const validateDto = (cls: new () => object, obj: unknown) =>
-  validate(plainToInstance(cls, obj), { whitelist: true, forbidNonWhitelisted: true });
+  validate(plainToInstance(cls, obj, GLOBAL_VALIDATION_OPTIONS.transformOptions), GLOBAL_VALIDATION_OPTIONS);
 
 describe('SendTextMessageDto mentions', () => {
   it('accepts an optional array of mention WIDs', async () => {
