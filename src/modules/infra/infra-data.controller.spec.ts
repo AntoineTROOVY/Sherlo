@@ -1320,7 +1320,7 @@ describe('InfraDataController.importData round-trips export-data (no silent mess
     expect(await ds.getRepository(Session).findOneBy({ id: 's2' })).toBeNull();
   });
 
-  it('refuses an empty/garbage backup — does not wipe existing data (#488 review must-fix)', async () => {
+  it('refuses an empty/garbage backup — does not wipe existing data (#488)', async () => {
     await seedSession('s1');
     await ds.getRepository(Message).save(
       ds.getRepository(Message).create({

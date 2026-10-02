@@ -969,7 +969,7 @@ export class InfraDataService {
         }
 
         // A wrong/empty/garbage backup file restores zero rows but the DELETE already ran — committing
-        // would silently WIPE the database and report success. Refuse it and roll back instead. (#488 review)
+        // would silently WIPE the database and report success. Refuse it and roll back instead. (#488)
         const totalRestored = Object.values(counts).reduce((sum, n) => sum + n, 0);
         if (totalRestored === 0) {
           await queryRunner.rollbackTransaction();
