@@ -693,9 +693,10 @@ export class MessageService implements PluginMessagePort {
     // Every gated sender's DTO addresses its destination as `chatId` except forward, which uses
     // `toChatId` — without the fallback a forward skipped the cold-reachout gate entirely, while
     // its persisted row still drained the cold budget. Edit carries a chatId too; the edited
-    // message's own row already makes that chat warm, so the gate is a no-op there.
+    // message's own row already makes that chat warm, so the cold rule is a no-op there. An edit
+    // writes no row, so it is judged against the caps without being held as a new send.
     const target = input as { chatId?: string; toChatId?: string };
-    await this.pacing.assertSendAllowed(sessionId, target.chatId ?? target.toChatId);
+    await this.pacing.assertSendAllowed(sessionId, target.chatId ?? target.toChatId, { hold: false });
     return applySendingGate(this.hookManager, sessionId, type, input, 'MessageService');
   }
 

@@ -71,6 +71,7 @@ describe('MessageService', () => {
   let hookManager: jest.Mocked<Partial<HookManager>>;
   let lidMappingStore: { findLidsForPhone: jest.Mock; findPhoneForLid: jest.Mock };
   let mockEngine: ReturnType<typeof createMockEngine>;
+  let pacing: SendPacingService;
 
   beforeEach(async () => {
     repository = {
@@ -128,6 +129,7 @@ describe('MessageService', () => {
     }).compile();
 
     service = module.get<MessageService>(MessageService);
+    pacing = module.get(SendPacingService);
   });
 
   // ── outbound send delegation ──────────────────────────────────────
@@ -850,6 +852,14 @@ describe('MessageService', () => {
         expect.objectContaining({ type: 'edit' }),
         expect.any(Object),
       );
+    });
+
+    // An edit only UPDATEs the existing row, so it is judged against the caps but never held in the
+    // admission window: holding it would charge the day's allowance for a message that is not sent.
+    it('checks an edit against the pacing caps without holding it', async () => {
+      await service.editMessage('sess-1', { chatId: 'test@c.us', messageId: 'wa-msg-1', body: 'edited' });
+
+      expect(jest.mocked(pacing.assertSendAllowed)).toHaveBeenCalledWith('sess-1', 'test@c.us', { hold: false });
     });
 
     it('lets a plugin block an edit before the engine is called', async () => {
