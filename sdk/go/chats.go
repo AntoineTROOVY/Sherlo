@@ -27,7 +27,10 @@ func (s *ChatsService) List(ctx context.Context, sessionID string, query *ListCh
 func (s *ChatsService) SubscribePresence(ctx context.Context, sessionID string, body SubscribePresenceRequest) (*SuccessResult, error) {
 	var out SuccessResult
 	err := s.client.do(ctx, "POST", "/api/sessions/"+pathEscape(sessionID)+"/presence/subscribe", nil, body, &out)
-	return &out, err
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // GetPresence returns the last presence reported for a chat, or nil when none has been — the chat
