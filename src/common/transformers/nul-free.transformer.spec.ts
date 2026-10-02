@@ -3,6 +3,8 @@ import { Message } from '../../modules/message/entities/message.entity';
 import { StatusUpdate } from '../../modules/status-store/entities/status-update.entity';
 import { IntegrationDeliveryFailure } from '../../modules/integration/entities/integration-delivery-failure.entity';
 import { WebhookDeliveryFailure } from '../../modules/webhook/entities/webhook-delivery-failure.entity';
+import { Session } from '../../modules/session/entities/session.entity';
+import { readyRowUpdate } from '../../modules/session/session-engine-lifecycle.service';
 
 // PostgreSQL rejects U+0000 in text and varchar, so free text from WhatsApp, a plugin error or a webhook
 // receiver that carried one failed its write there and the row was lost. SQLite stores it, which makes
@@ -15,7 +17,7 @@ describe('free-text columns drop NUL characters on write', () => {
     ds = new DataSource({
       type: 'better-sqlite3',
       database: ':memory:',
-      entities: [Message, StatusUpdate, IntegrationDeliveryFailure, WebhookDeliveryFailure],
+      entities: [Message, StatusUpdate, IntegrationDeliveryFailure, WebhookDeliveryFailure, Session],
       synchronize: true,
     });
     await ds.initialize();
@@ -64,6 +66,17 @@ describe('free-text columns drop NUL characters on write', () => {
     await repo.save(row);
     expect(await stored('status_updates', ['caption', 'contactName', 'contactPushName', 'mediaMimetype'])).toEqual([
       { caption: 'x', contactName: 'c', contactPushName: 'p', mediaMimetype: 'image/png' },
+    ]);
+  });
+
+  // The READY write sets status, phone, pushName and connectedAt in one UPDATE, so a NUL in the account's
+  // own profile name failed all of it and left the session with no bound phone.
+  it('sessions: the pushName of the READY row update', async () => {
+    const repo = ds.getRepository(Session);
+    const { id } = await repo.save(repo.create({ name: 'nul-session' }));
+    await repo.update(id, readyRowUpdate('6281', `Bo${N}b`, new Date()));
+    expect(await stored('sessions', ['phone', 'pushName', 'status'])).toEqual([
+      { phone: '6281', pushName: 'Bob', status: 'ready' },
     ]);
   });
 

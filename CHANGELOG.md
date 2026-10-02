@@ -254,6 +254,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A request whose path or query string contains `%00` is refused with `400`, the unauthenticated ingress route included, instead of failing with `500` on PostgreSQL.
 - A request body or MCP tool input holding a NUL character is refused with `400` instead of failing with `500` on PostgreSQL; `POST /api/infra/import-data` still accepts a backup holding one.
 - On PostgreSQL, a NUL character in received message text, a status, an archived media type or a dead-letter error is dropped when stored instead of failing the write, so a history sync no longer loses the rest of its batch.
+- On PostgreSQL, a NUL character in the account's own profile name is dropped when a session turns ready, instead of failing the write that binds its phone number.
 - An ingress delivery whose plugin error holds a NUL character is dead-lettered on PostgreSQL instead of being re-queued or replayed without end.
 - A replica that starts while Redis is unreachable subscribes to cross-replica WebSocket events once Redis returns, instead of missing them until a restart.
 - Status media received without a type is served as `application/octet-stream` instead of answering `404` on the `mediaUrl` it was advertised with.
