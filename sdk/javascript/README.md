@@ -65,9 +65,10 @@ catalog 503 can persist because WhatsApp may never answer that query, so bound
 any retry. A 429 from the global rate limiter lifts when its window expires
 (seconds for the per-second tier, up to an hour for the hourly tier by
 default), and `.retryAfterSeconds` carries its `Retry-After` header. A 429 whose
-`.code` is `"SEND_PACING_LIMITED"` is not transient: do not retry it before
-`.retryAfterSeconds`, which then comes from the body and can be hours. Every API
-error also exposes the response `.headers`. A 503 does not prove a write was
+`.code` is `"SEND_PACING_LIMITED"` is usually not transient: do not retry it
+before `.retryAfterSeconds`, which then comes from the body: a few seconds when
+only sends still in flight caused it, otherwise up to the next UTC day. Every
+API error also exposes the response `.headers`. A 503 does not prove a write was
 never carried out: the engine answers it when WhatsApp did not confirm in time,
 and the change may still have been applied, so re-read the state before
 repeating it. In a routed deployment a forward that fails before reaching the

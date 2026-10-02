@@ -8,9 +8,10 @@ import java.util.Map;
  *
  * <p>The global rate limiter's 429 lifts when its window expires (seconds for the per-second tier,
  * up to an hour for the hourly tier by default), and {@link #retryAfterSeconds()} carries its
- * {@code Retry-After} header. A 429 whose {@link #code()} is {@code "SEND_PACING_LIMITED"} is not
- * transient: do not retry it before {@link #retryAfterSeconds()}, which then comes from the body and
- * can be hours.
+ * {@code Retry-After} header. A 429 whose {@link #code()} is {@code "SEND_PACING_LIMITED"} is
+ * usually not transient: do not retry it before {@link #retryAfterSeconds()}, which then comes from
+ * the body: a few seconds when only sends still in flight caused it, otherwise up to the next UTC
+ * day.
  */
 public class OpenWARateLimitError extends OpenWAApiError {
     public OpenWARateLimitError(String message, int status, Object body, String errorKind) {

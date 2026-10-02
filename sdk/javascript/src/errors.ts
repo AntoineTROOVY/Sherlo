@@ -101,8 +101,8 @@ export class OpenWAConflictError extends OpenWAApiError {}
  * 429 Too Many Requests: rate limited. The global rate limiter's 429 lifts when its window
  * expires (seconds for the per-second tier, up to an hour for the hourly tier by default), and
  * `retryAfterSeconds` carries its `Retry-After` header. A 429 with `code: 'SEND_PACING_LIMITED'` is
- * not transient: do not retry it before `retryAfterSeconds`, which then comes from the body and can
- * be hours.
+ * usually not transient: do not retry it before `retryAfterSeconds`, which then comes from the body:
+ * a few seconds when only sends still in flight caused it, otherwise up to the next UTC day.
  */
 export class OpenWARateLimitError extends OpenWAApiError {}
 /** 501 Not Implemented — the active engine does not support this operation. */

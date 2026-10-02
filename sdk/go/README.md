@@ -124,9 +124,10 @@ because WhatsApp may never answer that query, so bound any retry. A 429 from
 the global rate limiter lifts when its window expires (seconds for the
 per-second tier, up to an hour for the hourly tier by default);
 `APIError.RetryAfter` carries its `Retry-After` header, which `WithRetry` also
-honors. A 429 whose `APIError.Code` is `"SEND_PACING_LIMITED"` is not transient:
-do not retry it before `RetryAfter`, which then comes from the body and can be
-hours. `APIError.Header` holds the response headers. A timeout surfaces as
+honors. A 429 whose `APIError.Code` is `"SEND_PACING_LIMITED"` is usually not
+transient: do not retry it before `RetryAfter`, which then comes from the body:
+a few seconds when only sends still in flight caused it, otherwise up to the
+next UTC day. `APIError.Header` holds the response headers. A timeout surfaces as
 `*openwa.TimeoutError`. A 503 does not prove a write was never carried out: the
 engine answers it when WhatsApp did not confirm in time, and the change may still
 have been applied, so re-read the state before repeating it. In a routed
