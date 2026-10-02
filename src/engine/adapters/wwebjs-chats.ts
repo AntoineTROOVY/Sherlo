@@ -250,9 +250,9 @@ export class WwebjsChats {
   }
 
   /**
-   * The write leg of mute and pin. A dead page or an expired protocol timeout is the 503 both routes
-   * document (mute, unmute, pin and unpin all converge when repeated) and a dead page is reported as
-   * the early death signal. Any other rejection is rethrown untouched, for the reason above.
+   * The write leg of mute, pin and the account's own presence. A dead page or an expired protocol
+   * timeout is a 503 (mute, unmute, pin, unpin and a presence change all converge when repeated) and
+   * a dead page is reported as the early death signal. Any other rejection is rethrown untouched, for the reason above.
    */
   private async chatWrite<T>(context: string, op: () => Promise<T>): Promise<T> {
     try {
@@ -363,11 +363,9 @@ export class WwebjsChats {
    */
   async setOnlinePresence(available: boolean): Promise<void> {
     this.host.ensureReady();
-    if (available) {
-      await this.client().sendPresenceAvailable();
-    } else {
-      await this.client().sendPresenceUnavailable();
-    }
+    await this.chatWrite('setOnlinePresence', () =>
+      available ? this.client().sendPresenceAvailable() : this.client().sendPresenceUnavailable(),
+    );
   }
 
   async sendChatState(chatId: string, state: ChatState): Promise<void> {
