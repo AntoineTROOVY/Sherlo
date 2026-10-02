@@ -5,7 +5,7 @@ import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 export const ADDRESSBOOK_NAME_MAX_LENGTH = 100;
 
 export class UpsertContactDto {
-  @ApiProperty({ description: "The contact's first name.", maxLength: ADDRESSBOOK_NAME_MAX_LENGTH })
+  @ApiProperty({ description: "The contact's first name.", minLength: 1, maxLength: ADDRESSBOOK_NAME_MAX_LENGTH })
   @IsString()
   @MinLength(1)
   @MaxLength(ADDRESSBOOK_NAME_MAX_LENGTH)
