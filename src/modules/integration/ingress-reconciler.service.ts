@@ -203,9 +203,30 @@ export class IngressReconcilerService implements OnModuleInit, OnModuleDestroy {
       // it under a fresh id when that write failed. Nothing is dispatched: the DLQ row stays redrivable
       // (written here if the processor's write was lost, and before the payload is retired, since it
       // becomes the payload's only home). A re-queued copy that delivers retires the row and marks the
-      // event 'dispatched'; one that fails again finds the row and adds no second one.
+      // event 'dispatched'; one that fails again finds the row and adds no second one. The copy can
+      // settle mid-sweep, before this row exists, so the mark only lands on a still-'pending' event,
+      // and a row written for an event the copy already dispatched is retired again.
       await this.ensureDeadLetterRow(jobData, resolveIngressJobOptions().attempts, 'ingress queue job failed');
-      await this.events.update({ id: row.id }, { lastDispatchAt: now, dispatchState: 'failed', payload: null });
+      const marked = await this.events.update(
+        { id: row.id, dispatchState: 'pending' },
+        { lastDispatchAt: now, dispatchState: 'failed', payload: null },
+      );
+      if (!marked.affected) {
+        const current = await this.events.findOne({ where: { id: row.id }, select: { dispatchState: true } });
+        if (current?.dispatchState === 'dispatched') {
+          await this.failures.update(
+            {
+              direction: 'inbound',
+              pluginId: row.pluginId,
+              instanceId: row.instanceId,
+              deliveryId: row.providerDeliveryId,
+              redriven: false,
+            },
+            { redriven: true },
+          );
+          return 'replayed';
+        }
+      }
       this.logger.warn('Stranded ingress event already failed in the queue; left for redrive', {
         pluginId: row.pluginId,
         instanceId: row.instanceId,

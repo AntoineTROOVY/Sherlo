@@ -20,16 +20,22 @@ describe('IngressProcessor', () => {
     const dispatchWebhook = jest.fn().mockResolvedValue({ ok: true, status: 200 });
     const loader = { dispatchWebhookForInstance: dispatchWebhook };
     const failures = { save: jest.fn() };
-    const proc = new IngressProcessor(loader as never, failures as never, { execute: jest.fn() } as never, {} as never);
+    const proc = new IngressProcessor(
+      loader as never,
+      failures as never,
+      { execute: jest.fn() } as never,
+      {} as never,
+      {} as never,
+    );
     await proc.process(job());
     expect(dispatchWebhook).toHaveBeenCalled();
   });
 
   it('records a DLQ failure row and fires ingress:error on the final attempt', async () => {
     const loader = { dispatchWebhookForInstance: jest.fn().mockRejectedValue(new Error('boom')) };
-    const failures = { save: jest.fn().mockResolvedValue(undefined) };
+    const failures = { save: jest.fn().mockResolvedValue(undefined), count: jest.fn().mockResolvedValue(0) };
     const hooks = { execute: jest.fn().mockResolvedValue({ continue: true }) };
-    const proc = new IngressProcessor(loader as never, failures as never, hooks as never, {} as never);
+    const proc = new IngressProcessor(loader as never, failures as never, hooks as never, {} as never, {} as never);
     await expect(proc.process(job({ attemptsMade: 2, opts: { attempts: 3 } }))).rejects.toThrow('boom');
     expect(failures.save).toHaveBeenCalledWith(
       expect.objectContaining({ direction: 'inbound', deliveryId: 'd1', pluginId: 'chatwoot' }),
@@ -42,13 +48,14 @@ describe('IngressProcessor', () => {
   // whole retry window refuses the row too, so the delivery goes back on the queue instead.
   it('re-queues the delivery when the final-attempt DLQ write fails, and still rethrows the dispatch error', async () => {
     const loader = { dispatchWebhookForInstance: jest.fn().mockRejectedValue(new Error('boom')) };
-    const failures = { save: jest.fn().mockRejectedValue(new Error('db down')) };
+    const failures = { save: jest.fn().mockRejectedValue(new Error('db down')), count: jest.fn().mockResolvedValue(0) };
     const queue = { add: jest.fn().mockResolvedValue(undefined) };
     const proc = new IngressProcessor(
       loader as never,
       failures as never,
       { execute: jest.fn().mockResolvedValue({ continue: true }) } as never,
       queue as never,
+      {} as never,
     );
     const failed = job({ id: 'ing-abc', name: 'ingress', attemptsMade: 2, opts: { attempts: 3 } });
 
@@ -72,11 +79,68 @@ describe('IngressProcessor', () => {
     );
   });
 
+  // The original job of a re-queued delivery stays 'failed', which the reconciler reads as dead-lettered:
+  // it may write a DLQ row and mark the event 'failed' before or after the re-queued copy runs.
+  it('records a re-queued delivery that succeeds as dispatched and retires its open DLQ row', async () => {
+    const loader = { dispatchWebhookForInstance: jest.fn().mockResolvedValue({ ok: true, status: 200 }) };
+    const failures = { update: jest.fn().mockResolvedValue(undefined) };
+    const events = { update: jest.fn().mockResolvedValue(undefined) };
+    const proc = new IngressProcessor(
+      loader as never,
+      failures as never,
+      { execute: jest.fn() } as never,
+      {} as never,
+      events as never,
+    );
+
+    await proc.process(job({ id: 'ing-abc' }));
+    expect(events.update).not.toHaveBeenCalled();
+    expect(failures.update).not.toHaveBeenCalled();
+
+    await proc.process(job({ id: 'ing-abc-requeued-1700000000000' }));
+    expect(events.update).toHaveBeenCalledWith(
+      { pluginId: 'chatwoot', instanceId: 'acct1', providerDeliveryId: 'd1' },
+      { dispatchState: 'dispatched', payload: null },
+    );
+    expect(failures.update).toHaveBeenCalledWith(
+      { direction: 'inbound', pluginId: 'chatwoot', instanceId: 'acct1', deliveryId: 'd1', redriven: false },
+      { redriven: true },
+    );
+
+    // The delivery already reached the plugin: a failed bookkeeping write must not fail the job into a retry.
+    events.update.mockRejectedValue(new Error('db down'));
+    await expect(proc.process(job({ id: 'ing-abc-requeued-1700000000001' }))).resolves.toBeUndefined();
+  });
+
+  it('does not add a second DLQ row when one is already open for the delivery', async () => {
+    const loader = { dispatchWebhookForInstance: jest.fn().mockRejectedValue(new Error('boom')) };
+    const failures = { save: jest.fn().mockResolvedValue(undefined), count: jest.fn().mockResolvedValue(1) };
+    const hooks = { execute: jest.fn().mockResolvedValue({ continue: true }) };
+    const queue = { add: jest.fn() };
+    const proc = new IngressProcessor(loader as never, failures as never, hooks as never, queue as never, {} as never);
+    await expect(
+      proc.process(job({ id: 'ing-abc-requeued-1700000000000', attemptsMade: 2, opts: { attempts: 3 } })),
+    ).rejects.toThrow('boom');
+    expect(failures.count).toHaveBeenCalledWith({
+      where: { direction: 'inbound', pluginId: 'chatwoot', instanceId: 'acct1', deliveryId: 'd1', redriven: false },
+    });
+    expect(failures.save).not.toHaveBeenCalled();
+    expect(queue.add).not.toHaveBeenCalled();
+
+    // An open row only rules out a duplicate for a re-queued copy: a redrive job reaches its final
+    // attempt while the row it replays is still open, and that row is retired once the redrive is queued.
+    await expect(proc.process(job({ id: 'redrive:row-1', attemptsMade: 2, opts: { attempts: 3 } }))).rejects.toThrow(
+      'boom',
+    );
+    expect(failures.save).toHaveBeenCalledTimes(1);
+    expect(failures.count).toHaveBeenCalledTimes(1);
+  });
+
   it('rethrows on a non-final attempt without recording a DLQ row or firing ingress:error', async () => {
     const loader = { dispatchWebhookForInstance: jest.fn().mockRejectedValue(new Error('boom')) };
     const failures = { save: jest.fn().mockResolvedValue(undefined) };
     const hooks = { execute: jest.fn().mockResolvedValue({ continue: true }) };
-    const proc = new IngressProcessor(loader as never, failures as never, hooks as never, {} as never);
+    const proc = new IngressProcessor(loader as never, failures as never, hooks as never, {} as never, {} as never);
     await expect(proc.process(job({ attemptsMade: 0, opts: { attempts: 3 } }))).rejects.toThrow('boom');
     expect(failures.save).not.toHaveBeenCalled();
     expect(hooks.execute).not.toHaveBeenCalled();
@@ -96,6 +160,7 @@ describe('IngressProcessor', () => {
       loader as never,
       { save: jest.fn() } as never,
       { execute: jest.fn() } as never,
+      {} as never,
       {} as never,
     );
     const mk = (deliveryId: string, convo: string) =>
@@ -132,6 +197,7 @@ describe('IngressProcessor', () => {
       { save: jest.fn() } as never,
       { execute: jest.fn() } as never,
       {} as never,
+      {} as never,
     );
     const mk = (deliveryId: string, convo: string) =>
       proc.process({
@@ -156,10 +222,10 @@ describe('IngressProcessor', () => {
 describe('IngressProcessor stall exhaustion (worker failed event)', () => {
   const STALLED = new Error('job stalled more than allowable limit');
   const setup = () => {
-    const failures = { save: jest.fn().mockResolvedValue(undefined) };
+    const failures = { save: jest.fn().mockResolvedValue(undefined), count: jest.fn().mockResolvedValue(0) };
     const hooks = { execute: jest.fn().mockResolvedValue({ continue: true }) };
     const queue = { add: jest.fn().mockResolvedValue(undefined) };
-    const proc = new IngressProcessor({} as never, failures as never, hooks as never, queue as never);
+    const proc = new IngressProcessor({} as never, failures as never, hooks as never, queue as never, {} as never);
     return { proc, failures, hooks, queue };
   };
 

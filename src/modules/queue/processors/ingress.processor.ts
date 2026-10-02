@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { QUEUE_NAMES } from '../queue-names';
 import { workerConnectionOptions, ingressWorkerConcurrency } from '../redis-connection';
 import { IntegrationDeliveryFailure } from '../../integration/entities/integration-delivery-failure.entity';
+import { IngressEvent } from '../../integration/entities/ingress-event.entity';
 import { PluginLoaderService } from '../../../core/plugins/plugin-loader.service';
 import { HookManager } from '../../../core/hooks';
 import { createLogger } from '../../../common/services/logger.service';
@@ -15,6 +16,9 @@ const STALL_EXHAUSTION_MESSAGE = 'job stalled more than allowable limit';
 
 // How long a delivery whose dead-letter row could not be written waits before it runs again.
 const REQUEUE_DELAY_MS = 60_000;
+
+// The id suffix deadLetterOrRequeue gives a re-queued delivery.
+const REQUEUED_JOB_ID = /-requeued-\d+$/;
 
 export interface IngressJobData {
   pluginId: string;
@@ -58,6 +62,8 @@ export class IngressProcessor extends WorkerHost {
     private readonly hooks: HookManager,
     @InjectQueue(QUEUE_NAMES.INGRESS)
     private readonly ingressQueue: Queue<IngressJobData>,
+    @InjectRepository(IngressEvent, 'data')
+    private readonly events: Repository<IngressEvent>,
   ) {
     super();
   }
@@ -84,6 +90,44 @@ export class IngressProcessor extends WorkerHost {
 
       // Re-throw to trigger BullMQ's exponential backoff / retry.
       throw err;
+    }
+    if (REQUEUED_JOB_ID.test(String(job.id))) await this.settleRequeued(d);
+  }
+
+  /**
+   * A re-queued copy runs while the original job stays 'failed' under the original id, which the
+   * reconciler reads as dead-lettered: for an event still 'pending' it writes a DLQ row and marks the
+   * event 'failed', before or after this copy runs. Record the delivery on both so neither is left
+   * redrivable for an event the plugin already received. Never rejects: the dispatch succeeded, and a
+   * retry would deliver it again.
+   */
+  private async settleRequeued(d: IngressJobData): Promise<void> {
+    try {
+      await this.events.update(
+        { pluginId: d.pluginId, instanceId: d.instanceId, providerDeliveryId: d.deliveryId },
+        { dispatchState: 'dispatched', payload: null },
+      );
+      await this.failures.update(
+        {
+          direction: 'inbound',
+          pluginId: d.pluginId,
+          instanceId: d.instanceId,
+          deliveryId: d.deliveryId,
+          redriven: false,
+        },
+        { redriven: true },
+      );
+    } catch (err) {
+      this.logger.error(
+        'Could not record a re-queued ingress delivery',
+        err instanceof Error ? err.message : String(err),
+        {
+          pluginId: d.pluginId,
+          instanceId: d.instanceId,
+          deliveryId: d.deliveryId,
+          action: 'ingress_requeue_settle_failed',
+        },
+      );
     }
   }
 
@@ -120,14 +164,14 @@ export class IngressProcessor extends WorkerHost {
   private async deadLetterOrRequeue(job: Job<IngressJobData>, attempts: number, errorMessage: string): Promise<void> {
     const d = job.data;
     try {
-      await this.deadLetter(d, attempts, errorMessage);
+      await this.deadLetter(d, attempts, errorMessage, REQUEUED_JOB_ID.test(String(job.id)));
     } catch (err) {
       const meta = { jobId: job.id, pluginId: d.pluginId, instanceId: d.instanceId, deliveryId: d.deliveryId };
       const reason = err instanceof Error ? err.message : String(err);
       try {
         await this.ingressQueue.add(job.name, d, {
           // The base id, so a delivery re-queued through a long outage keeps one suffix, not a chain.
-          jobId: `${String(job.id).replace(/-requeued-\d+$/, '')}-requeued-${Date.now()}`,
+          jobId: `${String(job.id).replace(REQUEUED_JOB_ID, '')}-requeued-${Date.now()}`,
           attempts: job.opts.attempts,
           backoff: job.opts.backoff,
           delay: REQUEUE_DELAY_MS,
@@ -147,12 +191,34 @@ export class IngressProcessor extends WorkerHost {
     }
   }
 
-  private async deadLetter(d: IngressJobData, attempts: number, errorMessage: string): Promise<void> {
+  private async deadLetter(
+    d: IngressJobData,
+    attempts: number,
+    errorMessage: string,
+    requeued: boolean,
+  ): Promise<void> {
     await this.hooks.execute(
       'ingress:error',
       { ...d, error: errorMessage },
       { sessionId: d.sessionId, source: 'IngressProcessor' },
     );
+    // The reconciler writes this row itself when it finds the original job failed with none, so a
+    // re-queued copy that fails again must not add a second redrivable one. Only a re-queued copy: a
+    // redrive job can fail while the row it replays is still open, and that row is retired regardless.
+    if (
+      requeued &&
+      (await this.failures.count({
+        where: {
+          direction: 'inbound',
+          pluginId: d.pluginId,
+          instanceId: d.instanceId,
+          deliveryId: d.deliveryId,
+          redriven: false,
+        },
+      })) > 0
+    ) {
+      return;
+    }
     await this.failures.save({
       direction: 'inbound',
       pluginId: d.pluginId,

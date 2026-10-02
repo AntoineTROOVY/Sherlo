@@ -382,6 +382,34 @@ describe('IngressReconcilerService.sweep', () => {
       expect((await stored(id)).dispatchState).toBe('failed');
     });
 
+    it('retires its dead-letter row when a re-queued copy settles the event during the sweep', async () => {
+      const id = await insertEvent();
+      // The copy dispatches after the state read, before the dead-letter write, while no row is open.
+      queue.getJobState.mockImplementation(async () => {
+        await events.update({ id }, { dispatchState: 'dispatched', payload: null });
+        return 'failed';
+      });
+
+      await service.sweep(OPTS);
+
+      expect((await stored(id)).dispatchState).toBe('dispatched');
+      expect(await failures.count({ where: { deliveryId: 'd-1', redriven: false } })).toBe(0);
+    });
+
+    it('keeps the dead-letter row open when another sweep already marked the event failed', async () => {
+      const id = await insertEvent();
+      queue.getJobState.mockImplementation(async () => {
+        await processorDeadLetter();
+        await events.update({ id }, { dispatchState: 'failed', payload: null });
+        return 'failed';
+      });
+
+      await service.sweep(OPTS);
+
+      expect((await stored(id)).dispatchState).toBe('failed');
+      expect(await failures.count({ where: { deliveryId: 'd-1', redriven: false } })).toBe(1);
+    });
+
     it('does not re-add a job that is still live, and closes the event row', async () => {
       const id = await insertEvent();
       queue.getJobState.mockResolvedValue('delayed');
