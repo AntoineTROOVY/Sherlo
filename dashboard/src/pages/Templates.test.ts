@@ -163,6 +163,24 @@ test('a successful empty read still shows the empty state', async () => {
   await rtl.screen.findByText('No templates saved');
 });
 
+// Between the sessions read and the effect that selects the first session, no templates read has
+// started yet; that frame must show the loading state, not claim the library is empty.
+test('a library with templates never flashes the empty state while the first session is selected', async () => {
+  templates = [{ id: 'tpl-1', name: 'invoice-reminder', body: 'Hi {{name}}' }];
+  let sawEmpty = false;
+  const observer = new MutationObserver(() => {
+    if (document.body.textContent?.includes('No templates saved')) sawEmpty = true;
+  });
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  try {
+    renderTemplates();
+    await rtl.screen.findByText('invoice-reminder');
+  } finally {
+    observer.disconnect();
+  }
+  assert.equal(sawEmpty, false, 'the empty state rendered before the templates read started');
+});
+
 test('a failed sessions read shows the error, not "no sessions available"', async () => {
   sessionsStatus = 502;
   renderTemplates();
