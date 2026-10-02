@@ -6514,10 +6514,10 @@ Generate a shareable WhatsApp call link.
 
 **Request body** — `CreateCallLinkDto`
 
-| Field       | Type   | Required | Constraints                | Description                                           |
-| ----------- | ------ | -------- | -------------------------- | ----------------------------------------------------- |
-| `type`      | string | Yes      | `@IsIn(['audio','video'])` | Which kind of call the link opens                     |
-| `startTime` | number | Yes      | `@IsInt`; `@Min(1)`        | Epoch **milliseconds** the call is scheduled to start |
+| Field       | Type   | Required | Constraints                                   | Description                                           |
+| ----------- | ------ | -------- | --------------------------------------------- | ----------------------------------------------------- |
+| `type`      | string | Yes      | `@IsIn(['audio','video'])`                    | Which kind of call the link opens                     |
+| `startTime` | number | Yes      | `@IsInt`; `@Min(1)`; `@Max(8640000000000000)` | Epoch **milliseconds** the call is scheduled to start |
 
 ```json
 { "type": "video", "startTime": 1800000000000 }
