@@ -42,7 +42,11 @@ import { SessionLivenessWatchdog } from './session-liveness-watchdog.service';
 import { SessionErrorStore } from './session-error-store.service';
 import { SessionRestrictionStore } from './session-restriction-store.service';
 import { PresenceStore, type ChatPresence } from './presence-store.service';
-import { SessionEngineLifecycle, resolveReconnectConfig } from './session-engine-lifecycle.service';
+import {
+  SessionEngineLifecycle,
+  resolveMaxConcurrentSessions,
+  resolveReconnectConfig,
+} from './session-engine-lifecycle.service';
 import { SessionOwnershipService } from './session-ownership.service';
 import { paginate, ListOptions, resolveListWindow } from '../../common/utils/paginate';
 import { isTransientDbError, isUniqueViolation } from '../../common/utils/db-errors';
@@ -263,6 +267,15 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
         this.logger.log(`Auto-start stopped at ${i} of ${sessions.length} session(s): shutting down`, {
           action: 'auto_start_aborted',
         });
+        return;
+      }
+      // Every start past the cap is refused, so going on would only log one failure per row.
+      const max = resolveMaxConcurrentSessions(this.configService);
+      if (max !== null && !this.hasStartCapacity(max)) {
+        this.logger.log(
+          `Auto-start stopped at ${i} of ${sessions.length} session(s): MAX_CONCURRENT_SESSIONS reached`,
+          { action: 'auto_start_capacity_reached', max },
+        );
         return;
       }
       const session = sessions[i];
@@ -580,6 +593,23 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
    * the engine start refuses them a row still marked stopped when it reads it.
    */
   async start(id: string, { explicit = false }: { explicit?: boolean } = {}): Promise<Session> {
+    // At the cap, refused before the claim: the engine's own cap check runs after it, and its
+    // refusal releases the claim to no node. A row nobody holds is never adopted by a peer, while a
+    // lapsed lease left where it is gets taken over by one with room. The engine check stays the
+    // authoritative one; this only keeps a refusal off the lease.
+    const max = resolveMaxConcurrentSessions(this.configService);
+    if (this.ownership && max !== null) {
+      const holders = this.engineLifecycle.startSlotHolders();
+      holders.delete(id);
+      if (holders.size >= max) {
+        // Same answer the failed claim below would give, so the cap does not mask a 404 or a 409.
+        await this.findOne(id);
+        if (await this.ownership.isHeldByOtherNode(id)) {
+          throw new ConflictException(`Session ${id} is running on another node`);
+        }
+        throw new BadRequestException(`Maximum concurrent sessions reached (${max})`);
+      }
+    }
     // Claimed before the engine is launched, never after: launching first and discovering the
     // session belongs elsewhere would already have opened a second connection to the account.
     if (this.ownership && !(await this.ownership.claim(id))) {

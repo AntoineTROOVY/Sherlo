@@ -1424,6 +1424,62 @@ describe('SessionService', () => {
       expect(ownership.release).toHaveBeenCalledWith('sess-uuid-1');
     });
 
+    // The engine's own cap check runs after the claim, and its refusal releases the claim to no node:
+    // a row nobody holds is never adopted by a peer, so the session stayed down until a reboot.
+    it('start() at MAX_CONCURRENT_SESSIONS refuses before claiming, leaving the lease for a peer', async () => {
+      const ownership = withOwnership();
+      (configService.get as jest.Mock).mockImplementation(<T>(key: string, def?: T): T | number =>
+        key === 'sessions.maxConcurrent' ? 1 : (def as T),
+      );
+      jest.spyOn(lifecycle, 'startSlotHolders').mockReturnValue(new Set(['other']));
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      const engineStart = jest.spyOn(lifecycle, 'start');
+
+      await expect(service.start('sess-uuid-1')).rejects.toThrow('Maximum concurrent sessions reached (1)');
+
+      expect(ownership.claim).not.toHaveBeenCalled();
+      expect(ownership.release).not.toHaveBeenCalled();
+      expect(engineStart).not.toHaveBeenCalled();
+    });
+
+    it('start() at MAX_CONCURRENT_SESSIONS still answers 404 for an unknown id', async () => {
+      withOwnership();
+      (configService.get as jest.Mock).mockImplementation(<T>(key: string, def?: T): T | number =>
+        key === 'sessions.maxConcurrent' ? 1 : (def as T),
+      );
+      jest.spyOn(lifecycle, 'startSlotHolders').mockReturnValue(new Set(['other']));
+      (repository.findOne as jest.Mock).mockResolvedValue(null);
+
+      await expect(service.start('missing')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('start() at MAX_CONCURRENT_SESSIONS still answers 409 for a session a live peer holds', async () => {
+      const ownership = withOwnership();
+      ownership.isHeldByOtherNode.mockResolvedValue(true);
+      (configService.get as jest.Mock).mockImplementation(<T>(key: string, def?: T): T | number =>
+        key === 'sessions.maxConcurrent' ? 1 : (def as T),
+      );
+      jest.spyOn(lifecycle, 'startSlotHolders').mockReturnValue(new Set(['other']));
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+
+      await expect(service.start('sess-uuid-1')).rejects.toBeInstanceOf(ConflictException);
+      expect(ownership.claim).not.toHaveBeenCalled();
+      expect(ownership.release).not.toHaveBeenCalled();
+    });
+
+    it('start() does not count its own running engine against the cap', async () => {
+      const ownership = withOwnership();
+      (configService.get as jest.Mock).mockImplementation(<T>(key: string, def?: T): T | number =>
+        key === 'sessions.maxConcurrent' ? 1 : (def as T),
+      );
+      jest.spyOn(lifecycle, 'startSlotHolders').mockReturnValue(new Set(['sess-uuid-1']));
+      jest.spyOn(lifecycle, 'start').mockRejectedValue(new BadRequestException('Session is already started'));
+      jest.spyOn(lifecycle, 'isEngineActive').mockReturnValue(true);
+
+      await expect(service.start('sess-uuid-1')).rejects.toThrow('Session is already started');
+      expect(ownership.claim).toHaveBeenCalledWith('sess-uuid-1');
+    });
+
     it('start() keeps the claim when the refusal means the engine genuinely runs here', async () => {
       const ownership = withOwnership();
       jest.spyOn(lifecycle, 'start').mockRejectedValue(new BadRequestException('Session is already started'));
@@ -8656,6 +8712,38 @@ describe('SessionService', () => {
         await autoStartRun();
 
         expect(startSpy).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    // Each start past the cap is refused anyway; launching on would only log one failure per row.
+    it('stops at MAX_CONCURRENT_SESSIONS and leaves the remaining sessions alone', async () => {
+      process.env.AUTO_START_SESSIONS = 'true';
+      (configService.get as jest.Mock).mockImplementation(<T>(key: string, def?: T): T | number =>
+        key === 'sessions.maxConcurrent' ? 1 : (def as T),
+      );
+      (repository.find as jest.Mock).mockResolvedValue([
+        { id: 'a', name: 'A' },
+        { id: 'b', name: 'B' },
+      ]);
+      const slots = jest.spyOn(lifecycle, 'startSlotHolders').mockReturnValue(new Set());
+      const startSpy = jest.spyOn(service, 'start').mockImplementation((id: string) => {
+        slots.mockReturnValue(new Set([id]));
+        return Promise.resolve(undefined as never);
+      });
+      const logger = (service as unknown as { logger: { error: jest.Mock } }).logger;
+      const logError = jest.spyOn(logger, 'error');
+
+      jest.useFakeTimers();
+      try {
+        service.onApplicationBootstrap();
+        await jest.advanceTimersByTimeAsync(AUTOSTART_THROTTLE_MS);
+        await autoStartRun();
+
+        expect(startSpy).toHaveBeenCalledTimes(1);
+        expect(startSpy).toHaveBeenCalledWith('a');
+        expect(logError).not.toHaveBeenCalled();
       } finally {
         jest.useRealTimers();
       }
