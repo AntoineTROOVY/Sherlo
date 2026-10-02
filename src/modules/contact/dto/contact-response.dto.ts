@@ -37,10 +37,10 @@ export class ContactDto {
 
   @ApiPropertyOptional({
     description:
-      'Not a usable URL. On Baileys it holds only the picture-change marker `changed` or `removed` from a ' +
-      'contact notification; whatsapp-web.js never sets it. Neither its value nor its absence says whether ' +
-      'the contact has a picture; fetch the URL from GET /contacts/{contactId}/profile-picture.',
-    example: 'changed',
+      'A cached profile picture URL. Only Baileys can fill it (whatsapp-web.js never sets it), and it is often ' +
+      'absent there too, so its absence does not say whether the contact has a picture; fetch the URL from ' +
+      'GET /contacts/{contactId}/profile-picture.',
+    example: 'https://pps.whatsapp.net/v/...',
   })
   profilePicUrl?: string;
 }
