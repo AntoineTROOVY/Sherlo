@@ -49,6 +49,7 @@ export class CreateSessionDto {
       'start then times out (~30s → 504 Gateway Timeout); on Baileys the start succeeds and the session ' +
       'keeps retrying the connection. Leave unset unless your network cannot reach WhatsApp directly. ' +
       'Setting it requires an ADMIN key (403 otherwise).',
+    maxLength: 255,
   })
   @IsOptional()
   @IsString()

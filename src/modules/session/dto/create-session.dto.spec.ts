@@ -1,4 +1,5 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { DECORATORS } from '@nestjs/swagger';
 import { validateSync } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { GLOBAL_VALIDATION_OPTIONS } from '../../../config/app-validation';
@@ -34,6 +35,13 @@ describe('CreateSessionDto proxyUrl validation', () => {
 
   it('allows an omitted proxyUrl (optional)', () => {
     expect(validateSync(plainToInstance(CreateSessionDto, { name: 'my-bot' }))).toHaveLength(0);
+  });
+
+  // @nestjs/swagger derives no bound from @MaxCodePoints, so the decorator has to state it.
+  it('publishes the 255 code point cap', () => {
+    const published = Reflect.getMetadata(DECORATORS.API_MODEL_PROPERTIES, CreateSessionDto.prototype, 'proxyUrl') as
+      { maxLength?: number } | undefined;
+    expect(published?.maxLength).toBe(255);
   });
 });
 
