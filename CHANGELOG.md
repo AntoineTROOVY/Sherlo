@@ -344,6 +344,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard API Keys: the create dialog cannot be closed while the key is being created, so its one-time secret is no longer lost.
 - Dashboard Message Tester: a single send keeps Send disabled until a media URL is a full `http` or `https` address and every field is within the gateway's limits, and sends the URL trimmed.
 - Dashboard: emoji-heavy text pasted into Message Tester, or a status text or caption, is no longer cut short of the gateway's length limit; Send or Post is held instead once over it.
+- Dashboard: a Message Tester, status or API key name field over the gateway's length limit shows a hint with the limit and its current length, and a bulk text message over the limit holds Send like a single one.
 - Dashboard Plugins: number fields with a minimum or maximum accept fractional values, and a card's buttons stay disabled while its own action runs when another plugin's finishes first.
 - Dashboard Infrastructure: a save no longer warns of a database switch when the external PostgreSQL host, port or name came from the environment, and Save with Restart Later shows the pending-restart note at once.
 - Java SDK (next SDK release after 0.5.0): `health.ready()` no longer fails with `Non-JSON response` against a healthy gateway; `HealthReadyDetails` holds `DependencyStatus` records.
