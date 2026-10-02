@@ -147,8 +147,8 @@ describe('PluginInstanceService provisioning', () => {
   it('regenerateSecret replaces the secret with a new value', async () => {
     const created = await service.create('chatwoot', 'acct1', {});
     const rotated = await service.regenerateSecret('chatwoot', 'acct1');
-    expect(rotated.secret).toMatch(/^[0-9a-f]{64}$/);
-    expect(rotated.secret).not.toBe(created.secret);
+    expect(rotated?.secret).toMatch(/^[0-9a-f]{64}$/);
+    expect(rotated?.secret).not.toBe(created.secret);
   });
 
   it('update patches enabled/scope/config in one write; remove deletes', async () => {
@@ -181,8 +181,8 @@ describe('PluginInstanceService provisioning', () => {
     await backdate();
     const rotated = await service.regenerateSecret('chatwoot', 'acct1');
     const afterRotate = await service.resolve('chatwoot', 'acct1');
-    expect(rotated.updatedAt).toEqual(afterRotate?.updatedAt);
-    expect(rotated.secret).toBe(afterRotate?.secret);
+    expect(rotated?.updatedAt).toEqual(afterRotate?.updatedAt);
+    expect(rotated?.secret).toBe(afterRotate?.secret);
   });
 
   it('answers a concurrent duplicate create with InstanceExistsError and keeps the first secret', async () => {
@@ -225,17 +225,17 @@ describe('PluginInstanceService provisioning', () => {
     await service.update('chatwoot', 'acct1', { enabled: false });
 
     const stored = await service.resolve('chatwoot', 'acct1');
-    expect(stored?.secret).toBe(rotated.secret);
+    expect(stored?.secret).toBe(rotated?.secret);
     expect(stored?.enabled).toBe(false);
   });
 
-  it('regenerateSecret does not re-insert a row deleted after it was read', async () => {
+  it('regenerateSecret answers null, without re-inserting, for a row deleted after it was read', async () => {
     await service.create('chatwoot', 'acct1', {});
     const stale = await service.resolve('chatwoot', 'acct1');
     await service.remove('chatwoot', 'acct1');
     jest.spyOn(service, 'resolve').mockResolvedValueOnce(stale);
 
-    await expect(service.regenerateSecret('chatwoot', 'acct1')).rejects.toThrow(/not found/);
+    await expect(service.regenerateSecret('chatwoot', 'acct1')).resolves.toBeNull();
     expect(await service.resolve('chatwoot', 'acct1')).toBeNull();
   });
 

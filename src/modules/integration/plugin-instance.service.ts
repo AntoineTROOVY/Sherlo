@@ -109,13 +109,11 @@ export class PluginInstanceService implements PluginInstancePort {
   // exists: a whole-row save() would re-insert a row deleted meanwhile, or write back a stale secret
   // over a concurrent rotation. Both re-read the row after the write so the result carries the fresh
   // updatedAt the database stamped.
-  async regenerateSecret(pluginId: string, instanceId: string): Promise<PluginInstance> {
+  async regenerateSecret(pluginId: string, instanceId: string): Promise<PluginInstance | null> {
     const inst = await this.resolve(pluginId, instanceId);
     const secret = randomBytes(32).toString('hex');
     const written = inst ? (await this.repo.update({ id: inst.id }, { secret })).affected : 0;
-    const stored = written ? await this.resolve(pluginId, instanceId) : null;
-    if (!stored) throw new Error(`instance ${instanceId} not found for plugin ${pluginId}`);
-    return stored;
+    return written ? this.resolve(pluginId, instanceId) : null;
   }
 
   async update(
