@@ -275,6 +275,34 @@ const check = (id, ok, detail) => results.push({ id, ok, detail });
   );
 }
 
+// With NODE_ENV=production the app sends upgrade-insecure-requests, so a dashboard opened over a
+// TLS-less ingress fetches its scripts over https and renders blank. NOTES must warn on exactly that
+// combination: ingress.tls or an explicit CSP_UPGRADE_INSECURE_REQUESTS=false silences it. `helm
+// template` does not render NOTES, so this one goes through a client-side dry-run install.
+{
+  const notes = (...setArgs) =>
+    execFileSync('docker', ['run', '--rm', '-v', `${CHARTS}:/charts:ro`, HELM_IMAGE, 'install', 'ci', '/charts/openwa', '--dry-run=client', ...setArgs], {
+      encoding: 'utf8',
+      maxBuffer: 1 << 24,
+    }).split('\nNOTES:\n')[1] ?? '';
+  const warns = out => out.includes('this ingress has no TLS');
+  const tls = ['--set', 'ingress.tls[0].secretName=openwa-tls', '--set', 'ingress.tls[0].hosts[0]=openwa.example.com'];
+  const cases = [
+    ['ingress without TLS', true, ['--set', 'ingress.enabled=true']],
+    ['CSP upgrade off', false, ['--set', 'ingress.enabled=true', '--set-string', 'env.CSP_UPGRADE_INSECURE_REQUESTS=false']],
+    // `--set` parses this one as a YAML boolean rather than a string.
+    ['CSP upgrade off as a boolean', false, ['--set', 'ingress.enabled=true', '--set', 'env.CSP_UPGRADE_INSECURE_REQUESTS=false']],
+    ['ingress with TLS', false, ['--set', 'ingress.enabled=true', ...tls]],
+    ['no ingress', false, []],
+  ];
+  const wrong = cases.filter(([, want, args]) => warns(notes(...args)) !== want).map(([name, want]) => `${name} (expected ${want ? 'a' : 'no'} warning)`);
+  check(
+    'notes-warn-on-tls-less-ingress',
+    wrong.length === 0,
+    wrong.length ? `NOTES got the plain-http ingress warning wrong for: ${wrong.join(', ')}` : 'NOTES warns only when the ingress has no TLS and the CSP upgrade is on',
+  );
+}
+
 const failed = results.filter(r => !r.ok);
 if (failed.length) {
   console.error('\n✖ Chart behaviour check failed:');
