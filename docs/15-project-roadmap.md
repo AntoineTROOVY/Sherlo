@@ -694,9 +694,9 @@ degrades the release notes to a bare `Release v<version>`.
 ### Verify, commit, tag
 
 Run the same gates the tag will run, so a failure costs a local minute rather than a released tag. The
-queue-on e2e suite skips when no Redis is reachable, while the tag runs it against a Redis service, so
-start one first (`docker run --rm -d -p 6379:6379 redis:7-alpine`, or set `QUEUE_TEST_REDIS_HOST` and
-`QUEUE_TEST_REDIS_PORT`) and check that jest reports no skipped suites:
+queue-on and throttler-redis e2e suites skip when no Redis is reachable, while the tag runs them against a
+Redis service, so start one first (`docker run --rm -d -p 6379:6379 redis:7-alpine`, or set `REDIS_HOST`
+and `REDIS_PORT`, which both suites read) and check that jest reports no skipped suites:
 
 ```bash
 npm run check:versions && npm run openapi:check && npm run lint && npm run format:check
