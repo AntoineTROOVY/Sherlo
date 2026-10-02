@@ -248,7 +248,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Outbound media archived from both the engine echo and the REST send at once no longer leaves a second copy in storage.
 - Lowering or raising an automation rule's `cooldownSeconds` applies to a quiet period already running in a chat, also on a gateway tracking 10,000 or more chats, and such a gateway no longer rescans every tracked chat on each automated reply.
 - `POST /api/sessions/:sessionId/calls/link` answers `400` for a `startTime` past the largest date JavaScript can hold, instead of `403` or `500`.
-- Channel delete and unsubscribe answer `404` for an id that is not a channel; on whatsapp-web.js they created a chat for it and failed with `500`.
+- Channel delete, mute and unsubscribe answer `404` for an id that is not a channel; on whatsapp-web.js delete and unsubscribe created a chat for it and failed with `500`.
 - Group and profile picture writes and media sends answer `400` for a non-string `base64` sent next to a `url`, and `send-template` for a non-string `templateId` or `templateName` sent next to the other, instead of `500`.
 - `POST /api/sessions/:sessionId/groups/join` trims whitespace around the invite code, as the join preview does.
 - A request whose path or query string contains `%00` is refused with `400`, the unauthenticated ingress route included, instead of failing with `500` on PostgreSQL.
