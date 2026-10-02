@@ -1642,7 +1642,9 @@ before WhatsApp may have taken it hands its place back at once. A daily or
 cold-reachout refusal can therefore come while the stored count is still under the cap; when only such
 held sends push it over, including for the group participant adds below, its `retryAfterSeconds` is 10
 or less instead of the time to the next UTC day; while a held send is still in flight or holding, a
-retry at that hint can be refused again.
+retry at that hint can be refused again. The hold is best-effort at two edges: a message sent from the
+linked phone while API sends are in flight, and a send still in flight when the UTC day changes, can
+each let one extra API send past a cap.
 
 Inside a bulk batch a refusal fails just that item (honouring `stopOnError`), not the batch — the
 allowance may free up, and a batch killed outright could not be resumed.
