@@ -171,4 +171,13 @@ describe('GroupController OpenAPI responses', () => {
   it('declares the rate-limited 503 on group creation', () => {
     expect(responsesOf('create')['503']?.description).toContain('429');
   });
+
+  // A batch larger than a whole day's cold-reachout allowance is refused 400 without a retry hint.
+  it.each(['create', 'addParticipants'])('%s describes the over-allowance 400', name => {
+    expect(responsesOf(name)['400']?.description).toContain('cold-reachout allowance');
+  });
+
+  it.each(['removeParticipants', 'promoteParticipants', 'demoteParticipants'])('%s keeps the unpaced 400', name => {
+    expect(responsesOf(name)['400']?.description).not.toContain('cold-reachout');
+  });
 });

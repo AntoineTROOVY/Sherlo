@@ -60,6 +60,12 @@ const PARTICIPANT_ID_400 =
   'A participant does not name an individual. Pass a phone number, `<phone>@c.us` or `<lid>@lid`; ' +
   'a group id or free text is rejected.';
 
+// Only the two routes that add people to a group are paced; remove, promote and demote are not.
+const PACED_PARTICIPANT_400 =
+  PARTICIPANT_ID_400 +
+  ' With send pacing on, also answered (without `retryAfterSeconds`) when the request names more new ' +
+  "contacts than the whole day's cold-reachout allowance; split it into smaller batches.";
+
 // EngineRegistry.require() answers 400 for a session with no engine; ENGINE_NOT_READY_409 covers only
 // an engine that exists but is not ready. The body variant is for routes that also validate a DTO.
 const BODY_OR_SESSION_400 = 'The body failed validation, or the session is not started (no engine is running for it).';
@@ -194,7 +200,7 @@ export class GroupController {
   @ApiResponse({ status: 201, description: 'Group created', type: GroupSummaryDto })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
   @ApiResponse({ status: 403, description: ENGINE_REFUSED_403 })
-  @ApiResponse({ status: 400, description: PARTICIPANT_ID_400 })
+  @ApiResponse({ status: 400, description: PACED_PARTICIPANT_400 })
   @ApiResponse({
     status: 503,
     description:
@@ -225,7 +231,7 @@ export class GroupController {
   @ApiResponse({ status: 503, description: PARTICIPANTS_503 })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })
   @ApiResponse({ status: 403, description: ENGINE_REFUSED_403 })
-  @ApiResponse({ status: 400, description: PARTICIPANT_ID_400 })
+  @ApiResponse({ status: 400, description: PACED_PARTICIPANT_400 })
   @HttpCode(HttpStatus.OK)
   @ApiResponse({ status: 404, description: GROUP_NOT_FOUND_404 })
   async addParticipants(
