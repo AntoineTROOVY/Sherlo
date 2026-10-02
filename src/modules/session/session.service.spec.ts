@@ -674,9 +674,11 @@ describe('SessionService', () => {
       expect(repository.update).toHaveBeenCalledWith('sess-uuid-1', { status: SessionStatus.DISCONNECTED });
     });
 
-    it('forceKill() throws NotFoundException for an unknown session', async () => {
+    it('forceKill() throws NotFoundException for an unknown session and keeps no stop request', async () => {
       (repository.findOne as jest.Mock).mockResolvedValue(null);
       await expect(service.forceKill('nope')).rejects.toThrow(NotFoundException);
+      // An id that only ever answers 404 must not leave an entry behind.
+      expect((service as unknown as { stopRequests: Map<string, number> }).stopRequests.has('nope')).toBe(false);
     });
 
     it('forceKill() rejects with BadRequestException when the session has no live engine', async () => {
@@ -1479,6 +1481,47 @@ describe('SessionService', () => {
       expect(lifecycle.isEngineActive('sess-uuid-1')).toBe(false);
       expect(desired()).toBe('stopped');
       expect(ownership.release.mock.calls.length).toBeGreaterThan(releasesBefore);
+    });
+
+    // The same race with a force-kill: the start sent while the engine still ran launched a new one
+    // once its claim resolved and cleared the stop record the kill had just written.
+    it('start() refuses with 409 when a forceKill() lands while its claim is pending', async () => {
+      const ownership = withOwnership();
+      const desired = trackDesiredState();
+      (service as unknown as { engines: Map<string, unknown> }).engines.set('sess-uuid-1', {
+        forceDestroy: jest.fn().mockResolvedValue(undefined),
+      });
+      let finishClaim: () => void = () => undefined;
+      ownership.claim.mockImplementationOnce(
+        () => new Promise<boolean>(resolve => (finishClaim = () => resolve(true))),
+      );
+
+      const starting = service.start('sess-uuid-1', { explicit: true });
+      const outcome = starting.catch((error: unknown) => error);
+      await service.forceKill('sess-uuid-1');
+      finishClaim();
+
+      expect(await outcome).toBeInstanceOf(SessionStoppedException);
+      expect(mockEngine.initialize).not.toHaveBeenCalled();
+      expect(lifecycle.isEngineActive('sess-uuid-1')).toBe(false);
+      expect(desired()).toBe('stopped');
+    });
+
+    // A refused force-kill took nothing down, so a start waiting on its claim must still launch.
+    it('start() still launches after a forceKill() refused with 400 while its claim is pending', async () => {
+      const ownership = withOwnership();
+      trackDesiredState();
+      let finishClaim: () => void = () => undefined;
+      ownership.claim.mockImplementationOnce(
+        () => new Promise<boolean>(resolve => (finishClaim = () => resolve(true))),
+      );
+
+      const starting = service.start('sess-uuid-1', { explicit: true });
+      await expect(service.forceKill('sess-uuid-1')).rejects.toThrow(BadRequestException);
+      finishClaim();
+      await starting;
+
+      expect(lifecycle.isEngineActive('sess-uuid-1')).toBe(true);
     });
 
     // The teardown finished while a start sent after it still waited on its claim, and handed back

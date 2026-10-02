@@ -771,12 +771,16 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
   }
 
   async forceKill(id: string): Promise<Session> {
+    // Counted like stop(), so a start still waiting on its claim yields rather than relaunching.
+    this.countStopRequest(id);
     try {
       // The engine kill records the stop itself, once it has an engine to kill.
       const session = await this.engineLifecycle.forceKill(id);
       await this.releaseAfterTeardown(id);
       return session;
     } catch (error) {
+      // A 400 "not started" or 404 took nothing down; the 502 did evict the engine and stays counted.
+      if (error instanceof BadRequestException || error instanceof NotFoundException) this.uncountStopRequest(id);
       // Same 400 rule as logout(): a "not started" refusal took nothing down.
       if (!(error instanceof BadRequestException)) await this.releaseAfterTeardown(id);
       throw error;
