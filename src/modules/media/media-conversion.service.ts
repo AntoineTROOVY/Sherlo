@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, OnApplicationShutdown, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { isUUID } from 'class-validator';
@@ -13,6 +13,7 @@ import { assertBase64WithinMediaCap, stripBase64DataUri } from '../message/media
 import {
   FfmpegConversionError,
   FfmpegSpawnError,
+  killRunningConversions,
   probeFfmpeg,
   runFfmpeg,
   videoEncodeArgs,
@@ -31,7 +32,7 @@ export interface ConvertedMedia {
 }
 
 @Injectable()
-export class MediaConversionService {
+export class MediaConversionService implements OnApplicationShutdown {
   private readonly logger = createLogger('MediaConversionService');
   /**
    * Result of the binary probe. Only a successful probe is kept: a failure can be a timeout or a
@@ -54,6 +55,15 @@ export class MediaConversionService {
   ) {
     const concurrency = this.configService.get<number>('mediaConversion.concurrency', 2);
     this.ffmpegGate = new ConcurrencyLimiter(concurrency, concurrency * 4);
+  }
+
+  /**
+   * Kill the detached ffmpeg groups still running. Nest's own signal handler re-raises the signal
+   * once its hooks finish, so the process dies from it without ever emitting `exit`; this hook runs
+   * on that path and on `app.close()`.
+   */
+  onApplicationShutdown(): void {
+    killRunningConversions();
   }
 
   /**

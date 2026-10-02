@@ -174,7 +174,8 @@ esac
     expect(process.listeners('exit')).toContain(killRunningConversions);
     const pidFile = `${stubPath}.pid`;
     await rm(pidFile, { force: true });
-    const run = runFfmpeg(Buffer.from('input'), 'bin', 'ogg', mode('orphan'), options({ timeoutMs: 10_000 }));
+    // The run's own timeout is longer than this test may take, so only the kill below can end it.
+    const run = runFfmpeg(Buffer.from('input'), 'bin', 'ogg', mode('orphan'), options({ timeoutMs: 60_000 }));
     const settled = run.catch((error: unknown) => error);
 
     let grandchild = 0;
@@ -191,10 +192,13 @@ esac
       }
     };
     try {
+      // The stub's own sleep ends in 10 s, so the kill has to land well before that to count.
+      const killedAt = Date.now();
       killRunningConversions();
       expect(await settled).toBeInstanceOf(FfmpegConversionError);
       for (let i = 0; i < 40 && alive(); i++) await new Promise(r => setTimeout(r, 50));
       expect(alive()).toBe(false);
+      expect(Date.now() - killedAt).toBeLessThan(2_000);
     } finally {
       if (alive()) process.kill(grandchild, 'SIGKILL');
     }
