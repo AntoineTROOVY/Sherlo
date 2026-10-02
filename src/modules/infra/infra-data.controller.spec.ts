@@ -1345,6 +1345,51 @@ describe('InfraDataController.importData round-trips export-data (no silent mess
     expect(await ds.getRepository(Message).count()).toBe(1);
   });
 
+  it('refuses a backup whose template names of one session differ only by NUL, before any teardown', async () => {
+    await seedSession('s1');
+
+    // The restore drops NUL from a template name and (sessionId, name) is unique: importing both rows
+    // would fail the second insert and roll everything back, so the pre-flight refuses the backup.
+    const res = await controller.importData({
+      tables: {
+        sessions: [
+          {
+            id: 's1',
+            name: 'restored',
+            status: 'ready',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ] as never,
+        templates: [
+          {
+            id: 't1',
+            sessionId: 's1',
+            name: 'promo',
+            body: 'a',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+          {
+            id: 't2',
+            sessionId: 's1',
+            name: 'promo\u0000',
+            body: 'b',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ] as never,
+      },
+    });
+
+    expect(res.imported).toBe(false);
+    expect(res.warnings).toEqual([
+      'Skipped template t2: name "promo" without NUL characters collides with template t1 of session s1',
+    ]);
+    expect(await ds.getRepository(Session).count()).toBe(1);
+    expect(await ds.getRepository(Template).count()).toBe(0);
+  });
+
   it('propagates a genuine clear-table failure (lock/IO) instead of committing a merged restore', async () => {
     // Pre-existing data that must survive if a clear step fails.
     await seedSession('s1');

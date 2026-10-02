@@ -587,12 +587,12 @@ export class InfraDataService {
     // before the orphan pre-flight: with no sessions in it every running engine reads as an orphan, and
     // a stopOrphans retry would tear all of them down for a restore that was never going to happen.
     // A row a skip guard vetoes is just as certain a rollback (see the warnings gate below), and the
-    // guards read only the archived row, so run them here too. The in-transaction call stays as a backstop.
+    // guards read only the archived tables, so run them here too. The in-transaction call stays as a backstop.
     const refusals = TABLE_IMPORTERS.every(importer => !data.tables[importer.key]?.length)
       ? [EMPTY_ARCHIVE_WARNING]
       : TABLE_IMPORTERS.flatMap(importer =>
           (data.tables[importer.key] ?? [])
-            .map(row => importer.skip?.(row as never))
+            .map((row, _index, rows) => importer.skip?.(row as never, rows as never))
             .filter((warning): warning is string => warning != null),
         );
     if (refusals.length > 0) {
@@ -864,7 +864,7 @@ export class InfraDataService {
             // cannot carry, and this loop is the one place it is known — so the cast lives here rather
             // than at each of the three uses below.
             const row = untypedRow as never;
-            const skipWarning = importer.skip?.(row);
+            const skipWarning = importer.skip?.(row, rows as never);
             if (skipWarning != null) {
               warnings.push(skipWarning);
               continue;
