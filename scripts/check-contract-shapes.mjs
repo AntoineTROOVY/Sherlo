@@ -58,6 +58,7 @@ const MAPPINGS = {
   'sdk/javascript/src/types.ts': {
     AccountRestriction: 'AccountRestrictionDto',
     ArchiveChatRequest: 'ArchiveChatDto',
+    BatchCancelResponse: 'BatchCancelResponseDto',
     BatchMessageResult: 'BatchMessageResultDto',
     BatchProgress: 'BatchProgressDto',
     BatchStatusResponse: 'BatchStatusResponseDto',
@@ -173,7 +174,7 @@ const MAPPINGS = {
  * added makes the shrink loud.
  */
 const MINIMUM_MAPPED = {
-  'sdk/javascript/src/types.ts': 84,
+  'sdk/javascript/src/types.ts': 85,
   'dashboard/src/services/api.ts': 21,
   'sdk/python/openwa/types.py': 79,
   'sdk/go': 79,
