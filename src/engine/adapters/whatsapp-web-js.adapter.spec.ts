@@ -4864,6 +4864,29 @@ describe('outbound document mode (#989)', () => {
       );
     });
 
+    // Status media takes the same route default: a URL posted without a declared type keeps a specific
+    // fetched type, and a generic one would otherwise reach WA Web and turn a photo into a document.
+    it.each<['postImageStatus' | 'postVideoStatus' | 'postVoiceStatus', string, string]>([
+      ['postImageStatus', 'image/png', 'image/png'],
+      ['postImageStatus', 'application/octet-stream', 'image/jpeg'],
+      ['postVideoStatus', '', 'video/mp4'],
+      ['postVoiceStatus', 'binary/octet-stream', 'audio/ogg; codecs=opus'],
+    ])('%s from a URL served as %j goes out as %s', async (post, fetched, expected) => {
+      (undiciFetch as jest.Mock).mockResolvedValue(remoteResponse({ 'content-type': fetched }));
+      const sendMessage = jest.fn().mockResolvedValue(sentMessage);
+
+      await ready({ sendMessage })[post](
+        { mimetype: 'application/octet-stream', data: 'https://files.example.com/status' },
+        {},
+      );
+
+      expect(sendMessage).toHaveBeenCalledWith(
+        'status@broadcast',
+        expect.objectContaining({ mimetype: expected }),
+        expect.anything(),
+      );
+    });
+
     it('leaves a document with a generic fetched type as it is', async () => {
       (undiciFetch as jest.Mock).mockResolvedValue(remoteResponse({ 'content-type': 'binary/octet-stream' }));
       const sendMessage = jest.fn().mockResolvedValue(sentMessage);

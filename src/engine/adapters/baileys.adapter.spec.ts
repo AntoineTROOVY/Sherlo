@@ -1829,9 +1829,7 @@ describe('BaileysAdapter messaging', () => {
       (adapter as unknown as { sock: unknown }).sock = null;
       return Promise.reject(new Error('Connection Closed'));
     });
-    await expect(adapter.sendTextMessage('628111@s.whatsapp.net', 'hello')).rejects.toBeInstanceOf(
-      EngineNotReadyError,
-    );
+    await expect(adapter.sendTextMessage('628111@s.whatsapp.net', 'hello')).rejects.toBeInstanceOf(EngineNotReadyError);
   });
 
   it('a send that fails on a socket still in place rethrows the failure as is', async () => {
@@ -6943,6 +6941,26 @@ describe('BaileysAdapter status posting', () => {
       'status@broadcast',
       { video: Buffer.from('AAAA', 'base64'), caption: undefined, mimetype: 'video/mp4' },
       { statusJidList: ['628111@s.whatsapp.net'], backgroundColor: undefined, font: undefined },
+    );
+  });
+
+  // A URL posted without a declared type carries the octet-stream placeholder, so the fetched
+  // Content-Type labels the bytes, and a host that serves a generic one falls back to the kind's default.
+  it.each([
+    ['image', 'image/png', 'image/png'],
+    ['image', 'application/octet-stream', 'image/jpeg'],
+    ['video', '', 'video/mp4'],
+  ] as const)('a %s status from a URL served as %j goes out as %s', async (kind, served, expected) => {
+    (loadRemoteMediaBuffer as jest.Mock).mockResolvedValue({ data: Buffer.from([9]), mimetype: served });
+    fakeSock.sendMessage.mockResolvedValue({ key: { id: 'URL1' }, messageTimestamp: 1719600000 });
+    const adapter = await ready();
+    const media = { mimetype: 'application/octet-stream', data: 'https://cdn.example/m' };
+    const options = { recipients: ['628111@c.us'] };
+    await (kind === 'image' ? adapter.postImageStatus(media, options) : adapter.postVideoStatus(media, options));
+    expect(fakeSock.sendMessage).toHaveBeenCalledWith(
+      'status@broadcast',
+      expect.objectContaining({ [kind]: Buffer.from([9]), mimetype: expected }),
+      expect.anything(),
     );
   });
 
