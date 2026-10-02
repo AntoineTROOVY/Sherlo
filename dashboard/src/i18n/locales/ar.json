@@ -44,6 +44,7 @@
     "hoursAgo_many": "منذ {{count}} ساعة",
     "hoursAgo_zero": "منذ {{count}} ساعة",
     "optional": "اختياري",
+    "fieldTooLong": "الحد الأقصى {{max}} حرفًا (الآن {{count}}).",
     "language": "اللغة",
     "back": "رجوع",
     "next": "التالي",

@@ -40,6 +40,7 @@
     "hoursAgo_other": "לפני {{count}} שעות",
     "hoursAgo_two": "לפני שעתיים",
     "optional": "אופציונלי",
+    "fieldTooLong": "מוגבל ל-{{max}} תווים (כרגע {{count}}).",
     "language": "שפה",
     "back": "חזרה",
     "next": "הבא",

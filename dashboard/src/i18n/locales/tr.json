@@ -36,6 +36,7 @@
     "hoursAgo": "{{count}} saat önce",
     "hoursAgo_other": "{{count}} saat önce",
     "optional": "isteğe bağlı",
+    "fieldTooLong": "En fazla {{max}} karakter olabilir (şu an {{count}}).",
     "language": "Dil",
     "back": "Geri",
     "next": "İleri",

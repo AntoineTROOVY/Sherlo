@@ -36,6 +36,7 @@
     "hoursAgo_other": "Hace {{count}} horas",
     "hoursAgo_many": "Hace {{count}} horas",
     "optional": "opcional",
+    "fieldTooLong": "Limitado a {{max}} caracteres (ahora {{count}}).",
     "language": "Idioma",
     "back": "Atrás",
     "next": "Siguiente",

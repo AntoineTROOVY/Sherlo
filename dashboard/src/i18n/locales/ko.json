@@ -36,6 +36,7 @@
     "hoursAgo": "{{count}}시간 전",
     "hoursAgo_other": "{{count}}시간 전",
     "optional": "선택 사항",
+    "fieldTooLong": "최대 {{max}}자입니다(현재 {{count}}자).",
     "language": "언어",
     "back": "뒤로",
     "next": "다음",

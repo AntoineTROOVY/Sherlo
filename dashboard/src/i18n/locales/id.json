@@ -36,6 +36,7 @@
     "hoursAgo": "{{count}} jam lalu",
     "hoursAgo_other": "{{count}} jam lalu",
     "optional": "opsional",
+    "fieldTooLong": "Dibatasi {{max}} karakter (saat ini {{count}}).",
     "language": "Bahasa",
     "back": "Kembali",
     "next": "Selanjutnya",

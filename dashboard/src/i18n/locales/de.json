@@ -36,6 +36,7 @@
     "hoursAgo": "vor {{count}} Std.",
     "hoursAgo_other": "vor {{count}} Std.",
     "optional": "optional",
+    "fieldTooLong": "Auf {{max}} Zeichen begrenzt (aktuell {{count}}).",
     "language": "Sprache",
     "back": "Zurück",
     "next": "Weiter",

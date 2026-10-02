@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ChangeEvent } from 'react';
+import { Fragment, useState, useEffect, useRef, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Send, CheckCircle, XCircle, Loader2, Upload, X, Plus, AlertCircle } from 'lucide-react';
 import {
@@ -350,20 +350,21 @@ export function MessageTester() {
   const bulkCaptionTooLong =
     bulkAttachment !== null && bulkAttachment.kind !== 'audio' && captionLength(content) > BULK_CAPTION_MAX_LENGTH;
 
+  // The text field goes out as the caption on image and video and as the filename on a document.
+  const mediaContentMax =
+    messageType === 'document'
+      ? MEDIA_FILENAME_MAX_LENGTH
+      : messageType === 'image' || messageType === 'video'
+        ? BULK_CAPTION_MAX_LENGTH
+        : Infinity;
+
   // Per-type required-field validation (the backend stays the authoritative validator). A multi-group
   // send repeats the request per group, so a body the backend would refuse must not start the run.
   let formValid = true;
   if (messageType === 'text') {
     formValid = content.trim().length > 0 && captionLength(content) <= MESSAGE_TEXT_MAX_LENGTH;
   } else if (isMediaMessageType) {
-    // The text field goes out as the caption on image and video and as the filename on a document.
-    const contentMax =
-      messageType === 'document'
-        ? MEDIA_FILENAME_MAX_LENGTH
-        : messageType === 'image' || messageType === 'video'
-          ? BULK_CAPTION_MAX_LENGTH
-          : Infinity;
-    formValid = (!!mediaFile || isHttpMediaUrl(mediaUrl)) && captionLength(content) <= contentMax;
+    formValid = (!!mediaFile || isHttpMediaUrl(mediaUrl)) && captionLength(content) <= mediaContentMax;
   } else if (messageType === 'location') {
     formValid =
       !Number.isNaN(lat) &&
@@ -409,6 +410,16 @@ export function MessageTester() {
     !session ||
     !formValid ||
     (messageType !== 'bulk' && (recipientType === 'group' ? selectedGroups.length === 0 : !recipient));
+
+  // Says why Send is held when a field runs past its bound, counted the way `formValid` counts it.
+  const tooLongHint = (value: string, max: number) => {
+    const count = captionLength(value);
+    return (
+      <span className="hint error" role="status">
+        {count > max ? t('common.fieldTooLong', { max, count }) : ''}
+      </span>
+    );
+  };
 
   const isGroupSending = groupSendProgress !== null;
 
@@ -828,6 +839,7 @@ export function MessageTester() {
                   placeholder={t('messageTester.messagePlaceholder')}
                   rows={5}
                 />
+                {tooLongHint(content, MESSAGE_TEXT_MAX_LENGTH)}
               </div>
             )}
 
@@ -851,6 +863,7 @@ export function MessageTester() {
                           : t('messageTester.captionPlaceholder')
                       }
                     />
+                    {tooLongHint(content, mediaContentMax)}
                   </div>
                 )}
               </>
@@ -896,6 +909,7 @@ export function MessageTester() {
                     value={locationDescription}
                     onChange={e => setLocationDescription(e.target.value)}
                   />
+                  {tooLongHint(locationDescription.trim(), LOCATION_TEXT_MAX_LENGTH)}
                 </div>
                 <div className="form-group">
                   <label htmlFor="mt-16">
@@ -907,6 +921,7 @@ export function MessageTester() {
                     value={locationAddress}
                     onChange={e => setLocationAddress(e.target.value)}
                   />
+                  {tooLongHint(locationAddress.trim(), LOCATION_TEXT_MAX_LENGTH)}
                 </div>
               </>
             )}
@@ -922,6 +937,7 @@ export function MessageTester() {
                     onChange={e => setContactName(e.target.value)}
                     placeholder={t('messageTester.contactNamePlaceholder')}
                   />
+                  {tooLongHint(contactName.trim(), CONTACT_NAME_MAX_LENGTH)}
                 </div>
                 <div className="form-group">
                   <label htmlFor="mt-7">{t('messageTester.contactNumber')}</label>
@@ -932,6 +948,7 @@ export function MessageTester() {
                     onChange={e => setContactNumber(e.target.value)}
                     placeholder="+62812345678"
                   />
+                  {tooLongHint(contactNumber.trim(), CONTACT_NUMBER_MAX_LENGTH)}
                 </div>
               </>
             )}
@@ -947,27 +964,31 @@ export function MessageTester() {
                     onChange={e => setPollQuestion(e.target.value)}
                     placeholder={t('messageTester.pollQuestionPlaceholder')}
                   />
+                  {tooLongHint(pollQuestion.trim(), POLL_NAME_MAX_LENGTH)}
                 </div>
                 <div className="form-group">
                   <label>{t('messageTester.pollOptions')}</label>
                   {pollOptions.map((option, index) => (
-                    <div className="poll-option-row" key={index}>
-                      <input
-                        type="text"
-                        value={option}
-                        onChange={e => setPollOptions(prev => prev.map((o, i) => (i === index ? e.target.value : o)))}
-                        placeholder={t('messageTester.pollOptionPlaceholder', { index: index + 1 })}
-                      />
-                      <button
-                        type="button"
-                        className="remove-option-btn"
-                        onClick={() => setPollOptions(prev => prev.filter((_, i) => i !== index))}
-                        disabled={pollOptions.length <= 2}
-                        aria-label={t('messageTester.removeOption')}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
+                    <Fragment key={index}>
+                      <div className="poll-option-row">
+                        <input
+                          type="text"
+                          value={option}
+                          onChange={e => setPollOptions(prev => prev.map((o, i) => (i === index ? e.target.value : o)))}
+                          placeholder={t('messageTester.pollOptionPlaceholder', { index: index + 1 })}
+                        />
+                        <button
+                          type="button"
+                          className="remove-option-btn"
+                          onClick={() => setPollOptions(prev => prev.filter((_, i) => i !== index))}
+                          disabled={pollOptions.length <= 2}
+                          aria-label={t('messageTester.removeOption')}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      {tooLongHint(option.trim(), POLL_OPTION_MAX_LENGTH)}
+                    </Fragment>
                   ))}
                   <button
                     type="button"

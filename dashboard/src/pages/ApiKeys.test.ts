@@ -226,6 +226,7 @@ test('a key name over the 100 characters the gateway takes keeps Create disabled
   assert.equal(create.disabled, false, 'Create is disabled for a 100-character name');
   fireEvent.change(name, { target: { value: '\u{1F511}'.repeat(101) } });
   assert.equal(create.disabled, true, 'Create is enabled for a 101-character name');
+  screen.getByText('Limited to 100 characters (101 now).');
 });
 
 test('an IP or chat line the gateway would refuse keeps Create disabled and names the line', async () => {

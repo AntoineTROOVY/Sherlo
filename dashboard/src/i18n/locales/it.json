@@ -38,6 +38,7 @@
     "hoursAgo_other": "{{count}} ore fa",
     "hoursAgo_many": "{{count}} ore fa",
     "optional": "opzionale",
+    "fieldTooLong": "Limitato a {{max}} caratteri (ora {{count}}).",
     "language": "Lingua",
     "back": "Indietro",
     "next": "Avanti",

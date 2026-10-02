@@ -321,12 +321,15 @@ function setValue(element: HTMLElement, value: string): void {
   rtl.fireEvent.change(element, { target: { value } });
 }
 
-/** Exactly `max` characters in `element` lets Send through; one more holds it. */
+/** Exactly `max` characters in `element` lets Send through; one more holds it and says why. */
 async function assertLengthBound(element: HTMLElement, max: number, char = 'x'): Promise<void> {
+  const reason = `Limited to ${max} characters (${max + 1} now).`;
   setValue(element, char.repeat(max));
   await rtl.waitFor(() => assert.equal(sendMessageButton().disabled, false));
+  assert.equal(rtl.screen.queryByText(reason), null);
   setValue(element, char.repeat(max + 1));
   assert.equal(sendMessageButton().disabled, true);
+  rtl.screen.getByText(reason);
   setValue(element, char.repeat(max));
 }
 

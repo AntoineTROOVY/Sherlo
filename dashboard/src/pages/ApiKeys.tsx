@@ -316,7 +316,8 @@ export function ApiKeys() {
   // The gateway takes a name of 3 to 100 characters, counted the way its validators count them (an
   // emoji is one); Create is held outside that range.
   const nameTooShort = captionLength(newKey.name.trim()) < 3;
-  const nameTooLong = [...newKey.name].length > 100;
+  const nameLength = [...newKey.name].length;
+  const nameTooLong = nameLength > 100;
   const canCreate =
     !createMutation.isPending && !nameTooShort && !nameTooLong && newErrors.ip === null && newErrors.chat === null;
   const canSave = !updateMutation.isPending && editErrors?.ip === null && editErrors.chat === null;
@@ -577,6 +578,9 @@ export function ApiKeys() {
               />
               {newKey.name.length > 0 && nameTooShort && (
                 <span className="key-field-hint">{t('apiKeys.nameTooShort')}</span>
+              )}
+              {nameTooLong && (
+                <span className="key-field-hint">{t('common.fieldTooLong', { max: 100, count: nameLength })}</span>
               )}
               <label htmlFor="ak-2">{t('common.role')}</label>
               <select

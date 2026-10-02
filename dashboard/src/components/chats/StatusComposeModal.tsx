@@ -132,6 +132,8 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
     reader.readAsDataURL(file);
   };
 
+  const composeTextLength = captionLength(composeText.trim());
+  const composeCaptionLength = captionLength(composeCaption.trim());
   const composeCanSubmit =
     Boolean(sessionId) &&
     !composePosting &&
@@ -141,9 +143,7 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
     (composeType === 'text' ? composeText.trim().length > 0 : Boolean(composeImageBase64 || composeImageUrl.trim())) &&
     // Bounded here rather than by a native maxLength, which counts UTF-16 units and would cut pasted
     // emoji the gateway accepts: it counts an astral character as one.
-    (composeType === 'text'
-      ? captionLength(composeText.trim()) <= 4096
-      : captionLength(composeCaption.trim()) <= 1024) &&
+    (composeType === 'text' ? composeTextLength <= 4096 : composeCaptionLength <= 1024) &&
     (!isBaileysEngine || composeRecipients.length > 0);
 
   const handleComposeSubmit = async () => {
@@ -218,6 +218,11 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
               onChange={e => setComposeText(e.target.value)}
               placeholder={t('chats.status.composeText')}
             />
+            {composeTextLength > 4096 && (
+              <p className="input-hint" role="status">
+                {t('common.fieldTooLong', { max: 4096, count: composeTextLength })}
+              </p>
+            )}
           </div>
           <div className="compose-row">
             <div className="compose-field">
@@ -275,6 +280,11 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
               value={composeCaption}
               onChange={e => setComposeCaption(e.target.value)}
             />
+            {composeCaptionLength > 1024 && (
+              <p className="input-hint" role="status">
+                {t('common.fieldTooLong', { max: 1024, count: composeCaptionLength })}
+              </p>
+            )}
           </div>
         </>
       )}

@@ -36,6 +36,7 @@
     "hoursAgo": "{{count}} గంట క్రితం",
     "hoursAgo_other": "{{count}} గంటల క్రితం",
     "optional": "ఐచ్ఛికం",
+    "fieldTooLong": "పరిమితి {{max}} అక్షరాలు (ప్రస్తుతం {{count}}).",
     "language": "భాష",
     "back": "వెనుకకు",
     "next": "తరువాత",
