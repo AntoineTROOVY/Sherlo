@@ -1169,7 +1169,11 @@ export interface SendTextStatusRequest {
 export interface StatusMediaInput {
   url?: string;
   base64?: string;
-  /** Optional explicit mimetype (inferred from URL/bytes when omitted). */
+  /**
+   * MIME type of the media. When omitted the server uses the route's default (`image/jpeg`, `video/mp4` or
+   * `audio/ogg; codecs=opus`), which also overrides a URL's Content-Type; the bytes are never inspected. Set
+   * it for base64 and for any media of another type.
+   */
   mimetype?: string;
 }
 
