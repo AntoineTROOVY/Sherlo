@@ -888,7 +888,7 @@
       "sslRejectUnauthorized": "Verificar certificado SSL",
       "sslRejectUnauthorizedDesc": "Rechazar certificados autofirmados o no válidos. Desactívalo para Postgres gestionado con certificados autofirmados (Supabase, Heroku, Render, Railway).",
       "migrationsTitle": "Migraciones de la base de datos",
-      "migrationsStatus": "El esquema se sincroniza automáticamente con TypeORM",
+      "migrationsStatus": "Las migraciones pendientes se aplican automáticamente al iniciar",
       "migrationsHint": "Las migraciones se gestionan automáticamente. Usa la CLI para migraciones manuales."
     },
     "engine": {

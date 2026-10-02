@@ -882,7 +882,7 @@
       "sslRejectUnauthorized": "SSL प्रमाणपत्र सत्यापित करें",
       "sslRejectUnauthorizedDesc": "स्व-हस्ताक्षरित या अमान्य प्रमाणपत्र अस्वीकार करें। स्व-हस्ताक्षरित प्रमाणपत्रों (Supabase, Heroku, Render, Railway) के साथ प्रबंधित Postgres के लिए बंद करें।",
       "migrationsTitle": "डेटाबेस माइग्रेशन",
-      "migrationsStatus": "स्कीमा TypeORM के साथ स्वतः-सिंक्रनाइज़ है",
+      "migrationsStatus": "लंबित माइग्रेशन स्टार्टअप पर स्वतः लागू होते हैं",
       "migrationsHint": "माइग्रेशन स्वचालित रूप से प्रबंधित किए जाते हैं। मैनुअल माइग्रेशन के लिए CLI का उपयोग करें।"
     },
     "engine": {

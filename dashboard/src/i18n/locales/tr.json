@@ -882,7 +882,7 @@
       "sslRejectUnauthorized": "SSL Sertifikasını Doğrula",
       "sslRejectUnauthorizedDesc": "Kendinden imzalı veya geçersiz sertifikaları reddeder. Kendinden imzalı sertifikalara sahip yönetilen Postgres için kapatın (Supabase, Heroku, Render, Railway).",
       "migrationsTitle": "Veritabanı Geçişleri (Migrations)",
-      "migrationsStatus": "Şema, TypeORM ile otomatik olarak senkronize edilir",
+      "migrationsStatus": "Bekleyen geçişler başlangıçta otomatik olarak uygulanır",
       "migrationsHint": "Geçişler otomatik olarak yönetilir. Manuel geçişler için CLI kullanın."
     },
     "engine": {

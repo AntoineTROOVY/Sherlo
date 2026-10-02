@@ -882,7 +882,7 @@
       "sslRejectUnauthorized": "SSL 인증서 확인",
       "sslRejectUnauthorizedDesc": "자체 서명되었거나 유효하지 않은 인증서를 거부합니다. 자체 서명 인증서를 사용하는 관리형 Postgres(Supabase, Heroku, Render, Railway)에서는 꺼 두세요.",
       "migrationsTitle": "데이터베이스 마이그레이션",
-      "migrationsStatus": "스키마는 TypeORM으로 자동 동기화됩니다",
+      "migrationsStatus": "대기 중인 마이그레이션은 시작 시 자동으로 적용됩니다",
       "migrationsHint": "마이그레이션은 자동으로 관리됩니다. 수동 마이그레이션은 CLI를 사용하세요."
     },
     "engine": {

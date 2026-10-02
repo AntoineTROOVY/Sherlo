@@ -882,7 +882,7 @@
       "sslRejectUnauthorized": "SSL-Zertifikat überprüfen",
       "sslRejectUnauthorizedDesc": "Selbstsignierte oder ungültige Zertifikate ablehnen. Bei verwaltetem PostgreSQL mit selbstsignierten Zertifikaten deaktivieren (Supabase, Heroku, Render, Railway).",
       "migrationsTitle": "Datenbankmigrationen",
-      "migrationsStatus": "Das Schema wird automatisch mit TypeORM synchronisiert",
+      "migrationsStatus": "Ausstehende Migrationen werden beim Start automatisch angewendet",
       "migrationsHint": "Migrationen werden automatisch verwaltet. Verwende die CLI für manuelle Migrationen."
     },
     "engine": {

@@ -907,7 +907,7 @@
       "sslRejectUnauthorized": "التحقق من شهادة SSL",
       "sslRejectUnauthorizedDesc": "رفض الشهادات الموقّعة ذاتيًا أو غير الصالحة. أوقفه لقواعد بيانات Postgres المُدارة ذات الشهادات الموقّعة ذاتيًا (Supabase وHeroku وRender وRailway).",
       "migrationsTitle": "ترحيل قاعدة البيانات",
-      "migrationsStatus": "يتم مزامنة المخطط تلقائياً مع TypeORM",
+      "migrationsStatus": "تُطبَّق عمليات الترحيل المعلّقة تلقائياً عند بدء التشغيل",
       "migrationsHint": "تُدار عمليات الترحيل تلقائياً. استخدم CLI للترحيل اليدوي."
     },
     "engine": {

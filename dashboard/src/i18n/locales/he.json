@@ -895,7 +895,7 @@
       "sslRejectUnauthorized": "אימות תעודת SSL",
       "sslRejectUnauthorizedDesc": "דחיית תעודות בחתימה עצמית או לא תקפות. כבה עבור Postgres מנוהל עם תעודות בחתימה עצמית (Supabase, Heroku, Render, Railway).",
       "migrationsTitle": "Migrations של מסד הנתונים",
-      "migrationsStatus": "הסכמה מסונכרנת אוטומטית עם TypeORM",
+      "migrationsStatus": "Migrations ממתינים מוחלים אוטומטית בעת ההפעלה",
       "migrationsHint": "ה-Migrations מנוהלים אוטומטית. ניתן להשתמש ב-CLI ל-Migrations ידניים."
     },
     "engine": {

@@ -882,7 +882,7 @@
       "sslRejectUnauthorized": "Verifikasi Sertifikat SSL",
       "sslRejectUnauthorizedDesc": "Tolak sertifikat self-signed atau tidak valid. Nonaktifkan untuk Postgres terkelola dengan sertifikat self-signed (Supabase, Heroku, Render, Railway).",
       "migrationsTitle": "Migrasi Database",
-      "migrationsStatus": "Skema disinkronkan otomatis dengan TypeORM",
+      "migrationsStatus": "Migrasi yang tertunda diterapkan otomatis saat startup",
       "migrationsHint": "Migrasi dikelola otomatis. Gunakan CLI untuk migrasi manual."
     },
     "engine": {

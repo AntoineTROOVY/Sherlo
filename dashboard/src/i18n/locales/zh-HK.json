@@ -882,7 +882,7 @@
       "sslRejectUnauthorized": "驗證 SSL 憑證",
       "sslRejectUnauthorizedDesc": "拒絕自簽署或無效的憑證。對於使用自簽署憑證的託管 Postgres（Supabase、Heroku、Render、Railway），請關閉此項。",
       "migrationsTitle": "資料庫遷移",
-      "migrationsStatus": "結構會透過 TypeORM 自動同步",
+      "migrationsStatus": "待處理的遷移會在啟動時自動套用",
       "migrationsHint": "遷移會自動管理。手動遷移請使用 CLI。"
     },
     "engine": {
