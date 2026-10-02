@@ -283,6 +283,28 @@ describe('AutomationRulesService', () => {
       expect(sends).toHaveLength(2);
     });
 
+    it('cooldown: a raised cooldownSeconds survives the sweep of a large cooldown map', async () => {
+      const rule = await service.create('sessA', { name: 'all', replyText: 'ack', cooldownSeconds: 60 });
+      const start = Date.now();
+      const now = jest.spyOn(Date, 'now').mockReturnValue(start);
+      try {
+        await service.evaluateInbound('sessA', inbound());
+        await service.update('sessA', rule.id, { cooldownSeconds: 3600 });
+        // Pad the map past the sweep threshold with copies of the live entry.
+        const cooldowns = (service as unknown as { cooldowns: Map<string, unknown> }).cooldowns;
+        const entry = cooldowns.values().next().value;
+        for (let i = 0; i < 10_000; i++) cooldowns.set(`pad:${i}`, entry);
+        now.mockReturnValue(start + 120_000);
+        // Another chat fires, which sweeps the map before it enters its own cooldown.
+        await service.evaluateInbound('sessA', inbound({ id: 'wamid.2', chatId: '628333@c.us', from: '628333@c.us' }));
+        await service.evaluateInbound('sessA', inbound({ id: 'wamid.3' }));
+      } finally {
+        now.mockRestore();
+      }
+
+      expect(sends.map(s => s.chatId)).toEqual(['628111@c.us', '628333@c.us']);
+    });
+
     it('cooldownSeconds 0 disables the quiet period', async () => {
       await service.create('sessA', { name: 'all', replyText: 'ack', cooldownSeconds: 0 });
 

@@ -10,7 +10,11 @@ import { evaluateFilters } from '../webhook/filters/filter-evaluator';
 import { PLUGIN_MESSAGE_PORT, type PluginMessagePort } from '../../core/plugins/plugin-host-ports';
 import { AutomationRule } from './entities/automation-rule.entity';
 import { Session } from '../session/entities/session.entity';
-import { CreateAutomationRuleDto, UpdateAutomationRuleDto } from './dto/automation-rule.dto';
+import {
+  AUTOMATION_COOLDOWN_MAX_SECONDS,
+  CreateAutomationRuleDto,
+  UpdateAutomationRuleDto,
+} from './dto/automation-rule.dto';
 
 /** Entries above this size trigger a sweep of expired cooldowns before inserting the next one. */
 const COOLDOWN_SWEEP_THRESHOLD = 10_000;
@@ -46,11 +50,11 @@ export class AutomationRulesService {
   private readonly logger = createLogger('AutomationRulesService');
 
   /**
-   * `${ruleId}:${chatId}` -> when the rule last fired in that chat, and the expiry its cooldown at
-   * that time implied. The quiet period is judged against the rule's CURRENT cooldownSeconds, so an
-   * edit takes effect on a window already running; `until` only drives the sweep. Per-process.
+   * `${ruleId}:${chatId}` -> when the rule last fired in that chat. The quiet period is judged against
+   * the rule's CURRENT cooldownSeconds, so an edit takes effect on a window already running; the sweep
+   * only drops an entry older than the longest cooldown a rule may have. Per-process.
    */
-  private readonly cooldowns = new Map<string, { firedAt: number; until: number }>();
+  private readonly cooldowns = new Map<string, number>();
 
   private messagePort?: PluginMessagePort;
 
@@ -234,18 +238,18 @@ export class AutomationRulesService {
 
   private inCooldown(rule: AutomationRule, chatId: string): boolean {
     if (!rule.cooldownSeconds) return false;
-    const entry = this.cooldowns.get(`${rule.id}:${chatId}`);
-    return entry !== undefined && entry.firedAt + rule.cooldownSeconds * 1000 > Date.now();
+    const firedAt = this.cooldowns.get(`${rule.id}:${chatId}`);
+    return firedAt !== undefined && firedAt + rule.cooldownSeconds * 1000 > Date.now();
   }
 
   private enterCooldown(rule: AutomationRule, chatId: string): void {
     if (!rule.cooldownSeconds) return;
     const now = Date.now();
     if (this.cooldowns.size >= COOLDOWN_SWEEP_THRESHOLD) {
-      for (const [key, { until }] of this.cooldowns) {
-        if (until <= now) this.cooldowns.delete(key);
+      for (const [key, firedAt] of this.cooldowns) {
+        if (firedAt + AUTOMATION_COOLDOWN_MAX_SECONDS * 1000 <= now) this.cooldowns.delete(key);
       }
     }
-    this.cooldowns.set(`${rule.id}:${chatId}`, { firedAt: now, until: now + rule.cooldownSeconds * 1000 });
+    this.cooldowns.set(`${rule.id}:${chatId}`, now);
   }
 }
