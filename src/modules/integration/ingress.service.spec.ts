@@ -152,13 +152,12 @@ describe('IngressService.handle', () => {
   it('persists the request method so a replay keeps it', async () => {
     const d = deps();
     await new IngressService(d).handle({ ...req, method: 'PUT' });
-    expect(d.events.recordOrSkip).toHaveBeenCalledWith(
-      expect.objectContaining({ payload: expect.objectContaining({ method: 'PUT' }) }),
-    );
-    expect(d.enqueue).toHaveBeenCalledWith(
-      expect.objectContaining({ method: 'PUT', payload: expect.not.objectContaining({ method: 'PUT' }) }),
-      'd1',
-    );
+    const [recorded] = d.events.recordOrSkip.mock.calls[0] as [{ payload: { method?: string } }];
+    expect(recorded.payload.method).toBe('PUT');
+    // The job carries the method at its top level; its payload stays the plain request shape.
+    const [job] = d.enqueue.mock.calls[0] as [{ method: string; payload: { method?: string } }];
+    expect(job.method).toBe('PUT');
+    expect(job.payload.method).toBeUndefined();
   });
 
   // A body no parser read would be handled as the empty body: it passes a header-only scheme, and every
