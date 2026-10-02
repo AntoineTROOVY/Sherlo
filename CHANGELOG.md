@@ -197,6 +197,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Startup no longer logs a `LegacyRouteConverter` warning for `/api/*`.
 - MCP no longer logs an info line on every request, and logs a tool call refused with a `4xx` as a one-line warning instead of an error with a stack.
 - Video conversion no longer fails on an odd-width input such as a GIF, and fits its output inside 1280x720, or 720x1280 for portrait, so square and 4:3 inputs also stay within the H.264 level older Android clients play.
+- Media conversion answers `503` instead of `400` when ffmpeg cannot be started, and a failed ffmpeg availability check is retried on the next call instead of disabling conversion until a restart.
 - A plugin search provider's fractional `tookMs`, `total` or hit `timestamp` is returned as a whole number, so the Go and Java SDKs can decode the search reply.
 - `GET /api/infra/export-data` and `POST /api/infra/import-data` answer `409` while the other runs; on SQLite an export taken during an import could archive a half-restored database.
 - A data export taken while a session is being created no longer produces a backup whose restore rolls back on an orphaned child row.
