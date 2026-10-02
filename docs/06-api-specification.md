@@ -1636,8 +1636,8 @@ by stored sends lasts until the next UTC day. Do not retry a `SEND_PACING_LIMITE
 A chat send (not an edit) also counts toward both caps before its row lands, so parallel sends cannot
 together pass them. A single send, which writes its row before WhatsApp is asked, is held for 10 seconds
 from its admission. A bulk item or product send is held while it is in flight (at most 5 minutes) and
-for 10 seconds after, or for as long as a send admitted while it was in flight is still held, if that
-is longer. A send that fails before WhatsApp may have taken it hands its place back at once. A daily or
+for 10 seconds after. A held send also stays held for as long as any send admitted after it is still
+held. A send that fails before WhatsApp may have taken it hands its place back at once. A daily or
 cold-reachout refusal can therefore come while the stored count is still under the cap; when only such
 held sends push it over, including for the group participant adds below, its `retryAfterSeconds` is 10
 or less instead of the time to the next UTC day; while a held send is still in flight or holding, a
