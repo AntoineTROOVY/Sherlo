@@ -629,8 +629,9 @@ curl -H "X-API-Key: $API_KEY" http://localhost:2785/api/health
 
 **Trigger:** Daily schedule, before maintenance, before upgrade
 
-**Impact:** None for the databases, which are snapshotted consistently online (`sqlite3 .backup`,
-`pg_dump`). Engine authentication state (`sessions/`, `baileys/`) is copied while the engines write
+**Impact:** The databases are snapshotted consistently online (`sqlite3 .backup`, `pg_dump`). On
+SQLite, app writes wait while each database file is copied, and fail if the copy outlasts their 30 s
+busy timeout. Engine authentication state (`sessions/`, `baileys/`) is copied while the engines write
 it, so a restored session can need re-pairing; for a copy that is consistent by construction, stop
 the sessions first (`POST /api/sessions/:id/stop`), or stop the container and archive the volume.
 A stopped session stays down across restarts, even with `AUTO_START_SESSIONS=true`, so start each
