@@ -7934,7 +7934,7 @@
             }
           },
           "409": {
-            "description": "Refused, with the reason in `code`. IMPORT_ALREADY_RUNNING: another import is running — wait for it. EXPORT_IN_PROGRESS: a data export is running; wait for it. IMPORT_NESTED_TRANSACTION: another database transaction holds this connection, so a restore could not be made durable — retry with nothing else in flight. IMPORT_WOULD_ORPHAN_ENGINES: live engines exist for sessions the backup would remove — retry with stopOrphans=true to stop them in-request, or force=true to proceed and restart after. Only the last of these is retryable with stopOrphans; the others leave nothing to decide",
+            "description": "Refused, with the reason in `code`. IMPORT_ALREADY_RUNNING: another import is running — wait for it. EXPORT_IN_PROGRESS: a data export is running; wait for it. IMPORT_NESTED_TRANSACTION: another database transaction holds this connection, so a restore could not be made durable — retry with nothing else in flight. IMPORT_WOULD_ORPHAN_ENGINES: sessions the backup would remove are running, starting or waiting to relaunch here — retry with stopOrphans=true to stop them in-request, or force=true to proceed and restart after. Only the last of these is retryable with stopOrphans; the others leave nothing to decide",
             "content": {
               "application/json": {
                 "schema": {
@@ -8854,7 +8854,7 @@
             }
           },
           "503": {
-            "description": "WhatsApp did not answer the lookup. Deliberately not reported as `url: null` — that is the same answer a contact with no picture gives, and a caller cannot tell them apart. On Baileys, also answered when WhatsApp rate-limits or times out the lookup (code 429 or 408); retry after a pause.",
+            "description": "WhatsApp did not answer the lookup. Deliberately not reported as `url: null` — that is the same answer a contact with no picture gives, and a caller cannot tell them apart. On Baileys, also answered when WhatsApp rate-limits, times out or fails on its side (code 429, 408 or 5xx); retry after a pause.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9511,7 +9511,7 @@
             }
           },
           "503": {
-            "description": "WhatsApp did not answer within the request budget — nothing could be read. On Baileys, also answered when WhatsApp rate-limits or times out the request (code 429 or 408); retry after a pause.",
+            "description": "WhatsApp did not answer within the request budget — nothing could be read. On Baileys, also answered when WhatsApp rate-limits or times out the request (code 429 or 408); retry after a pause. On Baileys, a WhatsApp server error (5xx) on the lookup also answers 503.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11691,16 +11691,6 @@
                 }
               }
             }
-          },
-          "503": {
-            "description": "Baileys only: WhatsApp did not answer within the request budget. A link may or may not have been minted, so a retry can create a second one.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "summary": "Generate a shareable WhatsApp call link",
@@ -13370,7 +13360,7 @@
             }
           },
           "404": {
-            "description": "No such channel — the id is not among the session's subscribed channels, either because it is wrong or because the channel has not synced into the local collection yet.",
+            "description": "The id is not a channel id (it does not end in `@newsletter`). Retrying the same id cannot succeed. On whatsapp-web.js, also answered for a channel id that is not among the session's subscribed channels or has not synced into the local collection yet.",
             "content": {
               "application/json": {
                 "schema": {
@@ -16320,6 +16310,9 @@
           "202": {
             "description": "Webhook accepted and queued for async plugin processing (the primary success path)."
           },
+          "400": {
+            "description": "The path or query contains an encoded NUL (`%00`), or a JSON body does not parse."
+          },
           "401": {
             "description": "Signature verification failed (missing, stale, or wrong secret)."
           },
@@ -16383,6 +16376,9 @@
           },
           "202": {
             "description": "Webhook accepted and queued for async plugin processing (the primary success path)."
+          },
+          "400": {
+            "description": "The path or query contains an encoded NUL (`%00`), or a JSON body does not parse."
           },
           "401": {
             "description": "Signature verification failed (missing, stale, or wrong secret)."
@@ -16448,6 +16444,9 @@
           "202": {
             "description": "Webhook accepted and queued for async plugin processing (the primary success path)."
           },
+          "400": {
+            "description": "The path or query contains an encoded NUL (`%00`), or a JSON body does not parse."
+          },
           "401": {
             "description": "Signature verification failed (missing, stale, or wrong secret)."
           },
@@ -16511,6 +16510,9 @@
           },
           "202": {
             "description": "Webhook accepted and queued for async plugin processing (the primary success path)."
+          },
+          "400": {
+            "description": "The path or query contains an encoded NUL (`%00`), or a JSON body does not parse."
           },
           "401": {
             "description": "Signature verification failed (missing, stale, or wrong secret)."
@@ -16576,6 +16578,9 @@
           "202": {
             "description": "Webhook accepted and queued for async plugin processing (the primary success path)."
           },
+          "400": {
+            "description": "The path or query contains an encoded NUL (`%00`), or a JSON body does not parse."
+          },
           "401": {
             "description": "Signature verification failed (missing, stale, or wrong secret)."
           },
@@ -16640,6 +16645,9 @@
           "202": {
             "description": "Webhook accepted and queued for async plugin processing (the primary success path)."
           },
+          "400": {
+            "description": "The path or query contains an encoded NUL (`%00`), or a JSON body does not parse."
+          },
           "401": {
             "description": "Signature verification failed (missing, stale, or wrong secret)."
           },
@@ -16703,6 +16711,9 @@
           },
           "202": {
             "description": "Webhook accepted and queued for async plugin processing (the primary success path)."
+          },
+          "400": {
+            "description": "The path or query contains an encoded NUL (`%00`), or a JSON body does not parse."
           },
           "401": {
             "description": "Signature verification failed (missing, stale, or wrong secret)."
