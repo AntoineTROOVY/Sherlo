@@ -18,8 +18,8 @@ import { createLogger } from '../../common/services/logger.service';
 import { resolveNonNegativeIntEnv } from '../../config/configuration';
 
 export interface IngressReconcilerOptions {
-  // Sweep cadence. 0 disables the reconciler. A blank or otherwise unparseable value falls back to
-  // the default rather than disabling the sweep, so a mis-set variable can never silently turn it off.
+  // Sweep cadence. 0 disables the reconciler. A blank value falls back to the default; boot validation
+  // refuses a negative or unparseable one, so a mis-set variable can never silently turn it off.
   intervalMs: number;
   // A 'pending' row only becomes sweep-eligible once its last activity (creation or latest attempt)
   // is older than this — the live path gets the whole window to record its own outcome first.
