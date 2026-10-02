@@ -318,7 +318,7 @@ The windows above run at the routing layer, after a request body has been buffer
 
 ### WebSocket (`/events`) limits
 
-Socket.IO frames never pass through the Nest enhancer pipeline, so the HTTP windows above do **not** apply to the WebSocket surface. `EventsGateway` enforces its own in-process limits instead (all keyed in-memory per process; any blank/non-positive/non-numeric env value falls back to the default):
+Socket.IO frames never pass through the Nest enhancer pipeline, so the HTTP windows above do **not** apply to the WebSocket surface. `EventsGateway` enforces its own in-process limits instead (all keyed in-memory per process; a blank env value falls back to the default, and one that is not a positive integer fails the boot):
 
 | Limit                                                               | Keyed on                                                        | Default                                | Env overrides                                                       |
 | ------------------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------- |
