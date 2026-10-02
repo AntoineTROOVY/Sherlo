@@ -32,6 +32,7 @@ import {
   GROUP_NOT_FOUND_404,
   MEDIA_TOO_LARGE_413,
   MEDIA_URL_PROXY_503,
+  SESSION_NOT_STARTED_400,
 } from '../../common/openapi/engine-status-responses';
 
 // Reading an invite code is admin-only, but the groups list returns every group the account
@@ -54,9 +55,6 @@ const PARTICIPANT_ID_400 =
 
 // EngineRegistry.require() answers 400 for a session with no engine; ENGINE_NOT_READY_409 covers only
 // an engine that exists but is not ready. The body variant is for routes that also validate a DTO.
-const SESSION_NOT_STARTED_400 =
-  'The session is not started: no engine is running for it (never started, stopped, or logged out). ' +
-  'Start the session and retry.';
 const BODY_OR_SESSION_400 = 'The body failed validation, or the session is not started (no engine is running for it).';
 
 // NOTE: the session→groups LIST lives on the SessionController at GET /sessions/:sessionId/groups (it
