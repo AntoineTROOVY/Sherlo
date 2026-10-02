@@ -445,6 +445,14 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
     sql: `INSERT INTO automation_rules (id, "sessionId", name, enabled, conditions, "replyText", "cooldownSeconds", "createdAt", "updatedAt")
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
     id: (rule: AutomationRuleRow) => rule.id,
+    // This path bypasses the rule DTOs. A conditions value without a conditions array matches every
+    // inbound message, so a malformed one stored verbatim would autoreply to every contact; veto the
+    // row with a warning, like the webhooks guard.
+    skip: (rule: AutomationRuleRow) => {
+      const errors = collectFilterErrors(decodeJsonColumn(rule.conditions));
+      if (errors.length === 0) return null;
+      return `Skipped automation rule ${rule.id}: invalid conditions (${errors.join('; ')})`;
+    },
     map: (rule: AutomationRuleRow) => [
       rule.id,
       rule.sessionId,

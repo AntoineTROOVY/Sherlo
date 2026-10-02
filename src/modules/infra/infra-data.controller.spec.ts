@@ -2261,7 +2261,7 @@ describe('InfraDataController.importData status_updates + runtime reconciliation
         sessionId: 's1',
         name: 'office hours',
         enabled: true,
-        conditions: { bodyContains: ['hello'] } as never,
+        conditions: { conditions: [{ field: 'body', operator: 'contains', value: 'hello' }] },
         replyText: 'We are closed',
         cooldownSeconds: 120,
       }),
@@ -2280,7 +2280,7 @@ describe('InfraDataController.importData status_updates + runtime reconciliation
     expect(restored.replyText).toBe('We are closed');
     expect(restored.cooldownSeconds).toBe(120);
     expect(restored.enabled).toBe(true);
-    expect(restored.conditions).toEqual({ bodyContains: ['hello'] });
+    expect(restored.conditions).toEqual({ conditions: [{ field: 'body', operator: 'contains', value: 'hello' }] });
   });
 
   it('exports and restores status_updates (the table the docs promise is covered)', async () => {

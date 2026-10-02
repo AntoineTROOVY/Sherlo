@@ -77,3 +77,31 @@ describe('webhooks table importer', () => {
     },
   );
 });
+
+/**
+ * A restore bypasses the automation rule DTOs. A conditions value without a conditions array matches
+ * every inbound message, so a malformed one stored verbatim would autoreply to every contact.
+ */
+describe('automationRules table importer', () => {
+  const automationRules = TABLE_IMPORTERS.find(importer => importer.key === 'automationRules');
+  const skip = (overrides: Record<string, unknown>) =>
+    automationRules?.skip?.({ id: 'rule-1', conditions: null, ...overrides } as never);
+  const chatCondition = { conditions: [{ field: 'isGroup', operator: 'is', value: false }] };
+
+  it('accepts no conditions, or conditions in either decoded or JSON-text form', () => {
+    expect(skip({})).toBeNull();
+    expect(skip({ conditions: undefined })).toBeNull();
+    expect(skip({ conditions: chatCondition })).toBeNull();
+    expect(skip({ conditions: JSON.stringify(chatCondition) })).toBeNull();
+  });
+
+  it.each([
+    [{ condition: [] }],
+    [{ conditions: 'x' }],
+    [{ conditions: [null] }],
+    ['not json'],
+    [{ conditions: [{ field: 'nope', operator: 'is' }] }],
+  ])('skips a row whose conditions is %j', conditions => {
+    expect(skip({ conditions })).toMatch(/Skipped automation rule rule-1: invalid conditions/);
+  });
+});
