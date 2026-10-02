@@ -109,7 +109,8 @@ curl -X POST "$BASE/api/sessions" \
 
 With an optional per-session egress proxy — only if your network can't reach WhatsApp directly. The
 proxy **must be a real, reachable host**; an unreachable value silently blocks the WhatsApp WebSocket
-(no QR is ever delivered) and `POST /api/sessions/:sessionId/start` returns `504` after ~30s.
+(no QR is ever delivered): on whatsapp-web.js `POST /api/sessions/:sessionId/start` returns `504`
+after ~30s; on Baileys the start succeeds and the session keeps retrying.
 
 Setting `proxyUrl` requires an unscoped ADMIN key; any other key gets `403`.
 
