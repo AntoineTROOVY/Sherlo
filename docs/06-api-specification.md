@@ -7178,7 +7178,7 @@ Every delivery includes:
 - `call.received`: `call_{sessionId}_{callId}` (a call id is unique per call, so no `occurredAt` salt)
 - `call.accepted` / `call.rejected` / `call.missed`: `call_{sessionId}_{callId}_{outcome}` (each call ends once, so no `occurredAt` salt)
 - `session.restriction`: `restr_{sessionId}_{kind}_{active}_{occurredAt}`
-- `presence.update`: `pres_{sessionId}_{chatId}_{occurredAt}`
+- `presence.update`: `pres_{sessionId}_{chatId}_{hash(participants)}_{occurredAt}`
 - any other event (for example `status.received`): `evt_{event with . replaced by _}_{hash(data)}`
 
 Recurring lifecycle events (and `message.reaction` / `message.edited` / `presence.update`) carry the same content across occurrences — the same phone on every reconnect, a constant disconnect reason, a re-applied emoji, or editing the same message multiple times — so they are salted with an `occurredAt` timestamp captured **once per dispatch and reused across that dispatch's retries**. This gives distinct occurrences distinct keys while keeping retries of one occurrence stable. Message keys are scoped by `sessionId` because WhatsApp message ids are unique per account, not globally.
