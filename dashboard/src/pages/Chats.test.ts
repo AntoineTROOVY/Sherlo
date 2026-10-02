@@ -524,7 +524,7 @@ test('status compose modal posts a text status with the baileys recipient allow-
 
   // Success path: the modal closes and onPosted refetches the status list (one GET from the
   // tab switch, one from the refetch).
-  await waitFor(() => assert.equal(screen.queryByRole('dialog'), null));
+  await waitFor(() => assert.equal(screen.queryByRole('dialog') === null, true));
   await waitFor(() => {
     assert.ok(
       countFetchCalls('GET', `/api/sessions/${SESSION.id}/status`) >= 2,
@@ -576,7 +576,7 @@ test('a typed draft survives closing and reopening the room', async () => {
 
   // Close the room with the back button (aria-label = common.back); the composer unmounts.
   fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-  assert.equal(screen.queryByRole('button', { name: 'Back' }), null);
+  assert.equal(screen.queryByRole('button', { name: 'Back' }) === null, true);
 
   // Reopen the same chat (room closed → 'Alice' matches only the sidebar row): the draft must
   // still be in the input — the page owns messageInput precisely so it survives this round trip.
@@ -602,12 +602,16 @@ test('Escape dismisses the emoji picker instead of the conversation behind it', 
   // inside the picker, so a handler bound to the picker element would never see this event. One
   // press must do both things, dismiss the picker and leave the conversation open.
   fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => assert.equal(container.querySelector('.chats-emoji-picker'), null, 'the picker stayed open'));
+  await waitFor(() =>
+    assert.equal(container.querySelector('.chats-emoji-picker') === null, true, 'the picker stayed open'),
+  );
   assert.ok(screen.queryByRole('button', { name: 'Back' }), 'Escape closed the room while the picker owned it');
 
   // With the picker gone the key belongs to the room again, which is what it must not keep.
   fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => assert.equal(screen.queryByRole('button', { name: 'Back' }), null, 'the room stayed open'));
+  await waitFor(() =>
+    assert.equal(screen.queryByRole('button', { name: 'Back' }) === null, true, 'the room stayed open'),
+  );
 });
 
 test('the emoji picker yields Escape to a surface layered above it', async () => {
@@ -640,7 +644,9 @@ test('the emoji picker yields Escape to a surface layered above it', async () =>
 
   // And once that surface is gone the picker answers again.
   fireEvent.keyDown(document, { key: 'Escape' });
-  await waitFor(() => assert.equal(container.querySelector('.chats-emoji-picker'), null, 'the picker stayed open'));
+  await waitFor(() =>
+    assert.equal(container.querySelector('.chats-emoji-picker') === null, true, 'the picker stayed open'),
+  );
 });
 
 test('Escape closes the open room, and is left alone while a dialog owns it', async () => {
@@ -663,7 +669,7 @@ test('Escape closes the open room, and is left alone while a dialog owns it', as
   dialog.remove();
   fireEvent.keyDown(document, { key: 'Escape' });
   await waitFor(() =>
-    assert.equal(screen.queryByRole('button', { name: 'Back' }), null, 'Escape did not close the room'),
+    assert.equal(screen.queryByRole('button', { name: 'Back' }) === null, true, 'Escape did not close the room'),
   );
 });
 
@@ -734,7 +740,7 @@ test('an operator key on whatsapp-web.js posts a status without the admin-only e
     const postButton = within(dialog).getByRole('button', { name: 'Post' }) as HTMLButtonElement;
     await waitFor(() => assert.equal(postButton.disabled, false, 'Post never enabled for an operator key'));
     // whatsapp-web.js has no recipient list, so the picker stays hidden and none are sent.
-    assert.equal(within(dialog).queryByRole('checkbox'), null);
+    assert.equal(within(dialog).queryByRole('checkbox') === null, true);
     fireEvent.click(postButton);
 
     await waitFor(() => {
@@ -758,7 +764,7 @@ test('an operator key on whatsapp-web.js lists its channels', async () => {
     await screen.findByText('Main (15551234567)');
     fireEvent.click(screen.getByRole('tab', { name: 'Channels' }));
     await screen.findByText(CHANNEL.name);
-    assert.equal(screen.queryByText('Channels are not supported on the Baileys engine.'), null);
+    assert.equal(screen.queryByText('Channels are not supported on the Baileys engine.') === null, true);
   } finally {
     window.sessionStorage.setItem('openwa_user_role', 'admin');
     window.sessionStorage.setItem('openwa_engine_type', 'baileys');
@@ -1246,7 +1252,7 @@ test('a staged attachment survives closing and reopening the same room', async (
 
   // Close the room: ChatComposer unmounts, so the file only survives because the page owns it.
   fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-  assert.equal(container.querySelector('.attachment-preview-banner'), null);
+  assert.equal(container.querySelector('.attachment-preview-banner') === null, true);
 
   fireEvent.click(screen.getByText('Alice'));
   await within(container.querySelector('.room-messages') as HTMLElement).findByText('hello from alice');
@@ -1277,7 +1283,11 @@ test('text typed with an audio attachment stays in the input instead of showing 
   await flush();
 
   assert.equal(input.value, 'not a caption', 'the text that was not sent was cleared');
-  assert.equal(within(thread).queryByText('not a caption'), null, 'the audio bubble shows text that was never sent');
+  assert.equal(
+    within(thread).queryByText('not a caption') === null,
+    true,
+    'the audio bubble shows text that was never sent',
+  );
 });
 
 test('sends answered with no message id each keep their own bubble', async () => {
@@ -1400,8 +1410,8 @@ test('a staged attachment is dropped when a different chat is opened', async () 
   fireEvent.click(screen.getByText('Carol'));
   await within(container.querySelector('.room-header') as HTMLElement).findByText('Carol');
   assert.equal(
-    container.querySelector('.attachment-preview-banner'),
-    null,
+    container.querySelector('.attachment-preview-banner') === null,
+    true,
     "Alice's attachment followed the user into Carol's room",
   );
 });
@@ -1465,7 +1475,7 @@ async function reopenAfterSessionSwitch(): Promise<void> {
     // have missed messages by the time it is selected again.
     selectSession(SESSION_2.id);
     await screen.findByText('Carol');
-    await waitFor(() => assert.equal(screen.queryByText('Alice'), null));
+    await waitFor(() => assert.equal(screen.queryByText('Alice') === null, true));
     selectSession(SESSION.id);
     fireEvent.click(await screen.findByText('Alice'));
     await within(container.querySelector('.room-messages') as HTMLElement).findByText('hello from alice');
@@ -1527,7 +1537,7 @@ test('a staged reply is dropped when another session is opened', async () => {
     fireEvent.change(container.querySelector('select.session-selector') as HTMLSelectElement, {
       target: { value: SESSION_2.id },
     });
-    await waitFor(() => assert.equal(container.querySelector('.room-header'), null));
+    await waitFor(() => assert.equal(container.querySelector('.room-header') === null, true));
     fireEvent.click(await screen.findByText('Alice'));
     await within(container.querySelector('.room-header') as HTMLElement).findByText('Alice');
     assert.equal(
@@ -1638,7 +1648,11 @@ test("a chat list that answers after a switch leaves the new session's spinner u
 
     releaseSecond();
     await screen.findByText('Carol');
-    assert.equal(container.querySelector('.chats-list-loading'), null, 'the list stayed on the loading spinner');
+    assert.equal(
+      container.querySelector('.chats-list-loading') === null,
+      true,
+      'the list stayed on the loading spinner',
+    );
   } finally {
     twoSessions = false;
   }
@@ -1697,7 +1711,11 @@ test("a failed background refetch during a session switch keeps the spinner over
 
     releaseSecond();
     await screen.findByText('Carol');
-    assert.equal(container.querySelector('.chats-list-loading'), null, 'the list stayed on the loading spinner');
+    assert.equal(
+      container.querySelector('.chats-list-loading') === null,
+      true,
+      'the list stayed on the loading spinner',
+    );
   } finally {
     twoSessions = false;
   }
@@ -1736,7 +1754,7 @@ test('a chat list refetch lands while a newer one is out, and an older answer ne
   // The first answer is the newest one applied so far, so it lands although newer calls are still out.
   answers[0]();
   await screen.findByText('carol v1');
-  assert.equal(container.querySelector('.chats-list-loading'), null, 'the list stayed on the loading spinner');
+  assert.equal(container.querySelector('.chats-list-loading') === null, true, 'the list stayed on the loading spinner');
 
   answers[2]();
   await screen.findByText('carol v3');
@@ -2040,7 +2058,7 @@ test('a search hit in another session on the chat open in this one opens it ther
     await screen.findByText('Carol');
     const select = container.querySelector('select.session-selector') as HTMLSelectElement;
     fireEvent.change(select, { target: { value: SESSION_2.id } });
-    await waitFor(() => assert.equal(screen.queryByText('Carol'), null));
+    await waitFor(() => assert.equal(screen.queryByText('Carol') === null, true));
     await openAlice();
     fireEvent.change(select, { target: { value: SESSION.id } });
     await screen.findByText('Carol');
@@ -2361,7 +2379,7 @@ test('scrolling to the top of a long thread pulls exactly one older page, then s
   const { container } = renderChats();
 
   const thread = await openPagedChat(container);
-  assert.equal(within(thread).queryByText('paged message 0'), null);
+  assert.equal(within(thread).queryByText('paged message 0') === null, true);
   assert.equal(countFetchCalls('GET', pagedMessagesPath(0)), 1);
 
   makeScrollable(thread, 0);
@@ -2394,8 +2412,12 @@ test('a failed older-page fetch does not blank an already-loaded thread', async 
   // the 100 already-loaded bubbles with the full-screen error placeholder — and the collapsed
   // container could then never regain enough height to retry by scrolling.
   await waitFor(() => assert.ok(within(thread).queryByText('paged message 119')));
-  assert.equal(within(thread).queryByText(/couldn.t load messages/i), null, 'the full-screen error must not render');
-  assert.equal(container.querySelector('.messages-empty'), null, 'the full-screen error must not render');
+  assert.equal(
+    within(thread).queryByText(/couldn.t load messages/i) === null,
+    true,
+    'the full-screen error must not render',
+  );
+  assert.equal(container.querySelector('.messages-empty') === null, true, 'the full-screen error must not render');
 
   // The failure shows inline, where the spinner would have — with a retry hint, since the
   // container never collapsed and scrolling up again is still possible.
@@ -2459,7 +2481,7 @@ test('the reading position is held across the commit that lands an older page', 
 
   releaseOlderPage();
   await within(thread).findByText('paged message 0');
-  await waitFor(() => assert.equal(thread.querySelector('.messages-loading-older'), null));
+  await waitFor(() => assert.equal(thread.querySelector('.messages-loading-older') === null, true));
 
   // The thread grew upward by the new bubbles, so the row the user was reading has to move down by
   // exactly that much. The regression this locks out: measuring the growth on the first commit that
@@ -2487,7 +2509,7 @@ test('leaving without scrolling again restores the corrected position, not the s
 
   releaseOlderPage();
   await within(thread).findByText('paged message 0');
-  await waitFor(() => assert.equal(thread.querySelector('.messages-loading-older'), null));
+  await waitFor(() => assert.equal(thread.querySelector('.messages-loading-older') === null, true));
 
   const corrected = thread.scrollTop;
   assert.ok(corrected > 0, 'expected the older-page correction to have moved scrollTop off 0');

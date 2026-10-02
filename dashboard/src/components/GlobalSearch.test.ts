@@ -197,7 +197,7 @@ test('"more" does not repeat a hit that a newly indexed message pushed onto the 
   await act(async () => pending.get('refund')!(['refund 39'], 41));
   await waitFor(() => assert.ok(screen.queryByText('refund 39')));
   assert.equal(screen.getAllByRole('option').length, 40);
-  assert.equal(screen.queryByRole('button', { name: /41/ }), null, '"more" stayed up after the last page');
+  assert.equal(screen.queryByRole('button', { name: /41/ }) === null, true, '"more" stayed up after the last page');
 });
 
 test('a failed "more" keeps the results already shown and offers the button again', async () => {
@@ -218,7 +218,7 @@ test('a failed "more" keeps the results already shown and offers the button agai
   await waitFor(() => assert.deepEqual(offsets, ['0', '20', '20']));
   await act(async () => pending.get('refund')!(page(20), 40));
   await waitFor(() => assert.equal(screen.getAllByRole('option').length, 40));
-  assert.equal(screen.queryByText('Search failed. Try again.'), null);
+  assert.equal(screen.queryByText('Search failed. Try again.') === null, true);
 });
 
 test('a failed search shows only the error', async () => {
@@ -234,8 +234,8 @@ test('a failed search shows only the error', async () => {
   await act(async () => failing.get('refunds')!(500));
   await screen.findByText('Search failed. Try again.');
   assert.equal(screen.queryAllByRole('option').length, 0, "the previous query's hits stayed on screen");
-  assert.equal(screen.queryByRole('button', { name: more40 }), null);
-  assert.equal(screen.queryByText('No messages found.'), null);
+  assert.equal(screen.queryByRole('button', { name: more40 }) === null, true);
+  assert.equal(screen.queryByText('No messages found.') === null, true);
 });
 
 test('Tab then Enter on "more" keeps the results open and returns focus to the input', async () => {

@@ -225,7 +225,7 @@ test('cancelling a group send stops the groups still waiting', async () => {
   assert.ok(rtl.screen.getByText('1/2 sent'));
   // One of two groups sent is not a success.
   assert.ok(rtl.screen.getByText('Failed'));
-  assert.equal(rtl.screen.queryByText('Success'), null);
+  assert.equal(rtl.screen.queryByText('Success') === null, true);
   assert.equal(window.document.getElementById('mt-2')?.matches(':disabled'), false);
 });
 
@@ -774,7 +774,7 @@ test('a media file that cannot be read is reported and not attached', async () =
     pickMedia(container, new window.File(['x'], 'broken.png', { type: 'image/png' }));
 
     await rtl.screen.findByText('File read failed');
-    assert.equal(rtl.screen.queryByText('broken.png'), null);
+    assert.equal(rtl.screen.queryByText('broken.png') === null, true);
   } finally {
     globalThis.FileReader.prototype.readAsDataURL = readAsDataURL;
   }
@@ -796,7 +796,7 @@ test('a failed sessions read is reported, not shown as "no ready sessions"', asy
   const alert = await rtl.screen.findByRole('alert');
   rtl.within(alert).getByText(/Failed to load data/);
   rtl.within(alert).getByText(/gateway restarting/);
-  assert.equal(rtl.screen.queryByRole('option', { name: 'No ready sessions' }), null);
+  assert.equal(rtl.screen.queryByRole('option', { name: 'No ready sessions' }) === null, true);
 });
 
 test('a failed groups read is reported, not shown as "no groups found"', async () => {
@@ -814,7 +814,7 @@ test('a failed groups read is reported, not shown as "no groups found"', async (
 
   const alert = await rtl.screen.findByRole('alert');
   rtl.within(alert).getByText(/Failed to load data/);
-  assert.equal(rtl.screen.queryByText('No groups found'), null);
+  assert.equal(rtl.screen.queryByText('No groups found') === null, true);
 });
 
 test('Send stays disabled while a batch cancel is in flight, so its answer cannot land on a newer batch', async () => {

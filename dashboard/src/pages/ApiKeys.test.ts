@@ -194,7 +194,7 @@ test('the create modal stays open until the request settles and then shows the s
   fireEvent.click(create);
   const cancel = await screen.findByRole<HTMLButtonElement>('button', { name: 'Cancel' });
   await rtl.waitFor(() => assert.equal(cancel.disabled, true, 'Cancel is live while the key is being created'));
-  assert.equal(screen.queryByRole('button', { name: 'Close' }), null, 'the close button is live mid-request');
+  assert.equal(screen.queryByRole('button', { name: 'Close' }) === null, true, 'the close button is live mid-request');
   fireEvent.keyDown(document, { key: 'Escape' });
   fireEvent.mouseDown(document.querySelector('.modal-overlay') as HTMLElement);
   screen.getByRole('dialog');
@@ -246,7 +246,7 @@ test('switching the new key to admin hides and drops the chat list', async () =>
   fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'root-key' } });
   fireEvent.change(screen.getByLabelText('Chat access (optional)'), { target: { value: '120363000@g.us' } });
   fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'admin' } });
-  assert.equal(screen.queryByLabelText('Chat access (optional)'), null);
+  assert.equal(screen.queryByLabelText('Chat access (optional)') === null, true);
   fireEvent.click(create);
   await waitFor(() => assert.ok(createBody));
   assert.deepEqual(createBody, { name: 'root-key', role: 'admin' });
@@ -282,7 +282,7 @@ test('an active admin key can be edited; a revoked key cannot', async () => {
   assert.equal(rtl.screen.getAllByTitle('Edit access').length, 1);
   rtl.fireEvent.click(rtl.screen.getByTitle('Edit access'));
   // Admin keys stay unscoped in the dashboard: no session or chat fields.
-  assert.equal(rtl.screen.queryByLabelText('Chat access (optional)'), null);
+  assert.equal(rtl.screen.queryByLabelText('Chat access (optional)') === null, true);
   rtl.screen.getByLabelText('Allowed IP addresses (optional)');
 });
 
@@ -303,7 +303,7 @@ test('saving an untouched key sends nothing, even with an expiry and lists set',
     expiresAt: '2027-03-04T05:06:59.000Z',
   });
   rtl.fireEvent.click(save);
-  await rtl.waitFor(() => assert.equal(rtl.screen.queryByRole('button', { name: 'Save' }), null));
+  await rtl.waitFor(() => assert.equal(rtl.screen.queryByRole('button', { name: 'Save' }) === null, true));
   assert.deepEqual(updateBodies, []);
 });
 
@@ -377,7 +377,7 @@ test('editing the key the dashboard is signed in with warns before saving', asyn
   rtl.cleanup();
   window.sessionStorage.setItem('openwa_api_key', 'owa_k1zzXXXXYYYYZZZZ');
   await openEdit(billingBot);
-  assert.equal(rtl.screen.queryByText(/This dashboard is signed in with this key/), null);
+  assert.equal(rtl.screen.queryByText(/This dashboard is signed in with this key/) === null, true);
 });
 
 // A datetime-local with a blank segment reports value '' (as an empty field does) and sets badInput.
@@ -472,7 +472,7 @@ test('Remove expiry appears for a partial expiry typed into an empty field', asy
   assert.deepEqual(updateBodies, []);
   fireEvent.click(screen.getByRole('button', { name: 'Remove expiry' }));
   fireEvent.click(save);
-  await waitFor(() => assert.equal(screen.queryByRole('button', { name: 'Save' }), null));
+  await waitFor(() => assert.equal(screen.queryByRole('button', { name: 'Save' }) === null, true));
   assert.deepEqual(updateBodies, []);
 });
 

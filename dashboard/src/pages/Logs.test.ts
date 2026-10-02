@@ -213,7 +213,11 @@ test('an export stopped by the throttle says to wait, not to narrow the filter',
     fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
     // The walk retries the refused page after one second and after two more before it stops.
     await screen.findByText(/newest 400 entries because the gateway is rate-limiting/, {}, { timeout: 10_000 });
-    assert.equal(screen.queryByText(/Narrow the severity filter/), null, 'the throttle was reported as the row cap');
+    assert.equal(
+      screen.queryByText(/Narrow the severity filter/) === null,
+      true,
+      'the throttle was reported as the row cap',
+    );
     assert.equal(downloads.length, 1, 'the rows fetched before the throttle are still downloaded');
   } finally {
     exportTotal = null;
@@ -247,7 +251,11 @@ test('a truncated export whose search matches nothing names the entries it scann
     fireEvent.change(screen.getByPlaceholderText('Search logs...'), { target: { value: 'no-such-action' } });
     fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
     await screen.findByText(/None of the newest 10,000 entries scanned match the search/, {}, { timeout: 10_000 });
-    assert.equal(screen.queryByText(/The export covers only/), null, 'the warning reads as if a file was produced');
+    assert.equal(
+      screen.queryByText(/The export covers only/) === null,
+      true,
+      'the warning reads as if a file was produced',
+    );
     assert.equal(downloads.length, 0, 'an empty export was downloaded');
   } finally {
     exportTotal = null;

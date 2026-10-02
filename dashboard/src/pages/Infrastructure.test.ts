@@ -477,7 +477,7 @@ test('a failed first /status read shows the status error card and no form', asyn
   renderInfrastructure();
 
   await rtl.screen.findByText(STATUS_LOAD_ERROR);
-  assert.equal(rtl.screen.queryByRole('button', { name: 'Save Configuration' }), null);
+  assert.equal(rtl.screen.queryByRole('button', { name: 'Save Configuration' }) === null, true);
 });
 
 test('a failed background /status refetch keeps the form and the restart modal on screen', async () => {
@@ -495,7 +495,7 @@ test('a failed background /status refetch keeps the form and the restart modal o
   await new Promise(resolve => setTimeout(resolve, 50));
 
   assert.ok(screen.queryByRole('dialog'), 'the restart modal must stay open');
-  assert.equal(screen.queryByText(STATUS_LOAD_ERROR), null);
+  assert.equal(screen.queryByText(STATUS_LOAD_ERROR) === null, true);
   screen.getByRole('button', { name: 'Save Configuration' });
 });
 
@@ -823,7 +823,7 @@ test('a refused restart shows the server reason and never polls readiness', { ti
   // Past the first readiness poll (3s), which a restart assumed to be under way would have sent.
   await new Promise(resolve => setTimeout(resolve, 3500));
   assert.equal(findFetchCall('GET', '/api/health/ready'), undefined);
-  assert.equal(within(dialog).queryByText('Server ready'), null);
+  assert.equal(within(dialog).queryByText('Server ready') === null, true);
 });
 
 test(
@@ -859,8 +859,8 @@ test(
       await within(dialog).findByText(
         'The proxy returned an error before the server answered, so it is not known whether the restart is in progress. Reload in a minute to check.',
       );
-      assert.equal(within(dialog).queryByText('Restart failed'), null);
-      assert.equal(within(dialog).queryByText('HTTP 504'), null);
+      assert.equal(within(dialog).queryByText('Restart failed') === null, true);
+      assert.equal(within(dialog).queryByText('HTTP 504') === null, true);
       assert.ok(within(dialog).getByText('Please wait…'), 'the unknown outcome has no neutral title');
       assert.ok(within(dialog).getByRole('button', { name: 'Reload Page' }), 'no way to reload by hand');
       // Past the first readiness poll (3s) and the reload a confirmed restart schedules 2s after it.
@@ -898,7 +898,7 @@ test('a proxy 502 without a gateway code on the restart request reports an unkno
   await within(dialog).findByText(
     'The proxy returned an error before the server answered, so it is not known whether the restart is in progress. Reload in a minute to check.',
   );
-  assert.equal(within(dialog).queryByText('Restart failed'), null);
+  assert.equal(within(dialog).queryByText('Restart failed') === null, true);
 });
 
 test('a 502 the gateway stamped with a code is a refusal, not an unknown outcome', async () => {
@@ -964,7 +964,10 @@ test(
       await within(dialog).findByText('Server ready', {}, { timeout: 5_000 });
       assert.ok(within(dialog).getByText(failure), 'the orchestration error is not shown');
       assert.ok(within(dialog).getByRole('button', { name: 'Reload Page' }), 'no way to reload after reading');
-      assert.equal(within(dialog).queryByText('Server is back online! The page will reload automatically.'), null);
+      assert.equal(
+        within(dialog).queryByText('Server is back online! The page will reload automatically.') === null,
+        true,
+      );
       // Past the 2s after which a clean restart reloads the page.
       await new Promise(resolve => setTimeout(resolve, 2500));
       assert.deepEqual(navigations, [], 'the page reloaded over the warning');
