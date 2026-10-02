@@ -152,7 +152,7 @@ jest.mock('@whiskeysockets/baileys', () => ({
 }));
 
 import { HttpsProxyAgent } from 'https-proxy-agent';
-import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ForbiddenException, HttpException } from '@nestjs/common';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { Dispatcher1Wrapper } from 'undici';
 import { BaileysAdapter, createProxyAgent } from './baileys.adapter';
@@ -176,7 +176,7 @@ import { ChatLabelsUnsupportedError } from '../../common/errors/chat-labels-unsu
 import { Boom } from '@hapi/boom';
 import { EngineTransportError } from '../../common/errors/engine-transport.error';
 import { LidNotMappedError } from '../../common/errors/lid-not-mapped.error';
-import { countsTowardSendBreaker } from '../../modules/message/send-pacing.service';
+import { countsTowardSendBreaker, sentNothing } from '../../modules/message/send-pacing.service';
 import { loadRemoteMediaBuffer } from '../../common/media/load-remote-media';
 import * as safeLinkPreview from './safe-link-preview';
 
@@ -7363,6 +7363,18 @@ describe('BaileysAdapter catalog (#905)', () => {
 
     expect(error).toBeInstanceOf(ForbiddenException);
     expect(countsTowardSendBreaker(error)).toBe(false);
+    expect(fakeSock.sendMessage).not.toHaveBeenCalled();
+  });
+
+  // The message was never handed to WhatsApp, so a paced send gives its admission back.
+  it('sendProduct answers 503 as nothing sent when the catalog lookup times out', async () => {
+    const adapter = await ready();
+    fakeSock.getCatalog.mockRejectedValue(new Boom('timed out', { data: 408 }));
+
+    const error: unknown = await adapter.sendProduct('628111@s.whatsapp.net', 'p1').catch((e: unknown) => e);
+
+    expect((error as HttpException).getStatus()).toBe(503);
+    expect(sentNothing(error)).toBe(true);
     expect(fakeSock.sendMessage).not.toHaveBeenCalled();
   });
 });

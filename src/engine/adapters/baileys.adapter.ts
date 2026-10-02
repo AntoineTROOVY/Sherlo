@@ -50,6 +50,8 @@ import {
 } from '../interfaces/whatsapp-engine.interface';
 import { EngineNotSupportedError } from '../../common/errors/engine-not-supported.error';
 import { EngineRefusedError } from '../../common/errors/engine-refused.error';
+import { EngineNotSentError } from '../../common/errors/engine-not-sent.error';
+import { EngineTransportError } from '../../common/errors/engine-transport.error';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { createLogger } from '../../common/services/logger.service';
 import { BaileysAdapterConfig } from '../types/baileys.types';
@@ -758,6 +760,8 @@ export class BaileysAdapter implements IWhatsAppEngine {
       // Still 403, but no longer an EngineRefusedError: the send breaker counts WhatsApp refusing a
       // send, and a catalog read it refused says nothing about the account's send standing.
       if (error instanceof EngineRefusedError) throw new ForbiddenException(error.message);
+      // A lookup that timed out or was throttled failed before the message was handed to WhatsApp.
+      if (error instanceof EngineTransportError) throw new EngineNotSentError(error.message);
       throw error;
     });
     if (!product) {
