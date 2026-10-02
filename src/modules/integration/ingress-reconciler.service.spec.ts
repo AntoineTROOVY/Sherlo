@@ -494,7 +494,7 @@ describe('IngressReconcilerService.onModuleInit (scheduling)', () => {
     else process.env.INGRESS_RECONCILE_INTERVAL_MS = original;
   });
 
-  it('does not schedule a timer when INGRESS_RECONCILE_INTERVAL_MS <= 0', () => {
+  it('does not schedule a timer when INGRESS_RECONCILE_INTERVAL_MS=0', () => {
     process.env.INGRESS_RECONCILE_INTERVAL_MS = '0';
     const [events, failures] = repos();
     const svc = new IngressReconcilerService(

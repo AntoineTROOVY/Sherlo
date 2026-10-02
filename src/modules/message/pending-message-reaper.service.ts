@@ -63,7 +63,7 @@ export class PendingMessageReaperService implements OnModuleInit, OnModuleDestro
   onModuleInit(): void {
     const opts = resolvePendingMessageReaperOptions();
     if (opts.intervalMs <= 0) {
-      this.logger.log('Pending message reaper disabled (MESSAGE_REAPER_INTERVAL_MS <= 0)');
+      this.logger.log('Pending message reaper disabled (MESSAGE_REAPER_INTERVAL_MS=0)');
       return;
     }
     this.timer = setInterval(() => {
