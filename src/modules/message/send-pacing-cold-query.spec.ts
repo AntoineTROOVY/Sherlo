@@ -653,6 +653,19 @@ describe('concurrent sends against a real database', () => {
     });
   });
 
+  it('answers a group add refused only by held cold sends with the seconds until they lapse', async () => {
+    const service = build([10_000], [5]);
+    for (let i = 0; i < 3; i++) expect(await send(service, `first${i}@c.us`, i)).toBe(true);
+    // A cold send admitted but never persisted (its outcome unknown), so it stays held.
+    await service.assertSendAllowed('s1', 'held@c.us');
+    jest.setSystemTime(NOW.getTime() + 4_000);
+
+    await expect(service.assertReachoutAllowed('s1', ['new1@c.us', 'new2@c.us'])).rejects.toMatchObject({
+      status: 429,
+      response: { code: SEND_PACING_LIMITED, retryAfterSeconds: 6 },
+    });
+  });
+
   it('judges by the persisted rows alone once the hold has lapsed', async () => {
     const service = build([5], []);
     // A gated send that never writes a row (a plugin veto) is held only briefly.

@@ -357,8 +357,8 @@ export class SendPacingService {
     if (startOfUtcDay(new Date()).getTime() !== dayStart.getTime()) {
       return this.assertReachoutAllowed(sessionId, contactIds);
     }
-    const usedToday =
-      this.chatReachoutsToday(sessionId, dayStart, coldChats) + this.groupReachoutsToday(sessionId, dayStart);
+    const groupToday = this.groupReachoutsToday(sessionId, dayStart);
+    const usedToday = this.chatReachoutsToday(sessionId, dayStart, coldChats) + groupToday;
     if (usedToday + coldCount <= allowance) {
       // Reserved now, with no await between the check and the charge: a concurrent request must
       // see this batch as spent. The caller refunds it (refundGroupReachouts) if the engine call
@@ -368,7 +368,12 @@ export class SendPacingService {
       return { coldCount, dayStartMs: dayStart.getTime() };
     }
 
-    this.refuse('cold_daily_cap', sessionId, secondsUntilNextUtcDay(), {
+    // Refused only because of cold sends still held: the batch fits once they lapse, not at the next UTC day.
+    const retryAfter =
+      coldChats + groupToday + coldCount <= allowance
+        ? secondsUntilLapsed(this.heldAdmissions(sessionId, dayStart).filter(a => a.cold))
+        : secondsUntilNextUtcDay();
+    this.refuse('cold_daily_cap', sessionId, retryAfter, {
       reason:
         `Reaching ${coldCount} new contact(s) would exceed the daily allowance of ${allowance} ` +
         `new conversation(s) for a session ${ageDays} day(s) old (${usedToday} already used)`,
