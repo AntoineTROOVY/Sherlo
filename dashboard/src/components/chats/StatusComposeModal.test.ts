@@ -10,11 +10,14 @@ let render: (engineType?: string) => ReturnType<typeof import('@testing-library/
 let queryClient: import('@tanstack/react-query').QueryClient;
 
 let reads = 0;
+// While set, a read starts but never finishes, standing in for a large file still being read.
+let holdReads = false;
 // Reads count, then finish on the next microtask with a data URL carrying the file's type.
 class CountingFileReader {
   onload: ((event: { target: { result: string } }) => void) | null = null;
   readAsDataURL(file: Blob): void {
     reads += 1;
+    if (holdReads) return;
     queueMicrotask(() => this.onload?.({ target: { result: `data:${file.type};base64,eA==` } }));
   }
 }
@@ -84,6 +87,7 @@ before(async () => {
 afterEach(() => {
   rtl.cleanup();
   reads = 0;
+  holdReads = false;
   posted.length = 0;
   contactReads = 0;
   queryClient.clear();
@@ -122,6 +126,20 @@ test('an oversized pick also drops the earlier pick it was meant to replace', as
   await screen.findByText('File is too large (max 18 MB)');
   // The input now reads "No file chosen", so nothing on screen shows the earlier image any more.
   assert.equal(post.disabled, true, 'the hidden earlier pick can still be posted');
+});
+
+test('a new pick still being read holds Post instead of sending the image it replaced', async () => {
+  const { screen, fireEvent, waitFor } = rtl;
+  render();
+  fireEvent.click(screen.getByRole('button', { name: 'Image' }));
+  const input = screen.getByLabelText('Status image');
+  fireEvent.change(input, { target: { files: [new window.File(['x'], 'a.jpg', { type: 'image/jpeg' })] } });
+  const post = screen.getByRole('button', { name: 'Post' }) as HTMLButtonElement;
+  await waitFor(() => assert.equal(post.disabled, false));
+
+  holdReads = true;
+  fireEvent.change(input, { target: { files: [new window.File(['x'], 'b.png', { type: 'image/png' })] } });
+  assert.equal(post.disabled, true, 'the replaced image can still be posted');
 });
 
 test('a picked image is posted with its own type', async () => {

@@ -116,7 +116,9 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
       e.target.value = '';
       return;
     }
+    // The input already shows the new file, so the earlier pick must not stay postable while it is read.
     setComposeImageUrl('');
+    setComposeImageBase64(null);
     const myRead = ++composeImageReadSeq.current;
     const reader = new FileReader();
     reader.onload = event => {
