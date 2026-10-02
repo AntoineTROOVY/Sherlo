@@ -244,7 +244,7 @@ export interface IngressChallengeSpec {
 export type IngressPreflightCheck = {
   // Reject (503) when the route's concrete-scoped WhatsApp session is not alive (no live engine, or
   // EngineStatus.FAILED). Recoverable statuses (INITIALIZING/QR_READY/AUTHENTICATING/DISCONNECTED) and
-  // READY pass through to a normal 202+enqueue so the worker can fail fast and the dedup row holds the
+  // READY pass through to a normal ack + enqueue so the worker can fail fast and the dedup row holds the
   // delivery. Skipped for wildcard (sessionScope null/'*') scopes — there is no single session to probe.
   type: 'session-alive';
 };
