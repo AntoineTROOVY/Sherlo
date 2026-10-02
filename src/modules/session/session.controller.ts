@@ -202,6 +202,7 @@ export class SessionController {
   })
   @ApiResponse({ status: 400, description: 'A supplied value is outside its accepted range' })
   @ApiResponse({ status: 404, description: 'Session not found' })
+  @ApiResponse({ status: 409, description: 'The session config kept changing under concurrent requests; retry' })
   async updateConfig(
     @Param('sessionId', ParseUUIDPipe) id: string,
     @Body() dto: UpdateSessionConfigDto,
