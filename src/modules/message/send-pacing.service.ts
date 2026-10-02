@@ -318,7 +318,7 @@ export class SendPacingService {
     return count;
   }
 
-  /** This session's admissions still held today, oldest first; empty once each has lapsed or the day rolled. */
+  /** This session's held admissions today, oldest first; empty once none of them is held or the day rolled. */
   private heldAdmissions(sessionId: string, dayStart: Date): Admission[] {
     const hold = this.holds.get(sessionId);
     if (!hold) return [];
@@ -330,11 +330,9 @@ export class SendPacingService {
       const a = hold.admissions[i];
       a.heldUntil = Math.max(a.until, hold.admissions[i + 1]?.heldUntil ?? 0);
     }
-    const live = hold.admissions.findIndex(a => a.heldUntil > now);
-    if (hold.dayStartMs === dayStart.getTime() && live !== -1) {
-      hold.admissions.splice(0, live);
-      return hold.admissions;
-    }
+    // heldUntil never rises from the oldest admission to the newest, so the hold lapses as a whole, once
+    // its oldest admission is no longer held.
+    if (hold.dayStartMs === dayStart.getTime() && (hold.admissions[0]?.heldUntil ?? 0) > now) return hold.admissions;
     this.holds.delete(sessionId);
     return [];
   }
