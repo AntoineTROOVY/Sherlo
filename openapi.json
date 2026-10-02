@@ -17289,7 +17289,7 @@
             "description": "Max hits to return",
             "schema": {
               "minimum": 1,
-              "type": "number"
+              "type": "integer"
             }
           },
           {
@@ -17300,7 +17300,7 @@
             "schema": {
               "minimum": 0,
               "maximum": 100000,
-              "type": "number"
+              "type": "integer"
             }
           }
         ],
