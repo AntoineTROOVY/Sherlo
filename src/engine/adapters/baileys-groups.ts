@@ -185,11 +185,22 @@ export class BaileysGroups {
     // groupFetchAllParticipating yields {} for BOTH an unanswered query and an account with no
     // groups, so the empty list carries no signal — only our own clock separates them, and an
     // empty list is the shape a caller is least able to question.
-    const all = await withQueryDeadline(
-      this.sock().groupFetchAllParticipating(),
-      this.queryBudgetMs,
-      'WhatsApp did not answer the group list query in time',
-    );
+    let all: Awaited<ReturnType<WASocket['groupFetchAllParticipating']>>;
+    try {
+      all = await withQueryDeadline(
+        this.sock().groupFetchAllParticipating(),
+        this.queryBudgetMs,
+        'WhatsApp did not answer the group list query in time',
+      );
+    } catch (err) {
+      // A throttle is retryable, as on getGroupInfo. Any other refusal keeps its old shape: folding
+      // it into mapServerRefusal's 403 would claim a permissions problem for a plain list read.
+      const code = refusedStatusCode(err);
+      if (code === 408 || code === 429) {
+        throw new EngineTransportError(`WhatsApp rate-limited or timed out the group list query (code ${code})`);
+      }
+      throw err;
+    }
     const self = this.host.normalizedSelfJid();
     return Object.values(all).map(metadata => mapBaileysGroup(metadata, self, jid => this.host.toNeutralJid(jid)));
   }
