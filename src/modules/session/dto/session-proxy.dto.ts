@@ -58,6 +58,7 @@ export class UpdateSessionProxyDto {
       'WhatsApp WebSocket and session start times out (~30s).',
     type: String,
     nullable: true,
+    maxLength: 255,
     example: 'http://user:pass@proxy.example.com:8080',
   })
   @IsOptional()
