@@ -104,6 +104,17 @@ describe('automationRules table importer', () => {
   ])('skips a row whose conditions is %j', conditions => {
     expect(skip({ conditions })).toMatch(/Skipped automation rule rule-1: invalid conditions/);
   });
+
+  // The column is text on both dialects. A decoded object would reach better-sqlite3 as a named
+  // parameter bag and fail the insert, rolling back a restore the guard above had accepted.
+  it('writes decoded conditions as JSON text, and keeps text or null as they are', () => {
+    const conditions = (value: unknown): unknown =>
+      automationRules!.map({ id: 'rule-1', conditions: value } as never)[4];
+    expect(conditions(chatCondition)).toBe(JSON.stringify(chatCondition));
+    expect(conditions(JSON.stringify(chatCondition))).toBe(JSON.stringify(chatCondition));
+    expect(conditions(null)).toBeNull();
+    expect(conditions(undefined)).toBeNull();
+  });
 });
 
 /**

@@ -468,7 +468,11 @@ export const TABLE_IMPORTERS: AnyTableImporter[] = [
       rule.sessionId,
       nulFree(rule.name),
       rule.enabled ?? true,
-      rule.conditions ?? null,
+      rule.conditions == null
+        ? null
+        : typeof rule.conditions === 'string'
+          ? rule.conditions
+          : JSON.stringify(rule.conditions),
       nulFree(rule.replyText),
       rule.cooldownSeconds ?? 60,
       rule.createdAt,
