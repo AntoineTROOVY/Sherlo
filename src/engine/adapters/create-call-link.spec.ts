@@ -83,27 +83,14 @@ describe('BaileysMessaging.createCallLink', () => {
     );
   });
 
-  it('reports an unanswered query rather than hanging on a silent socket', async () => {
+  // Minting a link is non-idempotent: the deadline abandons the query without cancelling it, so a
+  // 503, which the Go SDK replays for POST, could mint a second link. An unanswered query must still
+  // fail in time, but as a 500.
+  it('reports an unanswered query in time, as a non-retryable failure', async () => {
     const createCallLink = jest.fn(() => new Promise<never>(() => undefined));
-    await expect(makeMessaging({ createCallLink }, 15).createCallLink('video', START_MS)).rejects.toBeInstanceOf(
-      EngineTransportError,
-    );
-  });
-
-  it('answers 503 when the library would time the query out on its own', async () => {
-    // Baileys' query() given a timeoutMs arms its own timer first and rejects with a raw 408 Boom,
-    // which is not an HTTP error; without one, its wait resolves nothing and the deadline answers.
-    const createCallLink = jest.fn(
-      (_type: string, _event: unknown, timeoutMs?: number) =>
-        new Promise<never>((_resolve, reject) => {
-          if (timeoutMs) {
-            setTimeout(() => reject(Object.assign(new Error('Timed Out'), { output: { statusCode: 408 } })), timeoutMs);
-          }
-        }),
-    );
-    await expect(makeMessaging({ createCallLink }, 15).createCallLink('video', START_MS)).rejects.toBeInstanceOf(
-      EngineTransportError,
-    );
+    const failure = makeMessaging({ createCallLink }, 15).createCallLink('video', START_MS);
+    await expect(failure).rejects.toThrow(/did not confirm the call link in time/);
+    await expect(failure).rejects.not.toBeInstanceOf(EngineTransportError);
   });
 });
 

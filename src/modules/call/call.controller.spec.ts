@@ -31,14 +31,14 @@ describe('CallController', () => {
     );
   });
 
-  // Baileys answers an unconfirmed link_create with EngineTransportError (503). The mint is not
-  // idempotent, so the contract must say a 503 can follow a link that was in fact created.
-  it('POST link declares the Baileys 503', () => {
+  // The mint is not idempotent, so an unconfirmed link_create answers 500 on both engines: a
+  // retryable 503 would invite a replay that creates a second link.
+  it('POST link declares no retryable 503', () => {
     const responses = (Reflect.getMetadata(
       'swagger/apiResponse',
       Object.getOwnPropertyDescriptor(CallController.prototype, 'createLink')?.value as object,
     ) ?? {}) as Record<string, unknown>;
-    expect(Object.keys(responses)).toContain('503');
+    expect(Object.keys(responses)).not.toContain('503');
   });
 
   it('POST :callId/reject returns the success envelope', async () => {

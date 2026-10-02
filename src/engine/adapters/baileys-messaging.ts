@@ -435,13 +435,19 @@ export class BaileysMessaging {
     // link is that token behind one of the library's two exported prefixes. Note the audio prefix
     // WhatsApp itself uses is `/voice/`, which is also what whatsapp-web.js calls the same thing.
     //
-    // No timeoutMs is passed: given one, baileys' query() arms its own timer before ours and rejects
-    // with a raw 408 Boom, which answers 500. Without it the library's wait resolves nothing after its
-    // own 60 s, so the wrap below is the deadline that answers, with a 503.
-    const token = await this.confirmed(
-      this.sock().createCallLink(type, { startTime: Math.floor(startTime / 1000) }),
-      'the call link',
-    );
+    // No timeoutMs is passed: without it the library's wait resolves nothing after its own 60 s, which
+    // would read as "no link". The wrap below is the deadline, but its 503 is rethrown as a 500:
+    // minting is non-idempotent and the deadline does not cancel the query, so a client replaying a
+    // 503 could create a second link. Same rule as createGroup and the whatsapp-web.js call link.
+    let token: string | undefined;
+    try {
+      token = await this.confirmed(
+        this.sock().createCallLink(type, { startTime: Math.floor(startTime / 1000) }),
+        'the call link',
+      );
+    } catch (err) {
+      throw err instanceof EngineTransportError ? new Error(err.message) : err;
+    }
     if (!token) {
       // A prefix with nothing after it is a dead link that looks like a real one — the caller would
       // hand it to a user and only find out then.
