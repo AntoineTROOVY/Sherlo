@@ -1144,8 +1144,8 @@ curl -X GET "$BASE/api/webhooks?limit=100&offset=0" \
 List webhook deliveries that failed or were not sent (attempts 0), most recent first (ADMIN; results
 stay confined to the key's allowed sessions). A shed or shutdown-refused delivery is replayed by the
 outbox until its replay budget runs out; an oversize payload or a preflight failure on first dispatch
-is not replayed. `lastStatusCode` is `null` when the
-failure was a network/timeout/SSRF error rather than a non-2xx response.
+is not replayed. `lastStatusCode` is `null` when the failure was a network/timeout/SSRF error rather
+than a non-2xx response.
 
 ```bash
 curl -X GET "$BASE/api/webhooks/delivery-failures?limit=100&offset=0" \
