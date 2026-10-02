@@ -1028,6 +1028,29 @@ describe('WhatsAppWebJsAdapter.getChatHistory enrichment (parity with the live p
       expect(m2.downloadMedia).toHaveBeenCalled();
     });
 
+    // The per-item cap is clamped to MEDIA_DOWNLOAD_MAX_BYTES, so an override above it must not
+    // inflate the aggregate budget derived from it either.
+    it('derives the per-item-cap budget from the clamped cap, not a larger override', async () => {
+      process.env[ENV] = '4';
+      const origMax = process.env.MEDIA_DOWNLOAD_MAX_BYTES;
+      process.env.MEDIA_DOWNLOAD_MAX_BYTES = '3'; // budget = ceil(3 * 4 * 1.37) = 17 base64 chars
+      try {
+        const msgs = ['M16', 'M17', 'M18', 'M19', 'M20', 'M21'].map(id => ({
+          ...mediaMsg(id, 'QUJD'),
+          _data: { size: 3, mimetype: 'image/jpeg' },
+        }));
+
+        const out = await readyAdapter(clientFor(...msgs)).getChatHistory('status@broadcast', 50, true, 1024 * 1024);
+
+        expect(out.slice(0, 5).map(m => m.media)).toEqual(Array(5).fill({ mimetype: 'image/jpeg', data: 'QUJD' }));
+        expect(out[5].media).toEqual({ mimetype: 'image/jpeg', omitted: true, sizeBytes: 3 });
+        expect(msgs[5].downloadMedia).not.toHaveBeenCalled();
+      } finally {
+        if (origMax === undefined) delete process.env.MEDIA_DOWNLOAD_MAX_BYTES;
+        else process.env.MEDIA_DOWNLOAD_MAX_BYTES = origMax;
+      }
+    });
+
     it('stops the read loop when the abort signal fires (client disconnect)', async () => {
       const controller = new AbortController();
       const m1 = mediaMsg('M11', 'QUJD');
