@@ -1,6 +1,8 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { DECORATORS } from '@nestjs/swagger';
 import { GLOBAL_VALIDATION_OPTIONS } from '../../../config/app-validation';
-import { SendBulkMessageDto } from './bulk-message.dto';
+import { BULK_MESSAGES_MAX, BulkMessageContentDto, SendBulkMessageDto } from './bulk-message.dto';
+import { MENTIONS_MAX, MENTION_WID_MAX_LENGTH } from './send-message.dto';
 
 // The production pipe, built from the options main.ts uses, so these cases cannot assert a contract
 // the running app does not apply (restated options left out implicit conversion). Its whitelist +
@@ -70,5 +72,23 @@ describe('SendBulkMessageDto media url', () => {
   it('converts a numeric url next to base64 to a string', async () => {
     const dto = await validateBulk(imageItem({ base64: 'AAAA', url: 123 }));
     expect(dto.messages[0].content.image?.url).toBe('123');
+  });
+});
+
+// @nestjs/swagger does not derive bounds from the validators, so the published schema has to declare
+// them itself, or a client generated from it accepts arrays the server answers with a 400.
+describe('SendBulkMessageDto published schema', () => {
+  const published = (dto: object, key: string): Record<string, unknown> | undefined =>
+    Reflect.getMetadata(DECORATORS.API_MODEL_PROPERTIES, dto, key) as Record<string, unknown> | undefined;
+
+  it('publishes the batch size cap', () => {
+    expect(published(SendBulkMessageDto.prototype, 'messages')?.maxItems).toBe(BULK_MESSAGES_MAX);
+  });
+
+  it('publishes the mention list bounds', () => {
+    expect(published(BulkMessageContentDto.prototype, 'mentions')).toMatchObject({
+      maxItems: MENTIONS_MAX,
+      items: { type: 'string', maxLength: MENTION_WID_MAX_LENGTH },
+    });
   });
 });
