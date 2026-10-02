@@ -110,7 +110,8 @@ describe('automationRules table importer', () => {
  * A restore writes with raw SQL, so the NUL drop the entities apply to their free-text columns never
  * runs. PostgreSQL rejects U+0000 in a bound parameter, and an older SQLite backup may hold one, also
  * in template and rule text written before the DTOs refused it, so the importers drop it from those
- * columns and leave ids and lookup keys (a template name is unique per session) as they are.
+ * columns and leave ids and lookup keys as they are. A template name is dropped too: no request can
+ * look up a name holding NUL, so keeping it only made the template unreachable by name.
  */
 describe('table importers: NUL in free text', () => {
   const nul = 'a\u0000b';
@@ -127,7 +128,7 @@ describe('table importers: NUL in free text', () => {
     ],
     ['webhookDeliveryFailures', { id: 'wf1', lastError: nul }, [9]],
     ['integrationDeliveryFailures', { id: 'df1', lastError: nul }, [7]],
-    ['templates', { id: 't1', name: 'greet', body: nul, header: nul, footer: nul }, [3, 4, 5]],
+    ['templates', { id: 't1', name: nul, body: nul, header: nul, footer: nul }, [2, 3, 4, 5]],
     ['automationRules', { id: 'r1', name: nul, replyText: nul }, [2, 5]],
   ])('drops it from the %s text columns', (key, row, columns) => {
     const params = mapped(key, row);
@@ -137,6 +138,5 @@ describe('table importers: NUL in free text', () => {
   it('keeps it in a lookup column', () => {
     expect(mapped('messages', { id: 'm1', chatId: nul })[3]).toBe(nul);
     expect(mapped('statusUpdates', { id: 'su1', contactJid: nul })[2]).toBe(nul);
-    expect(mapped('templates', { id: 't1', name: nul })[2]).toBe(nul);
   });
 });
