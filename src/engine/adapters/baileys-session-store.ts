@@ -491,10 +491,20 @@ export class BaileysSessionStore {
    * JID and its neutral form, so {@link getEphemeralExpiration} hits regardless of which dialect the caller
    * sends to. A non-positive/absent value means "no live timer on this message" and is left untouched (a
    * single non-ephemeral message must not clear a known timer; WhatsApp keeps stamping it while on).
+   * A message no newer than the chat's last timer change (`ephemeralSettingTimestamp`, on any twin) is
+   * skipped: it carries the old timer, and a reconnect flush or history sync records it after the change.
    */
   private recordEphemeralFromMessage(chatId: string, msg: WAMessage): void {
     const duration = this.extractEphemeralDuration(msg);
     if (duration === undefined) {
+      return;
+    }
+    const setAt = Math.max(
+      ...[this.chatKey(chatId), ...this.chatTwins(chatId)].map(k =>
+        this.toUnixSeconds(this.chats.get(k)?.ephemeralSettingTimestamp),
+      ),
+    );
+    if (setAt > 0 && this.toUnixSeconds(msg.messageTimestamp) <= setAt) {
       return;
     }
     this.ephemeralByChat.set(chatId, duration);

@@ -556,6 +556,30 @@ describe('BaileysSessionStore', () => {
       expect(store.getEphemeralExpiration('628111@c.us')).toBeUndefined();
     });
 
+    it.each([
+      ['628111@s.whatsapp.net', '628111@s.whatsapp.net'],
+      ['111@lid', '628111@s.whatsapp.net'],
+      ['628111@s.whatsapp.net', '111@lid'],
+    ])('keeps a timer the %s chat turned off when an older %s message arrives later', (chat, from) => {
+      // A reconnect flush delivers chats.update before messages.upsert, and history sync applies the chats
+      // before their messages, so a message stamped under the old timer can be recorded after the change.
+      store.addLidMappings([{ lid: '111@lid', pn: '628111@s.whatsapp.net' }]);
+      store.upsertChats([{ id: chat, ephemeralSettingTimestamp: 200, ephemeralExpiration: null }]);
+      store.recordMessage({
+        key: { remoteJid: from, fromMe: false, id: 'M1' },
+        message: { extendedTextMessage: { text: 'hi', contextInfo: { expiration: 86400 } } },
+        messageTimestamp: 100,
+      });
+      expect(store.getEphemeralExpiration('628111@c.us')).toBeUndefined();
+      expect(store.getEphemeralExpiration('111@lid')).toBeUndefined();
+      store.recordMessage({
+        key: { remoteJid: from, fromMe: false, id: 'M2' },
+        message: { extendedTextMessage: { text: 'on again', contextInfo: { expiration: 604800 } } },
+        messageTimestamp: 300,
+      });
+      expect(store.getEphemeralExpiration('628111@c.us')).toBe(604800);
+    });
+
     it('takes a changed timer from chats.update over the one learned from messages', () => {
       store.recordMessage({
         key: { remoteJid: '628111@s.whatsapp.net', fromMe: false, id: 'M1' },
