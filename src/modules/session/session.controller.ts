@@ -320,7 +320,7 @@ export class SessionController {
     status: 504,
     description:
       'The engine did not finish starting within its timeout (WhatsApp Web or the network unreachable, ' +
-      'a stalled browser or resource limit, an unreachable proxyUrl, or the whatsapp-web.js auth ' +
+      'a stalled browser or resource limit, or, on whatsapp-web.js, an unreachable proxyUrl or the auth ' +
       'timeout); the engine is torn down and the start can be retried.',
   })
   async start(@Param('sessionId', ParseUUIDPipe) id: string): Promise<SessionResponseDto> {
