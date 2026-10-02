@@ -12,6 +12,7 @@ import pytest
 from openwa import OpenWAClient, OpenWAApiError, OpenWANotFoundError
 from openwa._http import build_url
 from openwa.errors import OpenWAServiceUnavailableError
+from openwa.resources.catalog import CatalogResource
 from openwa.resources.messages import MessagesResource
 from openwa.types import (
     BatchCancelResponse,
@@ -957,6 +958,16 @@ class TestLabelsChannelsCatalog:
         client.catalog.send_product("s", {"chatId": "a@c.us", "productId": "p1", "body": "x"})
         assert "/messages/send-product" in backend.calls[-1].url
         assert backend.calls[-1].body == {"chatId": "a@c.us", "productId": "p1", "body": "x"}
+
+    def test_catalog_reads_return_none_on_an_empty_body(self):
+        # The gateway answers 200 with an empty body when there is no catalog or no such product.
+        backend = MockBackend().on("GET", "/catalog", body=None)
+        client = make_client(backend)
+        assert client.catalog.info("s") is None
+        assert client.catalog.product("s", "p1") is None
+        # Read the annotation as written: evaluating `X | None` needs Python 3.10, and CI runs 3.9.
+        for method in (CatalogResource.info, CatalogResource.product):
+            assert method.__annotations__["return"].endswith("| None")
 
     def test_templates_crud(self):
         tpl = {"id": "t1", "sessionId": "s", "name": "welcome", "body": "Hi {{name}}", "createdAt": "", "updatedAt": ""}

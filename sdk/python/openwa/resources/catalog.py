@@ -29,7 +29,7 @@ class CatalogResource:
     def __init__(self, http: "HttpExecutor") -> None:
         self._http = http
 
-    def info(self, session_id: str) -> CatalogInfo:
+    def info(self, session_id: str) -> CatalogInfo | None:
         return self._http.request("GET", f"/api/sessions/{quote_segment(session_id)}/catalog")
 
     def products(
@@ -39,7 +39,7 @@ class CatalogResource:
             "GET", f"/api/sessions/{quote_segment(session_id)}/catalog/products", query=query
         )
 
-    def product(self, session_id: str, product_id: str) -> CatalogProduct:
+    def product(self, session_id: str, product_id: str) -> CatalogProduct | None:
         return self._http.request(
             "GET", f"/api/sessions/{quote_segment(session_id)}/catalog/products/{quote_segment(product_id)}"
         )
