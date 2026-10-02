@@ -245,3 +245,32 @@ describe('importFromStream writes regular files only', () => {
     expect(result).toEqual({ imported: 1, failed: 0 });
   });
 });
+
+describe('importFromStream reports partial counts on an abort', () => {
+  it('carries the entries already written on an entry-cap rejection', async () => {
+    const prev = process.env.STORAGE_IMPORT_MAX_ENTRIES;
+    process.env.STORAGE_IMPORT_MAX_ENTRIES = '2';
+    const pack = tar.pack();
+    for (const name of ['a.jpg', 'b.jpg', 'c.jpg']) pack.entry({ name }, Buffer.from(name));
+    pack.finalize();
+    const written: string[] = [];
+    try {
+      const rejection = await importFromStream(
+        pack.pipe(createGzip()),
+        name => {
+          written.push(name);
+          return Promise.resolve();
+        },
+        makeLogger() as never,
+      ).catch((err: unknown) => err);
+
+      expect(rejection).toBeInstanceOf(Error);
+      expect((rejection as Error).message).toMatch(/2-entry limit/);
+      expect(rejection).toMatchObject({ imported: 2, failed: 0 });
+      expect(written).toEqual(['a.jpg', 'b.jpg']);
+    } finally {
+      if (prev === undefined) delete process.env.STORAGE_IMPORT_MAX_ENTRIES;
+      else process.env.STORAGE_IMPORT_MAX_ENTRIES = prev;
+    }
+  });
+});
