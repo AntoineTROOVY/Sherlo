@@ -196,7 +196,7 @@ Single-recipient send routes under `/messages` return **HTTP 201** with `{ "mess
 
 Two consequences worth knowing:
 
-1. **WhatsApp does not reject an unregistered recipient synchronously.** A message to a number that is not on WhatsApp still returns `201` with a valid `messageId`. Whether it later delivers, stalls, or is reported as an error reaches you asynchronously, if at all.
+1. **Baileys does not reject an unregistered recipient synchronously.** A message to a number that is not on WhatsApp still returns `201` with a valid `messageId`. Whether it later delivers, stalls, or is reported as an error reaches you asynchronously, if at all. whatsapp-web.js refuses the same send with `400` when it cannot resolve the number, which can also mean this session has never had a chat with it.
 2. **There is no synchronous delivery confirmation on either engine** (whatsapp-web.js or Baileys), so the `201` cannot be made to mean "delivered."
 
 **Before sending to a new number**, you can confirm it is a registered WhatsApp account with `GET /api/sessions/:sessionId/contacts/check/:number` (returns `{ exists, whatsappId }`; needs an `OPERATOR` key, like the send itself; see the Contacts reference).
