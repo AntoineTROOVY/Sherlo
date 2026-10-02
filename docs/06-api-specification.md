@@ -4617,7 +4617,7 @@ Bare array, ordered by `createdAt` descending, bounded by `limit`/`offset`. If t
 
 #### GET /api/webhooks/delivery-failures
 
-List webhook deliveries that exhausted their retries or were not sent (attempts 0, pending replay), most recent first. This is the dead-letter trail referenced by §6.6 — a receiver outage longer than the retry window, an over-budget payload, or a blocked (SSRF-guarded) URL lands here instead of vanishing.
+List webhook deliveries that exhausted their retries or were not sent (attempts 0), most recent first. A shed or shutdown-refused delivery is replayed by the outbox until its replay budget runs out; an oversize payload or a preflight failure on first dispatch is not replayed. This is the dead-letter trail referenced by §6.6 — a receiver outage longer than the retry window, an over-budget payload, or a blocked (SSRF-guarded) URL lands here instead of vanishing.
 
 **Auth:** API key (ADMIN) · **Scope:** results are confined to the calling key's `allowedSessions`, so a session-restricted ADMIN key cannot read another session's rows via `sessionId`
 
