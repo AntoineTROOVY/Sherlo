@@ -63,6 +63,12 @@ describe('ffmpeg encoder arguments', () => {
           ':force_original_aspect_ratio=decrease:force_divisible_by=2',
       );
     });
+
+    // Level 3.1 also caps the macroblock rate, which is 1280x720 at 30 fps: a 60 fps phone clip kept
+    // its rate and declared a level it exceeded. `-fpsmax` lowers a faster rate and leaves a slower one.
+    it('caps the frame rate at the 30 fps level 3.1 allows for a 720p frame', () => {
+      expect(valueOf(args, '-fpsmax')).toBe('30');
+    });
   });
 });
 

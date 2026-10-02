@@ -132,7 +132,9 @@ export function voiceEncodeArgs(): string[] {
  * receiver can begin playback before the whole file arrives. The scale filter fits the frame inside
  * 1280x720 (720x1280 for a portrait one), the largest box within the Baseline 3.1 frame-size limit
  * whatever the aspect ratio, and keeps both edges even, which H.264 requires. `min()` means a
- * smaller video is never upscaled into a larger file than it started as.
+ * smaller video is never upscaled into a larger file than it started as. Level 3.1 also caps the
+ * macroblock rate, which is 1280x720 at 30 fps, so `-fpsmax` lowers a faster source to 30 fps and
+ * leaves a slower one as it is.
  */
 export function videoEncodeArgs(): string[] {
   return [
@@ -146,6 +148,8 @@ export function videoEncodeArgs(): string[] {
     'yuv420p',
     '-vf',
     "scale='min(iw,if(gte(iw,ih),1280,720))':'min(ih,if(gte(iw,ih),720,1280))':force_original_aspect_ratio=decrease:force_divisible_by=2",
+    '-fpsmax',
+    '30',
     '-c:a',
     'aac',
     '-b:a',
