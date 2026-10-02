@@ -4833,7 +4833,7 @@ List all API keys, newest first. The plaintext key is never returned.
 
 **Response** `200`
 
-Bare JSON array (no envelope), ordered by `createdAt` DESC. Null array/date fields are omitted.
+Bare JSON array (no envelope), ordered by `createdAt` DESC. Null array/date fields are omitted. A key stored with an expiry that cannot be read as a date reports `expiresAt` as `1970-01-01T00:00:00.000Z` here and in every other key response, and is refused as expired; give it a new expiry with `PUT /api/auth/api-keys/:id`.
 
 ```json
 [
@@ -4895,14 +4895,14 @@ Create a new API key; returns the full plaintext key exactly once.
 
 **Request body** — `CreateApiKeyDto`
 
-| Field             | Type                                   | Required | Constraints                                                                                              | Description                                                                       |
-| ----------------- | -------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `name`            | string                                 | yes      | length 3–100                                                                                             | Friendly name for the key.                                                        |
-| `role`            | enum `admin` \| `operator` \| `viewer` | no       | `@IsEnum`                                                                                                | Defaults to `operator` when omitted.                                              |
-| `allowedIps`      | string[]                               | no       | each entry a valid **IPv4** address or IPv4 CIDR `/0-32`; IPv6 rejected                                  | IP whitelist (IPv4-only by design).                                               |
-| `allowedSessions` | string[]                               | no       | each `@IsString`, `@ArrayUnique`; each entry non-empty, no surrounding whitespace, no comma              | Session IDs this key may access.                                                  |
-| `allowedChats`    | string[]                               | no       | unique entries, each a group `<id>@g.us`, a contact `<phone>@c.us` / `<lid>@lid`, or a bare phone number | Chat IDs this key may reach (see [Roles & Authorization](#roles--authorization)). |
-| `expiresAt`       | string (ISO 8601 date)                 | no       | `@IsDateString`                                                                                          | Stored as a `Date`.                                                               |
+| Field             | Type                                   | Required | Constraints                                                                                                                                                  | Description                                                                       |
+| ----------------- | -------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `name`            | string                                 | yes      | length 3–100                                                                                                                                                 | Friendly name for the key.                                                        |
+| `role`            | enum `admin` \| `operator` \| `viewer` | no       | `@IsEnum`                                                                                                                                                    | Defaults to `operator` when omitted.                                              |
+| `allowedIps`      | string[]                               | no       | each entry a valid **IPv4** address or IPv4 CIDR `/0-32`; IPv6 rejected                                                                                      | IP whitelist (IPv4-only by design).                                               |
+| `allowedSessions` | string[]                               | no       | each `@IsString`, `@ArrayUnique`; each entry non-empty, no surrounding whitespace, no comma                                                                  | Session IDs this key may access.                                                  |
+| `allowedChats`    | string[]                               | no       | unique entries, each a group `<id>@g.us`, a contact `<phone>@c.us` / `<lid>@lid`, or a bare phone number                                                     | Chat IDs this key may reach (see [Roles & Authorization](#roles--authorization)). |
+| `expiresAt`       | string (ISO 8601 date)                 | no       | `@IsDateString`, and must parse as a date: an ISO week, ordinal or basic form such as `2026-W40-1` is refused with `400 "expiresAt is not a parseable date"` | Stored as a `Date`.                                                               |
 
 ```json
 {
@@ -4957,7 +4957,7 @@ Update mutable fields of an API key. `isActive` is **not** updatable here — us
 | `allowedIps`      | string[]                               | no       | IPv4 address / CIDR only                                                                    | Applied if not `undefined` (can be set to `[]` to clear).                                                |
 | `allowedSessions` | string[]                               | no       | each `@IsString`, `@ArrayUnique`; each entry non-empty, no surrounding whitespace, no comma | Applied if not `undefined`.                                                                              |
 | `allowedChats`    | string[]                               | no       | same as create                                                                              | Applied if not `undefined` (`[]` clears it, making the key unrestricted).                                |
-| `expiresAt`       | string (ISO 8601 date) \| null         | no       | `@IsDateString`                                                                             | Applied if not `undefined`; `null` clears the expiry (an empty string fails `@IsDateString` with `400`). |
+| `expiresAt`       | string (ISO 8601 date) \| null         | no       | `@IsDateString`, and must parse as a date (same as create)                                  | Applied if not `undefined`; `null` clears the expiry (an empty string fails `@IsDateString` with `400`). |
 
 ```json
 {
@@ -4986,7 +4986,7 @@ Returns the updated key (no plaintext).
 }
 ```
 
-**Errors:** `400` validation (incl. `forbidNonWhitelisted` for unknown fields such as `isActive`) · `401` missing/invalid key · `403` key role below ADMIN, or the key is session-scoped or restricted with `allowedChats` · `404` not found · `409` change would remove the last usable admin key, or no other usable admin key lasts at least as long
+**Errors:** `400` validation (incl. `forbidNonWhitelisted` for unknown fields such as `isActive`), or an `expiresAt` that does not parse as a date · `401` missing/invalid key · `403` key role below ADMIN, or the key is session-scoped or restricted with `allowedChats` · `404` not found · `409` change would remove the last usable admin key, or no other usable admin key lasts at least as long
 
 #### POST /api/auth/api-keys/:id/revoke
 
