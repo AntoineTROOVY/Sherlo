@@ -94,12 +94,16 @@ interface BreakerState {
  * otherwise all read the same persisted count and all pass. Each cap is judged by the larger of the
  * persisted count and, for every held admission, the count it read plus the admissions held from it
  * on: none of those rows can be in the count it read, so nothing is counted twice. A send held until it
- * settles is credited to the counts of the admissions taken after it when it settles, since they read
- * before its row could land and would otherwise miss it once it stops being held.
+ * settles stays held, once settled, for as long as any admission taken while it was in flight, since
+ * they read before its row could land and would otherwise miss it once it stops being held.
  */
 interface Admission {
-  /** Epoch ms the admission stops being held, so only its row counts from then on. */
+  /** Epoch ms its own term ends: a window from its admission, or from its settle. */
   until: number;
+  /** Epoch ms it stops being held, so only its row counts from then on; refreshed by heldAdmissions. */
+  heldUntil: number;
+  /** Once settled with `true`: the admissions taken while it was in flight, held for as long as they are. */
+  pinnedBy?: Admission[];
   sentToday: number;
   /** Set for a cold send; the key is folded the way the cold count folds dialects. */
   cold: { key: string; coldToday: number } | null;
@@ -116,7 +120,8 @@ interface AdmissionHold {
  * admission, or for one taken `untilSettled`, from the moment its caller settles it. It only has to
  * outlast the gap between that moment and the row insert. A send that fails before writing a row hands
  * its admission back (see assertSendAllowed), so only one that may still have gone out is over-counted,
- * and for at most this long.
+ * for this long after it settles, or as long as a send admitted while it was in flight is held, if that
+ * is longer.
  */
 const ADMISSION_WINDOW_MS = 10_000;
 
@@ -132,7 +137,7 @@ const UNSETTLED_ADMISSION_MAX_MS = 5 * 60_000;
  * Settles the admission assertSendAllowed held. Called with nothing, for a send that provably never went
  * out, it hands the admission back at once. Called with `true`, once the engine returned or failed with an
  * unknown outcome, it holds the admission for ADMISSION_WINDOW_MS from now, while the row or the own-send
- * echo lands.
+ * echo lands, or for as long as a send admitted while it was in flight is held, if that is longer.
  */
 export type SettleAdmission = (mayHaveSent?: boolean) => void;
 
@@ -272,8 +277,10 @@ export class SendPacingService {
       this.assertUnderColdCap(sessionId, dayStart, ageDays, cold);
     }
     if (opts.hold !== false) {
+      const until = Date.now() + (opts.untilSettled ? UNSETTLED_ADMISSION_MAX_MS : ADMISSION_WINDOW_MS);
       const admission: Admission = {
-        until: Date.now() + (opts.untilSettled ? UNSETTLED_ADMISSION_MAX_MS : ADMISSION_WINDOW_MS),
+        until,
+        heldUntil: until,
         sentToday,
         cold: cold ? { key, coldToday: cold.coldToday } : null,
       };
@@ -284,18 +291,16 @@ export class SendPacingService {
         const admissions = this.holds.get(sessionId)?.admissions;
         const index = admissions?.indexOf(admission) ?? -1;
         if (!mayHaveSent) {
+          // An earlier admission may still pin this one; handed back, it holds nothing.
+          admission.until = admission.heldUntil = 0;
           if (admissions && index !== -1) admissions.splice(index, 1);
           return;
         }
+        // Every admission held after this one was taken while it was in flight, so the counts it read may
+        // miss this send's row. This one's own term counts it and each of them once, on a count read before
+        // any of their rows, so it stays held as long as they do; once it lapses they are judged without it.
         admission.until = Date.now() + ADMISSION_WINDOW_MS;
-        if (!admissions || index === -1) return;
-        // Every admission held after this one was taken while it was in flight, so the counts it read
-        // cannot include this send's coming row; credit it there, or once this one lapses a send still
-        // running would be judged without it.
-        for (const later of admissions.slice(index + 1)) {
-          later.sentToday += 1;
-          if (admission.cold && later.cold && later.cold.key !== admission.cold.key) later.cold.coldToday += 1;
-        }
+        if (admissions && index !== -1) admission.pinnedBy = admissions.slice(index + 1);
       };
     }
   }
@@ -320,7 +325,12 @@ export class SendPacingService {
     const hold = this.holds.get(sessionId);
     if (!hold) return [];
     const now = Date.now();
-    const live = hold.admissions.findIndex(a => a.until > now);
+    // Newest first, so the admissions each one is pinned by, all taken after it, are already refreshed.
+    for (let i = hold.admissions.length - 1; i >= 0; i--) {
+      const a = hold.admissions[i];
+      a.heldUntil = Math.max(a.until, ...(a.pinnedBy?.map(b => b.heldUntil) ?? []));
+    }
+    const live = hold.admissions.findIndex(a => a.heldUntil > now);
     if (hold.dayStartMs === dayStart.getTime() && live !== -1) {
       hold.admissions.splice(0, live);
       return hold.admissions;
@@ -756,7 +766,7 @@ function startOfUtcDay(at: Date): Date {
  */
 function secondsUntilLapsed(held: Admission[]): number {
   const now = Date.now();
-  const last = held.reduce((max, a) => Math.max(max, Math.min(a.until, now + ADMISSION_WINDOW_MS)), now);
+  const last = held.reduce((max, a) => Math.max(max, Math.min(a.heldUntil, now + ADMISSION_WINDOW_MS)), now);
   return Math.max(1, Math.ceil((last - now) / 1000));
 }
 
