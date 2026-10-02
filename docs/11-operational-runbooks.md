@@ -718,9 +718,10 @@ OPENWA_DATA_DIR=/srv/openwa/data \
 > third layer from the archive's `.env.generated` when the archive carries one, because that copy
 > replaces the target's and is the one the restored app reads. Two caveats when
 > operating directly on the host mount: a path recorded inside the container (`/app/data/...`) is not
-> host-visible, so override it in the environment; and a value written with quotes or a trailing `#`
-> comment, or a `KEY: value` line, is reported and skipped rather than guessed at, so pass those
-> explicitly too. Blanks around `=` and CRLF line endings are read as the app reads them.
+> host-visible, so override it in the environment; and a quoted value followed by a `#` comment, a
+> double-quoted value with backslash escapes, or a `KEY: value` line is reported and resolves to the
+> script default, so pass those explicitly too. Blanks around `=`, CRLF line endings, a value in one
+> pair of quotes and a `#` comment after an unquoted value are read as the app reads them.
 
 **Verification:**
 
