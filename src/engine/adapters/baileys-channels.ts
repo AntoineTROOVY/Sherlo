@@ -1,6 +1,7 @@
 import type { NewsletterMetadata, WASocket } from '@whiskeysockets/baileys';
 import { Channel } from '../interfaces/whatsapp-engine.interface';
 import { ChannelNotFoundError } from '../../common/errors/channel-not-found.error';
+import { EngineTransportError } from '../../common/errors/engine-transport.error';
 import { mapServerRefusal } from './baileys-groups';
 import { BAILEYS_QUERY_BUDGET_MS, withQueryDeadline } from './baileys-query-deadline';
 
@@ -111,14 +112,17 @@ export class BaileysChannels {
    * A channel lookup that WhatsApp refuses (an unknown id, a bad invite code) comes back as a w:mex
    * GraphQL error rather than an empty node, so a 4xx refusal is read as "no such channel", the same
    * way the group invite lookup reads one. A rate limit (429) or a timeout (408) says nothing about
-   * the channel, so it propagates, as does the deadline, which stays inside.
+   * the channel, so it answers 503, as the deadline does.
    */
   private async lookup(type: 'jid' | 'invite', key: string, operation: string) {
     try {
       return await this.bounded(this.sock().newsletterMetadata(type, key), operation);
     } catch (error) {
       const code = wmexRefusalCode(error);
-      if (code !== undefined && code >= 400 && code < 500 && code !== 408 && code !== 429) {
+      if (code === 408 || code === 429) {
+        throw new EngineTransportError(`WhatsApp rate-limited or timed out ${operation} (code ${code})`);
+      }
+      if (code !== undefined && code >= 400 && code < 500) {
         return null;
       }
       throw error;

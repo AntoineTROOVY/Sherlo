@@ -82,12 +82,22 @@ describe('a refused channel lookup is "no such channel", not a bare 500', () => 
     }
   });
 
-  it("Baileys' own send timeout or a rate limit on the lookup propagates, not as 404", async () => {
+  it("Baileys' own send timeout on the lookup propagates, not as 404", async () => {
     // promiseTimeout (Utils/generics.js) rejects a stalled send with an OBJECT data and a 408 code.
     const timedOut = new Boom('Timed Out', { statusCode: 408, data: { stack: 'Error\n    at x' } });
-    for (const error of [timedOut, wmexRefusal(429)]) {
-      const newsletterMetadata = jest.fn().mockRejectedValue(error);
-      await expect(channels({ newsletterMetadata }, 500).getChannelById('120363@newsletter')).rejects.toBe(error);
+    const newsletterMetadata = jest.fn().mockRejectedValue(timedOut);
+    await expect(channels({ newsletterMetadata }, 500).getChannelById('120363@newsletter')).rejects.toBe(timedOut);
+  });
+
+  it('a lookup WhatsApp rate-limits or times out answers 503, not 404 or a bare 500', async () => {
+    for (const code of [408, 429]) {
+      const newsletterMetadata = jest.fn().mockRejectedValue(wmexRefusal(code));
+      await expect(channels({ newsletterMetadata }, 500).getChannelById('120363@newsletter')).rejects.toBeInstanceOf(
+        EngineTransportError,
+      );
+      const sock = { newsletterMetadata, newsletterFollow: jest.fn() };
+      await expect(channels(sock, 500).subscribeToChannel('INVITE')).rejects.toBeInstanceOf(EngineTransportError);
+      expect(sock.newsletterFollow).not.toHaveBeenCalled();
     }
   });
 
