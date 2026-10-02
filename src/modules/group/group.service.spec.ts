@@ -5,6 +5,7 @@ import { IWhatsAppEngine } from '../../engine/interfaces/whatsapp-engine.interfa
 import { EngineNotSupportedError } from '../../common/errors/engine-not-supported.error';
 import { EngineRefusedError } from '../../common/errors/engine-refused.error';
 import { EngineTransportError } from '../../common/errors/engine-transport.error';
+import { EngineThrottledError } from '../../common/errors/engine-throttled.error';
 import { SendPacingService } from '../message/send-pacing.service';
 
 /** Pacing is off by default; its own spec covers the governor, so here it must simply not refuse. */
@@ -156,6 +157,24 @@ describe('GroupService', () => {
       },
     );
     await expect(svc.createGroup('s1', 'G', ['628111111@c.us', '628222222@c.us'])).rejects.toThrow();
+    expect(pacing.refundGroupReachouts).toHaveBeenCalledWith('s1', reservation);
+  });
+
+  // WhatsApp turned a throttled request away before it ran, so the batch contacted nobody.
+  it.each([
+    ['createGroup', (svc: GroupService) => svc.createGroup('s1', 'G', ['628111111@c.us'])],
+    ['addParticipants', (svc: GroupService) => svc.addParticipants('s1', 'g1', ['628111111@c.us'])],
+  ])('refunds the reservation when WhatsApp rate-limits %s', async (_label, call) => {
+    const error = new EngineThrottledError('rate-limited (code 429)');
+    const reservation = { coldCount: 1, dayStartMs: 1 };
+    const { svc, pacing } = makeServiceWithPacing(
+      { createGroup: jest.fn().mockRejectedValue(error), addParticipants: jest.fn().mockRejectedValue(error) },
+      {
+        assertReachoutAllowed: jest.fn().mockResolvedValue(reservation),
+        refundGroupReachouts: jest.fn(),
+      },
+    );
+    await expect(call(svc)).rejects.toBe(error);
     expect(pacing.refundGroupReachouts).toHaveBeenCalledWith('s1', reservation);
   });
 
