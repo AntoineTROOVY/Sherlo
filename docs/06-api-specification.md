@@ -6040,7 +6040,7 @@ Reinstalling over a plugin whose code went missing is supported and is the recov
 prescribes: its `ctx.storage` directory, config, session activations and enabled-on-boot decision are
 all kept. A directory the gateway did not install is still refused.
 
-**Errors:** `400` no file / invalid package / install failed · `401` · `403` · `409` plugin already loaded, or a directory under that id the gateway did not install
+**Errors:** `400` no file / invalid package / install failed · `401` · `403` · `409` plugin already loaded, or a directory under that id the gateway did not install · `413` package larger than 5 MB
 
 ---
 
