@@ -645,12 +645,13 @@ export class InfraDataService {
             `(removed from the engine registry; a process restart guarantees cleanup).`,
         );
       }
-      // Engines still mid-initialization (no Map entry yet) are reported in notRunning: their start()
-      // self-aborts via the stop mark, but they are not counted as stopped here.
+      // Sessions with no engine yet are reported in notRunning: one still initializing aborts its start()
+      // on the stop mark, and one waiting to relaunch after a failed reconnect had its relaunch cancelled.
+      // Neither is counted as stopped here.
       if (result.notRunning.length > 0) {
         notices.push(
-          `${result.notRunning.length} orphan session(s) had no live engine yet (still initializing): ` +
-            `${result.notRunning.join(', ')} — their start() will self-abort.`,
+          `${result.notRunning.length} orphan session(s) had no live engine yet (initializing or waiting to ` +
+            `reconnect): ${result.notRunning.join(', ')}; they will not start.`,
         );
       }
     } else if (orphanedEngines.length > 0 && !data.force) {

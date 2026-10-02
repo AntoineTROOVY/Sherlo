@@ -770,7 +770,9 @@ export class SessionEngineControls {
    * 10s deadlines per engine (destroy, then the forceDestroy escalation). The mark + reconnect-cancel happen first so an in-flight reconnect
    * cannot resurrect the id while teardown runs. Engines that are mid-initialization (no entry in
    * `engines` yet) are marked but cannot be torn down here — their start() will see the stop mark
-   * via its existing guard and self-abort; the caller learns about them in `notRunning`.
+   * via its existing guard and self-abort; the caller learns about them in `notRunning`. A session
+   * waiting to relaunch after a failed reconnect has no engine either: the reconnect cancel above is
+   * what stops it, and it is reported in `notRunning` too.
    *
    * Always resolves. Best-effort: a `failed` entry means destroy and the forceDestroy escalation both
    * threw or timed out, and the engine is removed from the Map regardless so it stops holding a
