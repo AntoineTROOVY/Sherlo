@@ -259,7 +259,11 @@ func (c *Client) doRaw(ctx context.Context, method, path string, query url.Value
 
 	rawURL := c.baseURL + path
 	if len(query) > 0 {
-		rawURL += "?" + query.Encode()
+		sep := "?"
+		if strings.Contains(path, "?") {
+			sep = "&"
+		}
+		rawURL += sep + query.Encode()
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, reader)
