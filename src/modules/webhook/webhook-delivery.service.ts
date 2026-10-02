@@ -273,12 +273,23 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
     const resolveLid = (jid: string): string | null => this.lidMappingStore?.resolveLid(jid) ?? null;
     // A row is judged on its own: one whose stored events or filters are malformed (e.g. restored from
     // a hand-edited backup) is skipped, instead of throwing here and dropping the event for every
-    // other webhook of the session.
+    // other webhook of the session. A `filters` that is not a plain object, or a non-array `conditions`,
+    // is refused explicitly: evaluateFilters reads either as "no filter", which would deliver every
+    // subscribed event unfiltered.
     const subscribed = webhooks.filter(
       w => Array.isArray(w.events) && (w.events.includes(event) || w.events.includes('*')),
     );
     const matching = subscribed.filter(w => {
       try {
+        const filters: unknown = w.filters;
+        if (
+          filters != null &&
+          (typeof filters !== 'object' ||
+            Array.isArray(filters) ||
+            (w.filters?.conditions != null && !Array.isArray(w.filters.conditions)))
+        ) {
+          throw new TypeError('filters must be an object with a conditions array');
+        }
         return evaluateFilters(w.filters, event, data, resolveLid);
       } catch (error) {
         this.logger.warn('Skipping webhook with malformed filters', {

@@ -1373,6 +1373,39 @@ describe('WebhookDeliveryService', () => {
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
+
+    it.each([
+      ['conditions is a string', { conditions: 'x' }],
+      ['conditions is an object', { conditions: {} }],
+      ['filters is an array', [{ field: 'from', operator: 'is', value: ['x'] }]],
+      ['filters is a string', 'x'],
+    ])('skips a webhook whose stored %s instead of delivering unfiltered', async (_label, filters) => {
+      mockFetch.mockClear();
+      const healthy = createMockWebhook({ id: 'wh-ok', events: ['*'] });
+      const badFilters = createMockWebhook({
+        id: 'wh-bad-conditions',
+        events: ['*'],
+        filters: filters as unknown as WebhookFilters,
+      });
+      (repository.find as jest.Mock).mockResolvedValue([badFilters, healthy]);
+
+      await service.dispatch('sess-1', 'message.received', { from: '111@c.us' });
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['an empty object', {}],
+      ['an empty conditions array', { conditions: [] }],
+    ])('still delivers to a webhook whose stored filters is %s', async (_label, filters) => {
+      mockFetch.mockClear();
+      const webhook = createMockWebhook({ id: 'wh-empty', events: ['*'], filters: filters as WebhookFilters });
+      (repository.find as jest.Mock).mockResolvedValue([webhook]);
+
+      await service.dispatch('sess-1', 'message.received', { from: '111@c.us' });
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ── custom-header sanitization ───────────────────────────────
