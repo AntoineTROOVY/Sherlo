@@ -7,6 +7,7 @@ import { useRole } from '../../hooks/useRole';
 import { useToast } from '../../hooks/useToast';
 import { Modal } from '../Modal';
 import { MEDIA_UPLOAD_MAX_BYTES } from './ChatComposer';
+import { captionLength } from '../../utils/bulkMedia';
 
 // Mirrors @ArrayMaxSize(256) on the send-status DTOs — the picker caps selection client-side so the
 // user can't build a list the backend is guaranteed to reject.
@@ -138,6 +139,11 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
     // it's still unknown, a Baileys submit would go out with no recipients and 400.
     Boolean(engineType) &&
     (composeType === 'text' ? composeText.trim().length > 0 : Boolean(composeImageBase64 || composeImageUrl.trim())) &&
+    // Bounded here rather than by a native maxLength, which counts UTF-16 units and would cut pasted
+    // emoji the gateway accepts: it counts an astral character as one.
+    (composeType === 'text'
+      ? captionLength(composeText.trim()) <= 4096
+      : captionLength(composeCaption.trim()) <= 1024) &&
     (!isBaileysEngine || composeRecipients.length > 0);
 
   const handleComposeSubmit = async () => {
@@ -210,7 +216,6 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
               id="scm-1"
               value={composeText}
               onChange={e => setComposeText(e.target.value)}
-              maxLength={4096}
               placeholder={t('chats.status.composeText')}
             />
           </div>
@@ -269,7 +274,6 @@ function StatusComposeModal({ sessionId, onClose, onPosted }: Props) {
               placeholder={t('chats.captionPlaceholder')}
               value={composeCaption}
               onChange={e => setComposeCaption(e.target.value)}
-              maxLength={1024}
             />
           </div>
         </>

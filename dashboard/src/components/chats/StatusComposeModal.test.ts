@@ -169,3 +169,29 @@ test('a contact list that stays throttled reads as a failure, not an empty addre
   assert.equal(screen.queryByText('No contacts found') === null, true);
   assert.equal(contactReads, 3);
 });
+
+// A native maxlength counts a surrogate pair as two and cuts pasted text the gateway would accept, so
+// Post alone holds an over-limit field, counting characters the way the gateway does.
+test('status text and caption are bounded by Post, not truncated by UTF-16 units', async () => {
+  const { screen, fireEvent, waitFor } = rtl;
+  render();
+  const post = screen.getByRole('button', { name: 'Post' }) as HTMLButtonElement;
+  const text = document.getElementById('scm-1') as HTMLTextAreaElement;
+  assert.equal(text.hasAttribute('maxlength'), false);
+  fireEvent.change(text, { target: { value: '\u{1F600}'.repeat(4096) } });
+  assert.equal(post.disabled, false, 'text the gateway accepts is held');
+  fireEvent.change(text, { target: { value: '\u{1F600}'.repeat(4097) } });
+  assert.equal(post.disabled, true, 'text over 4096 characters can be posted');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Image' }));
+  fireEvent.change(screen.getByLabelText('Status image'), {
+    target: { files: [new window.File(['x'], 'a.jpg', { type: 'image/jpeg' })] },
+  });
+  await waitFor(() => assert.equal(post.disabled, false));
+  const caption = document.getElementById('scm-5') as HTMLInputElement;
+  assert.equal(caption.hasAttribute('maxlength'), false);
+  fireEvent.change(caption, { target: { value: '\u{1F600}'.repeat(1024) } });
+  assert.equal(post.disabled, false, 'a caption the gateway accepts is held');
+  fireEvent.change(caption, { target: { value: '\u{1F600}'.repeat(1025) } });
+  assert.equal(post.disabled, true, 'a caption over 1024 characters can be posted');
+});
