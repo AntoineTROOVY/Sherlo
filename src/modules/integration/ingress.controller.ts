@@ -10,7 +10,7 @@ import { InstanceThrottlerGuard } from './instance-throttler.guard';
 // @Public so the global ApiKeyGuard early-returns (providers can't present an API key). The
 // controller-level @SkipThrottle below exempts the GLOBAL per-IP guard (see its comment).
 // The provider body is read as RAW bytes from req.rawBody (stashed by the json() verify callback in
-// main.ts) — it is intentionally NOT DTO-bound, so the global ValidationPipe never 400s on the
+// src/configure-app.ts) — it is intentionally NOT DTO-bound, so the global ValidationPipe never 400s on the
 // provider's unknown keys, and the exact signed bytes reach the HMAC verifier.
 @ApiTags('integration')
 @Public()
@@ -76,7 +76,7 @@ export class IngressController {
   @ApiResponse({
     status: 503,
     description:
-      "A route whose response contract declares a `session-alive` preflight, when the bound session's engine is not connected. The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay.",
+      "A route whose response contract declares a `session-alive` preflight, when the bound session has no running engine or its engine has failed (a starting, reconnecting or QR-pending session is answered with the route's ack). The delivery is not persisted, so the provider's retry is treated as a new one; `Retry-After` carries the delay.",
   })
   async receive(
     @Param('pluginId') pluginId: string,
