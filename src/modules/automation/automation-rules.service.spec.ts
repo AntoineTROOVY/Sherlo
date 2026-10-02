@@ -239,6 +239,10 @@ describe('AutomationRulesService', () => {
     it.each([
       ['a null condition', { conditions: [null] }, inbound()],
       ['a non-list conditions value on a broadcast message', { conditions: 'x' }, inbound({ kind: 'broadcast' })],
+      ['a non-list conditions value', { conditions: 'x' }, inbound()],
+      ['an object as the conditions value', { conditions: {} }, inbound()],
+      ['a string as the conditions object', 'x', inbound()],
+      ['an array as the conditions object', [], inbound()],
     ])('a rule with %s is skipped on its own; later rules still answer', async (_label, conditions, message) => {
       const broken = await service.create('sessA', { name: 'broken', replyText: 'broken-reply', cooldownSeconds: 0 });
       // Stored the way a restore writes it: the DTO would refuse this value.

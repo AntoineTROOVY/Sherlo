@@ -177,9 +177,20 @@ export class AutomationRulesService {
     // order (creation order) is the tiebreak the operator can reason about. A rule without a `kind`
     // condition skips the opt-in chat kinds; naming the kind is how a rule reaches them. A rule whose
     // stored conditions are malformed (a restore bypasses the DTO) is skipped on its own, so it cannot
-    // silence every other rule of the session.
+    // silence every other rule of the session. A `conditions` that is not a plain object, or a
+    // non-array `conditions.conditions`, is refused explicitly: evaluateFilters reads either as "no
+    // filter", which would answer every inbound message.
     const rule = rules.find(candidate => {
       try {
+        const conditions: unknown = candidate.conditions;
+        if (
+          conditions != null &&
+          (typeof conditions !== 'object' ||
+            Array.isArray(conditions) ||
+            (candidate.conditions?.conditions != null && !Array.isArray(candidate.conditions.conditions)))
+        ) {
+          throw new TypeError('conditions must be an object with a conditions array');
+        }
         return (
           (!optInOnly || candidate.conditions?.conditions?.some(c => c.field === 'kind')) &&
           evaluateFilters(candidate.conditions, 'message.received', message, resolveLid)
