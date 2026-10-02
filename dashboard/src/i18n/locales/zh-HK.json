@@ -1051,7 +1051,7 @@
       "healthFail": "健康檢查失敗",
       "healthError": "健康檢查錯誤",
       "savedTitle": "設定已儲存",
-      "savedDesc": "需要重新啟動伺服器以套用變更。",
+      "savedDesc": "變更無需重新啟動伺服器即可生效。",
       "saveFailed": "儲存失敗",
       "installed": "外掛已安裝",
       "installFailed": "安裝失敗",

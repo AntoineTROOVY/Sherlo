@@ -1051,7 +1051,7 @@
       "healthFail": "상태 확인 실패",
       "healthError": "상태 확인 오류",
       "savedTitle": "설정 저장 완료",
-      "savedDesc": "변경 사항을 적용하려면 서버를 재시작해야 합니다.",
+      "savedDesc": "변경 사항은 서버를 재시작하지 않아도 적용됩니다.",
       "saveFailed": "저장 실패",
       "installed": "플러그인이 설치되었습니다",
       "installFailed": "설치 실패",

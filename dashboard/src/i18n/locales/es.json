@@ -1057,7 +1057,7 @@
       "healthFail": "Comprobación de salud fallida",
       "healthError": "Error en la comprobación de salud",
       "savedTitle": "Configuración guardada",
-      "savedDesc": "Es necesario reiniciar el servidor para aplicar los cambios.",
+      "savedDesc": "Los cambios surten efecto sin reiniciar el servidor.",
       "saveFailed": "Error al guardar",
       "installed": "Plugin instalado",
       "installFailed": "Error en la instalación",

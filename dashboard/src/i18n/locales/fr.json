@@ -1057,7 +1057,7 @@
       "healthFail": "Bilan de santé échoué",
       "healthError": "Erreur lors du bilan de santé",
       "savedTitle": "Configuration enregistrée",
-      "savedDesc": "Redémarrage du serveur requis pour appliquer les modifications.",
+      "savedDesc": "Les modifications prennent effet sans redémarrage du serveur.",
       "saveFailed": "Échec de l'enregistrement",
       "installed": "Plugin installé",
       "installFailed": "Échec de l'installation",

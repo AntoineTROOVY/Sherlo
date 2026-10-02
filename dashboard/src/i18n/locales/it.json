@@ -1057,7 +1057,7 @@
       "healthFail": "Controllo dello Stato Fallito",
       "healthError": "Errore nel Controllo dello Stato",
       "savedTitle": "Configurazione Salvata",
-      "savedDesc": "È richiesto il riavvio del server per applicare le modifiche.",
+      "savedDesc": "Le modifiche hanno effetto senza riavviare il server.",
       "saveFailed": "Salvataggio non riuscito",
       "installed": "Plugin installato",
       "installFailed": "Installazione non riuscita",

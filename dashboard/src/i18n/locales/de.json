@@ -1051,7 +1051,7 @@
       "healthFail": "Funktionsprüfung fehlgeschlagen",
       "healthError": "Fehler bei der Funktionsprüfung",
       "savedTitle": "Konfiguration gespeichert",
-      "savedDesc": "Ein Serverneustart ist erforderlich, um die Änderungen anzuwenden.",
+      "savedDesc": "Änderungen werden ohne Serverneustart wirksam.",
       "saveFailed": "Speichern fehlgeschlagen",
       "installed": "Plugin installiert",
       "installFailed": "Installation fehlgeschlagen",

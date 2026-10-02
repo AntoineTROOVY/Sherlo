@@ -1051,7 +1051,7 @@
       "healthFail": "Sağlık Kontrolü Başarısız",
       "healthError": "Sağlık Kontrolü Hatası",
       "savedTitle": "Yapılandırma Kaydedildi",
-      "savedDesc": "Değişikliklerin uygulanması için sunucunun yeniden başlatılması gerekir.",
+      "savedDesc": "Değişiklikler sunucu yeniden başlatılmadan geçerli olur.",
       "saveFailed": "Kaydetme Başarısız",
       "installed": "Eklenti yüklendi",
       "installFailed": "Yükleme başarısız",

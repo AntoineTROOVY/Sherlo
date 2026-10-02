@@ -1051,7 +1051,7 @@
       "healthFail": "健康检查失败",
       "healthError": "健康检查出错",
       "savedTitle": "配置已保存",
-      "savedDesc": "需要重启服务器以应用更改。",
+      "savedDesc": "更改无需重启服务器即可生效。",
       "saveFailed": "保存失败",
       "installed": "插件已安装",
       "installFailed": "安装失败",

@@ -1051,7 +1051,7 @@
       "healthFail": "Cek Kesehatan Gagal",
       "healthError": "Kesalahan Cek Kesehatan",
       "savedTitle": "Konfigurasi Disimpan",
-      "savedDesc": "Restart server diperlukan untuk menerapkan perubahan.",
+      "savedDesc": "Perubahan berlaku tanpa restart server.",
       "saveFailed": "Gagal Menyimpan",
       "installed": "Plugin terpasang",
       "installFailed": "Gagal menginstal",
