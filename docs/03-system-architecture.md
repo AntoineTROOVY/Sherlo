@@ -1553,8 +1553,8 @@ flowchart LR
 | **Enterprise** | PostgreSQL | S3/MinIO | Redis | 10+      | 4GB+  | Agency, high volume   |
 
 > Session counts are guidance only by default. Set `MAX_CONCURRENT_SESSIONS` to a positive integer
-> to cap concurrently running or initializing engines; the default `0` keeps the historical
-> unlimited behavior.
+> to cap concurrently running or initializing engines, plus sessions waiting to relaunch after a
+> failed reconnect; the default `0` keeps the historical unlimited behavior.
 
 ### Configuration Examples
 
