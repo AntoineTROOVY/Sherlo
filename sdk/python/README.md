@@ -17,8 +17,10 @@ This README describes `main`. The 0.5.0 release lacks, among other additions, `s
 type, the `.code`, `.retry_after_seconds` and `.headers` error attributes, the `name` key of
 `ListSessionsQuery`, the `after` and `inlineMedia` keys of `ListMessagesQuery`, the `archived`,
 `pinned`, `muted` and `muteExpiration` keys of `ChatSummary`, the `order` and `product` keys of
-`ChatHistoryMessage` and the refusal of an empty, `.` or `..` id; they ship with the next SDK
-release. See [the SDK overview](../README.md#coverage).
+`ChatHistoryMessage`, the refusal of an empty, `.` or `..` id and the `ValueError` that
+`client.request` raises for a path that does not begin with `/` (0.5.0 resolves `api/health`
+against the base URL); they ship with the next SDK release. See
+[the SDK overview](../README.md#coverage).
 
 ## Usage
 

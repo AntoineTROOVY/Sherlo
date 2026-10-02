@@ -58,7 +58,8 @@ does not recognise to `null` (`MessageType` and `ChatKind` included), and
 `SessionStatus`, `DeliveryStatus` and the other response enums that lack an
 `unknown` wire value have no `UNKNOWN` constant there.
 The refusal of an empty, `.` or `..` id (and, in the JavaScript, Go and Java
-raw-request methods, of a `.` or `..` path segment), the PHP
+raw-request methods, of a `.` or `..` path segment), the refusal by all five
+raw-request methods of a path that does not begin with `/`, the PHP
 `sessions->create()` fix that sends an empty `config` as `{}`, the PHP
 `allowInsecureHttp` option (0.5.0 always raises an `E_USER_WARNING` for a
 non-local `http://` `baseUrl`) and the `null` return of PHP `catalog->info()`

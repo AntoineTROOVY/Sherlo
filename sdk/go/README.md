@@ -19,8 +19,9 @@ This README describes `main`. The v0.5.0 release lacks, among other additions,
 filter, the `After` and `InlineMedia` fields of `ListMessagesQuery`, the
 `Archived`, `Pinned`, `Muted` and `MuteExpiration` fields of `ChatSummary`, the
 `Order` and `Product` fields of `ChatHistoryMessage`, the `APIError` fields
-`Code`, `RetryAfter` and `Header` and the refusal of empty and dot ids; they ship
-with the next SDK release. See
+`Code`, `RetryAfter` and `Header`, the refusal of empty and dot ids and the
+refusal of a `Do` path that does not begin with `/`; they ship with the next SDK
+release. See
 [the SDK overview](../README.md#coverage).
 
 ## Quick start
