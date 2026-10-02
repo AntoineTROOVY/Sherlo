@@ -151,8 +151,8 @@ async function bootstrap() {
   app.useWebSocketAdapter(new RedisIoAdapter(app));
 
   // The production HTTP surface: request context, the CSP nonce, helmet, the SPA document handler,
-  // CORS, in-flight body budget, body parsers and the trailing-slash DELETE refusal. Extracted so the
-  // e2e lane runs the SAME stack instead of a copy of it (src/configure-app.ts).
+  // CORS, the encoded-NUL refusal, in-flight body budget, body parsers and the trailing-slash DELETE
+  // refusal. Extracted so the e2e lane runs the SAME stack instead of a copy of it (src/configure-app.ts).
   const { bodyLimit, inflightBudgetBytes } = configureApp(app);
   bootstrapLogger.log(`Request body caps: ${bodyLimit} per request, ${inflightBudgetBytes} bytes aggregate in flight`);
 

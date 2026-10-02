@@ -263,6 +263,19 @@ describe('production HTTP surface (configureApp)', () => {
     expect(ingressHits).toEqual(['DELETE /api/ingress/p/i/hook/', 'DELETE /API/ingress/p/i/hook/']);
   });
 
+  it('refuses a path or query that decodes to a NUL character before any route runs', async () => {
+    ingressHits.length = 0;
+    for (const path of ['/api/sessions/abc%00', '/api/sessions/abc?name=%00', '/api/ingress/p%00/i/hook']) {
+      const res = await request(app.getHttpServer()).get(path).set('Origin', 'https://allowed.example').expect(400);
+      expect(res.body).toMatchObject({ statusCode: 400, error: 'Bad Request' });
+      expect(res.headers['x-request-id']).toBeDefined();
+      expect(res.headers['access-control-allow-origin']).toBe('https://allowed.example');
+    }
+    expect(ingressHits).toEqual([]);
+    // %2500 decodes to the text "%00", not to a NUL, so it still reaches the route.
+    await request(app.getHttpServer()).get('/api/sessions/abc%2500').expect(200);
+  });
+
   it('answers a compressed body with 415 rather than charging the budget its inflated size', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/echo')
