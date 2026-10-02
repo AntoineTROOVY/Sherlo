@@ -357,9 +357,9 @@ Live WhatsApp checks require an operator-owned account and should not be part of
   smoke imports Baileys and launches the browser, neither of which needs WhatsApp to be reachable.
 - The default `test` job uses SQLite; PostgreSQL 16 is only exercised by the dedicated `test-postgres` job.
 - No default CI job exercises S3/MinIO or Docker socket proxy integration. (Redis is no longer a gap: the
-  `test` job starts a `redis:7-alpine` service container so the queue-on e2e suite has a broker. That suite
-  skips itself when no Redis is reachable, so it stays green on a machine without one; under GitHub Actions
-  it fails instead, so a workflow that loses its Redis service cannot report the suite green.)
+  `test` job starts a `redis:7-alpine` service container so the queue-on and throttler-redis e2e suites have a
+  broker. Those suites skip themselves when no Redis is reachable, so they stay green on a machine without one;
+  under GitHub Actions they fail instead, so a workflow that loses its Redis service cannot report them green.)
 - Performance testing is not automated.
 - Dashboard browser/visual UI tests are not currently automated; dashboard pure utility tests run via `npm --prefix dashboard run test:unit`.
 
