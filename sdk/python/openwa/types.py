@@ -1250,6 +1250,7 @@ class AuthValidateResponse(TypedDict, total=False):
     valid: bool
     role: str
     engineType: str
+    scoped: bool
 
 
 # ── Template ──────────────────────────────────────────────────────

@@ -15,6 +15,7 @@ from openwa.errors import OpenWAServiceUnavailableError
 from openwa.resources.catalog import CatalogResource
 from openwa.resources.messages import MessagesResource
 from openwa.types import (
+    AuthValidateResponse,
     BatchCancelResponse,
     HealthReadyResponse,
     WebhookDelivery,
@@ -899,6 +900,9 @@ class TestChatsAndHealth:
     def test_health_ready_response_requires_details(self):
         # The readiness route always sends details, on the 200 and on the 503.
         assert HealthReadyResponse.__required_keys__ == frozenset({"status", "details"})
+
+    def test_auth_validate_response_carries_scoped(self):
+        assert "scoped" in AuthValidateResponse.__optional_keys__
 
 
 class TestLabelsChannelsCatalog:

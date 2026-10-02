@@ -1235,6 +1235,7 @@ export interface AuthValidateResponse {
   valid: boolean;
   role?: string;
   engineType?: string;
+  scoped?: boolean;
 }
 
 // ── Template ──────────────────────────────────────────────────────

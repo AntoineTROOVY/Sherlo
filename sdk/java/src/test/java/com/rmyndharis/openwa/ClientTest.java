@@ -126,8 +126,8 @@ class ClientTest {
 
     @Test
     void authPostsToValidatePath() {
-        tx.respond(200, "{\"valid\":true,\"role\":\"OPERATOR\"}");
-        client.auth();
+        tx.respond(200, "{\"valid\":true,\"role\":\"OPERATOR\",\"scoped\":true}");
+        assertEquals(Boolean.TRUE, client.auth().scoped());
         assertEquals("http://h:2785/api/auth/validate", tx.lastRequest().url());
         assertEquals(HttpMethod.POST, tx.lastRequest().method());
     }
