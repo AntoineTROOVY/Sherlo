@@ -20,6 +20,9 @@ import { SessionOwnershipService } from '../session/session-ownership.service';
 import { HookManager } from '../../core/hooks';
 import { SsrfBlockedError } from '../../common/security/ssrf-guard';
 import { EnginePageError } from '../../common/errors/engine-page.error';
+import { EngineRefusedError } from '../../common/errors/engine-refused.error';
+import { EngineThrottledError } from '../../common/errors/engine-throttled.error';
+import { EngineTransportError } from '../../common/errors/engine-transport.error';
 
 /** Regression lock for the terminal-status decision (cancel-clobber + stopOnError overwrite bugs). */
 describe('resolveFinalBatchStatus', () => {
@@ -1020,6 +1023,48 @@ describe('BulkMessageService.processBatch', () => {
     expect(engine.sendTextMessage).not.toHaveBeenCalled();
     expect(hookManager.execute).not.toHaveBeenCalledWith('message:failed', expect.anything(), expect.anything());
     expect(pacing.recordSendFailure).not.toHaveBeenCalled();
+  });
+
+  // Bulk writes an item's row only after the engine accepts it, so an item that fails first must stop
+  // counting against the caps at once, or it refuses the next item for the rest of the hold.
+  it.each([
+    ['a plugin blocks it', () => hookManager.execute.mockResolvedValueOnce({ continue: false })],
+    ['the engine refuses it', () => engine.sendTextMessage.mockRejectedValueOnce(new EngineRefusedError('refused'))],
+    [
+      'WhatsApp throttles it',
+      () => engine.sendTextMessage.mockRejectedValueOnce(new EngineThrottledError('rate-overlimit')),
+    ],
+    ['its media URL is blocked', () => engine.sendTextMessage.mockRejectedValueOnce(new SsrfBlockedError('blocked'))],
+  ])('releases the pacing admission of an item that fails before its row when %s', async (_label, arrange) => {
+    const release = jest.fn();
+    pacing.assertSendAllowed.mockResolvedValue(release);
+    repo.findOne.mockResolvedValue(makeBatch(1));
+    arrange();
+
+    await runProcessBatch();
+
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['the engine accepts it', () => undefined],
+    [
+      'the engine fails with an unknown outcome',
+      () => engine.sendTextMessage.mockRejectedValueOnce(new Error('timeout')),
+    ],
+    [
+      'the engine transport fails',
+      () => engine.sendTextMessage.mockRejectedValueOnce(new EngineTransportError('timeout')),
+    ],
+  ])('keeps the pacing admission held when %s', async (_label, arrange) => {
+    const release = jest.fn();
+    pacing.assertSendAllowed.mockResolvedValue(release);
+    repo.findOne.mockResolvedValue(makeBatch(1));
+    arrange();
+
+    await runProcessBatch();
+
+    expect(release).not.toHaveBeenCalled();
   });
 
   it('sends a bulk audio item with ptt as a voice note and persists type "voice"', async () => {

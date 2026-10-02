@@ -6,7 +6,7 @@ import type {
   PaginatedProducts,
   MessageResult,
 } from '../../engine/interfaces/whatsapp-engine.interface';
-import { SendPacingService, countsTowardSendBreaker } from '../message/send-pacing.service';
+import { SendPacingService, countsTowardSendBreaker, sentNothing } from '../message/send-pacing.service';
 import { HookManager, applySendingGate } from '../../core/hooks';
 
 @Injectable()
@@ -53,29 +53,38 @@ export class CatalogService {
    * that row lands.
    */
   async sendProduct(sessionId: string, chatId: string, productId: string, body?: string): Promise<MessageResult> {
-    await this.pacing.assertSendAllowed(sessionId, chatId);
-    const gated = await applySendingGate(
-      this.hookManager,
-      sessionId,
-      'product',
-      // The DTO lets a JSON null through as "no body". Normalised here, so the checks below only ever
-      // judge what a plugin handed back, never the caller's own input.
-      { chatId, productId, body: body ?? undefined },
-      'CatalogService',
-    );
-    const gatedProductId: unknown = gated.productId;
-    const gatedBody: unknown = gated.body;
-    if (typeof gatedProductId !== 'string' || gatedProductId === '') {
-      throw new BadRequestException('A message:sending handler returned an invalid productId');
+    const release = await this.pacing.assertSendAllowed(sessionId, chatId);
+    let engineAsked = false;
+    try {
+      const gated = await applySendingGate(
+        this.hookManager,
+        sessionId,
+        'product',
+        // The DTO lets a JSON null through as "no body". Normalised here, so the checks below only ever
+        // judge what a plugin handed back, never the caller's own input.
+        { chatId, productId, body: body ?? undefined },
+        'CatalogService',
+      );
+      const gatedProductId: unknown = gated.productId;
+      const gatedBody: unknown = gated.body;
+      if (typeof gatedProductId !== 'string' || gatedProductId === '') {
+        throw new BadRequestException('A message:sending handler returned an invalid productId');
+      }
+      if (gatedBody !== undefined && typeof gatedBody !== 'string') {
+        throw new BadRequestException('A message:sending handler returned an invalid body');
+      }
+      const engine = this.engines.require(
+        sessionId,
+        () => new NotFoundException(`Session ${sessionId} not found or not connected`),
+      );
+      engineAsked = true;
+      return await this.recordedSend(sessionId, () => engine.sendProduct(chatId, gatedProductId, gatedBody));
+    } catch (error) {
+      // No row is written here, so a send that provably never went out gives its pacing admission back.
+      // One whose outcome is unknown stays held: its own-send echo may still write the row.
+      if (!engineAsked || sentNothing(error)) release?.();
+      throw error;
     }
-    if (gatedBody !== undefined && typeof gatedBody !== 'string') {
-      throw new BadRequestException('A message:sending handler returned an invalid body');
-    }
-    const engine = this.engines.require(
-      sessionId,
-      () => new NotFoundException(`Session ${sessionId} not found or not connected`),
-    );
-    return this.recordedSend(sessionId, () => engine.sendProduct(chatId, gatedProductId, gatedBody));
   }
 
   /**

@@ -8,6 +8,8 @@ import { resolveSendPacingConfig, type SendPacingConfig } from './send-pacing.co
 import { incrementSendPacingRefusals, type SendPacingRefusalReason } from '../../common/metrics/send-pacing-metrics';
 import { createLogger } from '../../common/services/logger.service';
 import { EngineRefusedError } from '../../common/errors/engine-refused.error';
+import { EngineNotSupportedError } from '../../common/errors/engine-not-supported.error';
+import { EngineThrottledError } from '../../common/errors/engine-throttled.error';
 import { SsrfBlockedError } from '../../common/security/ssrf-guard';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../audit/entities/audit-log.entity';
@@ -53,6 +55,21 @@ export function countsTowardSendBreaker(error: unknown): boolean {
 }
 
 /**
+ * Whether a send that threw provably never went out, so its admission can be handed back: a client or
+ * refusal status (4xx), a 501 for something the engine cannot do, a media URL the SSRF guard blocked
+ * before any fetch, or a WhatsApp rate limit (EngineThrottledError), turned away before it ran. Anything
+ * else (a deadline, a dropped socket, a dead page) leaves the outcome unknown; WhatsApp may have taken
+ * the message, so its admission stays held.
+ */
+export function sentNothing(error: unknown): boolean {
+  return (
+    error instanceof SsrfBlockedError ||
+    (error instanceof HttpException &&
+      (error.getStatus() < 500 || error instanceof EngineNotSupportedError || error instanceof EngineThrottledError))
+  );
+}
+
+/**
  * Cold reachouts `assertReachoutAllowed` set aside on the group tally for one request, and the UTC
  * day they were taken from. Hand it back to `refundGroupReachouts` if the engine call fails.
  */
@@ -93,8 +110,9 @@ interface AdmissionHold {
 
 /**
  * How long each admitted send is held against the caps, from its own admission, before only its row
- * counts. It only has to outlast the gap between the check and the row insert; a gated send that never
- * writes a row (a plugin veto) is over-counted for at most this long.
+ * counts. It only has to outlast the gap between the check and the row insert. A send that fails before
+ * writing a row hands its admission back (see assertSendAllowed), so only one that may still have gone
+ * out is over-counted, and for at most this long.
  */
 const ADMISSION_WINDOW_MS = 10_000;
 
@@ -186,8 +204,16 @@ export class SendPacingService {
    *
    * `hold: false` judges the send without holding it in the admission window, for a gated send that
    * never writes a row (an edit): holding it would charge the caps for a message that is never sent.
+   *
+   * Returns the release for the admission it held, or undefined when it held none. A caller whose send
+   * fails before writing a row, and before WhatsApp may have taken it, calls the release so that send
+   * stops counting against the caps at once instead of refusing the next one.
    */
-  async assertSendAllowed(sessionId: string, chatId?: string, opts: { hold?: boolean } = {}): Promise<void> {
+  async assertSendAllowed(
+    sessionId: string,
+    chatId?: string,
+    opts: { hold?: boolean } = {},
+  ): Promise<(() => void) | undefined> {
     const config = resolveSendPacingConfig(this.configService);
     if (!config.enabled) return;
 
@@ -227,6 +253,11 @@ export class SendPacingService {
       const hold = this.holds.get(sessionId);
       if (hold?.dayStartMs === dayStart.getTime()) hold.admissions.push(admission);
       else this.holds.set(sessionId, { dayStartMs: dayStart.getTime(), admissions: [admission] });
+      return () => {
+        const admissions = this.holds.get(sessionId)?.admissions;
+        const index = admissions?.indexOf(admission) ?? -1;
+        if (admissions && index !== -1) admissions.splice(index, 1);
+      };
     }
   }
 
@@ -457,7 +488,8 @@ export class SendPacingService {
     const sentToday = held.reduce((max, a, i) => Math.max(max, a.sentToday + held.length - i), persisted);
     if (sentToday < allowance) return;
 
-    this.refuse('daily_cap', sessionId, secondsUntilNextUtcDay(), {
+    const retryAfter = persisted < allowance ? secondsUntilLapsed(held) : secondsUntilNextUtcDay();
+    this.refuse('daily_cap', sessionId, retryAfter, {
       reason: `Daily send allowance of ${allowance} reached for a session ${ageDays} day(s) old`,
       allowance,
       sentToday,
@@ -542,11 +574,15 @@ export class SendPacingService {
   ): void {
     // Group adds share this budget: a day spent adding strangers to groups must leave fewer cold
     // chat reachouts, so fold the in-memory group tally in alongside the chat count.
-    const coldToday =
-      this.chatReachoutsToday(sessionId, dayStart, persisted) + this.groupReachoutsToday(sessionId, dayStart);
+    const groupToday = this.groupReachoutsToday(sessionId, dayStart);
+    const coldToday = this.chatReachoutsToday(sessionId, dayStart, persisted) + groupToday;
     if (coldToday < allowance) return;
 
-    this.refuse('cold_daily_cap', sessionId, secondsUntilNextUtcDay(), {
+    const retryAfter =
+      persisted + groupToday < allowance
+        ? secondsUntilLapsed(this.heldAdmissions(sessionId, dayStart).filter(a => a.cold))
+        : secondsUntilNextUtcDay();
+    this.refuse('cold_daily_cap', sessionId, retryAfter, {
       reason: `Daily allowance of ${allowance} new conversation(s) reached for a session ${ageDays} day(s) old`,
       allowance,
       coldToday,
@@ -667,6 +703,15 @@ function dialectVariants(chatId: string): string[] {
  */
 function startOfUtcDay(at: Date): Date {
   return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
+}
+
+/**
+ * Seconds until every one of these held admissions has lapsed: when the persisted count alone is under
+ * the cap, the refusal lifts then, not at the next UTC day.
+ */
+function secondsUntilLapsed(held: Admission[]): number {
+  const newest = held.at(-1)?.at ?? Date.now();
+  return Math.max(1, Math.ceil((newest + ADMISSION_WINDOW_MS - Date.now()) / 1000));
 }
 
 function secondsUntilNextUtcDay(): number {

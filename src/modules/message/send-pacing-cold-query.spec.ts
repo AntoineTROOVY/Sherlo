@@ -73,7 +73,7 @@ describe('cold-reachout counting against a real database', () => {
     await addMessage('known@c.us', TODAY);
 
     // Two cold reachouts used of three: a third stranger is still allowed.
-    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeUndefined();
+    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeInstanceOf(Function);
 
     await addMessage('new-3@c.us', TODAY);
     await expect(service.assertSendAllowed('s1', 'stranger-2@c.us')).rejects.toMatchObject({ status: 429 });
@@ -88,9 +88,9 @@ describe('cold-reachout counting against a real database', () => {
     await addMessage('inbound-4@c.us', TODAY, MessageDirection.INCOMING);
 
     // Replying to any of them is never refused, however many there are…
-    await expect(service.assertSendAllowed('s1', 'inbound-1@c.us')).resolves.toBeUndefined();
+    await expect(service.assertSendAllowed('s1', 'inbound-1@c.us')).resolves.toBeInstanceOf(Function);
     // …and none of them consumed the cold budget, so a stranger is still allowed.
-    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeUndefined();
+    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeInstanceOf(Function);
   });
 
   // The class rule — answering someone who wrote first is not a reachout — must hold for the
@@ -106,7 +106,7 @@ describe('cold-reachout counting against a real database', () => {
     await addMessage('cold-2@c.us', '2026-08-03T10:00:00.000Z', MessageDirection.INCOMING);
 
     // Two of three used: the answered chat did not count, the replied-to reachout still does.
-    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeUndefined();
+    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeInstanceOf(Function);
 
     await addMessage('cold-3@c.us', TODAY);
     await expect(service.assertSendAllowed('s1', 'stranger-2@c.us')).rejects.toMatchObject({ status: 429 });
@@ -121,7 +121,7 @@ describe('cold-reachout counting against a real database', () => {
       [TODAY, TODAY, TODAY],
     );
 
-    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeUndefined();
+    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeInstanceOf(Function);
   });
 
   // Whether a chat is new is a question about THIS account, not the deployment: another session
@@ -151,7 +151,7 @@ describe('cold-reachout counting against a real database', () => {
     await addMessage('cold-3@c.us', TODAY);
 
     // The budget of three is spent, but the @c.us spelling of a known contact stays warm.
-    await expect(service.assertSendAllowed('s1', '628555@c.us')).resolves.toBeUndefined();
+    await expect(service.assertSendAllowed('s1', '628555@c.us')).resolves.toBeInstanceOf(Function);
   });
 
   // The per-send probe and the daily aggregate must agree about who is a stranger, or the aggregate
@@ -166,7 +166,7 @@ describe('cold-reachout counting against a real database', () => {
     await addMessage('cold-2@c.us', TODAY);
 
     // Two of three used (the warm contact counted zero, the double-spelled stranger counted once).
-    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeUndefined();
+    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeInstanceOf(Function);
 
     await addMessage('cold-3@c.us', TODAY);
     await expect(service.assertSendAllowed('s1', 'stranger-2@c.us')).rejects.toMatchObject({ status: 429 });
@@ -178,7 +178,7 @@ describe('cold-reachout counting against a real database', () => {
     await addMessage('y3@c.us', YESTERDAY);
     await addMessage('y4@c.us', YESTERDAY);
 
-    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeUndefined();
+    await expect(service.assertSendAllowed('s1', 'stranger@c.us')).resolves.toBeInstanceOf(Function);
   });
 });
 
@@ -617,6 +617,40 @@ describe('concurrent sends against a real database', () => {
     }
 
     expect(sent).toEqual([true, true, true, true]);
+  });
+
+  it('stops counting an admitted send against the caps once it is released', async () => {
+    const service = build([2], [2]);
+    expect(await send(service, 'first@c.us', 1)).toBe(true);
+    // Admitted, then failed before writing a row (a plugin veto, an engine refusal).
+    const release = await service.assertSendAllowed('s1', 'second@c.us');
+    release?.();
+
+    expect(await send(service, 'third@c.us', 2)).toBe(true);
+  });
+
+  it('answers a refusal caused only by held sends with the seconds until they lapse', async () => {
+    const service = build([2], []);
+    expect(await send(service, 'known@c.us', 1)).toBe(true);
+    await service.assertSendAllowed('s1', 'known@c.us');
+    jest.setSystemTime(NOW.getTime() + 3_000);
+
+    await expect(service.assertSendAllowed('s1', 'known@c.us')).rejects.toMatchObject({
+      status: 429,
+      response: { code: SEND_PACING_LIMITED, retryAfterSeconds: 7 },
+    });
+  });
+
+  it('answers a cold refusal caused only by held sends with the seconds until they lapse', async () => {
+    const service = build([10_000], [2]);
+    expect(await send(service, 'first@c.us', 1)).toBe(true);
+    await service.assertSendAllowed('s1', 'second@c.us');
+    jest.setSystemTime(NOW.getTime() + 4_000);
+
+    await expect(service.assertSendAllowed('s1', 'third@c.us')).rejects.toMatchObject({
+      status: 429,
+      response: { code: SEND_PACING_LIMITED, retryAfterSeconds: 6 },
+    });
   });
 
   it('judges by the persisted rows alone once the hold has lapsed', async () => {

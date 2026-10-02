@@ -192,6 +192,33 @@ describe('CatalogService', () => {
       expect(sendProduct).not.toHaveBeenCalled();
     });
 
+    // A product send writes no row of its own, so one that provably never went out must stop counting
+    // against the pacing caps at once; one whose outcome is unknown may still be echoed, and stays held.
+    it.each([
+      ['a plugin vetoes it', { veto: true }, true],
+      ['the session is not started', { noEngine: true }, true],
+      ['the engine cannot send products', { engineError: new EngineNotSupportedError('sendProduct') }, true],
+      ['the engine fails with an unknown outcome', { engineError: new Error('socket closed') }, false],
+    ])('when %s, releases its pacing admission: %p', async (_label, setup, released) => {
+      const {
+        veto = false,
+        noEngine = false,
+        engineError,
+      } = setup as {
+        veto?: boolean;
+        noEngine?: boolean;
+        engineError?: Error;
+      };
+      const release = jest.fn();
+      const pacing = { assertSendAllowed: jest.fn().mockResolvedValue(release) };
+      const hookManager = veto ? { execute: jest.fn().mockResolvedValue({ continue: false }) } : passThroughHooks();
+      const sendProduct = jest.fn().mockRejectedValue(engineError);
+      const { svc } = makeService(noEngine ? undefined : { sendProduct }, pacing, hookManager);
+
+      await expect(svc.sendProduct('s1', '628123@c.us', 'prod-1')).rejects.toBeDefined();
+      expect(release).toHaveBeenCalledTimes(released ? 1 : 0);
+    });
+
     it('propagates an engine failure from sendProduct', async () => {
       const down = new Error('socket closed');
       const sendProduct = jest.fn().mockRejectedValue(down);
