@@ -1019,7 +1019,7 @@ class TestSearch:
             "sessionId": "s1",
             "chatId": "628123@c.us",
             "direction": "incoming",
-            "type": "chat",
+            "type": "text",
             "from": "628123456789@c.us",
             "dateFrom": 1720000000000,
             "dateTo": 1720100000000,
@@ -1032,7 +1032,7 @@ class TestSearch:
         assert "sessionId=s1" in url
         assert "chatId=628123%40c.us" in url  # @ percent-encoded in query
         assert "direction=incoming" in url
-        assert "type=chat" in url
+        assert "type=text" in url
         assert "from=628123456789%40c.us" in url
         assert "dateFrom=1720000000000" in url
         assert "dateTo=1720100000000" in url
@@ -1044,7 +1044,7 @@ class TestSearch:
             "messageId": "m1", "waMessageId": "wam1", "sessionId": "s1",
             "chatId": "628123@c.us", "body": "please send the invoice",
             "snippet": "please send the <mark>invoice</mark>", "timestamp": 1720000000,
-            "type": "chat", "direction": "incoming", "from": "628123456789@c.us",
+            "type": "text", "direction": "incoming", "from": "628123456789@c.us",
             "score": 0.42,
         }
         backend = MockBackend().on("GET", "/api/search", body={
