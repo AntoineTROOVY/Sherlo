@@ -561,6 +561,64 @@ describe('concurrent sends against a real database', () => {
     expect(sent).toEqual([true, true, true, true, true, false, false]);
   });
 
+  it('holds a send admitted just before the window would have lapsed for a full window of its own', async () => {
+    const service = build([2], []);
+    expect(await send(service, 'known@c.us', 1)).toBe(true);
+    jest.setSystemTime(NOW.getTime() + 9_990);
+    // Admitted, but its row has not landed yet (the plugin gate is still running).
+    await service.assertSendAllowed('s1', 'known@c.us');
+    jest.setSystemTime(NOW.getTime() + 10_010);
+
+    await expect(service.assertSendAllowed('s1', 'known@c.us')).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('holds a cold send admitted just before the window would have lapsed', async () => {
+    const service = build([10_000], [2]);
+    expect(await send(service, 'first@c.us', 1)).toBe(true);
+    jest.setSystemTime(NOW.getTime() + 9_990);
+    await service.assertSendAllowed('s1', 'second@c.us');
+    jest.setSystemTime(NOW.getTime() + 10_010);
+
+    await expect(service.assertSendAllowed('s1', 'third@c.us')).rejects.toMatchObject({ status: 429 });
+  });
+
+  it('counts a burst against rows the session wrote without asking, not a stale base', async () => {
+    const service = build([5], []);
+    expect(await send(service, 'known@c.us', 1)).toBe(true);
+    jest.setSystemTime(NOW.getTime() + 5_000);
+    // Sent from the phone: outgoing rows that never went through this check.
+    for (const id of ['phone1', 'phone2']) {
+      await ds.query(
+        `INSERT INTO "messages" ("id","sessionId","chatId","from","to","type","direction","createdAt")
+         VALUES (?,'s1','known@c.us','a','b','text','outgoing',?)`,
+        [id, new Date().toISOString()],
+      );
+    }
+    jest.setSystemTime(NOW.getTime() + 8_000);
+    expect(await send(service, 'known@c.us', 2)).toBe(true);
+    jest.setSystemTime(NOW.getTime() + 12_000);
+
+    const sent = await Promise.all(Array.from({ length: 5 }, (_, i) => send(service, 'known@c.us', 10 + i)));
+
+    expect(sent.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('stops holding a send that wrote no row once its own window ends, however busy the session', async () => {
+    const service = build([5], []);
+    // Three admitted sends that never write a row (an engine failure in a bulk batch), 3 s apart.
+    for (let i = 0; i < 3; i++) {
+      jest.setSystemTime(NOW.getTime() + i * 3_000);
+      await service.assertSendAllowed('s1', 'known@c.us');
+    }
+    const sent: boolean[] = [];
+    for (let i = 3; i < 7; i++) {
+      jest.setSystemTime(NOW.getTime() + i * 3_000);
+      sent.push(await send(service, 'known@c.us', i));
+    }
+
+    expect(sent).toEqual([true, true, true, true]);
+  });
+
   it('judges by the persisted rows alone once the hold has lapsed', async () => {
     const service = build([5], []);
     // A gated send that never writes a row (a plugin veto) is held only briefly.

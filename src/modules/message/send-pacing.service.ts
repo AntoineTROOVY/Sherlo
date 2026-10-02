@@ -72,26 +72,29 @@ interface BreakerState {
 }
 
 /**
- * Sends admitted in a short window, per session. A send's row is written by the caller after the
- * check returns (after the plugin gate), so a burst of parallel requests would otherwise all read the
- * same persisted count and all pass. Each cap is judged by the larger of the persisted count and the
- * count it read when the window opened plus what was admitted since, so nothing is counted twice.
+ * A send admitted recently, with the counts it read before it was admitted. A send's row is written by
+ * the caller after the check returns (after the plugin gate), so a burst of parallel requests would
+ * otherwise all read the same persisted count and all pass. Each cap is judged by the larger of the
+ * persisted count and, for every held admission, the count it read plus the admissions held from it
+ * on: none of those rows can be in the count it read, so nothing is counted twice.
  */
-interface AdmissionWindow {
-  openedAt: number;
+interface Admission {
+  at: number;
+  sentToday: number;
+  /** Set for a cold send; the key is folded the way the cold count folds dialects. */
+  cold: { key: string; coldToday: number } | null;
+}
+
+/** The admissions a session holds, in the order they were admitted, for one UTC day. */
+interface AdmissionHold {
   dayStartMs: number;
-  sentBase: number;
-  sent: number;
-  /** Null until the window admits its first cold send. */
-  coldBase: number | null;
-  /** Cold chats admitted, folded the way the cold count folds dialects: one contact is one reachout. */
-  coldChats: Set<string>;
+  admissions: Admission[];
 }
 
 /**
- * How long admitted sends are held against the caps before only their rows count. It only has to
- * outlast the gap between the check and the row insert; a gated send that never writes a row (a
- * plugin veto) is over-counted for at most this long.
+ * How long each admitted send is held against the caps, from its own admission, before only its row
+ * counts. It only has to outlast the gap between the check and the row insert; a gated send that never
+ * writes a row (a plugin veto) is over-counted for at most this long.
  */
 const ADMISSION_WINDOW_MS = 10_000;
 
@@ -140,7 +143,7 @@ const MAX_REFUSAL_KEYS = 1000;
  * (MessageProjector.handleOwnSendEcho) shortly after the send returns. Deliberate, and documented in
  * .env.example and docs/06 so the number an operator reads is the number they get.
  * Because the row lands only after the check returns, sends admitted in the last few seconds are
- * also held in memory (see AdmissionWindow), or a parallel burst would pass against one stale count.
+ * also held in memory (see Admission), or a parallel burst would pass against one stale count.
  * The breaker, by contrast, is in memory on purpose: it describes live conditions, and a restart
  * clearing it is the correct behaviour.
  */
@@ -159,7 +162,7 @@ export class SendPacingService {
    * chat half is counted from the messages table and is.
    */
   private readonly groupReachoutTally = new Map<string, { dayStartMs: number; count: number }>();
-  private readonly admissions = new Map<string, AdmissionWindow>();
+  private readonly holds = new Map<string, AdmissionHold>();
   private readonly refusalSamples = new Map<string, RefusalSample>();
 
   constructor(
@@ -210,53 +213,50 @@ export class SendPacingService {
     this.assertUnderDailyCap(sessionId, dayStart, ageDays, allowance, sentToday);
     // A status post (no chatId) never writes a row and never has, so it is not held either.
     if (!chatId) return;
-    // A chat already admitted cold in this window is the same reachout again, not a new one.
-    if (cold && !this.admissionWindow(sessionId, dayStart)?.coldChats.has(coldChatKey(chatId))) {
+    // A chat already held as a cold admission is the same reachout again, not a new one.
+    const key = coldChatKey(chatId);
+    if (cold && !this.heldAdmissions(sessionId, dayStart).some(a => a.cold?.key === key)) {
       this.assertUnderColdCap(sessionId, dayStart, ageDays, cold);
     }
     if (opts.hold !== false) {
-      this.admit(sessionId, dayStart, sentToday, cold ? { chatId, coldToday: cold.coldToday } : undefined);
-    }
-  }
-
-  /** Cold chat reachouts today: the persisted count, or more when the admission window holds more. */
-  private chatReachoutsToday(sessionId: string, dayStart: Date, persisted: number): number {
-    const window = this.admissionWindow(sessionId, dayStart);
-    return Math.max(persisted, window && window.coldBase !== null ? window.coldBase + window.coldChats.size : 0);
-  }
-
-  /** The current admission window for this session, or undefined once it lapsed or the day rolled. */
-  private admissionWindow(sessionId: string, dayStart: Date): AdmissionWindow | undefined {
-    const window = this.admissions.get(sessionId);
-    if (!window) return undefined;
-    if (window.dayStartMs === dayStart.getTime() && Date.now() - window.openedAt < ADMISSION_WINDOW_MS) return window;
-    this.admissions.delete(sessionId);
-    return undefined;
-  }
-
-  private admit(
-    sessionId: string,
-    dayStart: Date,
-    sentToday: number,
-    cold: { chatId: string; coldToday: number } | undefined,
-  ): void {
-    let window = this.admissionWindow(sessionId, dayStart);
-    if (!window) {
-      window = {
-        openedAt: Date.now(),
-        dayStartMs: dayStart.getTime(),
-        sentBase: sentToday,
-        sent: 0,
-        coldBase: null,
-        coldChats: new Set(),
+      const admission: Admission = {
+        at: Date.now(),
+        sentToday,
+        cold: cold ? { key, coldToday: cold.coldToday } : null,
       };
-      this.admissions.set(sessionId, window);
+      const hold = this.holds.get(sessionId);
+      if (hold?.dayStartMs === dayStart.getTime()) hold.admissions.push(admission);
+      else this.holds.set(sessionId, { dayStartMs: dayStart.getTime(), admissions: [admission] });
     }
-    window.sent += 1;
-    if (cold) {
-      window.coldBase ??= cold.coldToday;
-      window.coldChats.add(coldChatKey(cold.chatId));
+  }
+
+  /** Cold chat reachouts today: the persisted count, or more when the held admissions account for more. */
+  private chatReachoutsToday(sessionId: string, dayStart: Date, persisted: number): number {
+    const held = this.heldAdmissions(sessionId, dayStart);
+    // Newest first, so `chats` is always the distinct cold chats held from this admission on.
+    const chats = new Set<string>();
+    let count = persisted;
+    for (let i = held.length - 1; i >= 0; i--) {
+      const cold = held[i].cold;
+      if (!cold) continue;
+      chats.add(cold.key);
+      count = Math.max(count, cold.coldToday + chats.size);
     }
+    return count;
+  }
+
+  /** This session's admissions still held today, oldest first; empty once each has lapsed or the day rolled. */
+  private heldAdmissions(sessionId: string, dayStart: Date): Admission[] {
+    const hold = this.holds.get(sessionId);
+    if (!hold) return [];
+    const now = Date.now();
+    const live = hold.admissions.findIndex(a => now - a.at < ADMISSION_WINDOW_MS);
+    if (hold.dayStartMs === dayStart.getTime() && live !== -1) {
+      hold.admissions.splice(0, live);
+      return hold.admissions;
+    }
+    this.holds.delete(sessionId);
+    return [];
   }
 
   /**
@@ -453,8 +453,8 @@ export class SendPacingService {
     allowance: number,
     persisted: number,
   ): void {
-    const window = this.admissionWindow(sessionId, dayStart);
-    const sentToday = Math.max(persisted, window ? window.sentBase + window.sent : 0);
+    const held = this.heldAdmissions(sessionId, dayStart);
+    const sentToday = held.reduce((max, a, i) => Math.max(max, a.sentToday + held.length - i), persisted);
     if (sentToday < allowance) return;
 
     this.refuse('daily_cap', sessionId, secondsUntilNextUtcDay(), {
