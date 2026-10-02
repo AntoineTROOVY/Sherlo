@@ -1146,11 +1146,12 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
 
   /**
    * Ids of every session with a live engine — including ones mid-initialization (their engine is not
-   * in `engines` yet but will register when start() completes). The infra import pre-flight uses this
-   * to refuse a full-replace restore that would orphan a running engine.
+   * in `engines` yet but will register when start() completes) and ones waiting to relaunch after a
+   * failed reconnect (their timer registers one). The infra import pre-flight uses this to refuse a
+   * full-replace restore that would orphan a running engine.
    */
   getActiveSessionIds(): string[] {
-    return this.engines.activeIds();
+    return [...this.engineLifecycle.startSlotHolders()];
   }
 
   /** Whether this node has a MAX_CONCURRENT_SESSIONS slot free, counted exactly as the engine's cap check counts it. */

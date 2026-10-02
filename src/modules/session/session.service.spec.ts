@@ -1070,6 +1070,15 @@ describe('SessionService', () => {
       expect(service.getActiveSessionIds()).toContain('sess-uuid-1');
     });
 
+    it('counts a session waiting to relaunch after a failed reconnect as active for the import pre-flight', () => {
+      // Its engine was evicted, but its timer re-registers one, so an import must see it as an orphan.
+      const reconnectStates = (lifecycle as unknown as { reconnectStates: Map<string, ReconnectState> })
+        .reconnectStates;
+      reconnectStates.set('relaunching', { timer: null, attempts: 1, maxAttempts: 5, baseDelay: 1000 });
+
+      expect(service.getActiveSessionIds()).toContain('relaunching');
+    });
+
     it('evicts and tears down the engine when engine.initialize() fails (no orphan wedging the session)', async () => {
       (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
       (repository.update as jest.Mock).mockResolvedValue({ affected: 1 });
