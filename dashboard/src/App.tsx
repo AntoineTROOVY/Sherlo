@@ -42,7 +42,7 @@ function AppContent() {
   const [savedKey] = useState(() => sessionStorage.getItem('openwa_api_key'));
   const [isAuthenticated, setIsAuthenticated] = useState(!!savedKey);
   const [, setApiKey] = useState(savedKey || '');
-  const { setRole, role, setEngineType, setScoped } = useRole();
+  const { setRole, role, setEngineType, setScoped, scoped } = useRole();
 
   const handleLogin = (key: string, validatedRole?: string, engineType?: string, scoped = false) => {
     setApiKey(key);
@@ -124,11 +124,11 @@ function AppContent() {
               <Route path="chats" element={<Chats />} />
               <Route path="webhooks" element={<Webhooks />} />
               <Route path="templates" element={<Templates />} />
-              {role === 'admin' && <Route path="api-keys" element={<ApiKeys />} />}
+              {role === 'admin' && !scoped && <Route path="api-keys" element={<ApiKeys />} />}
               {role === 'admin' && <Route path="logs" element={<Logs />} />}
               <Route path="message-tester" element={<MessageTester />} />
-              {role === 'admin' && <Route path="infrastructure" element={<Infrastructure />} />}
-              {role === 'admin' && <Route path="plugins" element={<Plugins />} />}
+              {role === 'admin' && !scoped && <Route path="infrastructure" element={<Infrastructure />} />}
+              {role === 'admin' && !scoped && <Route path="plugins" element={<Plugins />} />}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
