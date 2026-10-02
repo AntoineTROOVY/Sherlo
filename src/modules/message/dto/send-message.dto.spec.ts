@@ -254,3 +254,17 @@ describe('SendMediaMessageDto url', () => {
     expect(errors.map(e => e.property)).toContain('url');
   });
 });
+
+describe('SendMediaMessageDto base64', () => {
+  // A url next to it must not switch the type check off: buildMediaInput reads base64 first, so a
+  // non-string there reached the engine whatever the url said.
+  it('rejects a non-string base64 even when a url is present', async () => {
+    const errors = await validateDto(SendMediaMessageDto, {
+      chatId: 'c@c.us',
+      url: 'https://example.com/a.jpg',
+      base64: ['x'],
+      mimetype: 'image/jpeg',
+    });
+    expect(errors.map(e => e.property)).toContain('base64');
+  });
+});

@@ -5,7 +5,6 @@ import {
   IsNotEmpty,
   IsOptional,
   MaxLength,
-  ValidateIf,
   IsArray,
   ArrayMaxSize,
   IsBoolean,
@@ -204,7 +203,6 @@ export class SendMediaMessageDto {
   })
   @IsOptional()
   @IsString()
-  @ValidateIf((o: SendMediaMessageDto) => !o.url)
   base64?: string;
 
   @ApiPropertyOptional({
