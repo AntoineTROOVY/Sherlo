@@ -3859,7 +3859,7 @@ Irreversible, and every subscriber loses the channel.
 
 **Response** `200` — `{ "success": true }`
 
-**Errors:** `400` session not started · `401` · `403` the engine refused (not found, or this account does not own it) · `409` conflict or engine not ready (retryable) · `503` session not ready or dependency unavailable (retryable)
+**Errors:** `400` session not started · `401` · `403` the engine refused (not found, or this account does not own it) · `404` the id is not a channel (does not end in `@newsletter`) · `409` conflict or engine not ready (retryable) · `503` session not ready or dependency unavailable (retryable)
 
 #### POST /api/sessions/:sessionId/channels/:channelId/mute
 
@@ -3993,7 +3993,7 @@ Unsubscribe from a channel.
 
 Note: the controller returns a literal `{ success: true }` after the void engine call resolves, as the channel delete, mute, admin demote and ownership transfer routes do. There is no `@HttpCode` override, so it returns `200`, not `204`.
 
-**Errors:** `400` `Session is not started` · `401` missing/invalid API key · `403` API-key role below OPERATOR, or WhatsApp refused the unfollow (for example the account does not follow the channel) · `409` conflict or engine not ready (retryable) · `503` session not ready or dependency unavailable (retryable)
+**Errors:** `400` `Session is not started` · `401` missing/invalid API key · `403` API-key role below OPERATOR, or WhatsApp refused the unfollow (for example the account does not follow the channel) · `404` the id is not a channel (does not end in `@newsletter`) · `409` conflict or engine not ready (retryable) · `503` session not ready or dependency unavailable (retryable)
 
 ### 6.4.7 Labels & Status
 
