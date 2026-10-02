@@ -1442,6 +1442,85 @@ describe('SessionService', () => {
       expect(engineStart).not.toHaveBeenCalled();
     });
 
+    // Both starts passed the cap check while neither had reached the engine yet, so the second
+    // claimed its lapsed lease, met the engine's own cap refusal, and released the lease to no node.
+    it('start() racing another start for the last slot refuses before claiming', async () => {
+      const ownership = withOwnership();
+      (configService.get as jest.Mock).mockImplementation(<T>(key: string, def?: T): T | number =>
+        key === 'sessions.maxConcurrent' ? 2 : (def as T),
+      );
+      jest.spyOn(lifecycle, 'startSlotHolders').mockImplementation(() => new Set(['other']));
+      jest.spyOn(lifecycle, 'isEngineActive').mockReturnValue(false);
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      let finishClaim = (): void => undefined;
+      ownership.claim.mockImplementationOnce(
+        () => new Promise<boolean>(resolve => (finishClaim = () => resolve(true))),
+      );
+      // The first start reaches the engine first and takes the slot there.
+      jest
+        .spyOn(lifecycle, 'start')
+        .mockImplementation(id =>
+          id === 'first'
+            ? Promise.resolve(createMockSession())
+            : Promise.reject(new BadRequestException('Maximum concurrent sessions reached (2)')),
+        );
+
+      const first = service.start('first');
+      await expect(service.start('second')).rejects.toThrow('Maximum concurrent sessions reached (2)');
+      expect(ownership.claim).not.toHaveBeenCalledWith('second');
+      expect(ownership.release).not.toHaveBeenCalledWith('second');
+
+      finishClaim();
+      await first;
+    });
+
+    it('start() refused as a duplicate keeps the slot the first start of that id holds', async () => {
+      const ownership = withOwnership();
+      (configService.get as jest.Mock).mockImplementation(<T>(key: string, def?: T): T | number =>
+        key === 'sessions.maxConcurrent' ? 2 : (def as T),
+      );
+      jest.spyOn(lifecycle, 'startSlotHolders').mockImplementation(() => new Set(['other']));
+      jest.spyOn(lifecycle, 'isEngineActive').mockReturnValue(false);
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      let finishClaim = (): void => undefined;
+      ownership.claim.mockImplementationOnce(
+        () => new Promise<boolean>(resolve => (finishClaim = () => resolve(true))),
+      );
+      jest
+        .spyOn(lifecycle, 'start')
+        .mockRejectedValueOnce(new BadRequestException('Session is already starting'))
+        .mockResolvedValue(createMockSession());
+
+      const first = service.start('first');
+      await expect(service.start('first')).rejects.toThrow('Session is already starting');
+      await expect(service.start('second')).rejects.toThrow('Maximum concurrent sessions reached (2)');
+      expect(ownership.claim).not.toHaveBeenCalledWith('second');
+
+      finishClaim();
+      await first;
+    });
+
+    // Boot auto-start and the takeover sweep stop at the first false answer, so a start whose claim
+    // then fails must not read as a used slot while that claim is awaited.
+    it('hasStartCapacity() does not count a start whose claim is still awaited', async () => {
+      const ownership = withOwnership();
+      (configService.get as jest.Mock).mockImplementation(<T>(key: string, def?: T): T | number =>
+        key === 'sessions.maxConcurrent' ? 2 : (def as T),
+      );
+      jest.spyOn(lifecycle, 'startSlotHolders').mockImplementation(() => new Set(['other']));
+      (repository.findOne as jest.Mock).mockResolvedValue(createMockSession());
+      let finishClaim = (): void => undefined;
+      ownership.claim.mockImplementationOnce(
+        () => new Promise<boolean>(resolve => (finishClaim = () => resolve(false))),
+      );
+
+      const first = service.start('first');
+      expect(service.hasStartCapacity(2)).toBe(true);
+
+      finishClaim();
+      await expect(first).rejects.toThrow(ConflictException);
+    });
+
     it('start() at MAX_CONCURRENT_SESSIONS still answers 404 for an unknown id', async () => {
       withOwnership();
       (configService.get as jest.Mock).mockImplementation(<T>(key: string, def?: T): T | number =>

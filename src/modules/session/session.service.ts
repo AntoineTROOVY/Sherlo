@@ -133,6 +133,12 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
    * after it began from a mark left over by an earlier stop, which start() clears by design.
    */
   private readonly stopRequests = new Map<string, number>();
+  /**
+   * Starts past start()'s cap check, held until they return. That check counts them with the
+   * engine's slot holders, so two starts at the last free slot cannot both pass it while their claims
+   * are awaited. hasStartCapacity() does not: a held start whose claim then fails never used a slot.
+   */
+  private readonly startReservations = new Set<string>();
 
   constructor(
     @InjectRepository(Session, 'data')
@@ -596,20 +602,33 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     // At the cap, refused before the claim: the engine's own cap check runs after it, and its
     // refusal releases the claim to no node. A row nobody holds is never adopted by a peer, while a
     // lapsed lease left where it is gets taken over by one with room. The engine check stays the
-    // authoritative one; this only keeps a refusal off the lease.
+    // authoritative one; this only keeps a refusal off the lease. A start that passes holds its slot
+    // until it returns, so a concurrent start cannot pass on the same free slot during the claim.
     const max = resolveMaxConcurrentSessions(this.configService);
-    if (this.ownership && max !== null) {
-      const holders = this.engineLifecycle.startSlotHolders();
-      holders.delete(id);
-      if (holders.size >= max) {
-        // Same answer the failed claim below would give, so the cap does not mask a 404 or a 409.
-        await this.findOne(id);
-        if (await this.ownership.isHeldByOtherNode(id)) {
-          throw new ConflictException(`Session ${id} is running on another node`);
-        }
-        throw new BadRequestException(`Maximum concurrent sessions reached (${max})`);
-      }
+    if (!this.ownership || max === null) {
+      return this.claimAndStart(id, explicit);
     }
+    const holders = this.startSlotsInUse();
+    holders.delete(id);
+    if (holders.size >= max) {
+      // Same answer the failed claim below would give, so the cap does not mask a 404 or a 409.
+      await this.findOne(id);
+      if (await this.ownership.isHeldByOtherNode(id)) {
+        throw new ConflictException(`Session ${id} is running on another node`);
+      }
+      throw new BadRequestException(`Maximum concurrent sessions reached (${max})`);
+    }
+    // A duplicate start of the same id leaves the reservation to the start that made it.
+    const reserved = !this.startReservations.has(id);
+    this.startReservations.add(id);
+    try {
+      return await this.claimAndStart(id, explicit);
+    } finally {
+      if (reserved) this.startReservations.delete(id);
+    }
+  }
+
+  private async claimAndStart(id: string, explicit: boolean): Promise<Session> {
     // Claimed before the engine is launched, never after: launching first and discovering the
     // session belongs elsewhere would already have opened a second connection to the account.
     if (this.ownership && !(await this.ownership.claim(id))) {
@@ -1134,9 +1153,13 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     return this.engines.activeIds();
   }
 
-  /** Whether this node has a MAX_CONCURRENT_SESSIONS slot free, counted exactly as the start path counts it. */
+  /** Whether this node has a MAX_CONCURRENT_SESSIONS slot free, counted exactly as the engine's cap check counts it. */
   hasStartCapacity(max: number): boolean {
     return this.engineLifecycle.startSlotHolders().size < max;
+  }
+
+  private startSlotsInUse(): Set<string> {
+    return new Set([...this.engineLifecycle.startSlotHolders(), ...this.startReservations]);
   }
 
   /**
