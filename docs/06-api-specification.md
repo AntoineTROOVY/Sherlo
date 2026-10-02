@@ -1639,8 +1639,10 @@ allowance may free up, and a batch killed outright could not be resumed.
 call — the most ban-associated action available — so each participant the account has no history
 with costs one cold reachout. A repeated id costs one; participants already known cost nothing. The
 whole request is refused rather than partially applied, so a `429` can never be confused with the
-per-participant failures those endpoints report normally. No message is sent, so neither call
-consumes the overall daily send allowance.
+per-participant failures those endpoints report normally. A request naming more new contacts than
+the whole day's allowance cannot fit that day however long it waits, so it is refused with `400` and
+no `retryAfterSeconds`; split it into batches no larger than the allowance. No message is sent, so
+neither call consumes the overall daily send allowance.
 
 Two consequences worth knowing: a paced-out send fires **no** `message:sending` plugin hook (see
 `docs/19-plugin-architecture.md`), and refusals are counted in the `openwa_send_pacing_refusals_total`
