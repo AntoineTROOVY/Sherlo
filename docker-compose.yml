@@ -19,7 +19,7 @@ services:
       # PING (health), INFO (getSystemInfo), CONTAINERS (list/inspect/create/start/stop),
       # IMAGES (pull), VOLUMES (createVolume). POST is the proxy's single all-or-nothing
       # method gate for non-GET requests (haproxy.cfg: `deny unless METH_GET || env(POST)`).
-      # Two consequences of the pinned v0.4.2 config, accepted and documented in SECURITY.md:
+      # Two consequences of the pinned proxy config, accepted and documented in SECURITY.md:
       #  - its `DELETE` env flag is dead config (never read), so it is not set here; DELETE is
       #    admitted to enabled paths as a side effect of POST — OpenWA itself never issues
       #    deletes (profile teardown is stop-only, see DockerService.stopManagedService).
