@@ -43,6 +43,13 @@ export interface WebhookJobData {
   payload: WebhookPayload;
   attempt: number;
   maxRetries: number;
+  /**
+   * The pre-`webhook:before` event data, carried only while WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS
+   * > 0 so the processor's terminal failure row can keep it for a redrive. `payload.data` is the
+   * post-hook body and must not be replayed: the redrive runs the hooks again. Bounded like `payload`
+   * (inline media over WEBHOOK_MEDIA_INLINE_MAX_BYTES was shed before it was captured).
+   */
+  replayData?: Record<string, unknown>;
 }
 
 /**
@@ -81,6 +88,19 @@ interface DispatchEventContext {
   baseData: Record<string, unknown>;
   /** Gives the dispatch slot up while `fn` runs (a retry backoff). Absent outside the limiter. */
   yieldSlot?: <R>(fn: () => Promise<R>) => Promise<R>;
+  /**
+   * Direct delivery makes one attempt instead of `webhook.retryCount`. Set by an operator redrive,
+   * which runs inside an HTTP request: the in-process backoff schedule would hold it for minutes.
+   */
+  singleAttempt?: boolean;
+}
+
+/** Per-delivery options of the direct path (deliverWebhook), derived from the dispatch context. */
+interface DirectDeliveryOptions {
+  yieldSlot?: <R>(fn: () => Promise<R>) => Promise<R>;
+  /** Kept on the terminal failure row for a redrive; set only while payload retention is on. */
+  replayData?: Record<string, unknown>;
+  singleAttempt?: boolean;
 }
 
 /** The limiter refused or dropped the task because shutdown closed it. */
@@ -545,6 +565,7 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
         payload: finalPayload,
         attempt: 1,
         maxRetries: webhook.retryCount,
+        ...(this.keepsFailurePayload() ? { replayData: ctx.baseData } : {}),
       };
 
       await this.webhookQueue!.add(`webhook-${webhook.id}`, jobData, {
@@ -595,7 +616,7 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
       // same X-OpenWA-Idempotency-Key / X-OpenWA-Delivery-Id, so a conformant receiver dedupes.
       try {
         // Removed, disabled or unsubscribed before a retry: nothing to report, as on the queued path.
-        if (!(await this.deliverWebhook(webhook, finalPayload, body, ctx.yieldSlot))) return 'cancelled';
+        if (!(await this.deliverWebhook(webhook, finalPayload, body, this.directOptions(ctx)))) return 'cancelled';
 
         await this.hookManager.execute(
           'webhook:delivered',
@@ -647,7 +668,7 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
     const { sessionId, event } = ctx;
     try {
       // Removed, disabled or unsubscribed before a retry: nothing to report, as on the queued path.
-      if (!(await this.deliverWebhook(webhook, finalPayload, body, ctx.yieldSlot))) return 'cancelled';
+      if (!(await this.deliverWebhook(webhook, finalPayload, body, this.directOptions(ctx)))) return 'cancelled';
 
       // Execute hook after successful delivery
       await this.hookManager.execute(
@@ -893,9 +914,32 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
     event: string,
     idempotencyKey: string,
     data: Record<string, unknown>,
+    options: { singleAttempt?: boolean } = {},
   ): Promise<WebhookDeliveryOutcome> {
     const deliveryId = generateDeliveryId();
-    return this.deliverOne(webhook, deliveryId, idempotencyKey, { sessionId, event, baseData: data });
+    return this.deliverOne(webhook, deliveryId, idempotencyKey, {
+      sessionId,
+      event,
+      baseData: data,
+      singleAttempt: options.singleAttempt,
+    });
+  }
+
+  /**
+   * WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS > 0: a terminal failure row keeps the event data it was
+   * built from, so an operator can redrive it. Off (0) by default, which stores nothing new.
+   */
+  private keepsFailurePayload(): boolean {
+    return this.configService.get<number>('webhook.failurePayloadRetentionHours', 0) > 0;
+  }
+
+  /** What the direct path needs from the dispatch context: the slot, the replay copy, the attempt cap. */
+  private directOptions(ctx: DispatchEventContext): DirectDeliveryOptions {
+    return {
+      yieldSlot: ctx.yieldSlot,
+      replayData: this.keepsFailurePayload() ? ctx.baseData : undefined,
+      singleAttempt: ctx.singleAttempt,
+    };
   }
 
   /**
@@ -913,8 +957,9 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
     webhook: Webhook,
     payload: WebhookPayload,
     body: string,
-    yieldSlot: <R>(fn: () => Promise<R>) => Promise<R> = fn => fn(),
+    options: DirectDeliveryOptions = {},
   ): Promise<boolean> {
+    const yieldSlot = options.yieldSlot ?? (<R>(fn: () => Promise<R>): Promise<R> => fn());
     const delay = this.configService.get<number>('webhook.retryDelay', 5000);
     let current = webhook;
     for (let attempt = 1; ; attempt++) {
@@ -980,7 +1025,7 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
           action: 'webhook_delivery_failed',
         });
 
-        if (attempt < current.retryCount) {
+        if (attempt < (options.singleAttempt ? 1 : current.retryCount)) {
           // Without the dispatch slot: a backoff sends nothing, and holding the slot through it let
           // a few failing receivers stall every other delivery. Taking it back throws once shutdown
           // closed the limiter, which skips the terminal record below: the event was not given up.
@@ -1000,6 +1045,7 @@ export class WebhookDeliveryService implements OnModuleInit, OnModuleDestroy {
           deliveryId: payload.deliveryId,
           attempts: attempt,
           error,
+          ...(options.replayData ? { payload: options.replayData } : {}),
         });
         if (recorded) {
           incrementWebhookDeliveryFailures();

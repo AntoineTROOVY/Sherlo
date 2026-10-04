@@ -1030,6 +1030,40 @@ export interface WebhookDeliveryFailure {
   lastError: string;
   /** ISO timestamp of when the row was recorded. */
   createdAt: string;
+  /**
+   * True when the row still holds the event data and can be replayed with
+   * {@link WebhooksResource.redriveDeliveryFailures}: a terminal row (`attempts > 0`) recorded while the
+   * gateway's `WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS` is above 0, until that window passes.
+   */
+  replayable: boolean;
+}
+
+/** Body of {@link WebhooksResource.redriveDeliveryFailures}. Every field narrows; an empty body takes the oldest rows. */
+export interface RedriveWebhookDeliveriesRequest {
+  /** Only rows of this session (within the key's allowedSessions). */
+  sessionId?: string;
+  /** Only rows of this webhook. */
+  webhookId?: string;
+  /** Only these failure rows (ids from `deliveryFailures`), at most 500. */
+  ids?: string[];
+  /** Max rows replayed by this call (1-500, default 100). */
+  limit?: number;
+}
+
+/** Outcome of {@link WebhooksResource.redriveDeliveryFailures}. */
+export interface WebhookRedriveResult {
+  /** Rows replayed by this call: delivered plus enqueued. */
+  redriven: number;
+  /** Delivered by a direct POST; their failure rows were removed. */
+  delivered: number;
+  /** Handed to the queue; each row is removed when its job delivers and kept if it fails again. */
+  enqueued: number;
+  /** Replays that failed again; their rows stay, with attempts raised by one. */
+  failed: number;
+  /** Rows not replayed: the webhook was removed, disabled or unsubscribed, or a plugin cancelled it. */
+  skipped: number;
+  /** Replayable rows still in scope after this call. */
+  remaining: number;
 }
 
 // ── Chat (session-scoped chat operations) ─────────────────────────

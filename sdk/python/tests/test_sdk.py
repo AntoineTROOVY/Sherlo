@@ -734,6 +734,16 @@ class TestWebhooks:
         make_client(backend).webhooks.create("s", {"url": "u", "events": ["message.received"], "filters": filters})
         assert backend.last_call.body == {"url": "u", "events": ["message.received"], "filters": filters}
 
+    def test_redrive_delivery_failures_posts_the_filter_or_an_empty_body(self):
+        result = {"redriven": 1, "delivered": 1, "enqueued": 0, "failed": 0, "skipped": 0, "remaining": 0}
+        backend = MockBackend().on("POST", "/api/webhooks/delivery-failures/redrive", body=result)
+        client = make_client(backend)
+        assert client.webhooks.redrive_delivery_failures({"sessionId": "s", "limit": 10}) == result
+        assert backend.last_call.method == "POST"
+        assert backend.last_call.body == {"sessionId": "s", "limit": 10}
+        client.webhooks.redrive_delivery_failures()
+        assert backend.last_call.body == {}
+
 
 class TestStatus:
     def test_send_image_video_forward_nested_media_body(self):

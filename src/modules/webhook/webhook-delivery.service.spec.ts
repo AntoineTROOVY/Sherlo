@@ -1626,6 +1626,23 @@ describe('WebhookDeliveryService', () => {
       // Custom headers may carry receiver credentials and the processor rebuilds every header from
       // the current row, so the job must not copy them into Redis.
       expect(jobData).not.toHaveProperty('headers');
+      // Payload retention is off by default, so the job carries no second copy of the event.
+      expect(jobData).not.toHaveProperty('replayData');
+    });
+
+    it('carries the pre-hook event data in the job only while payload retention is on', async () => {
+      const queueService = await buildQueueService((key: string, def?: unknown) => {
+        if (key === 'queue.enabled') return true;
+        if (key === 'webhook.failurePayloadRetentionHours') return 72;
+        return def;
+      });
+      (repository.find as jest.Mock).mockResolvedValue([createMockWebhook({ events: ['message.received'] })]);
+      (hookManager.execute as jest.Mock).mockResolvedValue({ continue: true, data: {} });
+
+      await queueService.dispatch('sess-1', 'message.received', { from: 'x@c.us' });
+
+      const [, jobData] = (webhookQueue.add as jest.Mock).mock.calls[0] as [string, WebhookJobData];
+      expect(jobData.replayData).toEqual({ from: 'x@c.us' });
     });
 
     it('leaves the shed row of a replay in place when its job is queued', async () => {
@@ -1963,6 +1980,58 @@ describe('WebhookDeliveryService', () => {
       // retryDelay is 100 here: 100, then 200, then 400.
       expect((sleep as unknown as jest.Mock).mock.calls.map(([ms]) => ms as number)).toEqual([100, 200, 400]);
       expect(mockFetch).toHaveBeenCalledTimes(4);
+    });
+
+    it('makes exactly one attempt for an operator redrive (singleAttempt), with no backoff', async () => {
+      const webhook = createMockWebhook({ retryCount: 4 });
+      mockFetch.mockRejectedValue(new Error('receiver down'));
+      (sleep as unknown as jest.Mock).mockClear();
+
+      await expect(
+        service.redeliver(webhook, 'sess-1', 'message.received', 'k', {}, { singleAttempt: true }),
+      ).resolves.toBe('failed');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(sleep).not.toHaveBeenCalled();
+      expect(insertedFailures).toEqual([expect.objectContaining({ attempts: 1, idempotencyKey: 'k' })]);
+    });
+
+    it('keeps no replay payload on the terminal row while payload retention is off (the default)', async () => {
+      const webhook = createMockWebhook({ retryCount: 1 });
+      mockFetch.mockRejectedValue(new Error('receiver down'));
+
+      await service.redeliver(webhook, 'sess-1', 'message.received', 'k', { from: 'x@c.us' });
+
+      expect(insertedFailures).toHaveLength(1);
+      expect(insertedFailures[0]).not.toHaveProperty('payload');
+    });
+
+    it('keeps the PRE-hook event data on the terminal row while payload retention is on', async () => {
+      (configService.get as jest.Mock).mockImplementation(<T>(key: string, def?: T) => {
+        if (key === 'webhook.failurePayloadRetentionHours') return 24;
+        if (key === 'webhook.retryDelay') return 100;
+        return def;
+      });
+      // A hook that rewrites the body: the stored copy must be the data before it, since a redrive
+      // runs the hooks again.
+      (hookManager.execute as jest.Mock).mockImplementation((name: string, ctx: { payload?: WebhookPayload }) =>
+        Promise.resolve(
+          name === 'webhook:before' && ctx.payload
+            ? { continue: true, data: { payload: { ...ctx.payload, data: { redacted: true } } } }
+            : { continue: true, data: {} },
+        ),
+      );
+      const webhook = createMockWebhook({ retryCount: 1 });
+      mockFetch.mockRejectedValue(new Error('receiver down'));
+
+      await service.redeliver(webhook, 'sess-1', 'message.received', 'k', { from: 'x@c.us', body: 'hi' });
+
+      expect(JSON.parse((mockFetch.mock.calls[0] as [string, SentInit])[1].body)).toMatchObject({
+        data: { redacted: true },
+      });
+      expect(insertedFailures).toEqual([
+        expect.objectContaining({ attempts: 1, payload: { from: 'x@c.us', body: 'hi' } }),
+      ]);
     });
   });
 

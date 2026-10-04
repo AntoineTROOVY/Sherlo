@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `POST /api/webhooks/delivery-failures/redrive` (ADMIN) replays recorded webhook deliveries that still hold their event data, in batches of up to 500, oldest first, with the stored idempotency key so a receiver can dedup a replay; `WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS` sets how long a terminal failure row keeps that data (default `0`: not kept, nothing to replay), and `GET /api/webhooks/delivery-failures` marks each row `replayable`. All five SDKs gain the call in their next release.
+
 ## [0.24.0] - 2026-10-03
 
 ### Added

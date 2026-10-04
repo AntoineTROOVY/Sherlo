@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
 import { NulFreeTransformer } from '../../../common/transformers/nul-free.transformer';
+import { jsonColumnType } from '../../../common/utils/column-types';
 
 /**
  * A durable record of a webhook delivery that exhausted all of its retries. The queued path (BullMQ)
@@ -49,6 +50,19 @@ export class WebhookDeliveryFailure {
 
   @Column({ type: 'text', transformer: NulFreeTransformer })
   lastError!: string;
+
+  /**
+   * The event data the delivery was built from (pre-`webhook:before`, after inline-media shedding),
+   * kept so `POST /webhooks/delivery-failures/redrive` can replay the lost event. Written only for a
+   * terminal row (attempts > 0) and only while WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS > 0; the
+   * retention sweep nulls it once that window passes, leaving the row itself for the audit trail.
+   * NULL on every row recorded with the knob off, which keeps today's behaviour.
+   *
+   * `select: false`: the column can hold a whole message body, and the list endpoint serializes
+   * these entities as they are read. Only the redrive path selects it explicitly.
+   */
+  @Column({ type: jsonColumnType(), nullable: true, select: false })
+  payload!: Record<string, unknown> | null;
 
   /** When the delivery was finally abandoned. */
   @CreateDateColumn()

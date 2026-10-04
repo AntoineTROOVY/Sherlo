@@ -1,4 +1,5 @@
 import { MoreThan, Repository } from 'typeorm';
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { WebhookDeliveryFailure } from '../entities/webhook-delivery-failure.entity';
 
 export interface WebhookDeliveryFailureInput {
@@ -11,6 +12,12 @@ export interface WebhookDeliveryFailureInput {
   attempts: number;
   lastStatusCode?: number | null;
   lastError: string;
+  /**
+   * The pre-hook event data to keep for a later redrive. Passed only while
+   * WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS > 0, and persisted only on a terminal row: an attempts-0
+   * row keeps its outbox row pending, which already holds the same data for the reconciler.
+   */
+  payload?: Record<string, unknown> | null;
 }
 
 /** Minimal logger shape — both WebhookProcessor and WebhookService pass their `createLogger` instance. */
@@ -112,7 +119,14 @@ export async function recordWebhookDeliveryFailure(
         return false;
       }
     }
-    await repo.insert({ ...input, lastStatusCode: input.lastStatusCode ?? null });
+    const { payload, ...row } = input;
+    // The cast covers `payload` only: TypeORM's insert typing cannot see through a free-form JSON
+    // record, while simple-json serializes it like the outbox payload.
+    await repo.insert({
+      ...row,
+      lastStatusCode: input.lastStatusCode ?? null,
+      ...(terminal && payload ? { payload } : {}),
+    } as QueryDeepPartialEntity<WebhookDeliveryFailure>);
     if (terminal) {
       // Only after the insert, so a crash in between leaves both rows, never none. A later terminal
       // record of the same delivery repeats this clear.

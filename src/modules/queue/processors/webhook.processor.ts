@@ -322,6 +322,8 @@ export class WebhookProcessor extends WorkerHost {
         attempts: job.attemptsMade + 1,
         lastStatusCode: statusCodeFromError(errorMessage),
         lastError: clientError,
+        // The producer attaches the pre-hook event data only while payload retention is on.
+        ...(job.data.replayData ? { payload: job.data.replayData } : {}),
       });
       if (recorded) {
         incrementWebhookDeliveryFailures();
@@ -397,6 +399,7 @@ export class WebhookProcessor extends WorkerHost {
       attempts: job.attemptsMade,
       lastStatusCode: null, // no HTTP exchange completed on the stalled attempts
       lastError: error.message,
+      ...(job.data.replayData ? { payload: job.data.replayData } : {}),
     });
     if (recorded) {
       incrementWebhookDeliveryFailures();

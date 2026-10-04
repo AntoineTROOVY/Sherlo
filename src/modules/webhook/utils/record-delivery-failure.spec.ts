@@ -221,6 +221,36 @@ describe('recordWebhookDeliveryFailure', () => {
     await expect(recordWebhookDeliveryFailure(repoWith(insert), logger, input)).resolves.toBe(true);
     expect(logger.error).toHaveBeenCalled();
   });
+
+  it('keeps the replay payload on a terminal row', async () => {
+    const insert = jest.fn().mockResolvedValue({});
+    const payload = { id: 'msg-1', body: 'hi' };
+
+    await recordWebhookDeliveryFailure(repoWith(insert), { error: jest.fn() }, { ...input, payload });
+
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ attempts: 3, payload }));
+  });
+
+  it('never stores a payload on an attempts-0 row: its pending outbox row already holds the data', async () => {
+    const insert = jest.fn().mockResolvedValue({});
+
+    await recordWebhookDeliveryFailure(
+      repoWith(insert),
+      { error: jest.fn() },
+      { ...input, attempts: 0, payload: { id: 'msg-1' } },
+    );
+
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect((insert.mock.calls as unknown[][])[0][0]).not.toHaveProperty('payload');
+  });
+
+  it('writes no payload column at all when none is given (payload retention off)', async () => {
+    const insert = jest.fn().mockResolvedValue({});
+
+    await recordWebhookDeliveryFailure(repoWith(insert), { error: jest.fn() }, input);
+
+    expect((insert.mock.calls as unknown[][])[0][0]).not.toHaveProperty('payload');
+  });
 });
 
 describe('clearDeliveryFailureRows', () => {

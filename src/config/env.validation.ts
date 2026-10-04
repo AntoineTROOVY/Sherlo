@@ -225,6 +225,7 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     'WEBHOOK_MAX_PER_SESSION', // 0 = unlimited
     'AUTOMATION_MAX_PER_SESSION', // 0 = unlimited
     'WEBHOOK_MEDIA_INLINE_MAX_BYTES', // 0 = never inline media
+    'WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS', // 0 = failure rows keep no payload (no redrive)
     'EXPORT_INLINE_MEDIA_BUDGET_BYTES', // 0 = a data export carries no inline media at all
     'MESSAGE_LIST_INLINE_MEDIA_BUDGET_BYTES', // 0 = a message list carries no inline media at all
     'CHAT_MEDIA_ARCHIVE_TTL_DAYS', // 0 = keep archived chat media forever
@@ -289,6 +290,13 @@ export function validateEnv(config: EnvConfig): EnvConfig {
     const days = str(key);
     if (days !== undefined && Number(days) > 36500) {
       errors.push(`${key} must be at most 36500 (got "${days}")`);
+    }
+  }
+  // The same cutoff bound, expressed in hours.
+  {
+    const hours = str('WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS');
+    if (hours !== undefined && Number(hours) > 36500 * 24) {
+      errors.push(`WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS must be at most ${36500 * 24} (got "${hours}")`);
     }
   }
   // The grace windows build the same kind of cutoff (now minus the grace), so they share the cap.

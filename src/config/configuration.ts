@@ -310,6 +310,10 @@ export default () => ({
     // 0 = don't wait (explicit opt-out); blank/garbage falls back to the default — a NaN here would
     // silently remove the drain deadline downstream (Math.max(0, NaN) is NaN).
     shutdownDrainMs: resolveNonNegativeIntEnv(process.env.WEBHOOK_SHUTDOWN_DRAIN_MS, 5000),
+    // How long a terminal delivery-failure row keeps the event data it was built from, so
+    // `POST /webhooks/delivery-failures/redrive` can replay it. 0 (the default) stores nothing, which
+    // is the pre-redrive behaviour. The retention sweep nulls an expired payload and keeps the row.
+    failurePayloadRetentionHours: resolveNonNegativeIntEnv(process.env.WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS, 0),
   },
 
   // API configuration

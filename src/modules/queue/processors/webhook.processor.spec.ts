@@ -187,6 +187,26 @@ describe('WebhookProcessor', () => {
     );
   });
 
+  it('keeps the job replay copy (pre-hook data) on the final-attempt row, never the sent body', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 503, statusText: 'Service Unavailable' });
+    const job = makeJob({ maxRetries: 3, replayData: { from: 'x@c.us', body: 'hi' } }, 2);
+    job.data.payload.data = { redacted: true };
+
+    await expect(processor.process(job)).rejects.toThrow();
+
+    expect(failureRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ attempts: 3, payload: { from: 'x@c.us', body: 'hi' } }),
+    );
+  });
+
+  it('writes no payload for a job enqueued with payload retention off', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 503, statusText: 'Service Unavailable' });
+
+    await expect(processor.process(makeJob({ maxRetries: 3 }, 2))).rejects.toThrow();
+
+    expect((failureRepo.insert.mock.calls as unknown[][])[0][0]).not.toHaveProperty('payload');
+  });
+
   it("replaces a replayed delivery's attempts-0 shed row with its own final-attempt row", async () => {
     // The shed row's dedup entry would otherwise suppress this row and keep only the capacity reason.
     failureRows.push({ webhookId: 'wh-1', idempotencyKey: 'k', attempts: 0 });

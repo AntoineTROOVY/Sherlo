@@ -137,9 +137,12 @@ const MAPPINGS = {
     UpdateSessionProxyRequest: 'UpdateSessionProxyDto',
     UpsertContactRequest: 'UpsertContactDto',
     UpsertLabelRequest: 'UpsertLabelDto',
+    RedriveWebhookDeliveriesRequest: 'RedriveWebhookDeliveriesDto',
+    RedriveWebhookDeliveriesRequest: 'RedriveWebhookDeliveriesDto',
     VotePollRequest: 'VotePollDto',
     WebhookDeliveryFailure: 'WebhookDeliveryFailureDto',
     WebhookFilterCondition: 'WebhookFilterConditionDto',
+    WebhookRedriveResult: 'WebhookRedriveResultDto',
     WebhookResponse: 'WebhookResponseDto',
   },
   'dashboard/src/services/api.ts': {
@@ -293,8 +296,10 @@ const PYTHON_MAPPING = {
   UpdateWebhookRequest: 'UpdateWebhookDto',
   UpsertContactRequest: 'UpsertContactDto',
   UpsertLabelRequest: 'UpsertLabelDto',
+  RedriveWebhookDeliveriesRequest: 'RedriveWebhookDeliveriesDto',
   VotePollRequest: 'VotePollDto',
   WebhookDeliveryFailure: 'WebhookDeliveryFailureDto',
+  WebhookRedriveResult: 'WebhookRedriveResultDto',
   WebhookResponse: 'WebhookResponseDto',
 };
 
@@ -378,8 +383,10 @@ const GO_MAPPING = {
   UpdateWebhookRequest: 'UpdateWebhookDto',
   UpsertContactRequest: 'UpsertContactDto',
   UpsertLabelRequest: 'UpsertLabelDto',
+  RedriveWebhookDeliveriesRequest: 'RedriveWebhookDeliveriesDto',
   VotePollRequest: 'VotePollDto',
   WebhookDeliveryFailure: 'WebhookDeliveryFailureDto',
+  WebhookRedriveResult: 'WebhookRedriveResultDto',
   WebhookResponse: 'WebhookResponseDto',
 };
 
@@ -467,8 +474,10 @@ const JAVA_MAPPING = {
   UpdateWebhookRequest: 'UpdateWebhookDto',
   UpsertContactRequest: 'UpsertContactDto',
   UpsertLabelRequest: 'UpsertLabelDto',
+  RedriveWebhookDeliveriesRequest: 'RedriveWebhookDeliveriesDto',
   VotePollRequest: 'VotePollDto',
   WebhookDeliveryFailure: 'WebhookDeliveryFailureDto',
+  WebhookRedriveResult: 'WebhookRedriveResultDto',
   WebhookResponse: 'WebhookResponseDto',
 };
 

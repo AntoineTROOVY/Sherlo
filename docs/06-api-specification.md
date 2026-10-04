@@ -4522,7 +4522,7 @@ wire and a client replaying on `503` would publish the status a second time. The
 
 ### 6.4.8 Webhooks (management)
 
-Webhooks are configured per session and managed under `/api/sessions/:sessionId/webhooks` (handled by `WebhookController`). Two cross-session endpoints live on `WebhooksListController`: `GET /api/webhooks` (list, **OPERATOR**) and `GET /api/webhooks/delivery-failures` (dead-letter log, **ADMIN**). Every other route requires an API key with **OPERATOR** role or higher.
+Webhooks are configured per session and managed under `/api/sessions/:sessionId/webhooks` (handled by `WebhookController`). Three cross-session endpoints live on `WebhooksListController`: `GET /api/webhooks` (list, **OPERATOR**), `GET /api/webhooks/delivery-failures` (dead-letter log, **ADMIN**) and `POST /api/webhooks/delivery-failures/redrive` (replay of that log, **ADMIN**). Every other route requires an API key with **OPERATOR** role or higher.
 
 Two fields — `secret` and `headers` — are **write-only**: they are accepted on create/update but are never returned by any webhook route (the response DTO has no `@Expose` for them, so `fromEntity` drops them). `GET /api/infra/export-data` also omits both from its `webhooks` rows, so a backup no longer carries webhook credentials — a restored webhook comes back unsigned (`secret` null, `headers` `{}`) until you set them again. The `secret` is used to compute the `X-OpenWA-Signature: sha256=<hex>` HMAC-SHA256 header on deliveries.
 
@@ -4660,16 +4660,53 @@ List webhook deliveries that exhausted their retries or were not sent (attempts 
     "attempts": 4,
     "lastStatusCode": 502,
     "lastError": "HTTP 502: Bad Gateway",
-    "createdAt": "2026-06-25T11:59:00.000Z"
+    "createdAt": "2026-06-25T11:59:00.000Z",
+    "replayable": false
   }
 ]
 ```
 
 Bare array of `WebhookDeliveryFailure` rows, ordered by `createdAt` descending. `lastStatusCode` is `null` when the failure was a network/timeout/SSRF error rather than a non-2xx response; `idempotencyKey`/`deliveryId` let you correlate the lost event with your own receiver logs.
 
+`replayable` is `true` when the row still holds the event data and can be replayed with [`POST /api/webhooks/delivery-failures/redrive`](#post-apiwebhooksdelivery-failuresredrive). The event data itself is never returned. Only terminal rows (`attempts` > 0) recorded while `WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS` > 0 keep it, and only until that window passes; with the default `0` every row reads `false`.
+
 A delivery shed because the dispatch queue was full, or refused during shutdown, is recorded here with `attempts: 0` while its outbox row stays pending, so the outbox sweep replays it. With the queue disabled, a delivery that shutdown interrupts while it waits out a retry backoff is recorded the same way (`attempts: 0`, `lastError` `ConcurrencyLimiter closed`) if the backoff ends within `WEBHOOK_SHUTDOWN_DRAIN_MS`, although its earlier attempts were sent and their responses are not in the row; one still asleep when the drain ends is only logged (`webhook_delivery_abandoned_shutdown`). Either way its outbox row stays pending, and the replay on the next start replaces or clears the row. Any delivery the receiver accepts with a `2xx`, inline or from a queued job, removes the rows filed under its idempotency key, so a replay that succeeds leaves none. A replay that exhausts its retries files a row carrying the real error and attempt count and only then removes the `attempts: 0` row, so the event stays on record throughout, across a restart or a lost queue job too. A replay that fails before sending (a payload over the size cap after the `webhook:before` hooks, or one that cannot be serialized) gives the `attempts: 0` row that reason instead. A replay that keeps failing files no second row. `openwa_webhook_delivery_failures_total` counts the original shed, and counts once more if a replay also exhausts its retries.
 
 **Errors:** `401` missing/invalid API key · `403` key role below ADMIN
+
+#### POST /api/webhooks/delivery-failures/redrive
+
+Replay recorded webhook deliveries that still hold their event data, in one bounded batch, oldest first. A row is replayable when it is terminal (`attempts` > 0; an `attempts: 0` row is the outbox's to replay) and was recorded while `WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS` > 0, until that window passes. With the default `0` nothing is kept and this call replays nothing.
+
+Each replay reuses the row's stored `idempotencyKey` (sent as `X-OpenWA-Idempotency-Key`), so a receiver that already handled the event — the POST timed out after it was processed — can dedup the replay instead of acting twice. `webhook:before` hooks run again on the stored pre-hook event data, as on an outbox replay. With the queue disabled each row gets **one** attempt inside the request; with the queue enabled the row is enqueued with the webhook's normal retry policy. A replay that is delivered removes its row; one that fails again keeps the row and raises its `attempts` by one (no second row is filed). Calls on one node run one after another, and every call is written to the audit log with its counts (no payload content).
+
+**Auth:** API key (ADMIN) · **Scope:** rows are confined to the calling key's `allowedSessions`; the body's `sessionId` can only narrow that. A row is replayed only to the webhook it was recorded for, and only while that webhook still belongs to the row's session.
+
+**Request body** (every field optional; an empty body `{}` takes the oldest rows)
+
+| Field       | Type            | Required | Validation                                   | Description                                                               |
+| ----------- | --------------- | -------- | -------------------------------------------- | ------------------------------------------------------------------------- |
+| `sessionId` | string          | no       | `@IsString`, `@MaxLength(128)`               | Only rows of this session.                                                |
+| `webhookId` | string          | no       | `@IsString`, `@MaxLength(128)`               | Only rows of this webhook.                                                |
+| `ids`       | string[]        | no       | `@IsArray`, `@ArrayMaxSize(500)`, each ≤ 128 | Only these failure rows (ids from `GET /api/webhooks/delivery-failures`). |
+| `limit`     | integer (1-500) | no       | `@IsInt`, `@Min(1)`, `@Max(500)`             | Max rows replayed by this call. Defaults to `100`.                        |
+
+**Response** `200`
+
+```json
+{
+  "redriven": 3,
+  "delivered": 2,
+  "enqueued": 1,
+  "failed": 0,
+  "skipped": 0,
+  "remaining": 0
+}
+```
+
+`redriven` is `delivered` + `enqueued`. `skipped` counts rows not replayed because the webhook was removed, disabled or no longer subscribes to the event, or a `webhook:before` hook cancelled it; those rows stay. `remaining` is the number of replayable rows still in scope after the call — call again while it is above `0`.
+
+**Errors:** `400` body fails validation · `401` missing/invalid API key · `403` key role below ADMIN
 
 #### POST /api/sessions/:sessionId/webhooks
 
