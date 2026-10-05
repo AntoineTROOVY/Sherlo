@@ -1569,14 +1569,13 @@ describe('MessageSendService', () => {
 
     it('merges the media payload onto the echo row instead of losing it', async () => {
       (repository.save as jest.Mock).mockRejectedValueOnce(uniqueViolation);
-      (repository.findOne as jest.Mock).mockResolvedValueOnce({ id: 'echo-row', ...bulkRow });
+      (repository.findOne as jest.Mock).mockResolvedValue({ id: 'echo-row', ...bulkRow });
 
       const saved = await service.saveOutgoingMessage('sess-1', bulkRow);
 
       expect(repository.update).toHaveBeenCalledWith(
-        { sessionId: 'sess-1', waMessageId: 'wa-bulk-1' },
+        expect.objectContaining({ sessionId: 'sess-1', waMessageId: 'wa-bulk-1' }),
         expect.objectContaining({
-          timestamp: 1706868000,
           metadata: bulkRow.metadata,
         }),
       );
@@ -1631,6 +1630,23 @@ describe('MessageSendService', () => {
   });
 
   describe('persistSentState vs the own-send echo (dedup race)', () => {
+    it('retains the sent media row when merging onto the echo fails', async () => {
+      (repository.save as jest.Mock)
+        .mockImplementationOnce(msg => Promise.resolve(msg))
+        .mockRejectedValueOnce(new Error('UNIQUE constraint failed: messages.sessionId, messages.waMessageId'));
+      (repository.findOne as jest.Mock).mockResolvedValue({ id: 'echo-row', metadata: {} });
+      (repository.update as jest.Mock).mockRejectedValueOnce(new Error('SQLITE_BUSY'));
+
+      const result = await service.sendImage('sess-1', { chatId: '621@c.us', base64: 'QUJD', mimetype: 'image/png' });
+
+      expect(result.messageId).toBe('wa-msg-1');
+      expect(mockEngine.sendImageMessage).toHaveBeenCalledTimes(1);
+      expect(repository.delete).not.toHaveBeenCalled();
+      expect(repository.update).toHaveBeenCalledWith(
+        { id: 'msg-uuid-1', status: MessageStatus.PENDING },
+        { status: MessageStatus.SENT, timestamp: 1706868000 },
+      );
+    });
     it('merges state onto the echo row, then drops the redundant PENDING row', async () => {
       // The engine's message_create echo (onMessageCreate) won the insert race, so the SENT-state save
       // collides on UNIQUE(sessionId, waMessageId). The echo row carries only what the engine reported
@@ -1664,6 +1680,7 @@ describe('MessageSendService', () => {
       (repository.save as jest.Mock)
         .mockImplementationOnce(msg => Promise.resolve(msg))
         .mockRejectedValueOnce(new Error('UNIQUE constraint failed: messages.sessionId, messages.waMessageId'));
+      (repository.findOne as jest.Mock).mockResolvedValue({ id: 'echo-row', metadata: {} });
 
       await service.sendImage('sess-1', { chatId: '621@c.us', base64: 'QUJD', mimetype: 'image/png' });
 

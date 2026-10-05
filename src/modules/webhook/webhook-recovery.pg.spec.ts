@@ -12,6 +12,7 @@ import { recordWebhookDeliveryFailure } from './utils/record-delivery-failure';
 import { DeduplicateTerminalWebhookFailures1787200000000 } from '../../database/migrations/1787200000000-DeduplicateTerminalWebhookFailures';
 import { ChatMediaArchiveService } from '../chat-media/chat-media-archive.service';
 import type { StorageService } from '../../common/storage/storage.service';
+import { mergeSentMetadata, updateMessageMetadata } from '../message/message-metadata';
 
 jest.mock('archiver', () => ({ default: jest.fn() }));
 const describePostgres = process.env.DATABASE_TYPE === 'postgres' ? describe : describe.skip;
@@ -203,6 +204,25 @@ describePostgres('webhook and media recovery on PostgreSQL', () => {
     expect((await repository.findOneByOrFail({ id: first.id })).metadata?.media).toMatchObject({
       archived: true,
       omitted: true,
+    });
+    await updateMessageMetadata(repository, { id: first.id }, current =>
+      mergeSentMetadata(current, { ...metadata, quotedMessage: { id: 'quoted' } }),
+    );
+    const archived = (await repository.findOneByOrFail({ id: first.id })).metadata;
+    expect(archived.media).toMatchObject({ archived: true, omitted: true });
+    expect(archived.quotedMessage).toEqual({ id: 'quoted' });
+    const update = repository.update.bind(repository);
+    jest.spyOn(repository, 'update').mockImplementationOnce(async (where, patch) => {
+      await update({ id: first.id }, { metadata: { ...archived, reactions: { a: 'first' } } });
+      return update(where, patch);
+    });
+    await updateMessageMetadata(repository, { id: first.id }, current => ({
+      ...current,
+      reactions: { ...(current.reactions as Record<string, string>), b: 'second' },
+    }));
+    expect((await repository.findOneByOrFail({ id: first.id })).metadata).toMatchObject({
+      media: { archived: true, omitted: true },
+      reactions: { a: 'first', b: 'second' },
     });
     const raced = await repository.save({ ...base, waMessageId: 'race' });
     const find = repository.findOne.bind(repository);

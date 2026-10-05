@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { markEngineSendFailure } from '../../common/errors/engine-send-failure';
+import { mergeSentMetadata, updateMessageMetadata } from './message-metadata';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, QueryDeepPartialEntity } from 'typeorm';
 import { SessionService } from '../session/session.service';
@@ -719,10 +720,23 @@ export class MessageSendService {
       };
       // Only when this write actually carries metadata worth merging: a text item must not blank
       // the echo's, and a URL pointer must not replace bytes the engine already downloaded.
-      if (message.metadata && !isUrlPointerMetadata(message.metadata)) {
-        patch.metadata = message.metadata as QueryDeepPartialEntity<Record<string, unknown>>;
+      const metadata = message.metadata;
+      if (metadata && !isUrlPointerMetadata(metadata)) {
+        try {
+          await updateMessageMetadata(this.messageRepository, { sessionId, waMessageId }, current =>
+            mergeSentMetadata(current, metadata),
+          );
+        } catch (error) {
+          if (message.status !== MessageStatus.SENT) throw error;
+          this.logger.warn(`Merging sent metadata onto the echo row failed (id=${waMessageId})`, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // The bulk engine has already sent this item. Keep its media in an id-less SENT row
+          // when the echo cannot accept it, instead of losing the only payload-bearing copy.
+          return this.messageRepository.save(this.messageRepository.create({ ...message, waMessageId: undefined }));
+        }
       }
-      await this.messageRepository.update({ sessionId, waMessageId }, patch);
+      if (message.timestamp !== undefined) await this.messageRepository.update({ sessionId, waMessageId }, patch);
       const surviving = await this.messageRepository.findOne({ where: { sessionId, waMessageId } });
       if (!surviving) throw err;
       return surviving;
@@ -813,8 +827,36 @@ export class MessageSendService {
         // first has advanced it further. Writing SENT here would undo that. See the sibling merge
         // in saveOutgoingMessage.
         const patch: QueryDeepPartialEntity<Message> = { timestamp: result.timestamp };
-        if (message.metadata && !isUrlPointerMetadata(message.metadata)) {
-          patch.metadata = message.metadata as QueryDeepPartialEntity<Record<string, unknown>>;
+        const metadata = message.metadata;
+        let metadataMerged = true;
+        if (metadata && !isUrlPointerMetadata(metadata)) {
+          await updateMessageMetadata(
+            this.messageRepository,
+            { sessionId: message.sessionId, waMessageId: result.id },
+            current => mergeSentMetadata(current, metadata),
+          ).catch(err => {
+            metadataMerged = false;
+            this.logger.warn(`Merging media onto the echo-persisted row failed (id=${result.id})`, {
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+        }
+        if (!metadataMerged) {
+          // Keep the payload-bearing row when the echo merge fails. Mark it SENT without the
+          // conflicting engine id so the pending reaper cannot strip successfully sent media.
+          await this.messageRepository
+            .update(
+              { id: message.id, status: MessageStatus.PENDING },
+              { status: MessageStatus.SENT, timestamp: result.timestamp },
+            )
+            .catch(err =>
+              this.logger.warn(`Preserving the sent media row failed (id=${message.id})`, {
+                error: err instanceof Error ? err.message : String(err),
+              }),
+            );
+          const retained = await this.messageRepository.findOne({ where: { id: message.id } }).catch(() => null);
+          if (retained) this.emitPersisted(message.sessionId, retained);
+          return { messageId: result.id, timestamp: result.timestamp };
         }
         await this.messageRepository
           .update({ sessionId: message.sessionId, waMessageId: result.id }, patch)

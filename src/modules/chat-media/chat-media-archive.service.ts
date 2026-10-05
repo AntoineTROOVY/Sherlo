@@ -153,7 +153,8 @@ export class ChatMediaArchiveService implements OnModuleInit, OnModuleDestroy {
     if (MEDIA_URL_POINTER.test(media.data)) return null;
 
     const maxBytes = this.configService.get<number>('chatMedia.maxBytes', DEFAULT_ARCHIVE_MAX_BYTES);
-    const sizeBytes = media.sizeBytes ?? Buffer.byteLength(media.data, 'base64');
+    // Measure decoded bytes; a plugin or imported row may supply an incorrect sizeBytes.
+    const sizeBytes = Buffer.byteLength(media.data, 'base64');
     if (sizeBytes > maxBytes) return null;
 
     // A random key rather than the WhatsApp message id: message ids are engine-controlled strings
@@ -179,11 +180,12 @@ export class ChatMediaArchiveService implements OnModuleInit, OnModuleDestroy {
         if (!stored.equals(bytes)) throw new Error('Archived media did not read back intact');
         const current = await this.repository.findOne({
           where: { id: row.id, mediaPath: IsNull(), type: Not('revoked') },
-          select: { id: true, metadata: true },
+          select: { id: true, metadata: true, waMessageId: true },
         });
         const metadata = current?.metadata;
         const currentMedia = (metadata as { media?: InlineMedia } | null | undefined)?.media;
-        if (!currentMedia?.data || currentMedia.data !== media.data) {
+        // The media route needs a WhatsApp id. An id-less send must keep its inline bytes.
+        if (!current?.waMessageId || !currentMedia?.data || currentMedia.data !== media.data) {
           await this.storageService.deleteFile(key).catch(() => undefined);
           return null;
         }

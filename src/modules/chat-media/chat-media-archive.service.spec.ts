@@ -9,6 +9,11 @@ jest.mock('archiver', () => ({ default: jest.fn() }));
 import { StorageService } from '../../common/storage/storage.service';
 import { Message, MessageDirection, MessageStatus } from '../message/entities/message.entity';
 import { ChatMediaArchiveService, CHAT_MEDIA_PREFIX } from './chat-media-archive.service';
+import { MessageMutationProjector } from '../session/message-mutation-projector';
+import { KeyedMutationQueue } from '../../common/utils/keyed-mutation-queue';
+import { MessageSendService } from '../message/message-send.service';
+import { EngineRegistry } from '../../engine/engine-registry.service';
+import { updateMessageMetadata } from '../message/message-metadata';
 
 /** A ConfigService stub that returns each call's default unless overridden by `overrides`. */
 function fakeConfigService(overrides: Record<string, unknown> = {}): ConfigService {
@@ -74,6 +79,139 @@ describe('ChatMediaArchiveService', () => {
   });
 
   describe('archive', () => {
+    it('updates null metadata and never restores metadata after a concurrent revoke', async () => {
+      const row = await saveRow();
+      expect(await updateMessageMetadata(repository, { id: row.id }, () => ({ keep: 1 }))).toEqual({ keep: 1 });
+      const update = repository.update.bind(repository);
+      jest.spyOn(repository, 'update').mockImplementationOnce(async (where, patch) => {
+        await update({ id: row.id }, { type: 'revoked', metadata: {} });
+        return update(where, patch);
+      });
+      expect(await updateMessageMetadata(repository, { id: row.id }, current => ({ ...current, stale: 1 }))).toBeNull();
+      expect((await repository.findOneByOrFail({ id: row.id })).metadata).toEqual({});
+    });
+
+    it('bounds metadata retries when another writer wins every update', async () => {
+      const row = await saveRow();
+      const update = jest.spyOn(repository, 'update').mockResolvedValue({ affected: 0, raw: [], generatedMaps: [] });
+      await expect(updateMessageMetadata(repository, { id: row.id }, () => ({ keep: 1 }))).rejects.toThrow(
+        'Message metadata changed repeatedly',
+      );
+      expect(update).toHaveBeenCalledTimes(3);
+      expect((await repository.findOneByOrFail({ id: row.id })).metadata).toBeNull();
+    });
+    it('enforces the byte cap even when supplied sizeBytes is too small', async () => {
+      const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64'), sizeBytes: 1 });
+      expect(await enabled({ 'chatMedia.maxBytes': 1 }).archive(row)).toBeNull();
+      expect((await repository.findOneByOrFail({ id: row.id })).mediaPath).toBeNull();
+    });
+    it.each(['bulk', 'single'])('keeps an archived echo when the %s send writer merges later', async mode => {
+      const media = { mimetype: 'image/png', data: PNG.toString('base64') };
+      const row = await saveRow(media, { direction: MessageDirection.OUTGOING });
+      await enabled({ 'chatMedia.inlineMode': 'archive' }).archive(row);
+      const engines = new EngineRegistry();
+      engines.set('sess-1', {
+        sendImageMessage: () => Promise.resolve({ id: row.waMessageId, timestamp: 1 }),
+      } as never);
+      const sender = new MessageSendService(
+        repository,
+        { findOne: () => Promise.resolve({ phone: '628111' }) } as never,
+        engines,
+        { execute: (_event: string, data: unknown) => Promise.resolve({ continue: true, data }) } as never,
+        {} as never,
+        { assertSendAllowed: () => Promise.resolve(), recordSendSuccess: () => undefined } as never,
+        fakeConfigService({ 'features.simulateTyping': false }),
+      );
+      if (mode === 'bulk') {
+        await sender.saveOutgoingMessage('sess-1', {
+          waMessageId: row.waMessageId,
+          chatId: row.chatId,
+          type: 'image',
+          status: MessageStatus.SENT,
+          metadata: { media },
+        });
+      } else {
+        await sender.sendImage('sess-1', { chatId: row.chatId, base64: media.data, mimetype: media.mimetype });
+      }
+      const stored = await repository.findOneByOrFail({ id: row.id });
+      expect(stored.mediaPath).toBeTruthy();
+      expect(stored.metadata).toEqual({
+        media: { mimetype: 'image/png', omitted: true, archived: true, sizeBytes: PNG.length },
+      });
+      expect(await repository.count()).toBe(1);
+    });
+
+    it('keeps archived media when a reaction read preceded archive publication', async () => {
+      const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64') });
+      const archive = enabled({ 'chatMedia.inlineMode': 'archive' });
+      const update = repository.update.bind(repository);
+      let published = false;
+      jest.spyOn(repository, 'update').mockImplementation(async (where, patch) => {
+        if (patch.metadata && !published) {
+          published = true;
+          await archive.archive(row);
+        }
+        return update(where, patch);
+      });
+      const mutations = new KeyedMutationQueue();
+      const projector = new MessageMutationProjector(
+        repository,
+        { emitMessageReaction: jest.fn() } as never,
+        { dispatch: jest.fn().mockResolvedValue(undefined) } as never,
+        mutations,
+        { error: jest.fn() } as never,
+      );
+      projector.applyReactionQueued('sess-1', {
+        messageId: row.waMessageId,
+        chatId: row.chatId,
+        senderId: '628111@c.us',
+        reaction: 'ok',
+      });
+      while (mutations.size) await new Promise(resolve => setImmediate(resolve));
+      const stored = await repository.findOneByOrFail({ id: row.id });
+      expect(stored.mediaPath).toBeTruthy();
+      expect(stored.metadata).toEqual({
+        media: { mimetype: 'image/png', omitted: true, archived: true, sizeBytes: PNG.length },
+        reactions: { '628111@c.us': 'ok' },
+      });
+    });
+
+    it.each(['bulk', 'single'])('preserves sent bytes after a failed %s echo merge', async mode => {
+      const row = await saveRow(undefined, { direction: MessageDirection.OUTGOING });
+      const engines = new EngineRegistry();
+      engines.set('sess-1', {
+        sendImageMessage: () => Promise.resolve({ id: row.waMessageId, timestamp: 1 }),
+      } as never);
+      const sender = new MessageSendService(
+        repository,
+        { findOne: () => Promise.resolve({ phone: '628111' }) } as never,
+        engines,
+        { execute: (_event: string, data: unknown) => Promise.resolve({ continue: true, data }) } as never,
+        {} as never,
+        { assertSendAllowed: () => Promise.resolve(), recordSendSuccess: () => undefined } as never,
+        fakeConfigService({ 'features.simulateTyping': false }),
+      );
+      jest.spyOn(repository, 'update').mockRejectedValueOnce(new Error('SQLITE_BUSY'));
+      const media = { mimetype: 'image/png', data: PNG.toString('base64') };
+      if (mode === 'bulk') {
+        await sender.saveOutgoingMessage('sess-1', {
+          waMessageId: row.waMessageId,
+          chatId: row.chatId,
+          type: 'image',
+          status: MessageStatus.SENT,
+          metadata: { media },
+        });
+      } else {
+        await sender.sendImage('sess-1', { chatId: row.chatId, base64: media.data, mimetype: media.mimetype });
+      }
+      const retained = await repository.findOneByOrFail({ sessionId: 'sess-1', waMessageId: IsNull() });
+      expect(retained.status).toBe(MessageStatus.SENT);
+      expect(retained.metadata.media).toEqual(media);
+      expect(await repository.count()).toBe(2);
+      expect(await enabled({ 'chatMedia.inlineMode': 'archive' }).archive(retained)).toBeNull();
+      expect((await repository.findOneByOrFail({ id: retained.id })).metadata.media).toEqual(media);
+    });
+
     it('writes the blob and points the row at it, under the chat-media prefix', async () => {
       const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64') });
 
