@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve archived media and reactions during concurrent metadata updates.
+- Keep sent media when merging onto an echo row fails.
+- Keep inline media when its WhatsApp message ID is unavailable.
+- Enforce chat media size limits using decoded payload bytes.
+- Bound archived dashboard previews alongside inline media.
+- Preserve the Java failure constructor and empty Go redrive filters.
 - Keep narrow chat panes scrollable and prevent message actions from shrinking previews.
 - Open archived images in the dashboard media viewer without fetching them again.
 - Forward container shutdown signals after dropping process privileges in Compose and Helm.
