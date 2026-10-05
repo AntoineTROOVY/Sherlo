@@ -65,6 +65,7 @@ export const BLANK_SHADOWED_ENV_KEYS: string[] = [
   'CHAT_MEDIA_ARCHIVE_OUTBOUND',
   'CHAT_MEDIA_ARCHIVE_MAX_BYTES',
   'CHAT_MEDIA_ARCHIVE_TTL_DAYS',
+  'MESSAGE_INLINE_MEDIA',
   'CHAT_MEDIA_ORPHAN_SWEEP_INTERVAL_MS',
   'CHAT_MEDIA_ORPHAN_GRACE_MS',
   // Send pacing. Blank-forwarded by compose like the chat-media keys, so an operator who sets

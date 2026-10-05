@@ -216,6 +216,11 @@ export type MessageMedia = {
   data?: string;
   omitted?: boolean;
   sizeBytes?: number;
+  /**
+   * Set alongside `omitted` when MESSAGE_INLINE_MEDIA=archive dropped the inline copy because the
+   * chat-media archive holds the bytes , the media route serves them, so the thread previews inline.
+   */
+  archived?: boolean;
 };
 
 export const getMediaSrc = (media?: MessageMedia): string => {

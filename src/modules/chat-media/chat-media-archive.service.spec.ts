@@ -68,6 +68,7 @@ describe('ChatMediaArchiveService', () => {
   });
 
   afterEach(async () => {
+    jest.restoreAllMocks();
     await repository.clear();
     for await (const file of storageService.iterateFiles('')) await storageService.deleteFile(file);
   });
@@ -221,6 +222,151 @@ describe('ChatMediaArchiveService', () => {
       const files = [];
       for await (const f of storageService.iterateFiles(CHAT_MEDIA_PREFIX)) files.push(f);
       expect(files).toEqual([]);
+    });
+  });
+
+  describe('archive with MESSAGE_INLINE_MEDIA=archive', () => {
+    const replacing = (overrides: Record<string, unknown> = {}): ChatMediaArchiveService =>
+      enabled({ 'chatMedia.inlineMode': 'archive', ...overrides });
+    const mediaOf = async (id: string) =>
+      ((await repository.findOneByOrFail({ id })).metadata as { media: Record<string, unknown> }).media;
+
+    it('replaces the inline copy with the archived marker once the file is stored', async () => {
+      const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64'), filename: 'cat.png' });
+
+      const key = await replacing().archive(row);
+
+      expect(key).not.toBeNull();
+      expect(await mediaOf(row.id)).toEqual({
+        mimetype: 'image/png',
+        filename: 'cat.png',
+        omitted: true,
+        sizeBytes: PNG.length,
+        archived: true,
+      });
+      // The bytes now live once, in the store, and the media route reads them from there.
+      expect(await storageService.getFile(key!)).toEqual(PNG);
+    });
+
+    it('keeps the rest of the metadata the row gained since it was persisted', async () => {
+      const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64') });
+      await repository.update(
+        { id: row.id },
+        {
+          metadata: { ...row.metadata, quotedMessage: { id: 'q1', body: 'hi' } },
+        },
+      );
+
+      await replacing().archive(row);
+
+      const reloaded = await repository.findOneByOrFail({ id: row.id });
+      expect((reloaded.metadata as { quotedMessage: unknown }).quotedMessage).toEqual({ id: 'q1', body: 'hi' });
+      expect((reloaded.metadata as { media: { data?: string } }).media.data).toBeUndefined();
+    });
+
+    it('keeps the inline copy when the stored file does not read back intact', async () => {
+      const base64 = PNG.toString('base64');
+      const row = await saveRow({ mimetype: 'image/png', data: base64 });
+      const get = jest.spyOn(storageService, 'getFile').mockResolvedValueOnce(Buffer.from('truncated'));
+
+      expect(await replacing().archive(row)).toBeNull();
+
+      expect((await mediaOf(row.id)).data).toBe(base64);
+      expect((await repository.findOneByOrFail({ id: row.id })).mediaPath).toBeNull();
+      get.mockRestore();
+    });
+
+    it('keeps the inline copy when the read-back fails', async () => {
+      const base64 = PNG.toString('base64');
+      const row = await saveRow({ mimetype: 'image/png', data: base64 });
+      const get = jest.spyOn(storageService, 'getFile').mockRejectedValueOnce(new Error('s3 down'));
+
+      await expect(replacing().archive(row)).resolves.toBeNull();
+
+      expect((await mediaOf(row.id)).data).toBe(base64);
+      expect((await repository.findOneByOrFail({ id: row.id })).mediaPath).toBeNull();
+      get.mockRestore();
+    });
+
+    it('keeps metadata changed between the inline snapshot and replacement', async () => {
+      const base64 = PNG.toString('base64');
+      const row = await saveRow({ mimetype: 'image/png', data: base64 });
+      const originalFindOne = repository.findOne.bind(repository);
+      const find = jest.spyOn(repository, 'findOne').mockImplementationOnce(async options => {
+        const snapshot = await originalFindOne(options);
+        await repository.update({ id: row.id }, { metadata: { ...row.metadata, reactions: { user: 'ok' } } });
+        return snapshot;
+      });
+
+      await replacing().archive(row);
+
+      find.mockRestore();
+      const current = await repository.findOneByOrFail({ id: row.id });
+      expect(current.metadata).toEqual({ ...row.metadata, reactions: { user: 'ok' } });
+      expect(current.mediaPath).toBeNull();
+    });
+
+    it('keeps an inline payload that changed while the archive was written', async () => {
+      const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64') });
+      const changedMedia = { mimetype: 'image/png', data: Buffer.from('new bytes').toString('base64') };
+      const originalPut = storageService.putFile.bind(storageService);
+      const put = jest.spyOn(storageService, 'putFile').mockImplementationOnce(async (key, bytes) => {
+        await originalPut(key, bytes);
+        await repository.update({ id: row.id }, { metadata: { media: changedMedia } });
+      });
+
+      await replacing().archive(row);
+
+      put.mockRestore();
+      expect(await mediaOf(row.id)).toEqual(changedMedia);
+      expect((await repository.findOneByOrFail({ id: row.id })).mediaPath).toBeNull();
+    });
+
+    it('does not publish media revoked while the verified snapshot was read', async () => {
+      const row = await saveRow({ mimetype: 'image/png', data: PNG.toString('base64') });
+      const originalFindOne = repository.findOne.bind(repository);
+      const find = jest.spyOn(repository, 'findOne').mockImplementationOnce(async options => {
+        const snapshot = await originalFindOne(options);
+        await repository.update({ id: row.id }, { type: 'revoked', metadata: null as unknown as undefined });
+        return snapshot;
+      });
+
+      expect(await replacing().archive(row)).toBeNull();
+
+      find.mockRestore();
+      const current = await repository.findOneByOrFail({ id: row.id });
+      expect(current.type).toBe('revoked');
+      expect(current.metadata).toBeNull();
+      expect(current.mediaPath).toBeNull();
+    });
+
+    it('keeps the inline copy when the file could not be written', async () => {
+      const base64 = PNG.toString('base64');
+      const row = await saveRow({ mimetype: 'image/png', data: base64 });
+      const put = jest.spyOn(storageService, 'putFile').mockRejectedValueOnce(new Error('disk on fire'));
+
+      await replacing().archive(row);
+
+      expect((await mediaOf(row.id)).data).toBe(base64);
+      put.mockRestore();
+    });
+
+    it('keeps the inline copy of media above the archive cap, which is not archived', async () => {
+      const base64 = PNG.toString('base64');
+      const row = await saveRow({ mimetype: 'image/png', data: base64 });
+
+      expect(await replacing({ 'chatMedia.maxBytes': 4 }).archive(row)).toBeNull();
+
+      expect((await mediaOf(row.id)).data).toBe(base64);
+    });
+
+    it('leaves the inline copy alone in the default inline mode', async () => {
+      const base64 = PNG.toString('base64');
+      const row = await saveRow({ mimetype: 'image/png', data: base64 });
+
+      await enabled({ 'chatMedia.inlineMode': 'inline' }).archive(row);
+
+      expect((await mediaOf(row.id)).data).toBe(base64);
     });
   });
 

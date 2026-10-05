@@ -100,6 +100,13 @@ export function validateEnv(config: EnvConfig): EnvConfig {
   };
   checkEnum('ENGINE_TYPE', ['whatsapp-web.js', 'baileys']);
   checkEnum('STORAGE_TYPE', ['local', 's3']);
+  checkEnum('MESSAGE_INLINE_MEDIA', ['inline', 'archive']);
+  // 'archive' drops the inline copy only after the archiver stored the file; with the archiver off
+  // nothing is ever stored, so the mode would silently do nothing. Refuse that rather than let an
+  // operator believe the inline copies are being reclaimed.
+  if (rawEnum('MESSAGE_INLINE_MEDIA') === 'archive' && config.CHAT_MEDIA_ARCHIVE_ENABLED !== 'true') {
+    errors.push('MESSAGE_INLINE_MEDIA=archive needs CHAT_MEDIA_ARCHIVE_ENABLED=true');
+  }
   // The S3 key root. A prefix that is absolute, traverses, or is only slashes would put this
   // deployment's objects (and its orphan sweeps' deletes) at the bucket root or outside its own root;
   // one with an empty or '.' segment builds keys an S3-compatible store refuses on every write.

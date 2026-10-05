@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expose caller-supplied send idempotency keys in all five SDKs.
 - Add optional 24-hour idempotency keys to twelve single-recipient send routes.
 
+- Add opt-in archive-only chat media with dashboard previews.
+
 ### Fixed
 
 - Preserve webhook outbox payloads until delivery or durable failure storage succeeds.
