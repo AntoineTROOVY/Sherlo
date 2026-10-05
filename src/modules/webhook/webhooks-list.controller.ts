@@ -68,10 +68,10 @@ export class WebhooksListController {
     status: 200,
     description:
       'One bounded batch of replayable failure rows (terminal rows recorded while ' +
-      'WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS > 0), oldest first. Each replay reuses the stored ' +
+      'WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS > 0), least-retried first, then oldest. Each replay reuses the stored ' +
       'idempotency key, so a receiver that already handled the event can dedup it, and runs the ' +
-      'webhook:before hooks again. With the queue disabled each row gets one attempt; with it enabled ' +
-      'the row is enqueued with the webhook retry policy. Rows outside the key allowedSessions are ' +
+      'webhook:before hooks again. Each row gets one direct POST attempt even when ordinary delivery ' +
+      'uses the queue; enqueued stays zero. Rows outside the key allowedSessions are ' +
       'never touched.',
     type: WebhookRedriveResultDto,
   })

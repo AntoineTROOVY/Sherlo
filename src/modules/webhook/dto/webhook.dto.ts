@@ -467,7 +467,7 @@ export class RedriveWebhookDeliveriesDto {
 
 /** Outcome of `POST /webhooks/delivery-failures/redrive`. */
 export class WebhookRedriveResultDto {
-  @ApiProperty({ description: 'Rows replayed by this call: delivered plus enqueued.', example: 3 })
+  @ApiProperty({ description: 'Rows replayed by this call; equals delivered.', example: 2 })
   redriven!: number;
 
   @ApiProperty({ description: 'Delivered by a direct POST; their failure rows were removed.', example: 2 })
@@ -475,7 +475,7 @@ export class WebhookRedriveResultDto {
 
   @ApiProperty({
     description: 'Reserved for response compatibility; operator redrive uses direct POST and returns zero.',
-    example: 1,
+    example: 0,
   })
   enqueued!: number;
 

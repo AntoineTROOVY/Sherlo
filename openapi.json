@@ -3725,7 +3725,7 @@
         },
         "responses": {
           "200": {
-            "description": "One bounded batch of replayable failure rows (terminal rows recorded while WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS > 0), oldest first. Each replay reuses the stored idempotency key, so a receiver that already handled the event can dedup it, and runs the webhook:before hooks again. With the queue disabled each row gets one attempt; with it enabled the row is enqueued with the webhook retry policy. Rows outside the key allowedSessions are never touched.",
+            "description": "One bounded batch of replayable failure rows (terminal rows recorded while WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS > 0), least-retried first, then oldest. Each replay reuses the stored idempotency key, so a receiver that already handled the event can dedup it, and runs the webhook:before hooks again. Each row gets one direct POST attempt even when ordinary delivery uses the queue; enqueued stays zero. Rows outside the key allowedSessions are never touched.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19465,8 +19465,8 @@
         "properties": {
           "redriven": {
             "type": "number",
-            "description": "Rows replayed by this call: delivered plus enqueued.",
-            "example": 3
+            "description": "Rows replayed by this call; equals delivered.",
+            "example": 2
           },
           "delivered": {
             "type": "number",
@@ -19476,7 +19476,7 @@
           "enqueued": {
             "type": "number",
             "description": "Reserved for response compatibility; operator redrive uses direct POST and returns zero.",
-            "example": 1
+            "example": 0
           },
           "failed": {
             "type": "number",
