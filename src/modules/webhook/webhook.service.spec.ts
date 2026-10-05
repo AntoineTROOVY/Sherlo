@@ -679,6 +679,9 @@ describe('WebhookService', () => {
     });
 
     it('flags the rows that still hold a replay payload, without reading any payload', async () => {
+      (configService.get as jest.Mock).mockImplementation((key: string, def?: unknown) =>
+        key === 'webhook.failurePayloadRetentionHours' ? 24 : def,
+      );
       (failureRepository.find as jest.Mock)
         .mockResolvedValueOnce([{ id: 'f1' }, { id: 'f2' }])
         .mockResolvedValueOnce([{ id: 'f2' }]);
@@ -695,6 +698,13 @@ describe('WebhookService', () => {
       };
       expect(second.select).toEqual({ id: true });
       expect(second.where.id).toEqual(In(['f1', 'f2']));
+      expect(second.where.createdAt).toEqual(expect.any(FindOperator));
+    });
+
+    it('reports retained payloads as unavailable when retention is disabled', async () => {
+      (failureRepository.find as jest.Mock).mockResolvedValue([{ id: 'f1' }]);
+      await expect(service.listDeliveryFailures({})).resolves.toEqual([{ id: 'f1', replayable: false }]);
+      expect(failureRepository.find).toHaveBeenCalledTimes(1);
     });
 
     it('skips the replayable lookup for an empty page', async () => {

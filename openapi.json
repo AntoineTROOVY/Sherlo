@@ -19247,7 +19247,7 @@
           },
           "enqueued": {
             "type": "number",
-            "description": "Handed to the queue; each row is removed when its job delivers and kept if it fails again.",
+            "description": "Reserved for response compatibility; operator redrive uses direct POST and returns zero.",
             "example": 1
           },
           "failed": {

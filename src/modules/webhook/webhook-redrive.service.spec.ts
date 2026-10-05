@@ -1,196 +1,336 @@
-import { FindOperator, Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'node:crypto';
+import { DataSource, Repository } from 'typeorm';
+import { Session, SessionStatus } from '../session/entities/session.entity';
 import { Webhook } from './entities/webhook.entity';
 import { WebhookDeliveryFailure } from './entities/webhook-delivery-failure.entity';
 import { WebhookDeliveryService } from './webhook-delivery.service';
 import { MAX_WEBHOOK_REDRIVE_LIMIT, WebhookRedriveService } from './webhook-redrive.service';
-
-const failure = (overrides: Partial<WebhookDeliveryFailure> = {}): WebhookDeliveryFailure => ({
-  id: 'f-1',
-  webhookId: 'wh-1',
-  sessionId: 'sess-1',
-  event: 'message.received',
-  url: 'https://r.example/h',
-  idempotencyKey: 'key-1',
-  deliveryId: 'd-1',
-  attempts: 3,
-  lastStatusCode: 503,
-  lastError: 'HTTP 503: x',
-  payload: { id: 'msg-1', body: 'hi' },
-  createdAt: new Date('2026-10-01T00:00:00Z'),
-  ...overrides,
-});
-
-const webhook = (overrides: Partial<Webhook> = {}): Webhook =>
-  ({
-    id: 'wh-1',
-    sessionId: 'sess-1',
-    url: 'https://r.example/h',
-    events: ['message.received'],
-    active: true,
-    retryCount: 3,
-    ...overrides,
-  }) as Webhook;
+import { recordWebhookDeliveryFailure } from './utils/record-delivery-failure';
 
 describe('WebhookRedriveService', () => {
-  let failures: { find: jest.Mock; count: jest.Mock; update: jest.Mock };
-  let webhooks: { find: jest.Mock };
-  let delivery: { redeliver: jest.Mock };
+  let ds: DataSource;
+  let failures: Repository<WebhookDeliveryFailure>;
+  let webhooks: Repository<Webhook>;
+  let primary: Webhook;
+  let otherSession: Webhook;
+  let retentionHours: number;
+  let delivery: { redeliver: jest.MockedFunction<WebhookDeliveryService['redeliver']> };
   let service: WebhookRedriveService;
 
-  beforeEach(() => {
-    failures = {
-      find: jest.fn().mockResolvedValue([failure()]),
-      count: jest.fn().mockResolvedValue(0),
-      update: jest.fn().mockResolvedValue({ affected: 1 }),
+  const addFailure = (overrides: Partial<WebhookDeliveryFailure> = {}): Promise<WebhookDeliveryFailure> =>
+    failures.save(
+      failures.create({
+        webhookId: primary.id,
+        sessionId: primary.sessionId,
+        event: 'message.received',
+        url: primary.url,
+        idempotencyKey: randomUUID(),
+        deliveryId: randomUUID(),
+        attempts: 3,
+        lastStatusCode: 503,
+        lastError: 'HTTP 503: receiver unavailable',
+        payload: { id: 'msg-1', body: 'hi' },
+        createdAt: new Date(Date.now() - 60_000),
+        ...overrides,
+      }),
+    );
+
+  beforeEach(async () => {
+    ds = new DataSource({
+      type: 'better-sqlite3',
+      database: ':memory:',
+      entities: [Session, Webhook, WebhookDeliveryFailure],
+      synchronize: true,
+    });
+    await ds.initialize();
+    failures = ds.getRepository(WebhookDeliveryFailure);
+    webhooks = ds.getRepository(Webhook);
+    for (const id of ['sess-1', 'sess-2']) {
+      await ds.getRepository(Session).save({ id, name: id, status: SessionStatus.READY, config: {} });
+    }
+    [primary, otherSession] = await webhooks.save(
+      ['sess-1', 'sess-2'].map(sessionId =>
+        webhooks.create({
+          sessionId,
+          url: `https://${sessionId}.example/h`,
+          events: ['message.received'],
+          active: true,
+          retryCount: 3,
+        }),
+      ),
+    );
+    retentionHours = 24;
+    delivery = {
+      redeliver: jest.fn<
+        ReturnType<WebhookDeliveryService['redeliver']>,
+        Parameters<WebhookDeliveryService['redeliver']>
+      >(async (webhook, sessionId, event, key, data) => {
+        if (data.fail === true) {
+          const recorded = await recordWebhookDeliveryFailure(
+            failures,
+            { error: jest.fn() },
+            {
+              webhookId: webhook.id,
+              sessionId,
+              event,
+              idempotencyKey: key,
+              url: webhook.url,
+              attempts: 1,
+              lastStatusCode: 503,
+              lastError: 'HTTP 503: receiver unavailable',
+              payload: data,
+            },
+          );
+          return recorded === null ? 'unrecorded' : 'failed';
+        }
+        await failures.delete({ webhookId: webhook.id, idempotencyKey: key });
+        return 'delivered';
+      }),
     };
-    webhooks = { find: jest.fn().mockResolvedValue([webhook()]) };
-    delivery = { redeliver: jest.fn().mockResolvedValue('delivered') };
     service = new WebhookRedriveService(
-      webhooks as unknown as Repository<Webhook>,
-      failures as unknown as Repository<WebhookDeliveryFailure>,
+      webhooks,
+      failures,
       delivery as unknown as WebhookDeliveryService,
+      { get: () => retentionHours } as unknown as ConfigService,
     );
   });
 
-  const findArgs = (): {
-    select: Record<string, boolean>;
-    where: Record<string, unknown>;
-    take: number;
-    order: Record<string, string>;
-  } => (failures.find.mock.calls as unknown[][])[0][0] as ReturnType<typeof findArgs>;
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await ds.destroy();
+  });
 
-  it('replays a stored row with its STORED idempotency key, one attempt, and reports it delivered', async () => {
-    const result = await service.redrive({});
+  it('replays the stored payload and key with one attempt, and removes the delivered row', async () => {
+    const row = await addFailure();
 
+    expect(await service.redrive({})).toEqual({
+      redriven: 1,
+      delivered: 1,
+      enqueued: 0,
+      failed: 0,
+      skipped: 0,
+      remaining: 0,
+    });
     expect(delivery.redeliver).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'wh-1' }),
-      'sess-1',
-      'message.received',
-      'key-1',
-      { id: 'msg-1', body: 'hi' },
+      expect.objectContaining({ id: primary.id }),
+      row.sessionId,
+      row.event,
+      row.idempotencyKey,
+      row.payload,
       { singleAttempt: true },
     );
-    expect(result).toEqual({ redriven: 1, delivered: 1, enqueued: 0, failed: 0, skipped: 0, remaining: 0 });
+    expect(await failures.count()).toBe(0);
+    expect(await service.redrive({})).toMatchObject({ delivered: 0, remaining: 0 });
   });
 
-  it('reads the select:false payload explicitly, takes only terminal keyed rows, oldest first', async () => {
-    await service.redrive({});
+  it('selects eligible subscriptions before the batch limit, past more than 100 old unavailable rows', async () => {
+    const disabled = await webhooks.save(webhooks.create({ ...primary, id: randomUUID(), active: false }));
+    const unsubscribed = await webhooks.save(
+      webhooks.create({ ...primary, id: randomUUID(), events: ['message.ack'] }),
+    );
+    const unavailable = [
+      { webhookId: randomUUID() },
+      { webhookId: disabled.id },
+      { webhookId: unsubscribed.id },
+      { webhookId: otherSession.id, sessionId: primary.sessionId },
+    ];
+    for (let i = 0; i < 104; i++) {
+      await addFailure({ ...unavailable[i % unavailable.length], createdAt: new Date(Date.now() - 120_000) });
+    }
+    const healthy = await addFailure();
 
-    const args = findArgs();
-    expect(args.select.payload).toBe(true);
-    expect(args.where.attempts).toBeInstanceOf(FindOperator);
-    expect((args.where.attempts as FindOperator<number>).type).toBe('moreThan');
-    expect((args.where.payload as FindOperator<unknown>).type).toBe('not');
-    expect((args.where.idempotencyKey as FindOperator<unknown>).type).toBe('not');
-    expect(args.order).toEqual({ createdAt: 'ASC', id: 'ASC' });
-    expect(args.take).toBe(100);
-  });
-
-  it('clamps the limit to the maximum batch', async () => {
-    await service.redrive({ limit: 10_000 });
-    expect(findArgs().take).toBe(MAX_WEBHOOK_REDRIVE_LIMIT);
-  });
-
-  it('confines a scoped key to its allowedSessions, and a sessionId outside them to nothing', async () => {
-    await service.redrive({}, ['sess-1', 'sess-2']);
-    expect((findArgs().where.sessionId as FindOperator<string[]>).value).toEqual(['sess-1', 'sess-2']);
-
-    failures.find.mockClear();
-    const result = await service.redrive({ sessionId: 'sess-9' }, ['sess-1']);
-    expect(failures.find).not.toHaveBeenCalled();
+    expect(await service.redrive({})).toMatchObject({ delivered: 1, skipped: 0, remaining: 0 });
     expect(delivery.redeliver).toHaveBeenCalledTimes(1);
-    expect(result.redriven).toBe(0);
+    expect(delivery.redeliver.mock.calls[0][3]).toBe(healthy.idempotencyKey);
+    expect(await failures.count()).toBe(104);
   });
 
-  it('narrows by webhookId and explicit ids', async () => {
-    await service.redrive({ webhookId: 'wh-1', ids: ['f-1', 'f-2'] });
-    const where = findArgs().where;
-    expect(where.webhookId).toBe('wh-1');
-    expect((where.id as FindOperator<string[]>).value).toEqual(['f-1', 'f-2']);
+  it('moves a failed batch behind never-replayed rows', async () => {
+    for (let i = 0; i < 100; i++) {
+      await addFailure({ payload: { fail: true }, createdAt: new Date(Date.now() - 120_000) });
+    }
+    await addFailure({ payload: { healthy: 1 } });
+    await addFailure({ payload: { healthy: 2 } });
+    expect(await service.redrive({})).toMatchObject({ failed: 100, delivered: 0, remaining: 102 });
+    expect(await service.redrive({ limit: 2 })).toMatchObject({ failed: 0, delivered: 2, remaining: 100 });
+    expect(await failures.countBy({ attempts: 4 })).toBe(100);
   });
 
-  it('skips a row whose webhook is gone, disabled, unsubscribed or now owned by another session', async () => {
-    failures.find.mockResolvedValue([
-      failure({ id: 'a', webhookId: 'gone' }),
-      failure({ id: 'b', webhookId: 'off' }),
-      failure({ id: 'c', webhookId: 'unsub' }),
-      failure({ id: 'd', webhookId: 'moved' }),
-    ]);
-    webhooks.find.mockResolvedValue([
-      webhook({ id: 'off', active: false }),
-      webhook({ id: 'unsub', events: ['message.ack'] }),
-      webhook({ id: 'moved', sessionId: 'sess-2' }),
-    ]);
+  it('requires a terminal keyed payload within the current retention window', async () => {
+    await addFailure({ createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000) });
+    await addFailure({ attempts: 0 });
+    await addFailure({ payload: null });
+    await addFailure({ idempotencyKey: null as never });
+    const fresh = await addFailure();
 
-    const result = await service.redrive({});
+    expect(await service.redrive({})).toMatchObject({ delivered: 1, remaining: 0 });
+    expect(delivery.redeliver.mock.calls[0][3]).toBe(fresh.idempotencyKey);
+    expect(await failures.count()).toBe(4);
+  });
 
+  it('returns no replayable rows when retention is off, even before payload cleanup', async () => {
+    await addFailure();
+    retentionHours = 0;
+
+    expect(await service.redrive({})).toMatchObject({ redriven: 0, remaining: 0 });
     expect(delivery.redeliver).not.toHaveBeenCalled();
-    expect(result.skipped).toBe(4);
+    expect(await failures.count()).toBe(1);
   });
 
-  it('counts enqueued and cancelled outcomes, and raises attempts on a replay that fails again', async () => {
-    failures.find.mockResolvedValue([
-      failure({ id: 'a', attempts: 3 }),
-      failure({ id: 'b', attempts: 5 }),
-      failure({ id: 'c' }),
-      failure({ id: 'd', attempts: 2 }),
-    ]);
+  it('narrows both delivery and remaining to the same ids, webhook and allowed sessions', async () => {
+    const chosen = await addFailure();
+    await addFailure();
+    const outside = await addFailure({ webhookId: otherSession.id, sessionId: otherSession.sessionId });
+
+    expect(
+      await service.redrive({ ids: [chosen.id, outside.id], webhookId: primary.id }, [primary.sessionId]),
+    ).toMatchObject({ delivered: 1, remaining: 0 });
+    expect(delivery.redeliver).toHaveBeenCalledTimes(1);
+    expect(delivery.redeliver.mock.calls[0][3]).toBe(chosen.idempotencyKey);
+    expect(await failures.count()).toBe(2);
+    expect(await service.redrive({ sessionId: otherSession.sessionId }, [primary.sessionId])).toMatchObject({
+      redriven: 0,
+      remaining: 0,
+    });
+    expect(await service.redrive({ webhookId: otherSession.id }, [primary.sessionId])).toMatchObject({
+      redriven: 0,
+      remaining: 0,
+    });
+    expect(await service.redrive({ ids: [] })).toMatchObject({ redriven: 0, remaining: 0 });
+    expect(delivery.redeliver).toHaveBeenCalledTimes(1);
+    expect(await service.redrive({ sessionId: otherSession.sessionId }, null)).toMatchObject({
+      delivered: 1,
+      remaining: 0,
+    });
+  });
+
+  it('allows wildcard subscriptions to replay another event', async () => {
+    await webhooks.update(primary.id, { events: ['*'] });
+    await addFailure({ event: 'session.disconnected' });
+
+    expect(await service.redrive({})).toMatchObject({ delivered: 1, remaining: 0 });
+    expect(delivery.redeliver.mock.calls[0][2]).toBe('session.disconnected');
+  });
+
+  it('matches exact event members and ignores non-array subscriptions', async () => {
+    await webhooks.update(primary.id, { events: ['message.received.extra'] });
+    await addFailure();
+    const malformed = await webhooks.save(
+      webhooks.create({ ...primary, id: randomUUID(), events: { event: 'message.received' } as never }),
+    );
+    await addFailure({ webhookId: malformed.id });
+
+    expect(await service.redrive({})).toMatchObject({ redriven: 0, remaining: 0 });
+    expect(delivery.redeliver).not.toHaveBeenCalled();
+    const exact = await addFailure({ event: 'message.received.extra' });
+    expect(await service.redrive({})).toMatchObject({ delivered: 1, remaining: 0 });
+    expect(delivery.redeliver.mock.calls[0][3]).toBe(exact.idempotencyKey);
+  });
+
+  it('supports unrestricted redrive with more than 1000 active webhooks', async () => {
+    const ids = Array.from({ length: 1001 }, () => randomUUID());
+    await webhooks
+      .createQueryBuilder()
+      .insert()
+      .values(ids.map(id => ({ id, sessionId: primary.sessionId, url: primary.url, events: ['message.received'] })))
+      .updateEntity(false)
+      .execute();
+    const row = await addFailure({ webhookId: ids.at(-1) });
+
+    expect(await service.redrive({})).toMatchObject({ delivered: 1, remaining: 0 });
+    expect(delivery.redeliver.mock.calls[0][3]).toBe(row.idempotencyKey);
+  });
+
+  it('orders equal-attempt rows by creation time and id', async () => {
+    const older = new Date(Date.now() - 120_000);
+    const first = await addFailure({
+      id: '00000000-0000-4000-8000-000000000001',
+      createdAt: older,
+      payload: { fail: true },
+    });
+    const second = await addFailure({
+      id: '00000000-0000-4000-8000-000000000002',
+      createdAt: older,
+      payload: { fail: true },
+    });
+    await addFailure();
+
+    expect(await service.redrive({ limit: 2 })).toMatchObject({ failed: 2, remaining: 3 });
+    expect(delivery.redeliver.mock.calls.map(call => call[3])).toEqual([first.idempotencyKey, second.idempotencyKey]);
+  });
+
+  it('clamps an internal request to the maximum batch', async () => {
+    for (let i = 0; i <= MAX_WEBHOOK_REDRIVE_LIMIT; i++) await addFailure({ payload: { fail: true } });
+
+    expect(await service.redrive({ limit: 10_000 })).toMatchObject({
+      failed: MAX_WEBHOOK_REDRIVE_LIMIT,
+      remaining: MAX_WEBHOOK_REDRIVE_LIMIT + 1,
+    });
+    expect(delivery.redeliver).toHaveBeenCalledTimes(MAX_WEBHOOK_REDRIVE_LIMIT);
+  });
+
+  it('counts legacy enqueued and cancelled outcomes, and increments a rejected replay', async () => {
+    await addFailure();
+    await addFailure();
+    await addFailure();
     delivery.redeliver
       .mockResolvedValueOnce('enqueued')
-      .mockResolvedValueOnce('failed')
       .mockResolvedValueOnce('cancelled')
-      .mockRejectedValueOnce(new Error('boom'));
-    failures.count.mockResolvedValue(2);
+      .mockRejectedValueOnce(new Error('receiver failed'));
 
-    const result = await service.redrive({});
-
-    expect(result).toEqual({ redriven: 1, delivered: 0, enqueued: 1, failed: 2, skipped: 1, remaining: 2 });
-    expect(failures.update).toHaveBeenCalledWith({ id: 'b' }, { attempts: 6 });
-    expect(failures.update).toHaveBeenCalledWith({ id: 'd' }, { attempts: 3 });
-    expect(failures.update).toHaveBeenCalledTimes(2);
+    expect(await service.redrive({})).toMatchObject({ redriven: 1, enqueued: 1, failed: 1, skipped: 1, remaining: 3 });
+    expect(await failures.countBy({ attempts: 4 })).toBe(1);
   });
 
-  it('keeps the batch going when recording a failed replay fails', async () => {
-    failures.find.mockResolvedValue([failure({ id: 'a' }), failure({ id: 'b' })]);
-    delivery.redeliver.mockResolvedValueOnce('failed').mockResolvedValueOnce('delivered');
-    failures.update.mockRejectedValue(new Error('db down'));
+  it('continues the batch when recording a failed replay fails', async () => {
+    await addFailure({ payload: { fail: true }, createdAt: new Date(Date.now() - 120_000) });
+    await addFailure();
+    jest.spyOn(failures, 'update').mockRejectedValueOnce(new Error('database unavailable'));
+    jest.spyOn(failures, 'increment').mockRejectedValueOnce(new Error('database unavailable'));
 
-    const result = await service.redrive({});
-
-    expect(result.failed).toBe(1);
-    expect(result.delivered).toBe(1);
+    expect(await service.redrive({})).toMatchObject({ failed: 1, delivered: 1, remaining: 1 });
   });
 
-  it('runs overlapping calls one after the other, and survives a failed batch', async () => {
+  it('serializes overlapping calls and keeps the chain usable after a failed batch', async () => {
+    await addFailure();
+    jest.spyOn(failures, 'createQueryBuilder').mockImplementationOnce(() => {
+      throw new Error('database unavailable');
+    });
+    await expect(service.redrive({})).rejects.toThrow('database unavailable');
     let release!: () => void;
     const gate = new Promise<void>(resolve => (release = resolve));
-    delivery.redeliver.mockImplementationOnce(async () => {
+    const deliver = delivery.redeliver.getMockImplementation()!;
+    delivery.redeliver.mockImplementationOnce(async (...args) => {
       await gate;
-      return 'delivered';
+      return deliver(...args);
     });
-    failures.find.mockRejectedValueOnce(new Error('db down')).mockResolvedValue([failure()]);
 
     const first = service.redrive({});
-    await expect(first).rejects.toThrow('db down');
-
     const second = service.redrive({});
-    const third = service.redrive({});
     await new Promise(resolve => setImmediate(resolve));
-    // The third call has not read anything while the second is still replaying.
-    expect(failures.find).toHaveBeenCalledTimes(2);
+    expect(delivery.redeliver).toHaveBeenCalledTimes(1);
     release();
-    await expect(second).resolves.toMatchObject({ delivered: 1 });
-    await expect(third).resolves.toMatchObject({ delivered: 1 });
-    expect(failures.find).toHaveBeenCalledTimes(3);
+    expect(await first).toMatchObject({ delivered: 1, remaining: 0 });
+    expect(await second).toMatchObject({ delivered: 0, remaining: 0 });
+    expect(delivery.redeliver).toHaveBeenCalledTimes(1);
   });
 
-  it('does not read webhooks when nothing is replayable', async () => {
-    failures.find.mockResolvedValue([]);
-    failures.count.mockResolvedValue(0);
+  it('bounds parallel direct replays to four', async () => {
+    for (let i = 0; i < 10; i++) await addFailure();
+    const deliver = delivery.redeliver.getMockImplementation()!;
+    let active = 0;
+    let peak = 0;
+    delivery.redeliver.mockImplementation(async (...args) => {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise(resolve => setImmediate(resolve));
+      const outcome = await deliver(...args);
+      active--;
+      return outcome;
+    });
 
-    const result = await service.redrive({});
-
-    expect(webhooks.find).not.toHaveBeenCalled();
-    expect(result).toEqual({ redriven: 0, delivered: 0, enqueued: 0, failed: 0, skipped: 0, remaining: 0 });
+    expect(await service.redrive({})).toMatchObject({ delivered: 10, remaining: 0 });
+    expect(peak).toBe(4);
   });
 });

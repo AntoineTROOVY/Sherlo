@@ -255,7 +255,8 @@ export class WebhookService implements OnModuleInit, OnModuleDestroy {
     // `payload` is select: false, so the page above never carries an event body. Which rows hold one
     // is a second, id-only read; with payload retention off no row does and it matches nothing.
     const replayable = new Set<string>();
-    if (rows.length > 0) {
+    const hours = this.configService.get<number>('webhook.failurePayloadRetentionHours', 0);
+    if (rows.length > 0 && hours > 0) {
       const withPayload = await this.failureRepository.find({
         select: { id: true },
         where: {
@@ -263,6 +264,7 @@ export class WebhookService implements OnModuleInit, OnModuleDestroy {
           payload: Not(IsNull()),
           attempts: MoreThan(0),
           idempotencyKey: Not(IsNull()),
+          createdAt: MoreThan(new Date(Date.now() - hours * 60 * 60 * 1000)),
         },
       });
       for (const r of withPayload) replayable.add(r.id);

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
+import { In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { Webhook } from './entities/webhook.entity';
 import { WebhookDeliveryFailure } from './entities/webhook-delivery-failure.entity';
 import { WebhookDeliveryService } from './webhook-delivery.service';
@@ -69,6 +70,7 @@ export class WebhookRedriveService {
     @InjectRepository(WebhookDeliveryFailure, 'data')
     private readonly failureRepository: Repository<WebhookDeliveryFailure>,
     private readonly delivery: WebhookDeliveryService,
+    private readonly configService: ConfigService,
   ) {}
 
   redrive(request: WebhookRedriveRequest, allowedSessions?: string[] | null): Promise<WebhookRedriveResult> {
@@ -93,38 +95,43 @@ export class WebhookRedriveService {
     // The calling key's allowedSessions is authoritative; the body's sessionId may only narrow it.
     const sessionScope = resolveSessionScope(allowedSessions, request.sessionId);
     if (sessionScope !== null && sessionScope.length === 0) return result;
+    const retentionHours = this.configService.get<number>('webhook.failurePayloadRetentionHours', 0);
+    if (retentionHours <= 0 || request.ids?.length === 0) return result;
 
-    // Replayable: terminal (an attempts-0 row is the outbox's to replay), with a stored payload and
-    // the key the receiver dedups on.
-    const where: FindOptionsWhere<WebhookDeliveryFailure> = {
-      attempts: MoreThan(0),
-      payload: Not(IsNull()),
-      idempotencyKey: Not(IsNull()),
-      ...(sessionScope ? { sessionId: In(sessionScope) } : {}),
-      ...(request.webhookId ? { webhookId: request.webhookId } : {}),
-    };
+    const cutoff = new Date(Date.now() - retentionHours * 60 * 60 * 1000);
+    // Join eligible subscriptions before taking a batch. A single membership predicate also avoids
+    // an OR expression and repeated ids parameters for every active webhook across all sessions.
+    const subscriptions =
+      this.failureRepository.manager.connection.options.type === 'postgres'
+        ? "json_array_elements_text(CASE WHEN json_typeof(webhook.events::json) = 'array' THEN webhook.events::json ELSE '[]'::json END) AS subscribed(event)"
+        : "json_each(CASE WHEN json_type(webhook.events) = 'array' THEN webhook.events ELSE '[]' END) AS subscribed";
+    const subscribedEvent =
+      this.failureRepository.manager.connection.options.type === 'postgres' ? 'subscribed.event' : 'subscribed.value';
+    const query = this.failureRepository
+      .createQueryBuilder('failure')
+      .innerJoin(Webhook, 'webhook', 'webhook.id = failure.webhookId AND webhook.sessionId = failure.sessionId')
+      .where({
+        attempts: MoreThan(0),
+        payload: Not(IsNull()),
+        idempotencyKey: Not(IsNull()),
+        createdAt: MoreThan(cutoff),
+        ...(request.ids ? { id: In(request.ids) } : {}),
+        ...(sessionScope ? { sessionId: In(sessionScope) } : {}),
+        ...(request.webhookId ? { webhookId: request.webhookId } : {}),
+      })
+      .andWhere('webhook.active = :active', { active: true })
+      .andWhere(`EXISTS (SELECT 1 FROM ${subscriptions} WHERE ${subscribedEvent} IN ('*', failure.event))`);
     const limit = Math.min(Math.max(1, request.limit ?? DEFAULT_WEBHOOK_REDRIVE_LIMIT), MAX_WEBHOOK_REDRIVE_LIMIT);
-    const rows = await this.failureRepository.find({
-      // `payload` is select: false on the entity; name every column so it is read here.
-      select: {
-        id: true,
-        webhookId: true,
-        sessionId: true,
-        event: true,
-        url: true,
-        idempotencyKey: true,
-        deliveryId: true,
-        attempts: true,
-        lastStatusCode: true,
-        lastError: true,
-        payload: true,
-        createdAt: true,
-      },
-      where: request.ids?.length ? { ...where, id: In(request.ids) } : where,
-      // Oldest first: the order the events were lost in.
-      order: { createdAt: 'ASC', id: 'ASC' },
-      take: limit,
-    });
+    const rows = await query
+      .clone()
+      // `payload` is select: false on the entity; replay explicitly reads it.
+      .addSelect('failure.payload')
+      // Failed replays move behind rows with fewer attempts, so a bad receiver cannot pin a batch.
+      .orderBy('failure.attempts', 'ASC')
+      .addOrderBy('failure.createdAt', 'ASC')
+      .addOrderBy('failure.id', 'ASC')
+      .take(limit)
+      .getMany();
 
     if (rows.length > 0) {
       const webhookIds = [...new Set(rows.map(r => r.webhookId))];
@@ -141,7 +148,7 @@ export class WebhookRedriveService {
     }
 
     result.redriven = result.delivered + result.enqueued;
-    result.remaining = await this.failureRepository.count({ where });
+    result.remaining = await query.clone().getCount();
     return result;
   }
 
@@ -169,7 +176,8 @@ export class WebhookRedriveService {
       else if (outcome === 'cancelled') result.skipped++;
       else {
         result.failed++;
-        await this.bumpAttempts(row);
+        // Terminal failures update their own attempt count in the shared recorder.
+        if (outcome !== 'failed') await this.bumpAttempts(row);
       }
     } catch (error) {
       result.failed++;
@@ -185,7 +193,7 @@ export class WebhookRedriveService {
   /** Count the failed replay on the row. Best-effort: the row is already on record either way. */
   private async bumpAttempts(row: WebhookDeliveryFailure): Promise<void> {
     try {
-      await this.failureRepository.update({ id: row.id }, { attempts: row.attempts + 1 });
+      await this.failureRepository.increment({ id: row.id }, 'attempts', 1);
     } catch (error) {
       this.logger.warn('Could not record a failed webhook redrive on its row', {
         failureId: row.id,

@@ -211,7 +211,7 @@ type WebhookDeliveryFailure struct {
 }
 
 // RedriveWebhookDeliveriesRequest is the body of RedriveDeliveryFailures.
-// Every field narrows; an empty body takes the oldest rows.
+// Every field narrows; an empty body takes eligible rows with the fewest attempts.
 type RedriveWebhookDeliveriesRequest struct {
 	// SessionID limits the batch to one session (within the key's allowedSessions).
 	SessionID string `json:"sessionId,omitempty"`
@@ -229,8 +229,7 @@ type WebhookRedriveResult struct {
 	Redriven int `json:"redriven"`
 	// Delivered rows went out by a direct POST; their failure rows were removed.
 	Delivered int `json:"delivered"`
-	// Enqueued rows were handed to the queue; each is removed when its job
-	// delivers and kept if it fails again.
+	// Enqueued is reserved for compatibility; operator redrive always returns zero.
 	Enqueued int `json:"enqueued"`
 	// Failed replays failed again; their rows stay, with attempts raised by one.
 	Failed int `json:"failed"`

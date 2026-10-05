@@ -428,7 +428,7 @@ export class WebhookDeliveryFailureDto {
   replayable!: boolean;
 }
 
-/** Body of `POST /webhooks/delivery-failures/redrive`. Every field narrows; an empty body takes the oldest rows. */
+/** Body of `POST /webhooks/delivery-failures/redrive`. Every field narrows; an empty body takes eligible rows with the fewest attempts. */
 export class RedriveWebhookDeliveriesDto {
   @ApiPropertyOptional({
     description: "Only rows of this session. Narrows within the calling key's allowedSessions, never past it.",
@@ -474,7 +474,7 @@ export class WebhookRedriveResultDto {
   delivered!: number;
 
   @ApiProperty({
-    description: 'Handed to the queue; each row is removed when its job delivers and kept if it fails again.',
+    description: 'Reserved for response compatibility; operator redrive uses direct POST and returns zero.',
     example: 1,
   })
   enqueued!: number;

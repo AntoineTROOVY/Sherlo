@@ -17,6 +17,10 @@ import { jsonColumnType } from '../../../common/utils/column-types';
 // Backs the before-insert duplicate lookup that keeps one row per lost delivery rather than one per
 // reconciler replay. See AddWebhookDeliveryFailureLookupIndex1786300000000.
 @Index('IDX_webhook_delivery_failures_delivery', ['webhookId', 'idempotencyKey'])
+@Index('UQ_webhook_delivery_failures_terminal', ['webhookId', 'idempotencyKey'], {
+  unique: true,
+  where: '"attempts" > 0',
+})
 export class WebhookDeliveryFailure {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

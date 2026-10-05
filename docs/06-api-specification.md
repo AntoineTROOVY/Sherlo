@@ -4674,15 +4674,17 @@ A delivery shed because the dispatch queue was full, or refused during shutdown,
 
 **Errors:** `401` missing/invalid API key · `403` key role below ADMIN
 
+Queued deliveries retain their pre-hook outbox copy until the worker completes delivery or stores a terminal failure. The reconciler checks the current job before replaying and keeps rows while Redis cannot be inspected. If failure persistence is unavailable after the replay budget is spent, it retries the storage handoff without another POST. This recovery boundary is best effort before the outbox row is created; receivers must still deduplicate repeated POSTs.
+
 #### POST /api/webhooks/delivery-failures/redrive
 
-Replay recorded webhook deliveries that still hold their event data, in one bounded batch, oldest first. A row is replayable when it is terminal (`attempts` > 0; an `attempts: 0` row is the outbox's to replay) and was recorded while `WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS` > 0, until that window passes. With the default `0` nothing is kept and this call replays nothing.
+Replay recorded webhook deliveries that still hold their event data, in one bounded batch, with the lowest attempt counts first, then oldest first. A row is replayable when it is terminal (`attempts` > 0; an `attempts: 0` row is the outbox's to replay) and was recorded while `WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS` > 0, until that window passes. With the default `0` nothing is kept and this call replays nothing.
 
-Each replay reuses the row's stored `idempotencyKey` (sent as `X-OpenWA-Idempotency-Key`), so a receiver that already handled the event — the POST timed out after it was processed — can dedup the replay instead of acting twice. `webhook:before` hooks run again on the stored pre-hook event data, as on an outbox replay. With the queue disabled each row gets **one** attempt inside the request; with the queue enabled the row is enqueued with the webhook's normal retry policy. A replay that is delivered removes its row; one that fails again keeps the row and raises its `attempts` by one (no second row is filed). Calls on one node run one after another, and every call is written to the audit log with its counts (no payload content).
+Each replay reuses the row's stored `idempotencyKey` (sent as `X-OpenWA-Idempotency-Key`), so receivers can deduplicate a POST that timed out after processing. `webhook:before` hooks run again on the stored pre-hook data. Each row gets **one direct POST** inside the request, including when ordinary dispatch uses the queue. Success removes its row; another failure keeps it and raises its attempt count. Calls on one node run serially. The audit log records counts without payload content.
 
 **Auth:** API key (ADMIN) · **Scope:** rows are confined to the calling key's `allowedSessions`; the body's `sessionId` can only narrow that. A row is replayed only to the webhook it was recorded for, and only while that webhook still belongs to the row's session.
 
-**Request body** (every field optional; an empty body `{}` takes the oldest rows)
+**Request body** (every field optional; an empty body `{}` takes the eligible rows with the fewest attempts)
 
 | Field       | Type            | Required | Validation                                   | Description                                                               |
 | ----------- | --------------- | -------- | -------------------------------------------- | ------------------------------------------------------------------------- |
@@ -4696,15 +4698,15 @@ Each replay reuses the row's stored `idempotencyKey` (sent as `X-OpenWA-Idempote
 ```json
 {
   "redriven": 3,
-  "delivered": 2,
-  "enqueued": 1,
+  "delivered": 3,
+  "enqueued": 0,
   "failed": 0,
   "skipped": 0,
   "remaining": 0
 }
 ```
 
-`redriven` is `delivered` + `enqueued`. `skipped` counts rows not replayed because the webhook was removed, disabled or no longer subscribes to the event, or a `webhook:before` hook cancelled it; those rows stay. `remaining` is the number of replayable rows still in scope after the call — call again while it is above `0`.
+`redriven` equals `delivered`; `enqueued` is retained for response compatibility and is always `0`. Removed, disabled, unsubscribed, expired and out-of-scope rows are excluded before applying the limit. `skipped` counts selected rows cancelled by a hook or invalidated during the call. `remaining` counts eligible rows in the same requested session, webhook and IDs after the call. Retry another batch only after resolving persistent failures or hook cancellations; `remaining > 0` alone does not mean another call will succeed.
 
 **Errors:** `400` body fails validation · `401` missing/invalid API key · `403` key role below ADMIN
 
