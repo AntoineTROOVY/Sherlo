@@ -120,7 +120,7 @@ describe('isValidIdempotencyKey', () => {
     expect(isValidIdempotencyKey(key)).toBe(true),
   );
 
-  it.each(['', ' ', 'has space', 'x'.repeat(256), 'tab\there', 'ünï'])('rejects %p', key =>
+  it.each(['', ' ', 'has space', 'x'.repeat(256), 'tab\there', 'ünï', 'key\n', 'key\r\n'])('rejects %p', key =>
     expect(isValidIdempotencyKey(key)).toBe(false),
   );
 });

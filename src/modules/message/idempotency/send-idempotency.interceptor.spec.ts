@@ -19,13 +19,17 @@ describe('SendIdempotencyInterceptor', () => {
   let interceptor: SendIdempotencyInterceptor;
   let setHeader: jest.Mock;
 
-  const contextFor = (headers: Record<string, string | string[]>, body: unknown = { chatId: 'c', text: 't' }) => {
+  const contextFor = (
+    headers: Record<string, string | string[]>,
+    body: unknown = { chatId: 'c', text: 't' },
+    rawHeaders?: string[],
+  ) => {
     setHeader = jest.fn();
     return {
       getType: () => 'http',
       getHandler: () => ({ name: 'sendText' }),
       switchToHttp: () => ({
-        getRequest: () => ({ headers, params: { sessionId: 's1' }, body }),
+        getRequest: () => ({ headers, params: { sessionId: 's1' }, body, rawHeaders }),
         getResponse: () => ({ setHeader }),
       }),
     } as unknown as ExecutionContext;
@@ -43,6 +47,15 @@ describe('SendIdempotencyInterceptor', () => {
 
   const run = async (ctx: ExecutionContext, handler: () => unknown) =>
     lastValueFrom(await interceptor.intercept(ctx, { handle: () => handler() as never }));
+
+  it('rejects duplicate raw headers even when Node joins their values', async () => {
+    const handler = jest.fn(() => of({}));
+    await expect(
+      run(contextFor({ 'idempotency-key': 'a, b' }, {}, ['Idempotency-Key', 'a', 'idempotency-key', 'b']), handler),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(store.claim).not.toHaveBeenCalled();
+    expect(handler).not.toHaveBeenCalled();
+  });
 
   it('passes a request without the header straight through, touching no storage', async () => {
     const out = await run(contextFor({}), () => of({ messageId: 'm1' }));
