@@ -60,7 +60,7 @@ class WebhooksResource:
         return self._http.request("GET", "/api/webhooks/delivery-failures", query=query)
 
     def redrive_delivery_failures(self, body: RedriveWebhookDeliveriesRequest | None = None) -> WebhookRedriveResult:
-        """Replay recorded deliveries that still hold their event data, oldest first, one bounded batch per call.
+        """Replay recorded deliveries in one bounded batch, fewest attempts first, then oldest.
 
         Only rows with ``replayable: True`` in :meth:`delivery_failures` qualify: terminal rows recorded while
         the gateway's ``WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS`` is above 0. Each replay reuses the stored

@@ -33,11 +33,11 @@ func (s *WebhooksService) DeliveryFailures(ctx context.Context, query *DeliveryF
 }
 
 // RedriveDeliveryFailures replays recorded deliveries that still hold their event data
-// (Replayable in DeliveryFailures), oldest first, one bounded batch per call. Each replay reuses the
-// stored idempotency key, so a receiver that already handled the event can dedup it. Only rows
+// (Replayable in DeliveryFailures), fewest attempts first, then oldest, one bounded batch per call.
+// Each replay reuses the stored idempotency key, so a receiver that already handled the event can dedup it. Only rows
 // recorded while the gateway's WEBHOOK_FAILURE_PAYLOAD_RETENTION_HOURS is above 0 are replayable.
 // Requires an ADMIN-level key; rows outside the key's allowedSessions are never touched. A nil body
-// takes the oldest rows.
+// uses the default batch filter.
 func (s *WebhooksService) RedriveDeliveryFailures(ctx context.Context, body *RedriveWebhookDeliveriesRequest) (*WebhookRedriveResult, error) {
 	if body == nil {
 		body = &RedriveWebhookDeliveriesRequest{}
