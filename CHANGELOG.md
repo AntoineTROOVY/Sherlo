@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add bounded webhook failure redrive with optional payload retention.
+- Expose caller-supplied send idempotency keys in all five SDKs.
 
 ### Fixed
 
