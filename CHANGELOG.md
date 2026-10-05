@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Forward container shutdown signals after dropping process privileges in Compose and Helm.
 - Preserve webhook outbox payloads until delivery or durable failure storage succeeds.
 - Enforce webhook replay retention and keep later eligible failures moving through batches.
 - Keep one terminal webhook failure per receiver idempotency key.
