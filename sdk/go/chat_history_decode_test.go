@@ -54,3 +54,24 @@ func TestChatHistoryMessageLeavesAbsentFieldsEmpty(t *testing.T) {
 		t.Errorf("absent scalars should stay zero: ephemeral=%d bg=%q", m.EphemeralDuration, m.BackgroundColor)
 	}
 }
+
+func TestChatSummaryDecodesOptionalLastMessageType(t *testing.T) {
+	var chats []ChatSummary
+	if err := json.Unmarshal([]byte(`[{"id":"photo@c.us","lastMessageType":"image"},{"id":"empty@c.us"}]`), &chats); err != nil {
+		t.Fatal(err)
+	}
+	if chats[0].LastMessageType != MsgImage || chats[1].LastMessageType != "" {
+		t.Fatalf("unexpected types: %+v", chats)
+	}
+	wire, err := json.Marshal(chats[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var empty map[string]interface{}
+	if err := json.Unmarshal(wire, &empty); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := empty["lastMessageType"]; ok {
+		t.Fatal("absent type must stay omitted")
+	}
+}

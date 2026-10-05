@@ -1075,6 +1075,7 @@ export interface ChatSummary {
   unreadCount: number;
   /** Preview text of the last message (the server returns a plain string, not an object). */
   lastMessage?: string;
+  lastMessageType?: MessageType;
   /** Unix seconds of the last activity. */
   timestamp: number;
   kind: ChatKind;
