@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
+import MediaLightbox from './MediaLightbox';
 
 export type ArchivedMediaKind = 'image' | 'video' | 'audio';
 
@@ -29,6 +30,7 @@ type PreviewState = { phase: 'waiting' | 'loading' | 'failed' } | { phase: 'read
 // scrolling through a long thread does not accumulate blobs.
 function ArchivedMediaPreview({ kind, load, alt, fallback, measureMedia, onMediaLoad }: ArchivedMediaPreviewProps) {
   const [state, setState] = useState<PreviewState>({ phase: 'waiting' });
+  const [imageOpen, setImageOpen] = useState(false);
   const anchorRef = useRef<HTMLDivElement | null>(null);
   // `load` is usually an inline arrow, so a fresh identity every render; holding it in a ref keeps
   // the effects below from re-running (and re-fetching) on each parent render.
@@ -103,9 +105,32 @@ function ArchivedMediaPreview({ kind, load, alt, fallback, measureMedia, onMedia
   switch (kind) {
     case 'image':
       return (
-        <div className="message-media-image">
-          <img src={state.url} alt={alt ?? ''} className="chat-image-media" ref={measureMedia} onLoad={onMediaLoad} />
-        </div>
+        <>
+          <div className="message-media-image">
+            <img
+              src={state.url}
+              alt={alt ?? ''}
+              className="chat-image-media"
+              ref={measureMedia}
+              onLoad={onMediaLoad}
+              role="button"
+              tabIndex={0}
+              onClick={() => setImageOpen(true)}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setImageOpen(true);
+                }
+              }}
+            />
+          </div>
+          <MediaLightbox
+            items={[{ id: 'archived-image', url: state.url, alt, filename: alt }]}
+            index={imageOpen ? 0 : null}
+            onClose={() => setImageOpen(false)}
+            onNavigate={() => {}}
+          />
+        </>
       );
     case 'video':
       return (

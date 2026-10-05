@@ -57,6 +57,16 @@ test('an archived image loads once from the media route and renders from an obje
   assert.equal(img.getAttribute('src'), 'blob:mock-0');
   assert.equal(calls, 1, 'the bytes are fetched exactly once');
   assert.deepEqual(revoked, [], 'the URL stays valid while the image is on screen');
+  rtl.fireEvent.click(img);
+  const dialog = await rtl.screen.findByRole('dialog');
+  assert.ok(dialog.querySelector('img[src="blob:mock-0"]'), 'the viewer uses the already loaded bytes');
+  rtl.fireEvent.click(rtl.screen.getByRole('button', { name: 'Close' }));
+  await rtl.act(() => new Promise(resolve => setTimeout(resolve, 500)));
+  assert.equal(rtl.screen.queryByRole('dialog'), null);
+  assert.equal(calls, 1, 'opening the viewer does not fetch the image again');
+  assert.deepEqual(revoked, [], 'closing the viewer keeps the preview URL valid');
+  rtl.fireEvent.keyDown(img, { key: 'Enter' });
+  assert.ok(rtl.screen.getByRole('dialog'), 'the viewer opens from the keyboard');
   unmount();
   assert.deepEqual(revoked, ['blob:mock-0'], 'unmounting releases the object URL');
 });
