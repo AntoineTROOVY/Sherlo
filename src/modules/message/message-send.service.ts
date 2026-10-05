@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { markEngineSendFailure } from '../../common/errors/engine-send-failure';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, QueryDeepPartialEntity } from 'typeorm';
 import { SessionService } from '../session/session.service';
@@ -207,42 +208,47 @@ export class MessageSendService {
     input: unknown,
     error: unknown,
   ): Promise<never> {
-    // Only failures that say something about the account's standing feed the breaker: adapters also
-    // raise client-fault and engine-state errors from inside this call (a blocked media URL, an
-    // unsupported capability, a disconnected socket), and counting those let a client sending bad
-    // requests trip the breaker on a healthy session.
-    if (countsTowardSendBreaker(error)) {
-      this.pacing.recordSendFailure(sessionId);
-      // The same classification picks the failures worth a log line. Otherwise an engine-side failure
-      // leaves only Nest's generic `[ExceptionsHandler]` line, with no session, chat or message type to
-      // correlate it with.
-      this.logger.warn(`Send failed in the engine (${type})`, {
-        sessionId,
-        chatId: message.chatId,
-        messageId: message.id,
-        error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
-        // An EnginePageError keeps the full in-page summary (stack, own properties) here only.
-        ...(error instanceof Error && error.cause instanceof Error ? { cause: error.cause.message } : {}),
-      });
+    try {
+      // Only failures that say something about the account's standing feed the breaker: adapters also
+      // raise client-fault and engine-state errors from inside this call (a blocked media URL, an
+      // unsupported capability, a disconnected socket), and counting those let a client sending bad
+      // requests trip the breaker on a healthy session.
+      if (countsTowardSendBreaker(error)) {
+        this.pacing.recordSendFailure(sessionId);
+        // The same classification picks the failures worth a log line. Otherwise an engine-side failure
+        // leaves only Nest's generic `[ExceptionsHandler]` line, with no session, chat or message type to
+        // correlate it with.
+        this.logger.warn(`Send failed in the engine (${type})`, {
+          sessionId,
+          chatId: message.chatId,
+          messageId: message.id,
+          error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+          // An EnginePageError keeps the full in-page summary (stack, own properties) here only.
+          ...(error instanceof Error && error.cause instanceof Error ? { cause: error.cause.message } : {}),
+        });
+      }
+      await this.saveFailedMessage(message);
+      // Sanitize the hook payload: an SSRF block's raw .message names the resolved internal address
+      // (a recon/DNS-rebind oracle); the client-facing throw below already maps it to a generic
+      // message via toClientFacingError, and the message:failed hook must not expose more than the
+      // client sees. Now that every media/extended sender routes here, this is the chokepoint that
+      // keeps SSRF detail out of plugin hands (bulk does the same via sanitizeBatchError).
+      const hookError =
+        error instanceof SsrfBlockedError
+          ? SSRF_BLOCKED_CLIENT_MESSAGE
+          : error instanceof Error
+            ? error.message
+            : String(error);
+      await this.hookManager.execute(
+        'message:failed',
+        { sessionId, error: hookError, input, type },
+        { sessionId, source: 'MessageService' },
+      );
+      throw this.toClientFacingError(error);
+    } catch (failure) {
+      // HTTP status alone cannot prove whether an engine accepted the message before failing.
+      throw markEngineSendFailure(failure);
     }
-    await this.saveFailedMessage(message);
-    // Sanitize the hook payload: an SSRF block's raw .message names the resolved internal address
-    // (a recon/DNS-rebind oracle) — the client-facing throw below already maps it to a generic
-    // message via toClientFacingError, and the message:failed hook must not expose more than the
-    // client sees. Now that every media/extended sender routes here, this is the chokepoint that
-    // keeps SSRF detail out of plugin hands (bulk does the same via sanitizeBatchError).
-    const hookError =
-      error instanceof SsrfBlockedError
-        ? SSRF_BLOCKED_CLIENT_MESSAGE
-        : error instanceof Error
-          ? error.message
-          : String(error);
-    await this.hookManager.execute(
-      'message:failed',
-      { sessionId, error: hookError, input, type },
-      { sessionId, source: 'MessageService' },
-    );
-    throw this.toClientFacingError(error);
   }
 
   /**

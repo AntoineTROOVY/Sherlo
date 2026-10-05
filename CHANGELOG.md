@@ -11,12 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add bounded webhook failure redrive with optional payload retention.
 - Expose caller-supplied send idempotency keys in all five SDKs.
+- Add optional 24-hour idempotency keys to twelve single-recipient send routes.
 
 ### Fixed
 
 - Preserve webhook outbox payloads until delivery or durable failure storage succeeds.
 - Enforce webhook replay retention and keep later eligible failures moving through batches.
 - Keep one terminal webhook failure per receiver idempotency key.
+
+### Fixed
+
+- Idempotent sends retain their key after an engine-stage failure, including HTTP 409, so a same-key retry cannot send another copy.
 
 ## [0.24.0] - 2026-10-03
 

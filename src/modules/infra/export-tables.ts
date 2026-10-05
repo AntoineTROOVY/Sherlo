@@ -329,5 +329,6 @@ export const EXPORT_TABLES: AnyExportTable[] = [
  * entity metadata does not report it.
  */
 export const EXPORT_TABLE_EXCLUSIONS: Readonly<Record<string, string>> = {
-  // (empty today: every data-connection entity table is exported)
+  // Claims expire within 24 hours; a restored key would only block or replay a send it never saw.
+  send_idempotency_keys: 'short-lived Idempotency-Key claims (24 h TTL), meaningless after a restore',
 };
