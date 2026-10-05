@@ -28,11 +28,11 @@ export interface WebhookRedriveRequest {
 }
 
 export interface WebhookRedriveResult {
-  /** Rows replayed by this call: delivered plus enqueued. */
+  /** Rows delivered by this call. */
   redriven: number;
   /** Delivered by a direct POST; their failure rows are gone. */
   delivered: number;
-  /** Handed to the queue; the row is removed when the job delivers, and kept when it fails again. */
+  /** Reserved for compatibility; operator redrive always uses a direct POST and returns zero. */
   enqueued: number;
   /** The replay failed again; the row stays, with its attempt count raised. */
   failed: number;
@@ -109,7 +109,11 @@ export class WebhookRedriveService {
       this.failureRepository.manager.connection.options.type === 'postgres' ? 'subscribed.event' : 'subscribed.value';
     const query = this.failureRepository
       .createQueryBuilder('failure')
-      .innerJoin(Webhook, 'webhook', 'webhook.id = failure.webhookId AND webhook.sessionId = failure.sessionId')
+      .innerJoin(
+        Webhook,
+        'webhook',
+        'CAST(webhook.id AS text) = failure.webhookId AND CAST(webhook.sessionId AS text) = failure.sessionId',
+      )
       .where({
         attempts: MoreThan(0),
         payload: Not(IsNull()),
