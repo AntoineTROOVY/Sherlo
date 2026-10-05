@@ -218,7 +218,8 @@ type RedriveWebhookDeliveriesRequest struct {
 	// WebhookID limits the batch to one webhook.
 	WebhookID string `json:"webhookId,omitempty"`
 	// IDs limits the batch to these failure rows (at most 500).
-	IDs []string `json:"ids,omitempty"`
+	// A nil pointer uses the default scope; a pointer to an empty slice replays nothing.
+	IDs *[]string `json:"ids,omitempty"`
 	// Limit caps the rows replayed by this call (1-500, default 100).
 	Limit int `json:"limit,omitempty"`
 }

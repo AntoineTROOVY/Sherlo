@@ -13,6 +13,7 @@ import com.rmyndharis.openwa.model.WebhookEvent;
 import com.rmyndharis.openwa.model.WebhookFilterCondition;
 import com.rmyndharis.openwa.model.WebhookFilters;
 import com.rmyndharis.openwa.model.WebhookRedriveResult;
+import com.rmyndharis.openwa.model.WebhookDeliveryFailure;
 import com.rmyndharis.openwa.support.MockTransport;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,15 @@ class WebhooksResourceTest {
     final MockTransport tx = new MockTransport();
     final OpenWAClient client = new OpenWAClient(
         ClientConfig.builder().baseUrl("http://h").apiKey("k").transport(tx).build());
+
+    @Test
+    void deliveryFailurePreservesThePreviousConstructor() {
+        WebhookDeliveryFailure row = new WebhookDeliveryFailure(
+            "id", "webhook", "session", "message.received", "https://example.test",
+            "key", "delivery", 1, 503, "unavailable", "2026-10-05T00:00:00Z");
+        assertEquals("id", row.id());
+        assertEquals(false, row.replayable());
+    }
 
     @Test
     void redriveDeliveryFailuresPostsTheFilterOrAnEmptyBody() {

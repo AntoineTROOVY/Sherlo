@@ -1038,7 +1038,7 @@ export interface WebhookDeliveryFailure {
   replayable: boolean;
 }
 
-/** Body of {@link WebhooksResource.redriveDeliveryFailures}. Every field narrows; an empty body takes the oldest rows. */
+/** Body of {@link WebhooksResource.redriveDeliveryFailures}. An empty body takes the least-retried eligible rows. */
 export interface RedriveWebhookDeliveriesRequest {
   /** Only rows of this session (within the key's allowedSessions). */
   sessionId?: string;
@@ -1056,7 +1056,7 @@ export interface WebhookRedriveResult {
   redriven: number;
   /** Delivered by a direct POST; their failure rows were removed. */
   delivered: number;
-  /** Handed to the queue; each row is removed when its job delivers and kept if it fails again. */
+  /** Reserved for compatibility; operator redrive always returns zero. */
   enqueued: number;
   /** Replays that failed again; their rows stay, with attempts raised by one. */
   failed: number;

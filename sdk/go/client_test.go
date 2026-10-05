@@ -1781,6 +1781,24 @@ func TestSendIdempotencyKey(t *testing.T) {
 	}
 }
 
+func TestRedrivePreservesAnEmptyIDsFilter(t *testing.T) {
+	rt := &recordTransport{status: 200, body: `{}`}
+	c := newTestClient(t, rt)
+	empty := []string{}
+	for _, ids := range []*[]string{nil, &empty} {
+		if _, err := c.Webhooks.RedriveDeliveryFailures(context.Background(), &RedriveWebhookDeliveriesRequest{IDs: ids}); err != nil {
+			t.Fatal(err)
+		}
+		want := `{}`
+		if ids != nil {
+			want = `{"ids":[]}`
+		}
+		if string(rt.lastRaw) != want {
+			t.Fatalf("body = %s, want %s", rt.lastRaw, want)
+		}
+	}
+}
+
 func TestRetryKeepsIdempotencyKey(t *testing.T) {
 	var keys []string
 	rt := RoundTripperFunc(func(req *http.Request) (*http.Response, error) {

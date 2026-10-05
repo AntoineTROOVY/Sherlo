@@ -1000,7 +1000,7 @@ class WebhookDeliveryFailure(TypedDict):
 
 
 class RedriveWebhookDeliveriesRequest(TypedDict, total=False):
-    """Body of ``WebhooksResource.redrive_delivery_failures``. Every field narrows; an empty body takes the oldest rows."""
+    """Body of ``WebhooksResource.redrive_delivery_failures``. An empty body takes the least-retried eligible rows."""
 
     # Only rows of this session (within the key's allowedSessions).
     sessionId: str
@@ -1019,7 +1019,7 @@ class WebhookRedriveResult(TypedDict):
     redriven: int
     # Delivered by a direct POST; their failure rows were removed.
     delivered: int
-    # Handed to the queue; each row is removed when its job delivers and kept if it fails again.
+    # Reserved for compatibility; operator redrive always returns zero.
     enqueued: int
     # Replays that failed again; their rows stay, with attempts raised by one.
     failed: int

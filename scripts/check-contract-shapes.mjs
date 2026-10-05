@@ -138,7 +138,6 @@ const MAPPINGS = {
     UpsertContactRequest: 'UpsertContactDto',
     UpsertLabelRequest: 'UpsertLabelDto',
     RedriveWebhookDeliveriesRequest: 'RedriveWebhookDeliveriesDto',
-    RedriveWebhookDeliveriesRequest: 'RedriveWebhookDeliveriesDto',
     VotePollRequest: 'VotePollDto',
     WebhookDeliveryFailure: 'WebhookDeliveryFailureDto',
     WebhookFilterCondition: 'WebhookFilterConditionDto',

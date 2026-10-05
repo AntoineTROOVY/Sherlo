@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * Request body for replaying recorded webhook deliveries. Every field narrows; {@code null} fields
- * are omitted, and an empty body takes the oldest rows.
+ * are omitted, and an empty body takes the least-retried eligible rows.
  */
 public record RedriveWebhookDeliveriesRequest(String sessionId, String webhookId, List<String> ids, Integer limit) {
     public static Builder builder() {
