@@ -9,7 +9,7 @@ interface ArchivedMediaPreviewProps {
   /** Fetches the archived bytes (the per-message media route). Called at most once per mount. */
   load: () => Promise<Blob>;
   alt?: string;
-  /** Rendered instead of the preview when the fetch fails , the download button, so the bytes stay reachable. */
+  /** Rendered instead of the preview when the fetch fails, the download button, so the bytes stay reachable. */
   fallback: ReactNode;
   measureMedia?: (el: Element | null) => void;
   onMediaLoad?: (event?: { currentTarget: Element | null }) => void;
@@ -17,7 +17,7 @@ interface ArchivedMediaPreviewProps {
 
 type PreviewState = { phase: 'waiting' | 'loading' | 'failed' } | { phase: 'ready'; url: string };
 
-// An inline preview for media whose list payload is the `{ omitted: true, archived: true }` marker ,
+// An inline preview for media whose list payload is the `{ omitted: true, archived: true }` marker,
 // what MESSAGE_INLINE_MEDIA=archive leaves once the bytes are verified on the archive store. The
 // archive is the only copy then, so without this an image would read as a bare "Media" button where
 // it used to render. A plain over-budget marker (no `archived`) keeps the click-to-download button:
@@ -27,7 +27,7 @@ type PreviewState = { phase: 'waiting' | 'loading' | 'failed' } | { phase: 'read
 // Fetched lazily, once the bubble nears the viewport, so opening a media-heavy chat does not fire one
 // request per archived message at once. Where IntersectionObserver is unavailable (old browsers, the
 // jsdom test runtime) it loads immediately rather than never. The object URL is revoked on unmount so
-// scrolling through a long thread does not accumulate blobs.
+// the parent's media cap unmounts older previews as the thread grows.
 function ArchivedMediaPreview({ kind, load, alt, fallback, measureMedia, onMediaLoad }: ArchivedMediaPreviewProps) {
   const [state, setState] = useState<PreviewState>({ phase: 'waiting' });
   const [imageOpen, setImageOpen] = useState(false);
@@ -38,7 +38,7 @@ function ArchivedMediaPreview({ kind, load, alt, fallback, measureMedia, onMedia
   useEffect(() => {
     loadRef.current = load;
   });
-  // The object URL the ready render points at. Revoked on unmount only , the phase never leaves
+  // The object URL the ready render points at. Revoked on unmount only, the phase never leaves
   // `ready`, so the URL stays valid for as long as the element showing it exists.
   const urlRef = useRef<string | null>(null);
   useEffect(
