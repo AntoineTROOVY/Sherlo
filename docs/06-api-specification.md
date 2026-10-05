@@ -1456,6 +1456,11 @@ Cast a vote on a poll.
 > **Options are texts, not ids.** whatsapp-web.js matches poll options by name, and no engine
 > surfaces a stable per-option id through this API, so the text is the only handle available. A poll
 > with two identically-worded options will therefore select **both**.
+>
+> A text that matches no option is ignored. When **none** of the texts match, the route answers `400`
+> with `code: "POLL_OPTION_NOT_FOUND"` and the poll's exact texts in `validOptions`, and nothing is
+> sent, so the current vote stays. (Before, whatsapp-web.js sent an empty selection, which cleared the
+> vote, and the route answered `200`.) Send `[]` to clear the vote on purpose.
 
 > **Only recent polls can be voted on.** The poll must be within the 100-message window the engine
 > fetches for the chat — the same limit that applies to react/delete/edit/pin. An older poll comes
@@ -1465,7 +1470,7 @@ Cast a vote on a poll.
 > for _receiving_ votes. Sending one requires hand-building a `PollUpdateMessage` with HMAC-SHA256
 > vote encryption keyed by the poll creation's `messageSecret`, which is not wired here.
 
-**Errors:** `400` session not active, or the target message is not a poll · `401` missing/invalid API key · `403` key lacks OPERATOR role · `404` poll not found in recent history · `501` Baileys engine · `409` conflict or engine not ready (retryable) · `503` the whatsapp-web.js page died mid-request; repeating it is safe (retryable)
+**Errors:** `400` session not active, the target message is not a poll, or none of the option texts match the poll (`POLL_OPTION_NOT_FOUND`) · `401` missing/invalid API key · `403` key lacks OPERATOR role · `404` poll not found in recent history · `501` Baileys engine · `409` conflict or engine not ready (retryable) · `503` the whatsapp-web.js page died mid-request; repeating it is safe (retryable)
 
 #### POST /api/sessions/:sessionId/messages/pin
 

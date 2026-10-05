@@ -749,7 +749,12 @@ export class MessageController {
   @ApiOperation({ summary: 'Cast a vote on a poll' })
   @ApiParam({ name: 'sessionId', description: 'Session ID' })
   @ApiResponse({ status: 200, description: 'Vote cast', type: MessageActionResponseDto })
-  @ApiResponse({ status: 400, description: 'Session not active, or the target message is not a poll' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Session not active, the target message is not a poll, or `POLL_OPTION_NOT_FOUND`: none of the ' +
+      'option texts match the poll (the body lists `validOptions`). Nothing is sent, so the current vote stays.',
+  })
   @ApiResponse({ status: 404, description: 'Poll not found in the chat’s recent history' })
   @ApiResponse({ status: 501, description: 'Not supported on the Baileys engine' })
   @ApiResponse({ status: 409, description: ENGINE_NOT_READY_409 })

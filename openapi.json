@@ -6682,7 +6682,7 @@
             }
           },
           "400": {
-            "description": "Session not active, or the target message is not a poll",
+            "description": "Session not active, the target message is not a poll, or `POLL_OPTION_NOT_FOUND`: none of the option texts match the poll (the body lists `validOptions`). Nothing is sent, so the current vote stays.",
             "content": {
               "application/json": {
                 "schema": {
