@@ -255,6 +255,7 @@ export interface Chat {
   unreadCount: number;
   timestamp: number;
   lastMessage?: string;
+  lastMessageType?: MessageType;
   archived: boolean;
   pinned: boolean;
   muted: boolean;

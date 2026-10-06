@@ -562,7 +562,11 @@ export function Chats() {
         });
       }
       if (revokedLastMessage) {
-        setChats(previous => previous.map(chat => (chat.id === event.chatId ? { ...chat, lastMessage: '' } : chat)));
+        setChats(previous =>
+          previous.map(chat =>
+            chat.id === event.chatId ? { ...chat, lastMessage: '', lastMessageType: 'revoked' } : chat,
+          ),
+        );
       } else if (!matchedCachedMessage) {
         // No cached thread proves whether the deleted message was the chat's newest; refresh the
         // summaries, as an edit does.

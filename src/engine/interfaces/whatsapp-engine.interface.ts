@@ -553,6 +553,8 @@ export interface ChatSummary {
   unreadCount: number;
   timestamp: number;
   lastMessage?: string;
+  /** Engine-neutral type of the last message, when available. */
+  lastMessageType?: MessageType;
   /** Archived state, as set via `POST /sessions/{sessionId}/chats/archive`. */
   archived: boolean;
   /** Pinned state, as set via `POST /sessions/{sessionId}/chats/pin`. */

@@ -497,12 +497,15 @@ Get active chats for a session, most-recent first (paginated).
     "unreadCount": 2,
     "timestamp": 1719306115,
     "lastMessage": "See you tomorrow",
+    "lastMessageType": "text",
     "archived": false,
     "pinned": false,
     "muted": false
   }
 ]
 ```
+
+`lastMessageType` uses the same engine-neutral types as messages, such as `text`, `image`, `voice`, and `document`. It identifies media even when `lastMessage` has no caption. The field is omitted when the engine has no last message available; on Baileys it becomes available after history sync or a new message.
 
 `archived`, `pinned` and `muted` are the read side of the `chats/archive`, `chats/pin` and
 `chats/mute` endpoints. `muted` is the verdict; `muteExpiration`, present only when `muted` is true,
