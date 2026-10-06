@@ -888,7 +888,7 @@ Two properties to design around:
 { "success": true }
 ```
 
-**Errors:** `400` validation, or session not started · `401` · `403` · `404` session not found · `501` the active engine cannot observe presence (whatsapp-web.js exposes only `sendPresenceAvailable`/`sendPresenceUnavailable`, which publish the account's _own_ presence, and emits no presence event) · `409` conflict or engine not ready (retryable)
+**Errors:** `400` validation, or session not started · `401` · `403` · `404` session not found · `501` the active engine cannot observe presence (whatsapp-web.js exposes only `sendPresenceAvailable`/`sendPresenceUnavailable`, which publish the account's _own_ presence, and emits no presence event) · `409` conflict or engine not ready (retryable) · `503` Baileys recipient lookup failed or timed out before the operation was sent
 
 #### GET /api/sessions/:sessionId/presence/:chatId
 
@@ -1292,15 +1292,16 @@ The single-recipient send routes (`send-text`, `send-template`, `send-image`, `s
 
 The key is 1-255 visible ASCII characters (a UUID works), unique per session, and is held for **24 hours** from the first request. Within that window:
 
-| Retry with the same key                                                                                        | Answer                                                                                                     |
-| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| first request succeeded, same route and body                                                                   | the first response again, with `Idempotent-Replayed: true`; nothing is sent                                |
-| first request still running                                                                                    | `409` `IDEMPOTENCY_KEY_IN_PROGRESS`; retry after it finishes                                               |
-| first request failed during an engine send (including `4xx` or `501`), with another server error, or a timeout | `409` `IDEMPOTENCY_OUTCOME_UNKNOWN`: the message may have gone out; check the chat, then use a **new** key |
-| first request was refused with `4xx` or `501` before calling the engine                                        | the key was freed, so the retry runs as a new request                                                      |
-| different route or body (key order in the JSON does not matter)                                                | `422` `IDEMPOTENCY_KEY_REUSED`                                                                             |
+| Retry with the same key                                                                         | Answer                                                                                                     |
+| ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| first request succeeded, same route and body                                                    | the first response again, with `Idempotent-Replayed: true`; nothing is sent                                |
+| first request still running                                                                     | `409` `IDEMPOTENCY_KEY_IN_PROGRESS`; retry after it finishes                                               |
+| first request failed with an uncertain delivery outcome                                         | `409` `IDEMPOTENCY_OUTCOME_UNKNOWN`: the message may have gone out; check the chat, then use a **new** key |
+| first request was refused with `4xx` or `501` before calling the engine                         | the key was freed, so the retry runs as a new request                                                      |
+| transport explicitly reported that nothing was sent, such as a Baileys recipient lookup timeout | the key was freed, so the retry runs as a new request                                                      |
+| different route or body (key order in the JSON does not matter)                                 | `422` `IDEMPOTENCY_KEY_REUSED`                                                                             |
 
-A malformed key, or the header sent twice, gets `400` `IDEMPOTENCY_KEY_INVALID`. A request still pending ten minutes after it was claimed (its node most likely stopped) also reads as `IDEMPOTENCY_OUTCOME_UNKNOWN`. HTTP status alone does not prove that nothing was sent: an engine can report `409` after attempting delivery, so engine-stage failures retain the key conservatively. Keys are stored in the data database (`send_idempotency_keys`); concurrent processes using that database share the claim, and the session-owner proxy forwards the header. This does not change the deployment support limits in [Horizontal scaling](./13-horizontal-scaling.md). `send-bulk` does not take the header: retrying its request can create another batch. A call that outlives the 24-hour key window is outside the retry guarantee.
+A malformed key, or the header sent twice, gets `400` `IDEMPOTENCY_KEY_INVALID`. A request still pending ten minutes after it was claimed (its node most likely stopped) also reads as `IDEMPOTENCY_OUTCOME_UNKNOWN`. HTTP status alone does not prove that nothing was sent: an engine can report `409` after attempting delivery, so engine-stage failures retain the key unless transport explicitly proves that nothing was sent. Keys are stored in the data database (`send_idempotency_keys`); concurrent processes using that database share the claim, and the session-owner proxy forwards the header. This does not change the deployment support limits in [Horizontal scaling](./13-horizontal-scaling.md). `send-bulk` does not take the header: retrying its request can create another batch. A call that outlives the 24-hour key window is outside the retry guarantee.
 
 #### GET /api/sessions/:sessionId/messages
 
@@ -1785,7 +1786,7 @@ rejected with `400` rather than guessing which half was meant.
 
 `messageId` is the WhatsApp message id from the engine. By default (`SIMULATE_TYPING`; set it to `false` to disable) a typing indicator and a humanising pause run before the send: 500 ms plus 45 ms per character, capped at `SIMULATE_TYPING_MAX_MS` (default 5000 ms), with +/-15% jitter.
 
-**Errors:** `400` unknown body field, validation failure, or session not active / blocked by a plugin hook · `401` missing/invalid API key · `403` key role below OPERATOR · `404` the `quotedMessageId` could not be resolved (see Quoted sends) · `500` engine error · `409` conflict or engine not ready (retryable) · `501` not supported on the active engine · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends))
+**Errors:** `400` unknown body field, validation failure, or session not active / blocked by a plugin hook · `401` missing/invalid API key · `403` key role below OPERATOR · `404` the `quotedMessageId` could not be resolved (see Quoted sends) · `500` engine error · `409` conflict or engine not ready (retryable) · `501` not supported on the active engine · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends)) · `503` Baileys recipient lookup failed or timed out before the operation was sent
 
 ##### Quoted sends
 
@@ -1874,7 +1875,7 @@ Render a stored text template (header/body/footer joined by blank lines, `{{vars
 
 Delegates to the send-text path after rendering.
 
-**Errors:** `400` unknown body field, validation failure, neither `templateId` nor `templateName` given, or session not active · `401` missing/invalid API key · `403` key role below OPERATOR · `404` session or template not found · `500` engine error · `409` conflict or engine not ready (retryable) · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends))
+**Errors:** `400` unknown body field, validation failure, neither `templateId` nor `templateName` given, or session not active · `401` missing/invalid API key · `403` key role below OPERATOR · `404` session or template not found · `500` engine error · `409` conflict or engine not ready (retryable) · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends)) · `503` Baileys recipient lookup failed or timed out before the operation was sent
 
 #### POST /api/sessions/:sessionId/messages/send-image
 
@@ -2037,7 +2038,7 @@ Send a location pin.
 { "messageId": "true_628123456789@c.us_3EB0ABCD", "timestamp": 1719312000 }
 ```
 
-**Errors:** `400` invalid coords / session not active / unknown body field · `401` missing/invalid API key · `403` key role below OPERATOR · `404` the `quotedMessageId` could not be resolved (see Quoted sends) · `500` engine error · `409` conflict or engine not ready (retryable) · `501` whatsapp-web.js cannot send a location to a channel (`<id>@newsletter`) or a status or broadcast list (`@broadcast`); nothing is sent · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends))
+**Errors:** `400` invalid coords / session not active / unknown body field · `401` missing/invalid API key · `403` key role below OPERATOR · `404` the `quotedMessageId` could not be resolved (see Quoted sends) · `500` engine error · `409` conflict or engine not ready (retryable) · `501` whatsapp-web.js cannot send a location to a channel (`<id>@newsletter`) or a status or broadcast list (`@broadcast`); nothing is sent · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends)) · `503` Baileys recipient lookup failed or timed out before the operation was sent
 
 #### POST /api/sessions/:sessionId/messages/send-contact
 
@@ -2070,7 +2071,7 @@ Send a contact card (vCard).
 { "messageId": "true_628123456789@c.us_3EB0ABCD", "timestamp": 1719312000 }
 ```
 
-**Errors:** `400` validation failure / session not active / unknown body field · `401` missing/invalid API key · `403` key role below OPERATOR · `404` the `quotedMessageId` could not be resolved (see Quoted sends) · `500` engine error · `409` conflict or engine not ready (retryable) · `501` whatsapp-web.js cannot send a contact card to a channel (`<id>@newsletter`) or a status or broadcast list (`@broadcast`); nothing is sent · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends))
+**Errors:** `400` validation failure / session not active / unknown body field · `401` missing/invalid API key · `403` key role below OPERATOR · `404` the `quotedMessageId` could not be resolved (see Quoted sends) · `500` engine error · `409` conflict or engine not ready (retryable) · `501` whatsapp-web.js cannot send a contact card to a channel (`<id>@newsletter`) or a status or broadcast list (`@broadcast`); nothing is sent · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends)) · `503` Baileys recipient lookup failed or timed out before the operation was sent
 
 #### POST /api/sessions/:sessionId/messages/send-sticker
 
@@ -2135,7 +2136,7 @@ Send a native WhatsApp poll.
 { "messageId": "true_1203630000@g.us_3EB0ABCD", "timestamp": 1719312000 }
 ```
 
-**Errors:** `400` validation failure (option count/length) / session not active / unknown body field · `401` missing/invalid API key · `403` key role below OPERATOR · `404` the `quotedMessageId` could not be resolved (see Quoted sends) · `500` engine error · `409` conflict or engine not ready (retryable) · `501` whatsapp-web.js cannot send a poll to a status or broadcast list (`@broadcast`), nor one with `quotedMessageId` to a channel (`<id>@newsletter`); nothing is sent · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends))
+**Errors:** `400` validation failure (option count/length) / session not active / unknown body field · `401` missing/invalid API key · `403` key role below OPERATOR · `404` the `quotedMessageId` could not be resolved (see Quoted sends) · `500` engine error · `409` conflict or engine not ready (retryable) · `501` whatsapp-web.js cannot send a poll to a status or broadcast list (`@broadcast`), nor one with `quotedMessageId` to a channel (`<id>@newsletter`); nothing is sent · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends)) · `503` Baileys recipient lookup failed or timed out before the operation was sent
 
 #### POST /api/sessions/:sessionId/messages/reply
 
@@ -2170,7 +2171,7 @@ Reply to a message, quoting a prior message.
 
 The quoted body is best-effort resolved from the DB for the reply preview.
 
-**Errors:** `400` validation failure / session not active / unknown body field · `401` missing/invalid API key · `403` key role below OPERATOR · `404` the quoted message is not found in this chat · `500` engine error · `409` conflict or engine not ready (retryable) · `501` whatsapp-web.js cannot send a reply to a channel (`<id>@newsletter`) or a status or broadcast list (`@broadcast`); nothing is sent · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends))
+**Errors:** `400` validation failure / session not active / unknown body field · `401` missing/invalid API key · `403` key role below OPERATOR · `404` the quoted message is not found in this chat · `500` engine error · `409` conflict or engine not ready (retryable) · `501` whatsapp-web.js cannot send a reply to a channel (`<id>@newsletter`) or a status or broadcast list (`@broadcast`); nothing is sent · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends)) · `503` Baileys recipient lookup failed or timed out before the operation was sent
 
 #### POST /api/sessions/:sessionId/messages/click-button
 
@@ -2213,7 +2214,7 @@ Tap a choice on a WhatsApp Business button / list prompt by sending the structur
 > render after the store evicts the prompt, and a tap then 404s. URL/call CTA buttons cannot be
 > clicked this way, only quick-reply style choices and list rows.
 
-**Errors:** `400` validation failure, session not active, the message is not a clickable prompt, or `buttonId` is not among its choices · `401` · `403` · `404` prompt not in the engine store / wrong chat · `501` whatsapp-web.js · `409` conflict or engine not ready (retryable) · `500` engine error
+**Errors:** `400` validation failure, session not active, the message is not a clickable prompt, or `buttonId` is not among its choices · `401` · `403` · `404` prompt not in the engine store / wrong chat · `501` whatsapp-web.js · `409` conflict or engine not ready (retryable) · `500` engine error · `503` Baileys recipient lookup failed or timed out before the operation was sent
 
 #### POST /api/sessions/:sessionId/messages/forward
 
@@ -2247,7 +2248,7 @@ Forward a message from one chat to another.
 
 `messageId` may be an empty string when the engine could not recover the forwarded copy's id.
 
-**Errors:** `400` validation failure / session not active / unknown body field · `401` missing/invalid API key · `403` key role below OPERATOR · `404` the message to forward is not found in `fromChatId` · `500` engine error · `409` conflict or engine not ready (retryable) · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends))
+**Errors:** `400` validation failure / session not active / unknown body field · `401` missing/invalid API key · `403` key role below OPERATOR · `404` the message to forward is not found in `fromChatId` · `500` engine error · `409` conflict or engine not ready (retryable) · `422` the `Idempotency-Key` was already used for a different request (see [Idempotent sends](#idempotent-sends)) · `503` Baileys recipient lookup failed or timed out before the operation was sent
 
 #### POST /api/sessions/:sessionId/messages/react
 
