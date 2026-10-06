@@ -590,16 +590,16 @@ with zero OpenWA surface. Baileys-only; whatsapp-web.js has no community API at 
 
 **Queries** (8)
 
-| Library method                 | OpenWA exposure         |
-| ------------------------------ | ----------------------- |
-| `executeUSyncQuery`            | ❌ **not exposed**      |
-| `fetchAccountReachoutTimelock` | ⚙️ internal wiring      |
-| `fetchBlocklist`               | ✅ `getBlockedContacts` |
-| `fetchDisappearingDuration`    | ❌ **not exposed**      |
-| `fetchNewChatMessageCap`       | ❌ **not exposed**      |
-| `fetchStatus`                  | ❌ **not exposed**      |
-| `getUSyncDevices`              | ❌ **not exposed**      |
-| `onWhatsApp`                   | ✅ `getNumberId`        |
+| Library method                 | OpenWA exposure                     |
+| ------------------------------ | ----------------------------------- |
+| `executeUSyncQuery`            | ❌ **not exposed**                  |
+| `fetchAccountReachoutTimelock` | ⚙️ internal wiring                  |
+| `fetchBlocklist`               | ✅ `getBlockedContacts`             |
+| `fetchDisappearingDuration`    | ❌ **not exposed**                  |
+| `fetchNewChatMessageCap`       | ❌ **not exposed**                  |
+| `fetchStatus`                  | ❌ **not exposed**                  |
+| `getUSyncDevices`              | ❌ **not exposed**                  |
+| `onWhatsApp`                   | ✅ `getNumberId`, `sendTextMessage` |
 
 **Profile, contacts & presence** (12)
 
