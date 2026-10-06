@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Restore legacy webhook failures and normalize terminal duplicates before SQLite schema synchronization.
+- Exclude retained webhook replay payloads from database backup reads.
+- Advance webhook recovery scans past live queued deliveries.
+- Apply current receiver configuration and session ownership to every webhook delivery attempt.
+- Clear revoked Baileys history messages from chat previews.
+- Preserve pending message mutations when REST storage wins an own-send echo.
+- Cancel archived media preview downloads when their components unmount.
 - Refresh Baileys pairing secrets and prevent stale QR renders during linking.
 - Upgrade proxy-addr to 2.0.8 to correct IPv4-mapped IPv6 proxy trust matching.
 - Upgrade source-map-js to 1.2.2 to validate indexed source-map offsets.
