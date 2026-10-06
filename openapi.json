@@ -4268,6 +4268,67 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "since",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive message-time lower bound, Unix epoch milliseconds (not ingestion time).",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "until",
+            "required": false,
+            "in": "query",
+            "description": "Exclusive message-time upper bound, Unix epoch milliseconds.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "direction",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "incoming",
+                "outgoing"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "description": "Newest first. Default createdAt preserves existing ordering; timestamp uses message time and excludes rows without a known timestamp.",
+            "schema": {
+              "enum": [
+                "createdAt",
+                "timestamp"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Exact stored message type token, e.g. text, image, voice.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "messageId",
+            "required": false,
+            "in": "query",
+            "description": "Exact WhatsApp message reference; remains scoped to the session and chat.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4282,7 +4343,7 @@
             }
           },
           "400": {
-            "description": "`after` names no message in this session. The keyset comparison would otherwise return an empty page, which reads exactly like the end of the history, so a walk resumed from a stale or foreign cursor would stop silently instead of reporting the cursor.",
+            "description": "Invalid message filters or an unknown cursor. With time, direction, type or message-reference filters, the cursor must belong to the same selection.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19842,6 +19903,10 @@
       "MessageListResponseDto": {
         "type": "object",
         "properties": {
+          "unknownTimestampTotal": {
+            "type": "number",
+            "description": "Rows matching the non-time filters with unknown message time, before time bounds. Present only for time selections; excluded from their messages and total. Stored history is not proof of complete remote history."
+          },
           "messages": {
             "description": "Newest first.",
             "type": "array",
