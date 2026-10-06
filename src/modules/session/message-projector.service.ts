@@ -733,8 +733,8 @@ export class MessageProjector {
       // one transient retry) fails open, so a real send is never dropped on a DB fault.
       const outcome = await this.insertWithRetry(id, engine, dbMessage, 'outgoing');
       if (outcome.landed === 'stale') return;
-      // The first attempt may have committed before its error: that row still takes what arrived.
-      if (outcome.landed === 'dup' && outcome.retried) this.applyChangesMadeInFlight(id, outgoing.id);
+      // The REST writer may have won either attempt; its row still takes the echo's pending changes.
+      if (outcome.landed === 'dup') this.applyChangesMadeInFlight(id, outgoing.id);
       if (outcome.landed === 'yes') {
         this.applyChangesMadeInFlight(id, outgoing.id);
         // Fire-and-forget, mirroring onMessage: plugin providers (search etc.) see phone-
