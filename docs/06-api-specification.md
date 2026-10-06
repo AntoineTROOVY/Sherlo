@@ -1440,6 +1440,10 @@ Returns a bare array of `MessageReaction`:
 
 **Errors:** `400` session not active · `401` missing/invalid API key · `500` engine error · `409` conflict or engine not ready (retryable) · `501` not supported on the active engine · `503` the whatsapp-web.js page died mid-read (retryable)
 
+Poll creation messages include `poll { name, options, allowMultipleAnswers }` when the engine provides the choices. Live `message.received` and `message.sent` events and whatsapp-web.js history carry it at the top level. Stored-message responses carry the same object in `metadata.poll`, including polls sent through `send-poll`. The dashboard displays these option texts. Use the exact strings in `options` when voting; their order and whitespace are preserved.
+
+Legacy stored polls may have no choices because they were captured before this field was stored. Vote counts are not included.
+
 #### POST /api/sessions/:sessionId/messages/vote-poll
 
 Cast a vote on a poll.

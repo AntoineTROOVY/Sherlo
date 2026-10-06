@@ -82,6 +82,7 @@ interface IncomingWsMessage {
   call?: { video: boolean; missed: boolean };
   /** Business prompt choices (Baileys); top-level on the live event, folded into metadata for the UI. */
   buttons?: Array<{ id: string; text: string }>;
+  poll?: { name: string; options: string[]; allowMultipleAnswers: boolean };
   metadata?: ChatMessageView['metadata'];
   kind?: ChatKind;
   /** Group poster: `from` is the group JID, so `contact`/`author` identify who actually sent it. */

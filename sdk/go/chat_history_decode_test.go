@@ -75,3 +75,13 @@ func TestChatSummaryDecodesOptionalLastMessageType(t *testing.T) {
 		t.Fatal("absent type must stay omitted")
 	}
 }
+
+func TestChatHistoryDecodesPollChoices(t *testing.T) {
+	var m ChatHistoryMessage
+	if err := json.Unmarshal([]byte(`{"poll":{"name":"Q","options":[" Park ","Beach"],"allowMultipleAnswers":false}}`), &m); err != nil {
+		t.Fatal(err)
+	}
+	if m.Poll == nil || m.Poll.Name != "Q" || m.Poll.Options[0] != " Park " || m.Poll.AllowMultipleAnswers {
+		t.Fatalf("poll = %+v", m.Poll)
+	}
+}
