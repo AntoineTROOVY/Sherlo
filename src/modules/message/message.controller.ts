@@ -49,6 +49,7 @@ import {
 import { ChatQuotedAllowed, ChatScoped, CurrentApiKey, RequireRole } from '../auth/decorators/auth.decorators';
 import { type ApiKey, ApiKeyRole } from '../auth/entities/api-key.entity';
 import { ChatScopeService } from '../auth/chat-scope.service';
+import { parseMessageWindow } from './message-window';
 import {
   CHANNEL_MEDIA_501,
   CUSTOM_LINK_PREVIEW_501,
@@ -81,6 +82,11 @@ export class MessageController {
 
   // Fenced on the optional ?chatId=: the guard checks it when present, and requireChat refuses a
   // chat-restricted key that omits it, so such a key reads only its own chats' stored history.
+  @ApiQuery({
+    name: 'messageId',
+    required: false,
+    description: 'Exact WhatsApp message reference; remains scoped to the session and chat.',
+  })
   @ChatScoped('fenced')
   @Get()
   @ApiOperation({ summary: 'Get message history for a session' })
@@ -119,12 +125,37 @@ export class MessageController {
     description: 'Message history',
     type: MessageListResponseDto,
   })
+  @ApiQuery({
+    name: 'since',
+    required: false,
+    type: Number,
+    description: 'Inclusive message-time lower bound, Unix epoch milliseconds (not ingestion time).',
+  })
+  @ApiQuery({
+    name: 'until',
+    required: false,
+    type: Number,
+    description: 'Exclusive message-time upper bound, Unix epoch milliseconds.',
+  })
+  @ApiQuery({ name: 'direction', required: false, enum: ['incoming', 'outgoing'] })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    type: String,
+    description: 'Exact stored message type token, e.g. text, image, voice.',
+  })
+  @ApiQuery({
+    name: 'orderBy',
+    required: false,
+    enum: ['createdAt', 'timestamp'],
+    description:
+      'Newest first. Default createdAt preserves existing ordering; timestamp uses message time and excludes rows without a known timestamp.',
+  })
   @ApiResponse({
     status: 400,
     description:
-      '`after` names no message in this session. The keyset comparison would otherwise return an ' +
-      'empty page, which reads exactly like the end of the history, so a walk resumed from a stale ' +
-      'or foreign cursor would stop silently instead of reporting the cursor.',
+      'Invalid message filters or an unknown cursor. With time, direction, type or message-reference filters, ' +
+      'the cursor must belong to the same selection.',
   })
   @ApiResponse({
     status: 403,
@@ -141,9 +172,16 @@ export class MessageController {
     @Query('after') after?: string,
     @Query('inlineMedia') inlineMedia?: string,
     @CurrentApiKey() apiKey?: ApiKey,
+    @Query('since') since?: string,
+    @Query('until') until?: string,
+    @Query('direction') direction?: string,
+    @Query('orderBy') orderBy?: string,
+    @Query('type') type?: string,
+    @Query('messageId') messageId?: string,
   ) {
     this.chatScope.requireChat(apiKey, chatId);
     return this.messageService.getMessages(sessionId, {
+      ...parseMessageWindow({ since, until, direction, orderBy, type, messageId }),
       chatId,
       from,
       limit: limit ? parseInt(limit, 10) : undefined,
