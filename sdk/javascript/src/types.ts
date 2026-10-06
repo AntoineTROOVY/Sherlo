@@ -623,6 +623,7 @@ export interface ChatHistoryMessage {
     sizeBytes?: number;
   };
   quotedMessage?: { id: string; body: string };
+  poll?: { name: string; options: string[]; allowMultipleAnswers: boolean };
   location?: { latitude: number; longitude: number; description?: string; address?: string; url?: string };
   /** Present on `order` messages only: the placed cart, plus the single-order token for its items. */
   order?: { orderId: string; token?: string };

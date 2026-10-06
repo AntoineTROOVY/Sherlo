@@ -8,6 +8,7 @@ import {
   extractBaileysButtonReply,
   extractBaileysButtons,
   extractBaileysCommerce,
+  extractBaileysPoll,
   isBaileysCatalogShare,
 } from './baileys-message-mapper';
 import { BAILEYS_QUERY_BUDGET_MS, withQueryDeadline } from './baileys-query-deadline';
@@ -271,6 +272,7 @@ export class BaileysHistory {
         // Same commerce mapping as the live path, so a whole-catalog share is `unknown` on both.
         order: commerce.order,
         product: commerce.product,
+        poll: extractBaileysPoll(content),
         button,
         buttons,
         isCatalogShare: isBaileysCatalogShare(content),
