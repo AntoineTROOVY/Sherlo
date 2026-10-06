@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Refresh Baileys pairing secrets and prevent stale QR renders during linking.
 - Upgrade proxy-addr to 2.0.8 to correct IPv4-mapped IPv6 proxy trust matching.
 - Upgrade source-map-js to 1.2.2 to validate indexed source-map offsets.
 - Fix Baileys first-contact addresses and reject phone numbers reported as unregistered before sending.
