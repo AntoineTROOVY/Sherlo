@@ -401,9 +401,18 @@ services:
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-}
       - BETTER_AUTH_OPEN_SIGNUP=${BETTER_AUTH_OPEN_SIGNUP:-}
       - AUTH_DATABASE_PATH=${AUTH_DATABASE_PATH:-}
+      # Transactional email (Resend). Required for sign-up OTP and password reset.
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - RESEND_FROM=${RESEND_FROM:-}
+      # Stripe billing (preferred when STRIPE_SECRET_KEY + STRIPE_PRICE_ID are set).
+      # Webhook endpoint: {public API origin}/api/account/stripe/webhook
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_PRICE_ID=${STRIPE_PRICE_ID:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
       # Polar subscriptions (Better Auth plugin). Token from the Polar organization settings.
       # Webhook endpoint: ${BETTER_AUTH_URL}/api/account/polar/webhooks
       - POLAR_ACCESS_TOKEN=${POLAR_ACCESS_TOKEN:-}
+      - POLAR_CREATE_CUSTOMER_ON_SIGNUP=${POLAR_CREATE_CUSTOMER_ON_SIGNUP:-}
       - POLAR_WEBHOOK_SECRET=${POLAR_WEBHOOK_SECRET:-}
       - POLAR_ENVIRONMENT=${POLAR_ENVIRONMENT:-}
       - POLAR_PRODUCTS=${POLAR_PRODUCTS:-}
