@@ -222,7 +222,6 @@ export function Sessions() {
     clearQrCodeForSession,
   } = useSessionPairing({
     sessions,
-    sessionsRef,
     reloadSessions: fetchSessions,
     applySessionPatch: applySessionPatchForPairing,
     onPairingReady: handlePairingReady,

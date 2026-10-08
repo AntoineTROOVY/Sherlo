@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { sessionApi, type Session } from '../services/api';
 import { isValidPairingPhone } from '../utils/sessionForm';
@@ -12,7 +11,6 @@ export interface QrData {
 
 export interface UseSessionPairingArgs {
   sessions: Session[];
-  sessionsRef: RefObject<Session[]>;
   reloadSessions: () => Promise<Session[]>;
   /** Apply a single session row from GET /sessions/:id — avoids list refetch (often 429 while pairing). */
   applySessionPatch: (session: Session) => void;
@@ -60,7 +58,6 @@ function isTooManyRequests(err: unknown): boolean {
  */
 export function useSessionPairing({
   sessions,
-  sessionsRef,
   reloadSessions,
   applySessionPatch,
   onPairingReady,

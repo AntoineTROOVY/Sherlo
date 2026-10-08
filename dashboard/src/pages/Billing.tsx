@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useTranslation, type TFunction } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { Check, CreditCard, Loader2 } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useBillingAccess } from '../hooks/useBillingAccess';
