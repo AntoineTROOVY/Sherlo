@@ -9,8 +9,8 @@ export interface AccountIdentity {
   id: string;
   email: string;
   role: 'admin' | 'user';
-  /** Null for an instance admin (sees every session). A list for everyone else. */
-  sessionIds: string[] | null;
+  /** WhatsApp session ids owned by this account (each dashboard user, including instance admin). */
+  sessionIds: string[];
 }
 
 export interface AccountApiKey extends ApiKey {
@@ -82,11 +82,14 @@ export function authDatabasePath(env: NodeJS.ProcessEnv): string {
  * An in-memory API key that lets the existing guard, roles, and session fence treat a Better Auth
  * account as the caller. It is never written to api_keys.
  */
+/** Explicit session allowlist for Better Auth actors — never null (null means every session on API keys). */
+export function accountAllowedSessions(sessionIds: string[]): string[] {
+  return sessionIds.length > 0 ? sessionIds : [ACCOUNT_SCOPE_NONE];
+}
+
 export function syntheticAccountKey(identity: AccountIdentity): AccountApiKey {
   const admin = identity.role === 'admin';
-  // Dashboard accounts are never session-scoped via allowedSessions: non-admins are fenced by
-  // session.ownerUserId instead, so a new member with zero sessions can still POST /sessions.
-  const allowedSessions = null;
+  const allowedSessions = accountAllowedSessions(identity.sessionIds);
   return {
     id: identity.id,
     name: identity.email,

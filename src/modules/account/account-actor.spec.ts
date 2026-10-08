@@ -1,6 +1,7 @@
 import { ApiKeyRole } from '../auth/entities/api-key.entity';
 import {
   ACCOUNT_SCOPE_NONE,
+  accountAllowedSessions,
   accountUserIdOf,
   authDatabasePath,
   resolveBetterAuthBaseURL,
@@ -68,18 +69,25 @@ describe('authDatabasePath', () => {
   });
 });
 
+describe('accountAllowedSessions', () => {
+  it('scopes dashboard users to their sessions and blocks wildcard subscribe when empty', () => {
+    expect(accountAllowedSessions(['s1', 's2'])).toEqual(['s1', 's2']);
+    expect(accountAllowedSessions([])).toEqual([ACCOUNT_SCOPE_NONE]);
+  });
+});
+
 describe('syntheticAccountKey', () => {
-  it('makes the first admin unscoped and a member unable to see other sessions', () => {
+  it('gives each account an explicit session allowlist (never null)', () => {
     const admin = syntheticAccountKey({ id: 'u1', email: 'a@b.c', role: 'admin', sessionIds: ['s1'] });
     expect(admin.role).toBe(ApiKeyRole.ADMIN);
-    expect(admin.allowedSessions).toBeNull();
+    expect(admin.allowedSessions).toEqual(['s1']);
     expect(accountUserIdOf(admin)).toBe('u1');
 
     const member = syntheticAccountKey({ id: 'u2', email: 'c@d.e', role: 'user', sessionIds: ['s2'] });
     expect(member.role).toBe(ApiKeyRole.OPERATOR);
-    expect(member.allowedSessions).toBeNull();
+    expect(member.allowedSessions).toEqual(['s2']);
 
     const empty = syntheticAccountKey({ id: 'u3', email: 'e@f.g', role: 'user', sessionIds: [] });
-    expect(empty.allowedSessions).toBeNull();
+    expect(empty.allowedSessions).toEqual([ACCOUNT_SCOPE_NONE]);
   });
 });

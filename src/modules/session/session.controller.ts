@@ -153,8 +153,7 @@ export class SessionController {
       limit: limit ? parseInt(limit, 10) : undefined,
       offset: offset ? parseInt(offset, 10) : undefined,
       name,
-      ownerUserId:
-        accountOwnerId && apiKey?.role !== ApiKeyRole.ADMIN ? accountOwnerId : undefined,
+      ownerUserId: accountOwnerId ?? undefined,
     });
     return sessions.map(s => this.transformSession(s));
   }
@@ -963,6 +962,9 @@ export class SessionController {
   }> {
     // Scope aggregate stats to the key's allowedSessions so a session-restricted key cannot enumerate
     // global session counts/status (the route carries no :sessionId for the guard to scope against).
-    return this.sessionService.getStats(apiKey?.allowedSessions);
+    const accountOwnerId = accountUserIdOf(apiKey);
+    return this.sessionService.getStats(apiKey?.allowedSessions, {
+      ownerUserId: accountOwnerId ?? undefined,
+    });
   }
 }

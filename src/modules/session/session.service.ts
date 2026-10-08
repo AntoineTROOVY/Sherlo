@@ -1134,7 +1134,10 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
   /**
    * Get overall session statistics for multi-session monitoring
    */
-  async getStats(allowedSessions?: string[] | null): Promise<{
+  async getStats(
+    allowedSessions?: string[] | null,
+    opts: { ownerUserId?: string } = {},
+  ): Promise<{
     total: number;
     active: number;
     ready: number;
@@ -1155,6 +1158,13 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
       .addSelect('COUNT(session.id)', 'count');
     if (scope) {
       qb.where('session.id IN (:...scope)', { scope });
+    }
+    if (opts.ownerUserId) {
+      if (scope) {
+        qb.andWhere('session.ownerUserId = :ownerUserId', { ownerUserId: opts.ownerUserId });
+      } else {
+        qb.where('session.ownerUserId = :ownerUserId', { ownerUserId: opts.ownerUserId });
+      }
     }
     const rows = await qb.groupBy('session.status').getRawMany<{ status: string; count: string }>();
 

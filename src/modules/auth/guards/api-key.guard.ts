@@ -122,7 +122,7 @@ export class ApiKeyGuard implements CanActivate {
     // validateApiKey already applied this fence for a stored key. An account cookie is checked here,
     // after the actor is stamped, so a denial is attributed to the account.
     const accountUserId = accountUserIdOf(apiKey);
-    if (accountUserId && apiKey.role !== ApiKeyRole.ADMIN && sessionId) {
+    if (accountUserId && sessionId) {
       if (this.accounts) {
         await this.accounts.assertAccountOwnsSession(accountUserId, sessionId);
       }

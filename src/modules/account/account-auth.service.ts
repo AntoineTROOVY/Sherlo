@@ -53,12 +53,9 @@ export class AccountAuthService implements OnModuleInit {
     const session = await auth.api.getSession({ headers: fromNodeHeaders(headers) });
     if (!session?.user) return null;
     const role = (session.user as { role?: string }).role === 'admin' ? 'admin' : 'user';
-    const sessionIds =
-      role === 'admin'
-        ? null
-        : (await this.sessions.find({ select: { id: true }, where: { ownerUserId: session.user.id } })).map(
-            row => row.id,
-          );
+    const sessionIds = (
+      await this.sessions.find({ select: { id: true }, where: { ownerUserId: session.user.id } })
+    ).map(row => row.id);
     return syntheticAccountKey({
       id: session.user.id,
       email: session.user.email,
