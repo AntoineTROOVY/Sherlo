@@ -157,3 +157,10 @@ a:hover {
 .yarl__button {
   --yarl__color_button: rgba(255, 255, 255, 0.9);
 }
+
+/* Tawk.to live chat — fixed bottom-right, above layout chrome */
+.tawk-min-container,
+#tawk-bubble-container,
+iframe[title='chat widget'] {
+  z-index: 10050 !important;
+}

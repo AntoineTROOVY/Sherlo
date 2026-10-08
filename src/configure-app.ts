@@ -82,7 +82,11 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
           // UI (/api/admin/queues) links IBM Plex from Google Fonts; that stylesheet is blocked and it falls
           // back to system fonts.
           styleSrc: ["'self'", "'unsafe-inline'"],
-          scriptSrc: ["'self'", (_req, res) => `'nonce-${(res as Response).locals.cspNonce as string}'`],
+          scriptSrc: [
+            "'self'",
+            (_req, res) => `'nonce-${(res as Response).locals.cspNonce as string}'`,
+            'https://embed.tawk.to',
+          ],
           // `blob:` is needed for the outgoing image-attachment preview, which the dashboard renders
           // from a URL.createObjectURL(file) blob before the message is sent (Chats.tsx).
           imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
@@ -90,7 +94,8 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
           // explicit media-src, <audio>/<video> fall back to default-src 'self' and are blocked.
           // Mirror imgSrc so audio/video render the same way images already do.
           mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
-          connectSrc: ["'self'"],
+          connectSrc: ["'self'", 'https://*.tawk.to', 'wss://*.tawk.to'],
+          frameSrc: ['https://embed.tawk.to'],
           fontSrc: ["'self'"],
           objectSrc: ["'none'"],
           // Auto-upgrade HTTP→HTTPS in production, unless CSP_UPGRADE_INSECURE_REQUESTS opts out for an
