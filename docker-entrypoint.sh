@@ -37,6 +37,17 @@ if ! mkdir -p "${XDG_CONFIG_HOME:-/tmp/.config}" "${XDG_CACHE_HOME:-/tmp/.cache}
   exit 1
 fi
 
+# Better Auth: fail fast with a compose/Dokploy hint before Node boot-loops in production.
+if [ "${NODE_ENV:-production}" = "production" ]; then
+  _auth_secret=$(printf '%s' "${BETTER_AUTH_SECRET:-}" | tr -d ' \t\r\n')
+  if [ "${#_auth_secret}" -lt 32 ]; then
+    echo "FATAL: BETTER_AUTH_SECRET must be at least 32 characters in production." >&2
+    echo "       Set it in Dokploy → Environment (written to .env) or mount env_file .env." >&2
+    echo "       Do not use empty compose forwards like BETTER_AUTH_SECRET=\${BETTER_AUTH_SECRET:-} — they shadow real values." >&2
+    exit 1
+  fi
+fi
+
 # Nothing below can run without root: the chowns need CAP_CHOWN and gosu needs CAP_SETUID.
 if [ "$(id -u)" != 0 ]; then
   exec "$@"

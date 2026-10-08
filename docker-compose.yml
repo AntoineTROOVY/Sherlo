@@ -96,6 +96,12 @@ services:
       - '127.0.0.1:${API_PORT:-2785}:2785'
     expose:
       - '2785'
+    # Dokploy (and local operators) supply secrets via a `.env` next to this file — never commit it.
+    # Listing those keys again under `environment:` with `${VAR:-}` substituted empty during deploy
+    # overwrote Dokploy's values (e.g. BETTER_AUTH_SECRET length 0 while BETTER_AUTH_URL worked).
+    env_file:
+      - path: .env
+        required: false
     environment:
       # Core
       - NODE_ENV=${NODE_ENV:-production}
@@ -394,28 +400,7 @@ services:
       - LOG_FORMAT=${LOG_FORMAT:-}
       - BASE_URL=${BASE_URL:-}
       - DASHBOARD_URL=${DASHBOARD_URL:-}
-      # Better Auth (email accounts). The SQLite file stays on the openwa-data volume (/app/data).
-      # Set BETTER_AUTH_SECRET (32+ random chars) and BETTER_AUTH_URL to the public https origin
-      # before a Dokploy deploy. Leave OPEN_SIGNUP unset to allow only the first account.
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-}
-      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-}
-      - BETTER_AUTH_OPEN_SIGNUP=${BETTER_AUTH_OPEN_SIGNUP:-}
-      - AUTH_DATABASE_PATH=${AUTH_DATABASE_PATH:-}
-      # Transactional email (Resend). Required for sign-up OTP and password reset.
-      - RESEND_API_KEY=${RESEND_API_KEY:-}
-      - RESEND_FROM=${RESEND_FROM:-}
-      # Stripe billing (preferred when STRIPE_SECRET_KEY + STRIPE_PRICE_ID are set).
-      # Webhook endpoint: {public API origin}/api/account/stripe/webhook
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
-      - STRIPE_PRICE_ID=${STRIPE_PRICE_ID:-}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
-      # Polar subscriptions (Better Auth plugin). Token from the Polar organization settings.
-      # Webhook endpoint: ${BETTER_AUTH_URL}/api/account/polar/webhooks
-      - POLAR_ACCESS_TOKEN=${POLAR_ACCESS_TOKEN:-}
-      - POLAR_CREATE_CUSTOMER_ON_SIGNUP=${POLAR_CREATE_CUSTOMER_ON_SIGNUP:-}
-      - POLAR_WEBHOOK_SECRET=${POLAR_WEBHOOK_SECRET:-}
-      - POLAR_ENVIRONMENT=${POLAR_ENVIRONMENT:-}
-      - POLAR_PRODUCTS=${POLAR_PRODUCTS:-}
+      # Better Auth, Resend, Stripe, Polar: set in Dokploy Environment / `.env` only (see env_file).
       # Docker socket proxy (openwa-api never touches /var/run/docker.sock directly)
       - DOCKER_HOST=tcp://docker-proxy:2375
     volumes:
