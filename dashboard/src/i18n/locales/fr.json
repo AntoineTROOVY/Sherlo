@@ -70,7 +70,8 @@
     "messageTester": "Testeur de messages",
     "infrastructure": "Infrastructure",
     "plugins": "Plugins",
-    "logs": "Journaux"
+    "logs": "Journaux",
+    "billing": "Facturation"
   },
   "chats": {
     "media": {
@@ -219,10 +220,51 @@
     "connecting": "Connexion...",
     "invalidKey": "Clé API invalide",
     "connectionError": "Impossible de se connecter au serveur. Veuillez réessayer.",
+    "serverError": "Erreur serveur. Réessayez ou contactez le support.",
     "help": "Besoin d'aide ?",
     "viewDocs": "Voir la documentation",
     "footer": "Fait avec ❤️ par Yudhi Armyndharis et la communauté OpenWA",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "E-mail",
+    "emailPlaceholder": "vous@exemple.com",
+    "password": "Mot de passe",
+    "name": "Nom",
+    "namePlaceholder": "Votre nom",
+    "signIn": "Se connecter",
+    "signUp": "Créer un compte",
+    "signingIn": "Connexion...",
+    "creating": "Création du compte...",
+    "switchToSignUp": "Créer un compte",
+    "switchToSignIn": "Déjà un compte ? Se connecter",
+    "emailRequired": "L'e-mail est requis",
+    "passwordRequired": "Le mot de passe est requis",
+    "nameRequired": "Le nom est requis",
+    "invalidCredentials": "E-mail ou mot de passe invalide",
+    "showPassword": "Afficher le mot de passe",
+    "hidePassword": "Masquer le mot de passe",
+    "forgotPassword": "Mot de passe oublié ?",
+    "forgotPasswordHint": "Entrez votre e-mail et nous vous enverrons un lien de réinitialisation.",
+    "sendResetLink": "Envoyer le lien",
+    "sendingReset": "Envoi...",
+    "resetEmailSent": "Si cet e-mail existe dans notre système, consultez votre boîte de réception.",
+    "backToSignIn": "Retour à la connexion",
+    "newPassword": "Nouveau mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "resetPassword": "Réinitialiser",
+    "resetting": "Réinitialisation...",
+    "passwordResetSuccess": "Mot de passe mis à jour. Vous pouvez vous connecter.",
+    "passwordsMismatch": "Les mots de passe ne correspondent pas",
+    "invalidResetToken": "Ce lien est invalide ou a expiré.",
+    "resetPasswordTitle": "Choisissez un nouveau mot de passe.",
+    "verifyOtpHint": "Un code à 6 chiffres vous a été envoyé par e-mail. Saisissez-le pour valider votre compte.",
+    "otpCode": "Code de vérification",
+    "verifyOtp": "Vérifier l'e-mail",
+    "verifyingOtp": "Vérification...",
+    "otpSent": "Consultez votre e-mail pour le code de vérification.",
+    "otpSentSignIn": "Votre e-mail n'est pas encore vérifié. Nous vous avons renvoyé un code.",
+    "resendOtp": "Renvoyer le code",
+    "otpInvalid": "Code invalide ou expiré. Réessayez ou demandez un nouveau code.",
+    "emailVerifiedSuccess": "E-mail vérifié. Connexion en cours..."
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -326,10 +368,12 @@
       "step3": "<strong>3.</strong> Appuyez sur <strong>Connecter un appareil</strong> et scannez ce QR",
       "autoRefresh": "Le QR code s'actualise automatiquement toutes les 5 secondes",
       "generating": "Génération du code QR...",
+      "authenticating": "QR scanné — finalisation de la connexion sur le serveur…",
       "preparing": "Préparation du code QR...",
       "showQr": "Afficher le QR",
       "loading": "Chargement...",
-      "scanToConnect": "Scannez le code QR pour vous connecter"
+      "scanToConnect": "Scannez le code QR pour vous connecter",
+      "rateLimited": "Trop de requêtes — attendez environ une minute, puis fermez et rouvrez cette fenêtre."
     },
     "details": {
       "title": "Détails de la session",
@@ -1171,5 +1215,76 @@
       "current": "Cette session"
     },
     "loading": "Recherche…"
+  },
+  "billing": {
+    "title": "Facturation",
+    "subtitle": "Gérez votre abonnement Sherlo.",
+    "subscribe": "S’abonner avec Polar",
+    "manage": "Gérer l’abonnement",
+    "loading": "Chargement des offres…",
+    "empty": "Aucune offre configurée. Définissez POLAR_PRODUCTS sur le serveur ou corrigez les scopes du token Polar (products:read).",
+    "active": "Votre abonnement est actif.",
+    "inactive": "Aucun abonnement actif sur ce compte.",
+    "error": "Impossible de charger les offres Polar. Vérifiez les scopes du token (products:read) et réessayez.",
+    "sessionError": "Session expirée. Déconnectez-vous puis reconnectez-vous.",
+    "notConfigured": "La facturation n’est pas configurée sur ce serveur.",
+    "trialDaysRemaining_one": "Il vous reste {{count}} jour d’essai gratuit.",
+    "trialDaysRemaining_other": "Il vous reste {{count}} jours d’essai gratuit.",
+    "trialLastDay": "Dernier jour de votre essai gratuit.",
+    "trialCta": "Voir les offres",
+    "trialExpired": "Votre essai gratuit est terminé. Abonnez-vous ci-dessous pour continuer à utiliser Sherlo.",
+    "notSubscribedEyebrow": "Non abonné",
+    "notSubscribedTitle": "Débloquez Sherlo",
+    "notSubscribedLead": "Vous n’êtes pas encore abonné. Abonnez-vous pour connecter WhatsApp et utiliser le tableau de bord.",
+    "defaultPlanName": "Sherlo",
+    "priceOnCheckout": "Tarif affiché au paiement",
+    "subscribeCta": "S’abonner",
+    "redirecting": "Redirection…",
+    "checkoutFootnote": "Paiement sécurisé via Polar. Résiliation possible depuis le portail client.",
+    "subscribedEyebrow": "Abonnement actif",
+    "subscribedTitle": "Vous êtes abonné",
+    "subscribedLead": "Votre offre est active. Factures et moyens de paiement se gèrent dans le portail client.",
+    "proPlan": {
+      "badge": "LE PLUS POPULAIRE",
+      "name": "Pro",
+      "priceMain": "4,5 $",
+      "perMonth": "/mois",
+      "priceYear": "54 $ / an",
+      "yearlyFromMonthly": "{{amount}} / an",
+      "billedYearly": "Facturation annuelle",
+      "description": "Idéal pour les entreprises en croissance qui gèrent plusieurs numéros WhatsApp pour toucher plus de clients.",
+      "cta": "Choisir Pro",
+      "features": [
+        "Numéros WhatsApp connectés illimités",
+        "Contacts illimités",
+        "Pas de plafond de messages quotidien",
+        "Intégrations CRM et automatisations",
+        "Envoi aux utilisateurs, groupes et canaux",
+        "Texte, images, vidéos et audio",
+        "Documents, contacts et localisations",
+        "Accès API complet",
+        "Webhooks en temps réel",
+        "Support prioritaire"
+      ]
+    },
+    "detail": {
+      "plan": "Offre",
+      "price": "Tarif",
+      "status": "Statut",
+      "renewal": "Renouvellement"
+    },
+    "status": {
+      "active": "Actif",
+      "trialing": "Essai",
+      "past_due": "Paiement en retard",
+      "canceled": "Annulé",
+      "incomplete": "Incomplet"
+    },
+    "interval": {
+      "month": "mois",
+      "year": "an",
+      "week": "semaine",
+      "day": "jour"
+    }
   }
 }

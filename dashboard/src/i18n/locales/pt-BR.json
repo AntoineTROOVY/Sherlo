@@ -70,7 +70,8 @@
     "infrastructure": "Infraestrutura",
     "plugins": "Plugins",
     "logs": "Registros",
-    "templates": "Modelos"
+    "templates": "Modelos",
+    "billing": "Cobrança"
   },
   "chats": {
     "media": {
@@ -222,7 +223,24 @@
     "help": "Precisa de ajuda?",
     "viewDocs": "Ver documentação",
     "footer": "Feito com ❤️ por Yudhi Armyndharis e a comunidade OpenWA",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "E-mail",
+    "emailPlaceholder": "voce@exemplo.com",
+    "password": "Senha",
+    "name": "Nome",
+    "namePlaceholder": "Seu nome",
+    "signIn": "Entrar",
+    "signUp": "Criar conta",
+    "signingIn": "Entrando...",
+    "creating": "Criando conta...",
+    "switchToSignUp": "Criar uma conta",
+    "switchToSignIn": "Já tem uma conta? Entrar",
+    "emailRequired": "O e-mail é obrigatório",
+    "passwordRequired": "A senha é obrigatória",
+    "nameRequired": "O nome é obrigatório",
+    "invalidCredentials": "E-mail ou senha inválidos",
+    "showPassword": "Mostrar senha",
+    "hidePassword": "Ocultar senha"
   },
   "dashboard": {
     "title": "Painel",
@@ -1171,5 +1189,23 @@
       "current": "Esta sessão"
     },
     "loading": "Pesquisando…"
+  },
+  "billing": {
+    "title": "Cobrança",
+    "subtitle": "Assine com a Polar. A assinatura fica vinculada a esta conta.",
+    "subscribe": "Assinar",
+    "manage": "Gerenciar assinatura",
+    "loading": "Carregando planos…",
+    "empty": "Nenhum plano de assinatura disponível.",
+    "active": "Sua assinatura está ativa.",
+    "inactive": "Nenhuma assinatura ativa nesta conta.",
+    "error": "Não foi possível falar com a Polar. Tente de novo.",
+    "notConfigured": "A cobrança não está configurada neste servidor.",
+    "interval": {
+      "month": "mês",
+      "year": "ano",
+      "week": "semana",
+      "day": "dia"
+    }
   }
 }

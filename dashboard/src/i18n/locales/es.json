@@ -70,7 +70,8 @@
     "infrastructure": "Infraestructura",
     "plugins": "Plugins",
     "logs": "Registros",
-    "templates": "Plantillas"
+    "templates": "Plantillas",
+    "billing": "Facturación"
   },
   "chats": {
     "media": {
@@ -222,7 +223,24 @@
     "help": "¿Necesitas ayuda?",
     "viewDocs": "Ver documentación",
     "footer": "Hecho con ❤️ por Yudhi Armyndharis y la comunidad OpenWA",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "Correo",
+    "emailPlaceholder": "tu@ejemplo.com",
+    "password": "Contraseña",
+    "name": "Nombre",
+    "namePlaceholder": "Tu nombre",
+    "signIn": "Entrar",
+    "signUp": "Crear cuenta",
+    "signingIn": "Entrando...",
+    "creating": "Creando cuenta...",
+    "switchToSignUp": "Crear una cuenta",
+    "switchToSignIn": "¿Ya tienes cuenta? Entra",
+    "emailRequired": "El correo es obligatorio",
+    "passwordRequired": "La contraseña es obligatoria",
+    "nameRequired": "El nombre es obligatorio",
+    "invalidCredentials": "Correo o contraseña no válidos",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña"
   },
   "dashboard": {
     "title": "Panel",
@@ -1171,5 +1189,23 @@
       "current": "Esta sesión"
     },
     "loading": "Buscando…"
+  },
+  "billing": {
+    "title": "Facturación",
+    "subtitle": "Suscríbete con Polar. La suscripción queda vinculada a esta cuenta.",
+    "subscribe": "Suscribirse",
+    "manage": "Gestionar suscripción",
+    "loading": "Cargando planes…",
+    "empty": "Todavía no hay planes de suscripción.",
+    "active": "Tu suscripción está activa.",
+    "inactive": "No hay una suscripción activa en esta cuenta.",
+    "error": "No se pudo contactar con Polar. Inténtalo de nuevo.",
+    "notConfigured": "La facturación no está configurada en este servidor.",
+    "interval": {
+      "month": "mes",
+      "year": "año",
+      "week": "semana",
+      "day": "día"
+    }
   }
 }

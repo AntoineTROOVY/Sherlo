@@ -68,7 +68,8 @@
     "messageTester": "메시지 테스터",
     "infrastructure": "인프라",
     "plugins": "플러그인",
-    "logs": "로그"
+    "logs": "로그",
+    "billing": "결제"
   },
   "chats": {
     "media": {
@@ -217,7 +218,24 @@
     "help": "도움이 필요하신가요?",
     "viewDocs": "문서 보기",
     "footer": "Yudhi Armyndharis와 OpenWA 커뮤니티가 ❤️로 만들었습니다",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "이메일",
+    "emailPlaceholder": "you@example.com",
+    "password": "비밀번호",
+    "name": "이름",
+    "namePlaceholder": "이름",
+    "signIn": "로그인",
+    "signUp": "계정 만들기",
+    "signingIn": "로그인 중...",
+    "creating": "계정 생성 중...",
+    "switchToSignUp": "계정 만들기",
+    "switchToSignIn": "이미 계정이 있나요? 로그인",
+    "emailRequired": "이메일이 필요합니다",
+    "passwordRequired": "비밀번호가 필요합니다",
+    "nameRequired": "이름이 필요합니다",
+    "invalidCredentials": "이메일 또는 비밀번호가 올바르지 않습니다",
+    "showPassword": "비밀번호 표시",
+    "hidePassword": "비밀번호 숨기기"
   },
   "dashboard": {
     "title": "대시보드",
@@ -1165,5 +1183,23 @@
       "current": "현재 세션"
     },
     "loading": "검색하는 중…"
+  },
+  "billing": {
+    "title": "결제",
+    "subtitle": "Polar로 구독하세요. 구독은 이 계정에 연결됩니다.",
+    "subscribe": "구독",
+    "manage": "구독 관리",
+    "loading": "요금제를 불러오는 중…",
+    "empty": "아직 구독 요금제가 없습니다.",
+    "active": "구독이 활성 상태입니다.",
+    "inactive": "이 계정에는 활성 구독이 없습니다.",
+    "error": "Polar에 연결하지 못했습니다. 다시 시도하세요.",
+    "notConfigured": "이 서버에는 결제가 설정되어 있지 않습니다.",
+    "interval": {
+      "month": "월",
+      "year": "년",
+      "week": "주",
+      "day": "일"
+    }
   }
 }

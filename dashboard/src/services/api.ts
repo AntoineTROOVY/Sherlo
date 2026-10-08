@@ -747,6 +747,7 @@ async function handleErrorResponse<T>(response: Response): Promise<T> {
   const error = await response.json().catch(() => ({}));
   if (isKeyUnusable(response.status, error.message)) {
     sessionStorage.removeItem('openwa_api_key');
+    sessionStorage.removeItem('openwa_account');
     if (typeof window !== 'undefined') {
       window.location.assign('/');
       return new Promise<T>(() => {});
@@ -781,7 +782,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     ...options.headers,
   };
 
-  const response = await fetch(url, { ...options, headers });
+  const response = await fetch(url, { ...options, headers, credentials: 'include' });
 
   if (!response.ok) {
     return handleErrorResponse<T>(response);
@@ -798,6 +799,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 async function requestText(endpoint: string): Promise<string> {
   const apiKey = sessionStorage.getItem('openwa_api_key');
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    credentials: 'include',
     headers: { ...(apiKey ? { 'X-API-Key': apiKey } : {}) },
   });
 
@@ -819,7 +821,7 @@ async function requestBlob(endpoint: string, signal?: AbortSignal): Promise<Blob
     ...(apiKey ? { 'X-API-Key': apiKey } : {}),
   };
 
-  const response = await fetch(url, { headers, signal });
+  const response = await fetch(url, { headers, signal, credentials: 'include' });
 
   if (!response.ok) {
     return handleErrorResponse<Blob>(response);

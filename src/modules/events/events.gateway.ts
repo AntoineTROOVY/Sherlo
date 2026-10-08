@@ -9,7 +9,7 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { OnModuleDestroy } from '@nestjs/common';
+import { OnModuleDestroy, Optional } from '@nestjs/common';
 import { createLogger } from '../../common/services/logger.service';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from '../auth/auth.service';
@@ -23,6 +23,7 @@ import { DEFAULT_WEBHOOK_MEDIA_INLINE_MAX_BYTES, shedInlineMedia } from '../../c
 import { isSafeSessionName } from '../../common/utils/path-safety';
 import { ApiKeyRole, type ApiKey } from '../auth/entities/api-key.entity';
 import { apiKeyAuthorizationFingerprint, apiKeyExpiryTime } from '../auth/api-key-authorization';
+import { AccountAuthService } from '../account/account-auth.service';
 import {
   readWsRateLimitConfig,
   TokenBucketLimiter,
@@ -177,6 +178,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
     private readonly chatScope: ChatScopeService = new ChatScopeService(),
+    @Optional() private readonly accounts?: AccountAuthService,
   ) {
     this.rateLimits = readWsRateLimitConfig();
     this.frameLimiter = new TokenBucketLimiter(this.rateLimits.framePerSecond, this.rateLimits.frameBurst);
@@ -227,11 +229,50 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     }
     const keyIds = Array.from(this.socketsByKeyId.keys());
     if (keyIds.length === 0) return;
-    const current = await this.authService.findAuthorizationStates(keyIds);
-    const byId = new Map(current.map(key => [key.id, key]));
+    // Account sockets are not rows in api_keys. Feeding their user ids to that lookup would both
+    // miss (and look like a deleted key) and, on Postgres, fail the uuid comparison.
+    const dbKeyIds: string[] = [];
     for (const keyId of keyIds) {
+      const sockets = Array.from(this.socketsByKeyId.get(keyId) ?? []);
+      if (sockets.length > 0 && sockets.every(client => this.isAccountSocket(client))) {
+        await this.sweepAccountSockets(sockets);
+        continue;
+      }
+      dbKeyIds.push(keyId);
+    }
+    if (dbKeyIds.length === 0) return;
+    const current = await this.authService.findAuthorizationStates(dbKeyIds);
+    const byId = new Map(current.map(key => [key.id, key]));
+    for (const keyId of dbKeyIds) {
       const reason = this.evictionReason(byId.get(keyId), this.socketsByKeyId.get(keyId), now);
       if (reason) this.evictApiKey(keyId, reason);
+    }
+  }
+
+  private isAccountSocket(client: Socket): boolean {
+    return (client.data as { accountAuth?: boolean }).accountAuth === true;
+  }
+
+  /** Drop account sockets whose cookie is gone or whose role changed. A new WhatsApp session does not. */
+  private async sweepAccountSockets(sockets: Socket[]): Promise<void> {
+    if (!this.accounts) return;
+    for (const client of sockets) {
+      if (client.disconnected) continue;
+      let fresh: ApiKey | null;
+      try {
+        fresh = await this.accounts.actorFromHeaders(client.handshake.headers);
+      } catch {
+        fresh = null;
+      }
+      const snapshot = (client.data as { apiKey?: ApiKey }).apiKey;
+      if (!fresh || (snapshot && fresh.role !== snapshot.role)) {
+        client.emit(
+          'message',
+          this.createError('UNAUTHORIZED', fresh ? EVICTION_MESSAGES.authorization_changed : 'Session expired'),
+        );
+        client.disconnect();
+        this.untrackSocket(client);
+      }
     }
   }
 
@@ -370,24 +411,23 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     const handshakeAuth = client.handshake.auth as { apiKey?: string } | undefined;
     const apiKey = handshakeAuth?.apiKey || (client.handshake.headers['x-api-key'] as string);
 
-    if (!apiKey) {
-      this.logger.warn(`Client ${client.id} rejected: No API key provided`);
-      void this.auditService.logWarn(AuditAction.API_KEY_AUTH_FAILED, {
-        ipAddress: clientIp,
-        metadata: { surface: 'websocket' },
-        errorMessage: 'missing API key',
-      });
-      client.emit('message', this.createError('UNAUTHORIZED', 'API key required'));
-      client.disconnect();
-      return;
-    }
-
     try {
-      // validateApiKey THROWS on any failure (it never resolves to a falsy value), so the rejection
-      // path is the catch below — a separate `if (!validKey)` branch here was dead code. The clientIp
-      // is passed so an IP-restricted key (allowedIps set) is ENFORCED rather than blanket-rejected
-      // for "Client IP could not be determined".
-      const validKey = await this.authService.validateApiKey(apiKey, clientIp);
+      // A dashboard signed in with Better Auth has no API key; the session cookie rides the handshake.
+      // validateApiKey THROWS on any failure (it never resolves to a falsy value). The clientIp is
+      // passed so an IP-restricted key (allowedIps set) is ENFORCED rather than blanket-rejected.
+      const accountKey = apiKey ? null : await this.accounts?.actorFromHeaders(client.handshake.headers);
+      if (!apiKey && !accountKey) {
+        this.logger.warn(`Client ${client.id} rejected: No API key provided`);
+        void this.auditService.logWarn(AuditAction.API_KEY_AUTH_FAILED, {
+          ipAddress: clientIp,
+          metadata: { surface: 'websocket' },
+          errorMessage: 'missing API key',
+        });
+        client.emit('message', this.createError('UNAUTHORIZED', 'API key required'));
+        client.disconnect();
+        return;
+      }
+      const validKey = accountKey ?? (await this.authService.validateApiKey(apiKey ?? '', clientIp));
 
       // Cap simultaneous sockets per key: each socket holds rooms, engine fan-out, and memory,
       // so one key must not open connections without bound. Enough for multi-tab dashboards;
@@ -411,8 +451,12 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
       // Store the validated key AND the raw key — the raw key lets handleSubscribe
       // RE-validate on each subscription so a key revoked mid-connection is caught.
-      (client.data as { apiKey: unknown; rawApiKey: string }).apiKey = validKey;
-      (client.data as { rawApiKey: string }).rawApiKey = apiKey;
+      (client.data as { apiKey: unknown; rawApiKey?: string; accountAuth?: boolean }).apiKey = validKey;
+      if (apiKey) {
+        (client.data as { rawApiKey: string }).rawApiKey = apiKey;
+      } else {
+        (client.data as { accountAuth?: boolean }).accountAuth = true;
+      }
       this.trackSocket(validKey.id, client);
       // The handshake window is charged pre-auth to keep an unauthenticated flood off the DB. This
       // one turned out to be authentic, so give the slot back: the window then bounds FAILED
@@ -551,10 +595,15 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     // The clientIp is re-resolved (trusted-proxy-aware) so an IP-restricted key is enforced
     // here too, not just at connect.
     const rawApiKey = (client.data as { rawApiKey?: string }).rawApiKey;
+    const accountAuth = this.isAccountSocket(client);
     const clientIp = this.resolveClientIp(client);
     let subscriberKey: ApiKey | null;
     try {
-      subscriberKey = rawApiKey ? await this.authService.validateApiKey(rawApiKey, clientIp) : null;
+      subscriberKey = accountAuth
+        ? ((await this.accounts?.actorFromHeaders(client.handshake.headers)) ?? null)
+        : rawApiKey
+          ? await this.authService.validateApiKey(rawApiKey, clientIp)
+          : null;
     } catch (error) {
       subscriberKey = null;
       // A key refused here was valid at connect (revoked, expired, deleted or IP-refused since), so it
@@ -597,7 +646,9 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     // snapshot here would look current to the sweep while still holding rooms its key has since lost.
     // What it does record is that the two diverged, since everything granted below outlives the key
     // state that granted it, and the row can be back to the snapshot by the time the sweep reads it.
-    if (apiKeyAuthorizationFingerprint(subscriberKey) !== this.snapshotFingerprint(client)) {
+    // Growing the account's WhatsApp session list changes allowedSessions. That is not a revocation:
+    // flagging it would drop the socket on the next sweep. Role changes are still caught there.
+    if (!accountAuth && apiKeyAuthorizationFingerprint(subscriberKey) !== this.snapshotFingerprint(client)) {
       (client.data as { authorizationDiverged?: boolean }).authorizationDiverged = true;
     }
     this.syncQrAccess(client, subscriberKey.role);

@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 import { DateTransformer } from '../../../common/transformers/date.transformer';
 import { NulFreeTransformer } from '../../../common/transformers/nul-free.transformer';
 import { jsonColumnType, dateColumnType } from '../../../common/utils/column-types';
@@ -90,6 +90,14 @@ export class Session {
    */
   @Column({ type: 'varchar', length: 20, nullable: true })
   desiredState!: 'stopped' | null;
+
+  /**
+   * Better Auth user id that owns this WhatsApp session. NULL for rows created before accounts
+   * existed (visible to an instance admin) and for sessions created with an API key.
+   */
+  @Index('IDX_sessions_ownerUserId')
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  ownerUserId!: string | null;
 
   @CreateDateColumn()
   createdAt!: Date;

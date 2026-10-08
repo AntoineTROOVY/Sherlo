@@ -72,7 +72,8 @@
     "messageTester": "בדיקת הודעות",
     "infrastructure": "תשתית",
     "plugins": "תוספים",
-    "logs": "לוגים"
+    "logs": "לוגים",
+    "billing": "חיוב"
   },
   "chats": {
     "media": {
@@ -228,7 +229,24 @@
     "help": "צריך עזרה?",
     "viewDocs": "לצפייה בתיעוד",
     "footer": "נבנה באהבה על ידי Yudhi Armyndharis וקהילת OpenWA",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "אימייל",
+    "emailPlaceholder": "you@example.com",
+    "password": "סיסמה",
+    "name": "שם",
+    "namePlaceholder": "השם שלך",
+    "signIn": "התחברות",
+    "signUp": "יצירת חשבון",
+    "signingIn": "מתחבר...",
+    "creating": "יוצר חשבון...",
+    "switchToSignUp": "יצירת חשבון",
+    "switchToSignIn": "כבר יש חשבון? התחבר",
+    "emailRequired": "אימייל נדרש",
+    "passwordRequired": "סיסמה נדרשת",
+    "nameRequired": "שם נדרש",
+    "invalidCredentials": "אימייל או סיסמה שגויים",
+    "showPassword": "הצג סיסמה",
+    "hidePassword": "הסתר סיסמה"
   },
   "dashboard": {
     "title": "דאשבורד",
@@ -1178,5 +1196,23 @@
       "current": "הפעלה זו"
     },
     "loading": "מחפש…"
+  },
+  "billing": {
+    "title": "חיוב",
+    "subtitle": "הירשמו דרך Polar. המנוי משויך לחשבון הזה.",
+    "subscribe": "הירשמו",
+    "manage": "ניהול המנוי",
+    "loading": "טוען מסלולים…",
+    "empty": "אין עדיין מסלולי מנוי.",
+    "active": "המנוי שלכם פעיל.",
+    "inactive": "אין מנוי פעיל בחשבון הזה.",
+    "error": "לא ניתן להגיע ל-Polar. נסו שוב.",
+    "notConfigured": "החיוב לא מוגדר בשרת הזה.",
+    "interval": {
+      "month": "חודש",
+      "year": "שנה",
+      "week": "שבוע",
+      "day": "יום"
+    }
   }
 }

@@ -68,7 +68,8 @@
     "messageTester": "మెసేజ్ టెస్టర్",
     "infrastructure": "ఇన్‌ఫ్రాస్ట్రక్చర్",
     "plugins": "ప్లగిన్స్",
-    "logs": "లాగ్స్"
+    "logs": "లాగ్స్",
+    "billing": "బిల్లింగ్"
   },
   "chats": {
     "media": {
@@ -217,7 +218,24 @@
     "help": "సహాయం కావాలా?",
     "viewDocs": "డాక్యుమెంటేషన్ చూడండి",
     "footer": "Yudhi Armyndharis మరియు OpenWA కమ్యూనిటీ ద్వారా ❤️ తో తయారు చేయబడింది",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "ఇమెయిల్",
+    "emailPlaceholder": "you@example.com",
+    "password": "పాస్‌వర్డ్",
+    "name": "పేరు",
+    "namePlaceholder": "మీ పేరు",
+    "signIn": "సైన్ ఇన్",
+    "signUp": "ఖాతా సృష్టించండి",
+    "signingIn": "సైన్ ఇన్ అవుతోంది...",
+    "creating": "ఖాతా సృష్టిస్తోంది...",
+    "switchToSignUp": "ఖాతా సృష్టించండి",
+    "switchToSignIn": "ఇప్పటికే ఖాతా ఉందా? సైన్ ఇన్",
+    "emailRequired": "ఇమెయిల్ అవసరం",
+    "passwordRequired": "పాస్‌వర్డ్ అవసరం",
+    "nameRequired": "పేరు అవసరం",
+    "invalidCredentials": "ఇమెయిల్ లేదా పాస్‌వర్డ్ తప్పు",
+    "showPassword": "పాస్‌వర్డ్ చూపించు",
+    "hidePassword": "పాస్‌వర్డ్ దాచు"
   },
   "dashboard": {
     "title": "డ్యాష్‌బోర్డ్",
@@ -1165,5 +1183,23 @@
       "current": "ఈ సెషన్"
     },
     "loading": "శోధిస్తోంది…"
+  },
+  "billing": {
+    "title": "బిల్లింగ్",
+    "subtitle": "Polar తో సబ్‌స్క్రైబ్ చేయండి. సబ్‌స్క్రిప్షన్ ఈ ఖాతాకు కట్టబడి ఉంటుంది.",
+    "subscribe": "సబ్‌స్క్రైబ్",
+    "manage": "సబ్‌స్క్రిప్షన్ నిర్వహించండి",
+    "loading": "ప్లాన్లు లోడ్ అవుతున్నాయి…",
+    "empty": "ఇంకా సబ్‌స్క్రిప్షన్ ప్లాన్లు లేవు.",
+    "active": "మీ సబ్‌స్క్రిప్షన్ సక్రియంగా ఉంది.",
+    "inactive": "ఈ ఖాతాలో సక్రియ సబ్‌స్క్రిప్షన్ లేదు.",
+    "error": "Polar ను చేరుకోలేకపోయాం. మళ్లీ ప్రయత్నించండి.",
+    "notConfigured": "ఈ సర్వర్‌లో బిల్లింగ్ సెట్ చేయబడలేదు.",
+    "interval": {
+      "month": "నెల",
+      "year": "సంవత్సరం",
+      "week": "వారం",
+      "day": "రోజు"
+    }
   }
 }

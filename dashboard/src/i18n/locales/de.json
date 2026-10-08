@@ -68,7 +68,8 @@
     "messageTester": "Nachrichtentester",
     "infrastructure": "Infrastruktur",
     "plugins": "Plugins",
-    "logs": "Protokolle"
+    "logs": "Protokolle",
+    "billing": "Abrechnung"
   },
   "chats": {
     "media": {
@@ -217,7 +218,24 @@
     "help": "Brauchst du Hilfe?",
     "viewDocs": "Dokumentation ansehen",
     "footer": "Mit ❤️ erstellt von Yudhi Armyndharis und der OpenWA-Community",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "E-Mail",
+    "emailPlaceholder": "du@beispiel.de",
+    "password": "Passwort",
+    "name": "Name",
+    "namePlaceholder": "Dein Name",
+    "signIn": "Anmelden",
+    "signUp": "Konto erstellen",
+    "signingIn": "Anmeldung...",
+    "creating": "Konto wird erstellt...",
+    "switchToSignUp": "Konto erstellen",
+    "switchToSignIn": "Schon ein Konto? Anmelden",
+    "emailRequired": "E-Mail ist erforderlich",
+    "passwordRequired": "Passwort ist erforderlich",
+    "nameRequired": "Name ist erforderlich",
+    "invalidCredentials": "E-Mail oder Passwort ungültig",
+    "showPassword": "Passwort anzeigen",
+    "hidePassword": "Passwort verbergen"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1165,5 +1183,23 @@
       "current": "Diese Sitzung"
     },
     "loading": "Suche läuft…"
+  },
+  "billing": {
+    "title": "Abrechnung",
+    "subtitle": "Mit Polar abonnieren. Das Abo ist an dieses Konto gebunden.",
+    "subscribe": "Abonnieren",
+    "manage": "Abo verwalten",
+    "loading": "Tarife werden geladen…",
+    "empty": "Es sind noch keine Abos verfügbar.",
+    "active": "Dein Abo ist aktiv.",
+    "inactive": "Kein aktives Abo für dieses Konto.",
+    "error": "Polar ist nicht erreichbar. Bitte erneut versuchen.",
+    "notConfigured": "Abrechnung ist auf diesem Server nicht konfiguriert.",
+    "interval": {
+      "month": "Monat",
+      "year": "Jahr",
+      "week": "Woche",
+      "day": "Tag"
+    }
   }
 }

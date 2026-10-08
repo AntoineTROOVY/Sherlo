@@ -68,7 +68,8 @@
     "messageTester": "संदेश परीक्षक",
     "infrastructure": "बुनियादी ढांचा",
     "plugins": "प्लगइन्स",
-    "logs": "लॉग्स"
+    "logs": "लॉग्स",
+    "billing": "बिलिंग"
   },
   "chats": {
     "media": {
@@ -217,7 +218,24 @@
     "help": "मदद चाहिए?",
     "viewDocs": "दस्तावेज़ देखें",
     "footer": "Yudhi Armyndharis और OpenWA समुदाय द्वारा ❤️ से बनाया गया",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "ईमेल",
+    "emailPlaceholder": "you@example.com",
+    "password": "पासवर्ड",
+    "name": "नाम",
+    "namePlaceholder": "आपका नाम",
+    "signIn": "साइन इन",
+    "signUp": "खाता बनाएँ",
+    "signingIn": "साइन इन हो रहा है...",
+    "creating": "खाता बन रहा है...",
+    "switchToSignUp": "खाता बनाएँ",
+    "switchToSignIn": "पहले से खाता है? साइन इन करें",
+    "emailRequired": "ईमेल आवश्यक है",
+    "passwordRequired": "पासवर्ड आवश्यक है",
+    "nameRequired": "नाम आवश्यक है",
+    "invalidCredentials": "ईमेल या पासवर्ड गलत है",
+    "showPassword": "पासवर्ड दिखाएँ",
+    "hidePassword": "पासवर्ड छिपाएँ"
   },
   "dashboard": {
     "title": "डैशबोर्ड",
@@ -1165,5 +1183,23 @@
       "current": "यह सत्र"
     },
     "loading": "खोजा जा रहा है…"
+  },
+  "billing": {
+    "title": "बिलिंग",
+    "subtitle": "Polar से सदस्यता लें. सदस्यता इसी खाते से जुड़ी है.",
+    "subscribe": "सदस्यता लें",
+    "manage": "सदस्यता प्रबंधित करें",
+    "loading": "प्लान लोड हो रहे हैं…",
+    "empty": "अभी कोई सदस्यता प्लान उपलब्ध नहीं है.",
+    "active": "आपकी सदस्यता सक्रिय है.",
+    "inactive": "इस खाते पर कोई सक्रिय सदस्यता नहीं है.",
+    "error": "Polar तक नहीं पहुँच सके. फिर कोशिश करें.",
+    "notConfigured": "इस सर्वर पर बिलिंग कॉन्फ़िगर नहीं है.",
+    "interval": {
+      "month": "माह",
+      "year": "वर्ष",
+      "week": "सप्ताह",
+      "day": "दिन"
+    }
   }
 }

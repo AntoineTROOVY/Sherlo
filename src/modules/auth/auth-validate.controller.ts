@@ -4,6 +4,7 @@ import { CurrentApiKey } from './decorators/auth.decorators';
 import { ApiKey } from './entities/api-key.entity';
 import { ValidateApiKeyResponseDto } from './dto';
 import { EngineFactory } from '../../engine/engine.factory';
+import { accountUserIdOf } from '../account/account-actor';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -44,7 +45,7 @@ export class AuthValidateController {
       valid: true,
       role: apiKey.role,
       engineType: this.engineFactory.getCurrentEngine(),
-      scoped: (apiKey.allowedSessions?.length ?? 0) > 0,
+      scoped: accountUserIdOf(apiKey) ? false : (apiKey.allowedSessions?.length ?? 0) > 0,
     };
   }
 }

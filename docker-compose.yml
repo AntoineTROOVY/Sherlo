@@ -394,6 +394,19 @@ services:
       - LOG_FORMAT=${LOG_FORMAT:-}
       - BASE_URL=${BASE_URL:-}
       - DASHBOARD_URL=${DASHBOARD_URL:-}
+      # Better Auth (email accounts). The SQLite file stays on the openwa-data volume (/app/data).
+      # Set BETTER_AUTH_SECRET (32+ random chars) and BETTER_AUTH_URL to the public https origin
+      # before a Dokploy deploy. Leave OPEN_SIGNUP unset to allow only the first account.
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-}
+      - BETTER_AUTH_OPEN_SIGNUP=${BETTER_AUTH_OPEN_SIGNUP:-}
+      - AUTH_DATABASE_PATH=${AUTH_DATABASE_PATH:-}
+      # Polar subscriptions (Better Auth plugin). Token from the Polar organization settings.
+      # Webhook endpoint: ${BETTER_AUTH_URL}/api/account/polar/webhooks
+      - POLAR_ACCESS_TOKEN=${POLAR_ACCESS_TOKEN:-}
+      - POLAR_WEBHOOK_SECRET=${POLAR_WEBHOOK_SECRET:-}
+      - POLAR_ENVIRONMENT=${POLAR_ENVIRONMENT:-}
+      - POLAR_PRODUCTS=${POLAR_PRODUCTS:-}
       # Docker socket proxy (openwa-api never touches /var/run/docker.sock directly)
       - DOCKER_HOST=tcp://docker-proxy:2375
     volumes:

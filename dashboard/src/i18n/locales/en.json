@@ -68,7 +68,8 @@
     "messageTester": "Message Tester",
     "infrastructure": "Infrastructure",
     "plugins": "Plugins",
-    "logs": "Logs"
+    "logs": "Logs",
+    "billing": "Billing"
   },
   "chats": {
     "media": {
@@ -214,10 +215,51 @@
     "connecting": "Connecting...",
     "invalidKey": "Invalid API key",
     "connectionError": "Unable to connect to server. Please try again.",
+    "serverError": "Something went wrong on the server. Please try again or contact support.",
     "help": "Need help?",
     "viewDocs": "View Documentation",
     "footer": "Made with ❤️ by Yudhi Armyndharis and the OpenWA Community",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "Email",
+    "emailPlaceholder": "you@example.com",
+    "password": "Password",
+    "name": "Name",
+    "namePlaceholder": "Your name",
+    "signIn": "Sign in",
+    "signUp": "Create account",
+    "signingIn": "Signing in...",
+    "creating": "Creating account...",
+    "switchToSignUp": "Create an account",
+    "switchToSignIn": "Already have an account? Sign in",
+    "emailRequired": "Email is required",
+    "passwordRequired": "Password is required",
+    "nameRequired": "Name is required",
+    "invalidCredentials": "Invalid email or password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "forgotPassword": "Forgot password?",
+    "forgotPasswordHint": "Enter your email and we will send you a reset link.",
+    "sendResetLink": "Send reset link",
+    "sendingReset": "Sending...",
+    "resetEmailSent": "If this email exists in our system, check your inbox for the reset link.",
+    "backToSignIn": "Back to sign in",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "resetPassword": "Reset password",
+    "resetting": "Resetting...",
+    "passwordResetSuccess": "Password updated. You can sign in now.",
+    "passwordsMismatch": "Passwords do not match",
+    "invalidResetToken": "This reset link is invalid or has expired.",
+    "resetPasswordTitle": "Choose a new password for your account.",
+    "verifyOtpHint": "We sent a 6-digit code to your email. Enter it below to verify your account.",
+    "otpCode": "Verification code",
+    "verifyOtp": "Verify email",
+    "verifyingOtp": "Verifying...",
+    "otpSent": "Check your email for the verification code.",
+    "otpSentSignIn": "Your email is not verified yet. We sent you a new code.",
+    "resendOtp": "Resend code",
+    "otpInvalid": "Invalid or expired code. Try again or request a new one.",
+    "emailVerifiedSuccess": "Email verified. Signing you in..."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -326,10 +368,12 @@
       "step3": "<strong>3.</strong> Tap <strong>Link a Device</strong> and scan this QR",
       "autoRefresh": "QR updates automatically every 5 seconds",
       "generating": "Generating QR code...",
+      "authenticating": "QR scanned — finishing connection on the server…",
       "preparing": "Preparing QR code...",
       "showQr": "Show QR",
       "loading": "Loading...",
-      "scanToConnect": "Scan QR code to connect"
+      "scanToConnect": "Scan QR code to connect",
+      "rateLimited": "Too many requests — wait about a minute, then close and reopen this window."
     },
     "details": {
       "title": "Session Details",
@@ -1165,5 +1209,76 @@
       "current": "This session"
     },
     "loading": "Searching…"
+  },
+  "billing": {
+    "title": "Billing",
+    "subtitle": "Manage your Sherlo subscription.",
+    "subscribe": "Subscribe with Polar",
+    "manage": "Manage subscription",
+    "loading": "Loading plans…",
+    "empty": "No subscription plans are configured. Set POLAR_PRODUCTS on the server or fix the Polar token scopes (products:read).",
+    "active": "Your subscription is active.",
+    "inactive": "No active subscription on this account.",
+    "error": "Could not load plans from Polar. Check POLAR_ACCESS_TOKEN scopes (products:read) and try again.",
+    "sessionError": "Your session expired. Sign out and sign in again.",
+    "notConfigured": "Billing is not configured on this server.",
+    "trialDaysRemaining_one": "{{count}} day left on your free trial.",
+    "trialDaysRemaining_other": "{{count}} days left on your free trial.",
+    "trialLastDay": "Last day of your free trial.",
+    "trialCta": "View plans",
+    "trialExpired": "Your free trial has ended. Subscribe below to keep using Sherlo.",
+    "notSubscribedEyebrow": "Not subscribed",
+    "notSubscribedTitle": "Unlock Sherlo",
+    "notSubscribedLead": "You are not subscribed yet. Subscribe to connect WhatsApp and use the dashboard.",
+    "defaultPlanName": "Sherlo",
+    "priceOnCheckout": "Price shown at checkout",
+    "subscribeCta": "Subscribe now",
+    "redirecting": "Redirecting…",
+    "checkoutFootnote": "Secure checkout powered by Polar. Cancel anytime from the customer portal.",
+    "subscribedEyebrow": "Active subscription",
+    "subscribedTitle": "You are subscribed",
+    "subscribedLead": "Your plan is active. Manage invoices and payment methods in the customer portal.",
+    "proPlan": {
+      "badge": "MOST POPULAR",
+      "name": "Pro",
+      "priceMain": "$4.5",
+      "perMonth": "/mo",
+      "priceYear": "$54 / year",
+      "yearlyFromMonthly": "{{amount}} / year",
+      "billedYearly": "Billed yearly",
+      "description": "Ideal for growing businesses managing unlimited WhatsApp numbers to reach more customers.",
+      "cta": "Choose Pro",
+      "features": [
+        "Unlimited Connected WhatsApp Numbers",
+        "Unlimited Contacts",
+        "No Daily Message Cap",
+        "CRM & automation integrations",
+        "Send to Users, Groups & Channels",
+        "Send Text, Images, Videos & Audio",
+        "Send Documents, Contacts & Locations",
+        "Full API Access",
+        "Real-time Webhooks",
+        "Priority Support"
+      ]
+    },
+    "detail": {
+      "plan": "Plan",
+      "price": "Price",
+      "status": "Status",
+      "renewal": "Renews on"
+    },
+    "status": {
+      "active": "Active",
+      "trialing": "Trialing",
+      "past_due": "Past due",
+      "canceled": "Canceled",
+      "incomplete": "Incomplete"
+    },
+    "interval": {
+      "month": "month",
+      "year": "year",
+      "week": "week",
+      "day": "day"
+    }
   }
 }

@@ -70,7 +70,8 @@
     "messageTester": "Messaggio di prova",
     "infrastructure": "Infrastruttura",
     "plugins": "Plugin",
-    "logs": "Log"
+    "logs": "Log",
+    "billing": "Fatturazione"
   },
   "chats": {
     "media": {
@@ -222,7 +223,24 @@
     "help": "Serve aiuto?",
     "viewDocs": "Visualizza la documentazione",
     "footer": "Fatto con il ❤️ da Yudhi Armyndharis e dalla Community di OpenWA",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "Email",
+    "emailPlaceholder": "tu@esempio.com",
+    "password": "Password",
+    "name": "Nome",
+    "namePlaceholder": "Il tuo nome",
+    "signIn": "Accedi",
+    "signUp": "Crea account",
+    "signingIn": "Accesso...",
+    "creating": "Creazione account...",
+    "switchToSignUp": "Crea un account",
+    "switchToSignIn": "Hai già un account? Accedi",
+    "emailRequired": "L'email è obbligatoria",
+    "passwordRequired": "La password è obbligatoria",
+    "nameRequired": "Il nome è obbligatorio",
+    "invalidCredentials": "Email o password non validi",
+    "showPassword": "Mostra password",
+    "hidePassword": "Nascondi password"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1171,5 +1189,23 @@
       "current": "Questa sessione"
     },
     "loading": "Ricerca…"
+  },
+  "billing": {
+    "title": "Fatturazione",
+    "subtitle": "Abbonati con Polar. L’abbonamento è legato a questo account.",
+    "subscribe": "Abbonati",
+    "manage": "Gestisci abbonamento",
+    "loading": "Caricamento dei piani…",
+    "empty": "Nessun piano di abbonamento disponibile.",
+    "active": "Il tuo abbonamento è attivo.",
+    "inactive": "Nessun abbonamento attivo su questo account.",
+    "error": "Impossibile raggiungere Polar. Riprova.",
+    "notConfigured": "La fatturazione non è configurata su questo server.",
+    "interval": {
+      "month": "mese",
+      "year": "anno",
+      "week": "settimana",
+      "day": "giorno"
+    }
   }
 }

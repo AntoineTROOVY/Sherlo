@@ -76,7 +76,8 @@
     "messageTester": "اختبار الرسائل",
     "infrastructure": "البنية التحتية",
     "plugins": "الإضافات",
-    "logs": "السجلات"
+    "logs": "السجلات",
+    "billing": "الفوترة"
   },
   "chats": {
     "media": {
@@ -238,7 +239,24 @@
     "help": "هل تحتاج مساعدة؟",
     "viewDocs": "عرض التوثيق",
     "footer": "صُنع بـ ❤️ بواسطة Yudhi Armyndharis ومجتمع OpenWA",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "البريد",
+    "emailPlaceholder": "you@example.com",
+    "password": "كلمة المرور",
+    "name": "الاسم",
+    "namePlaceholder": "اسمك",
+    "signIn": "تسجيل الدخول",
+    "signUp": "إنشاء حساب",
+    "signingIn": "جارٍ الدخول...",
+    "creating": "جارٍ إنشاء الحساب...",
+    "switchToSignUp": "إنشاء حساب",
+    "switchToSignIn": "لديك حساب؟ سجّل الدخول",
+    "emailRequired": "البريد مطلوب",
+    "passwordRequired": "كلمة المرور مطلوبة",
+    "nameRequired": "الاسم مطلوب",
+    "invalidCredentials": "البريد أو كلمة المرور غير صحيحة",
+    "showPassword": "إظهار كلمة المرور",
+    "hidePassword": "إخفاء كلمة المرور"
   },
   "dashboard": {
     "title": "لوحة التحكم",
@@ -1190,5 +1208,23 @@
       "current": "هذه الجلسة"
     },
     "loading": "جارٍ البحث…"
+  },
+  "billing": {
+    "title": "الفوترة",
+    "subtitle": "اشترك عبر Polar. الاشتراك مرتبط بهذا الحساب.",
+    "subscribe": "اشترك",
+    "manage": "إدارة الاشتراك",
+    "loading": "جارٍ تحميل الخطط…",
+    "empty": "لا توجد خطط اشتراك متاحة.",
+    "active": "اشتراكك نشط.",
+    "inactive": "لا يوجد اشتراك نشط على هذا الحساب.",
+    "error": "تعذر الاتصال بـ Polar. أعد المحاولة.",
+    "notConfigured": "الفوترة غير مهيأة على هذا الخادم.",
+    "interval": {
+      "month": "شهر",
+      "year": "سنة",
+      "week": "أسبوع",
+      "day": "يوم"
+    }
   }
 }

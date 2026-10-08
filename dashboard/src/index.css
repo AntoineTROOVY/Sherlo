@@ -84,7 +84,7 @@ button {
 button:focus-visible,
 a:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--primary, #25d366);
+  outline: 2px solid var(--primary, #dff96d);
   outline-offset: 2px;
 }
 button:focus:not(:focus-visible) {
@@ -128,13 +128,13 @@ select {
 }
 
 select:hover {
-  border-color: var(--primary, #25d366);
+  border-color: var(--primary, #dff96d);
 }
 
 select:focus {
   outline: none;
-  border-color: var(--primary, #25d366);
-  box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.1);
+  border-color: var(--primary, #dff96d);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
 select:disabled {
@@ -248,9 +248,9 @@ select:disabled {
 
 .modal-body input:focus {
   outline: none;
-  border-color: var(--primary, #25d366);
+  border-color: var(--primary, #dff96d);
   background: var(--bg-white, #fff);
-  box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
 /* The rule above is meant for TEXT inputs. Radios/checkboxes would otherwise stretch to width:100%
@@ -343,10 +343,8 @@ select:disabled {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
-  background: var(--primary, #25d366);
-  /* Dark text on the WhatsApp green: 9.0:1 (AAA). White was 1.98:1, failing even the AA
-     large-text floor - the single worst contrast pair in the dashboard. */
-  color: #0f172a;
+  background: var(--primary, #dff96d);
+  color: var(--on-primary, #000000);
   border: none;
   border-radius: 8px;
   font-size: 0.9375rem;
@@ -356,7 +354,7 @@ select:disabled {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--primary-hover, #1da851);
+  background: var(--primary-hover, #c8e855);
 }
 
 .btn-primary:disabled {

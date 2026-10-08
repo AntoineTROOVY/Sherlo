@@ -184,13 +184,13 @@ afterEach(() => {
   validateBody = { valid: true, role: 'operator', engineType: 'whatsapp-web.js' };
 });
 
-// Types a key into the login form and submits it, then waits until App has applied the role from
-// the validate response (the synchronous tail of handleLogin).
-async function signIn(apiKey: string): Promise<void> {
+// Types an email and password into the login form and submits it, then waits until App has applied
+// the role from the validate response (the synchronous tail of handleLogin).
+async function signIn(): Promise<void> {
   const { screen, waitFor, fireEvent } = rtl;
-  const input = await screen.findByLabelText('API Key');
-  fireEvent.change(input, { target: { value: apiKey } });
-  fireEvent.submit(input.closest('form')!);
+  fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'ada@example.com' } });
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+  fireEvent.submit(screen.getByLabelText('Email').closest('form')!);
   await waitFor(() => assert.ok(sessionStorage.getItem(ROLE_KEY), 'expected a role to be stored after sign-in'));
   // Give the post-login render and its effects a macrotask to fire before counting requests.
   await new Promise(resolve => setTimeout(resolve, 50));
@@ -199,13 +199,14 @@ async function signIn(apiKey: string): Promise<void> {
 test('a fresh sign-in makes exactly one /auth/validate request, feeding the role from its response', async () => {
   rtl.render(createElement(App));
 
-  await signIn('fresh-key');
+  await signIn();
 
   // The login page's own validate is the one request; the startup re-validation effect must not
-  // re-fire on the null→key transition that storing the fresh key causes.
+  // re-fire on the null→account transition that storing the fresh session causes.
   assert.equal(validateCallCount(), 1);
   assert.equal(sessionStorage.getItem(ROLE_KEY), 'operator');
-  assert.equal(sessionStorage.getItem(LOGIN_KEY), 'fresh-key');
+  assert.equal(sessionStorage.getItem('openwa_account'), '1');
+  assert.equal(sessionStorage.getItem(LOGIN_KEY), null);
   // The engine comes from the same response: a non-admin key cannot read /infra/engines/current.
   assert.equal(sessionStorage.getItem(ENGINE_KEY), 'whatsapp-web.js');
 });
@@ -214,7 +215,7 @@ test('a fresh sign-in with a role-less validate response still degrades to viewe
   validateBody = { valid: true };
   rtl.render(createElement(App));
 
-  await signIn('fresh-key');
+  await signIn();
 
   assert.equal(validateCallCount(), 1);
   assert.equal(sessionStorage.getItem(ROLE_KEY), 'viewer');
@@ -253,7 +254,7 @@ test('a fresh sign-in with a session-scoped admin key keeps the scope from the v
   validateBody = { valid: true, role: 'admin', engineType: 'baileys', scoped: true };
   rtl.render(createElement(App));
 
-  await signIn('scoped-key');
+  await signIn();
 
   assert.equal(sessionStorage.getItem(ROLE_KEY), 'admin');
   assert.equal(sessionStorage.getItem(SCOPED_KEY), 'true');

@@ -18,6 +18,14 @@ describe('AuthValidateController', () => {
     });
   });
 
+  it('never reports a Better Auth cookie account as scoped (session create stays available)', () => {
+    expect(
+      controller.validate(
+        makeKey({ allowedSessions: ['00000000-0000-0000-0000-000000000000'], accountUserId: 'u1' } as ApiKey),
+      ),
+    ).toMatchObject({ scoped: false });
+  });
+
   it('reports a key restricted to selected sessions as scoped', () => {
     // The dashboard gates the unscoped-only stats reads on this, so a scoped admin never sends them.
     expect(controller.validate(makeKey({ role: ApiKeyRole.ADMIN, allowedSessions: ['s1'] }))).toMatchObject({

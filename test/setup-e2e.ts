@@ -115,6 +115,9 @@ for (const [key, name] of [
   process.env[key] = join(tmpdir(), `openwa-e2e-${name}-${e2eRunId}`);
 }
 process.env.DATABASE_TYPE = 'sqlite';
+// Better Auth opens its SQLite file at import time. Point it at this suite's temp dir so a boot
+// never creates ./data/auth.sqlite in the developer's checkout.
+process.env.AUTH_DATABASE_PATH = join(tmpdir(), `openwa-e2e-auth-${e2eRunId}.sqlite`);
 // Isolate the e2e data DB to a throwaway temp file so suites never pollute the developer's
 // ./data/openwa.sqlite. e2e creates sessions/webhooks and doesn't self-clean, so without this they
 // pile up across runs. Start each run from a fresh file.

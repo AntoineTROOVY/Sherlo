@@ -68,7 +68,8 @@
     "messageTester": "Penguji Pesan",
     "infrastructure": "Infrastruktur",
     "plugins": "Plugin",
-    "logs": "Log"
+    "logs": "Log",
+    "billing": "Tagihan"
   },
   "chats": {
     "media": {
@@ -217,7 +218,24 @@
     "help": "Butuh bantuan?",
     "viewDocs": "Lihat Dokumentasi",
     "footer": "Dibuat dengan ❤️ oleh Yudhi Armyndharis dan Komunitas OpenWA",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "Email",
+    "emailPlaceholder": "kamu@contoh.com",
+    "password": "Kata sandi",
+    "name": "Nama",
+    "namePlaceholder": "Nama kamu",
+    "signIn": "Masuk",
+    "signUp": "Buat akun",
+    "signingIn": "Masuk...",
+    "creating": "Membuat akun...",
+    "switchToSignUp": "Buat akun",
+    "switchToSignIn": "Sudah punya akun? Masuk",
+    "emailRequired": "Email wajib diisi",
+    "passwordRequired": "Kata sandi wajib diisi",
+    "nameRequired": "Nama wajib diisi",
+    "invalidCredentials": "Email atau kata sandi salah",
+    "showPassword": "Tampilkan kata sandi",
+    "hidePassword": "Sembunyikan kata sandi"
   },
   "dashboard": {
     "title": "Dasbor",
@@ -1165,5 +1183,23 @@
       "current": "Sesi ini"
     },
     "loading": "Mencari…"
+  },
+  "billing": {
+    "title": "Tagihan",
+    "subtitle": "Berlangganan lewat Polar. Langganan terikat ke akun ini.",
+    "subscribe": "Berlangganan",
+    "manage": "Kelola langganan",
+    "loading": "Memuat paket…",
+    "empty": "Belum ada paket langganan.",
+    "active": "Langganan Anda aktif.",
+    "inactive": "Tidak ada langganan aktif di akun ini.",
+    "error": "Tidak dapat menghubungi Polar. Coba lagi.",
+    "notConfigured": "Penagihan belum dikonfigurasi di server ini.",
+    "interval": {
+      "month": "bulan",
+      "year": "tahun",
+      "week": "minggu",
+      "day": "hari"
+    }
   }
 }

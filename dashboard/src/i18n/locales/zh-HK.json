@@ -68,7 +68,8 @@
     "messageTester": "訊息測試器",
     "infrastructure": "基礎架構",
     "plugins": "外掛",
-    "logs": "記錄"
+    "logs": "記錄",
+    "billing": "賬單"
   },
   "chats": {
     "media": {
@@ -217,7 +218,24 @@
     "help": "需要協助？",
     "viewDocs": "查看文件",
     "footer": "由 Yudhi Armyndharis 及 OpenWA 社群用 ❤️ 打造",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "電郵",
+    "emailPlaceholder": "you@example.com",
+    "password": "密碼",
+    "name": "姓名",
+    "namePlaceholder": "你的姓名",
+    "signIn": "登入",
+    "signUp": "建立帳戶",
+    "signingIn": "登入中...",
+    "creating": "正在建立帳戶...",
+    "switchToSignUp": "建立帳戶",
+    "switchToSignIn": "已有帳戶？登入",
+    "emailRequired": "請填寫電郵",
+    "passwordRequired": "請填寫密碼",
+    "nameRequired": "請填寫姓名",
+    "invalidCredentials": "電郵或密碼不正確",
+    "showPassword": "顯示密碼",
+    "hidePassword": "隱藏密碼"
   },
   "dashboard": {
     "title": "控制面板",
@@ -1165,5 +1183,23 @@
       "current": "目前工作階段"
     },
     "loading": "搜尋中…"
+  },
+  "billing": {
+    "title": "賬單",
+    "subtitle": "透過 Polar 訂閱。訂閱會綁定喺呢個帳戶。",
+    "subscribe": "訂閱",
+    "manage": "管理訂閱",
+    "loading": "載入方案中…",
+    "empty": "暫時未有訂閱方案。",
+    "active": "你的訂閱已生效。",
+    "inactive": "呢個帳戶沒有有效訂閱。",
+    "error": "連唔到 Polar。請再試。",
+    "notConfigured": "呢部伺服器未設定賬單。",
+    "interval": {
+      "month": "月",
+      "year": "年",
+      "week": "週",
+      "day": "日"
+    }
   }
 }

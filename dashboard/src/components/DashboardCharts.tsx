@@ -30,7 +30,7 @@ const PERIODS: StatsPeriod[] = ['24h', '7d', '30d'];
 // repeats here or in the fallback palette, so no known type shares its color, not even with a type
 // that falls back.
 const TYPE_COLORS: Record<string, string> = {
-  text: '#25d366',
+  text: '#dff96d',
   image: '#3b82f6',
   contact: '#a855f7',
   document: '#f59e0b',
@@ -119,8 +119,8 @@ export function DashboardCharts() {
               <AreaChart data={timeSeries} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gSent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#25d366" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#25d366" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#dff96d" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#dff96d" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="gReceived" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
@@ -136,7 +136,7 @@ export function DashboardCharts() {
                   type="monotone"
                   dataKey="sent"
                   name={t('dashboard.charts.sent')}
-                  stroke="#25d366"
+                  stroke="#dff96d"
                   fill="url(#gSent)"
                   strokeWidth={2}
                 />
@@ -187,7 +187,7 @@ export function DashboardCharts() {
                     tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
                   />
                   <Tooltip />
-                  <Bar dataKey="count" name={t('dashboard.charts.messages')} fill="#25d366" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="count" name={t('dashboard.charts.messages')} fill="#dff96d" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}

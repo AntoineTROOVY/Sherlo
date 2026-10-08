@@ -68,7 +68,8 @@
     "messageTester": "消息测试器",
     "infrastructure": "基础设施",
     "plugins": "插件",
-    "logs": "日志"
+    "logs": "日志",
+    "billing": "账单"
   },
   "chats": {
     "media": {
@@ -217,7 +218,24 @@
     "help": "需要帮助？",
     "viewDocs": "查看文档",
     "footer": "由 Yudhi Armyndharis 和 OpenWA 社区用 ❤️ 打造",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "邮箱",
+    "emailPlaceholder": "you@example.com",
+    "password": "密码",
+    "name": "姓名",
+    "namePlaceholder": "你的姓名",
+    "signIn": "登录",
+    "signUp": "创建账户",
+    "signingIn": "正在登录...",
+    "creating": "正在创建账户...",
+    "switchToSignUp": "创建账户",
+    "switchToSignIn": "已有账户？登录",
+    "emailRequired": "请填写邮箱",
+    "passwordRequired": "请填写密码",
+    "nameRequired": "请填写姓名",
+    "invalidCredentials": "邮箱或密码不正确",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码"
   },
   "dashboard": {
     "title": "仪表盘",
@@ -1165,5 +1183,23 @@
       "current": "当前会话"
     },
     "loading": "搜索中…"
+  },
+  "billing": {
+    "title": "账单",
+    "subtitle": "通过 Polar 订阅。订阅绑定在这个账户上。",
+    "subscribe": "订阅",
+    "manage": "管理订阅",
+    "loading": "正在加载方案…",
+    "empty": "还没有可用的订阅方案。",
+    "active": "你的订阅已生效。",
+    "inactive": "此账户没有有效订阅。",
+    "error": "无法连接 Polar。请重试。",
+    "notConfigured": "此服务器尚未配置账单。",
+    "interval": {
+      "month": "月",
+      "year": "年",
+      "week": "周",
+      "day": "天"
+    }
   }
 }

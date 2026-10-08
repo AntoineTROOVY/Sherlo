@@ -247,6 +247,22 @@ export const BLANK_SHADOWED_ENV_KEYS: string[] = [
   'LOG_FORMAT',
   'BASE_URL',
   'DASHBOARD_URL',
+  // Better Auth. Blank forwards must not shadow a secret or public URL written in .env.
+  'BETTER_AUTH_SECRET',
+  'BETTER_AUTH_URL',
+  'BETTER_AUTH_OPEN_SIGNUP',
+  'AUTH_DATABASE_PATH',
+  'POLAR_ACCESS_TOKEN',
+  'POLAR_WEBHOOK_SECRET',
+  'POLAR_ENVIRONMENT',
+  'POLAR_PRODUCTS',
+  'POLAR_CREATE_CUSTOMER_ON_SIGNUP',
+  'TRIAL_DAYS',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'STRIPE_PRICE_ID',
+  'RESEND_API_KEY',
+  'RESEND_FROM',
 ];
 
 export function clearBlankEnv(env: NodeJS.ProcessEnv, keys: string[]): void {

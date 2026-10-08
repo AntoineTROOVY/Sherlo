@@ -20,7 +20,7 @@
 }
 
 .dashboard .status-badge.connected {
-  background: rgba(37, 211, 102, 0.1);
+  background: rgba(223, 249, 109, 0.1);
   color: var(--primary-text);
 }
 
@@ -222,7 +222,7 @@
 }
 
 .dashboard .status-pill.ready {
-  background: rgba(37, 211, 102, 0.1);
+  background: rgba(223, 249, 109, 0.1);
   color: var(--primary-text);
 }
 

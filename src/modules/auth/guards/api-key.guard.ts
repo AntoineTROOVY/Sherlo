@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
@@ -28,6 +29,8 @@ import { setRequestActor } from '../../../common/services/request-context';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '../../audit/entities/audit-log.entity';
 import { allowUnauthenticatedAuditRow } from '../../audit/auth-failure-audit-limiter';
+import { AccountAuthService } from '../../account/account-auth.service';
+import { accountUserIdOf } from '../../account/account-actor';
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
@@ -37,6 +40,7 @@ export class ApiKeyGuard implements CanActivate {
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
     private readonly chatScope: ChatScopeService,
+    @Optional() private readonly accounts?: AccountAuthService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -77,10 +81,6 @@ export class ApiKeyGuard implements CanActivate {
   private async authorize(request: Request, context: ExecutionContext): Promise<boolean> {
     const apiKeyHeader = this.extractApiKey(request);
 
-    if (!apiKeyHeader) {
-      throw new UnresolvedApiKeyException('API key is required');
-    }
-
     const requiredRole = this.reflector.getAllAndOverride<ApiKeyRole>(REQUIRED_ROLE_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -98,8 +98,14 @@ export class ApiKeyGuard implements CanActivate {
       string | undefined;
     const clientIp = this.getClientIp(request);
 
-    // Validate API key
-    const apiKey = await this.authService.validateApiKey(apiKeyHeader, clientIp, sessionId);
+    // An API key still authenticates programmatic clients. The dashboard signs in with a Better Auth
+    // cookie instead; that cookie becomes an in-memory key scoped to the account's WhatsApp sessions.
+    const apiKey = apiKeyHeader
+      ? await this.authService.validateApiKey(apiKeyHeader, clientIp, sessionId)
+      : await this.accountActor(request);
+    if (!apiKey) {
+      throw new UnresolvedApiKeyException('API key is required');
+    }
 
     // Stamp the resolved actor into the per-request async context so downstream audit log writes —
     // which fire from services deep in the call stack without DI access to the key — can attribute
@@ -113,8 +119,25 @@ export class ApiKeyGuard implements CanActivate {
     // so the operator could see that a key had been denied but not which one to revoke.
     setRequestActor({ apiKeyId: apiKey.id, apiKeyName: apiKey.name, ipAddress: clientIp });
 
+    // validateApiKey already applied this fence for a stored key. An account cookie is checked here,
+    // after the actor is stamped, so a denial is attributed to the account.
+    const accountUserId = accountUserIdOf(apiKey);
+    if (accountUserId && apiKey.role !== ApiKeyRole.ADMIN && sessionId) {
+      if (this.accounts) {
+        await this.accounts.assertAccountOwnsSession(accountUserId, sessionId);
+      }
+    } else if (!apiKeyHeader && apiKey.allowedSessions && apiKey.allowedSessions.length > 0 && sessionId) {
+      if (!apiKey.allowedSessions.includes(sessionId)) {
+        throw new ForbiddenException('API key not authorized for this session');
+      }
+    }
+
     if (requiredRole && !this.authService.hasPermission(apiKey, requiredRole)) {
       throw new ForbiddenException(`Insufficient permissions. Required: ${requiredRole}`);
+    }
+
+    if (this.accounts) {
+      await this.accounts.assertAccountBillingAccess(request, apiKey, Boolean(apiKeyHeader));
     }
 
     // Chat fence — DEFAULT DENY. A key carrying `allowedChats` may reach only a handler marked
@@ -141,7 +164,7 @@ export class ApiKeyGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (requireUnscoped && (apiKey.allowedSessions?.length ?? 0) > 0) {
+    if (requireUnscoped && !accountUserId && (apiKey.allowedSessions?.length ?? 0) > 0) {
       throw new ForbiddenException('Session-scoped API keys are not permitted on this route');
     }
 
@@ -225,6 +248,14 @@ export class ApiKeyGuard implements CanActivate {
         throw new ForbiddenException('API key is restricted to selected chats');
       }
     }
+  }
+
+  /**
+   * Resolve the signed-in account, enforcing the same session fence validateApiKey applies to a
+   * stored key. Returns null when there is no cookie session.
+   */
+  private async accountActor(request: Request): Promise<ApiKey | null> {
+    return this.accounts ? this.accounts.actorFromHeaders(request.headers) : null;
   }
 
   private extractApiKey(request: Request): string | undefined {

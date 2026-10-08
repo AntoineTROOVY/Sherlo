@@ -17,6 +17,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiExtraModels, getSchemaPath } from '@nestjs/swagger';
+import { accountUserIdOf } from '../account/account-actor';
 import { SessionService } from './session.service';
 import {
   CreateSessionDto,
@@ -108,7 +109,7 @@ export class SessionController {
     if (dto.proxyUrl && apiKey?.role !== ApiKeyRole.ADMIN) {
       throw new ForbiddenException('Setting proxyUrl requires an ADMIN key');
     }
-    const session = await this.sessionService.create(dto);
+    const session = await this.sessionService.create(dto, accountUserIdOf(apiKey));
     await this.auditService.logInfo(AuditAction.SESSION_CREATED, {
       sessionId: session.id,
       sessionName: session.name,
@@ -147,10 +148,13 @@ export class SessionController {
     }
     // Scope to the key's allowedSessions so a session-restricted key cannot enumerate every
     // session. A null/empty allowlist lists all whatever the key's role; a scoped ADMIN key is filtered too.
+    const accountOwnerId = accountUserIdOf(apiKey);
     const sessions = await this.sessionService.findAll(apiKey?.allowedSessions, {
       limit: limit ? parseInt(limit, 10) : undefined,
       offset: offset ? parseInt(offset, 10) : undefined,
       name,
+      ownerUserId:
+        accountOwnerId && apiKey?.role !== ApiKeyRole.ADMIN ? accountOwnerId : undefined,
     });
     return sessions.map(s => this.transformSession(s));
   }

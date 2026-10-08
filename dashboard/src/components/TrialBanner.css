@@ -1,0 +1,24 @@
+.trial-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1rem;
+  padding: 0.65rem 1rem;
+  background: color-mix(in srgb, var(--primary) 14%, var(--bg-white));
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.trial-banner.is-last-day {
+  background: color-mix(in srgb, #f59e0b 18%, var(--bg-white));
+  border-bottom-color: color-mix(in srgb, #f59e0b 35%, transparent);
+}
+
+.trial-banner a {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

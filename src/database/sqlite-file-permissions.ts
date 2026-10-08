@@ -50,7 +50,11 @@ export class SqlitePermissionsBoot implements OnApplicationBootstrap {
   constructor(private readonly config: ConfigService) {}
 
   onApplicationBootstrap(): void {
-    const paths: string[] = [this.config.get<string>('database.database', './data/main.sqlite')];
+    const paths: string[] = [
+      this.config.get<string>('database.database', './data/main.sqlite'),
+      // Better Auth accounts live in their own SQLite file on the same data volume.
+      process.env.AUTH_DATABASE_PATH?.trim() || './data/auth.sqlite',
+    ];
     if (this.config.get<string>('dataDatabase.type', 'sqlite') !== 'postgres') {
       paths.push(this.config.get<string>('dataDatabase.database', './data/openwa.sqlite'));
     }

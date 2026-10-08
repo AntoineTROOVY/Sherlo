@@ -254,27 +254,44 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
   // charged to the budget at its compressed size and bounded by nothing. Every other parser in the
   // process must carry the same flag for that argument to hold; the MCP route-level fallback
   // (src/modules/mcp/mcp.server.ts) does.
-  app.use(
-    json({
-      limit: bodyLimit,
-      inflate: false,
-      verify: (req: Request & { rawBody?: Buffer }, _res, buf) => {
-        req.rawBody = buf;
-      },
-    }),
-  );
-  app.use(
-    urlencoded({
-      extended: true,
-      limit: bodyLimit,
-      inflate: false,
-      // Form-encoded webhook providers also sign the exact wire bytes. Use the same capture contract
-      // as json(); other content types remain unsupported rather than installing a global catch-all.
-      verify: (req: Request & { rawBody?: Buffer }, _res, buf) => {
-        req.rawBody = buf;
-      },
-    }),
-  );
+  // Better Auth (and the Polar webhook signature check) reads the raw request stream. Express json()
+  // runs before that middleware and would replace the bytes with a re-serialized object, so Polar
+  // would reject every webhook. Account routes parse their own JSON.
+  const accountBody = (req: Request): boolean => {
+    const path = (req.originalUrl ?? req.url ?? '').split('?')[0];
+    return path === '/api/account' || path.startsWith('/api/account/');
+  };
+  const jsonParser = json({
+    limit: bodyLimit,
+    inflate: false,
+    verify: (req: Request & { rawBody?: Buffer }, _res, buf) => {
+      req.rawBody = buf;
+    },
+  });
+  const urlencodedParser = urlencoded({
+    extended: true,
+    limit: bodyLimit,
+    inflate: false,
+    // Form-encoded webhook providers also sign the exact wire bytes. Use the same capture contract
+    // as json(); other content types remain unsupported rather than installing a global catch-all.
+    verify: (req: Request & { rawBody?: Buffer }, _res, buf) => {
+      req.rawBody = buf;
+    },
+  });
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (accountBody(req)) {
+      next();
+      return;
+    }
+    jsonParser(req, res, next);
+  });
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (accountBody(req)) {
+      next();
+      return;
+    }
+    urlencodedParser(req, res, next);
+  });
 
   // A DELETE path ending in '/' names no resource. Non-strict routing would still match it to the
   // route without the slash, so a client that normalises `<parent>/<child>/..` down to `<parent>/`

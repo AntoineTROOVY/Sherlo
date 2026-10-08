@@ -68,7 +68,8 @@
     "messageTester": "Mesaj Test Aracı",
     "infrastructure": "Altyapı",
     "plugins": "Eklentiler",
-    "logs": "Kayıtlar (Logs)"
+    "logs": "Kayıtlar (Logs)",
+    "billing": "Faturalandırma"
   },
   "chats": {
     "media": {
@@ -217,7 +218,24 @@
     "help": "Yardıma mı ihtiyacınız var?",
     "viewDocs": "Dokümantasyonu Görüntüle",
     "footer": "Yudhi Armyndharis ve OpenWA Topluluğu tarafından ❤️ ile yapılmıştır",
-    "version": "v{{version}} · {{date}}"
+    "version": "v{{version}} · {{date}}",
+    "email": "E-posta",
+    "emailPlaceholder": "sen@ornek.com",
+    "password": "Parola",
+    "name": "Ad",
+    "namePlaceholder": "Adın",
+    "signIn": "Giriş yap",
+    "signUp": "Hesap oluştur",
+    "signingIn": "Giriş yapılıyor...",
+    "creating": "Hesap oluşturuluyor...",
+    "switchToSignUp": "Hesap oluştur",
+    "switchToSignIn": "Hesabın var mı? Giriş yap",
+    "emailRequired": "E-posta gerekli",
+    "passwordRequired": "Parola gerekli",
+    "nameRequired": "Ad gerekli",
+    "invalidCredentials": "E-posta veya parola geçersiz",
+    "showPassword": "Parolayı göster",
+    "hidePassword": "Parolayı gizle"
   },
   "dashboard": {
     "title": "Kontrol Paneli",
@@ -1165,5 +1183,23 @@
       "current": "Bu oturum"
     },
     "loading": "Aranıyor…"
+  },
+  "billing": {
+    "title": "Faturalandırma",
+    "subtitle": "Polar ile abone olun. Abonelik bu hesaba bağlıdır.",
+    "subscribe": "Abone ol",
+    "manage": "Aboneliği yönet",
+    "loading": "Planlar yükleniyor…",
+    "empty": "Henüz abonelik planı yok.",
+    "active": "Aboneliğiniz aktif.",
+    "inactive": "Bu hesapta aktif abonelik yok.",
+    "error": "Polar’a ulaşılamadı. Tekrar deneyin.",
+    "notConfigured": "Bu sunucuda faturalandırma yapılandırılmamış.",
+    "interval": {
+      "month": "ay",
+      "year": "yıl",
+      "week": "hafta",
+      "day": "gün"
+    }
   }
 }

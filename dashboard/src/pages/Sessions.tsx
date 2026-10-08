@@ -192,6 +192,18 @@ export function Sessions() {
   }, [t, queryClient]);
   const fetchSessions = useCallback(() => (latestList.current = readSessions()), [readSessions]);
 
+  const applySessionPatchForPairing = useCallback(
+    (updated: Session) => {
+      rowWrites.current += 1;
+      updateSessions(current => replaceSession(current, updated));
+    },
+    [updateSessions],
+  );
+
+  const handlePairingReady = useCallback(() => {
+    toast.success(t('sessions.toasts.readyTitle'), t('sessions.toasts.readyDesc'));
+  }, [toast, t]);
+
   const {
     qrData,
     pairingMode,
@@ -208,7 +220,13 @@ export function Sessions() {
     applyQrPush,
     dismissQrForSession,
     clearQrCodeForSession,
-  } = useSessionPairing({ sessions, sessionsRef, reloadSessions: fetchSessions });
+  } = useSessionPairing({
+    sessions,
+    sessionsRef,
+    reloadSessions: fetchSessions,
+    applySessionPatch: applySessionPatchForPairing,
+    onPairingReady: handlePairingReady,
+  });
 
   const {
     showCreateModal,
@@ -298,6 +316,7 @@ export function Sessions() {
         // does not re-invalidate on duplicate envelopes).
         void invalidateSessionQueries(queryClient, queryKeys.sessions);
         if (event.status === 'ready') {
+          dismissQrForSession(event.sessionId);
           // Refresh so the card picks up the phone and lastActive the gateway writes on READY.
           void fetchSessions();
           toast.success(t('sessions.toasts.readyTitle'), t('sessions.toasts.readyDesc'));
@@ -670,6 +689,8 @@ export function Sessions() {
     );
   }
 
+  const qrModalSession = qrData ? sessions.find(s => s.id === qrData.sessionId) : undefined;
+
   return (
     <div className="sessions-page">
       <PageHeader
@@ -846,7 +867,14 @@ export function Sessions() {
 
             {!pairingMode ? (
               // QR Code Content
-              qrData.qrCode ? (
+              <>
+              {pairingError && <div className="pairing-error">{pairingError}</div>}
+              {qrModalSession?.status === 'authenticating' ? (
+                <div style={{ padding: '2rem' }}>
+                  <Loader2 className="animate-spin" size={48} />
+                  <p>{t('sessions.qr.authenticating')}</p>
+                </div>
+              ) : qrData.qrCode ? (
                 <>
                   <img src={qrData.qrCode} alt="QR" style={{ maxWidth: '280px', borderRadius: '12px' }} />
                   <div className="qr-instructions">
@@ -869,7 +897,8 @@ export function Sessions() {
                   <Loader2 className="animate-spin" size={48} />
                   <p>{t('sessions.qr.generating')}</p>
                 </div>
-              )
+              )}
+              </>
             ) : (
               // Pairing Code Content
               <div className="pairing-container" role="tabpanel">

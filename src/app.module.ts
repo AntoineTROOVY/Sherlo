@@ -17,6 +17,7 @@ import { TemplateModule } from './modules/template/template.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AccountModule } from './modules/account/account.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { EngineModule } from './engine/engine.module';
 import { LoggerModule } from './common/services/logger.module';
@@ -273,6 +274,7 @@ if (dashboardServingEnabled && dashboardBuildPresent) {
     EventsModule, // WebSocket real-time events
     ...queueModules,
     AuthModule,
+    AccountModule,
     EngineModule,
     SessionModule,
     MessageModule,

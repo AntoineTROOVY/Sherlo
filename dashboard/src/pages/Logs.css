@@ -107,7 +107,7 @@
 }
 
 .logs-page .logs-table .table-row:not(.header):hover {
-  background: rgba(37, 211, 102, 0.05);
+  background: rgba(223, 249, 109, 0.05);
 }
 
 .logs-page .timestamp {
@@ -207,7 +207,7 @@
 .logs-page .page-numbers button.active {
   background: var(--primary);
   border-color: var(--primary);
-  color: white;
+  color: var(--on-primary, #000000);
 }
 
 /* Empty Table State */

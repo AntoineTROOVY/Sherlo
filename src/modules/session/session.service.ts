@@ -334,7 +334,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     await this.ownership?.releaseAll();
   }
 
-  async create(dto: CreateSessionDto): Promise<Session> {
+  async create(dto: CreateSessionDto, ownerUserId?: string | null): Promise<Session> {
     // Check if session with same name exists
     const existing = await this.sessionRepository.findOne({
       where: { name: dto.name },
@@ -350,6 +350,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
       proxyUrl: dto.proxyUrl || null,
       proxyType: dto.proxyType || null,
       status: SessionStatus.CREATED,
+      ...(ownerUserId ? { ownerUserId } : {}),
     });
 
     // The findOne pre-check above is a fast path for the common case, but it's a check-then-insert
@@ -382,7 +383,10 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     return saved;
   }
 
-  async findAll(allowedSessions?: string[] | null, opts: SessionListOptions = {}): Promise<Session[]> {
+  async findAll(
+    allowedSessions?: string[] | null,
+    opts: SessionListOptions & { ownerUserId?: string } = {},
+  ): Promise<Session[]> {
     // A session-restricted key only lists its own sessions; an unrestricted key (null/empty
     // allowlist) lists all — mirroring the ApiKeyGuard allowedSessions model so a scoped key
     // cannot enumerate every session through this aggregate route.
@@ -401,6 +405,9 @@ export class SessionService implements OnModuleDestroy, OnModuleInit, OnApplicat
     // array from a repeated query key, an empty value) is not a name and must not become one.
     if (typeof opts.name === 'string' && opts.name.length > 0) {
       where.name = opts.name;
+    }
+    if (opts.ownerUserId) {
+      where.ownerUserId = opts.ownerUserId;
     }
     if (Object.keys(where).length > 0) {
       options.where = where;

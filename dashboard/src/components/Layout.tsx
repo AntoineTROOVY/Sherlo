@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
@@ -13,6 +13,7 @@ import {
   Send,
   Server,
   Puzzle,
+  CreditCard,
   Sun,
   Moon,
   Monitor,
@@ -25,7 +26,9 @@ import {
 import { useTheme } from '../hooks/useTheme';
 import { useRole, type UserRole } from '../hooks/useRole';
 import { languageOptions, resolveSupportedLanguage, rtlLanguages, type SupportedLanguage } from '../i18n';
-import { healthApi, infraApi } from '../services/api';
+import { infraApi } from '../services/api';
+import { useBillingAccess } from '../hooks/useBillingAccess';
+import { TrialBanner } from './TrialBanner';
 import './Layout.css';
 
 interface LayoutProps {
@@ -43,10 +46,11 @@ const allNavItems = [
   { to: '/api-keys', icon: Key, key: 'apiKeys' as const, adminOnly: true, unscopedOnly: true },
   { to: '/message-tester', icon: Send, key: 'messageTester' as const, adminOnly: false },
   // Backend /infra/* is ADMIN-only; hide the nav item from non-admins (UX + defense-in-depth).
-  { to: '/infrastructure', icon: Server, key: 'infrastructure' as const, adminOnly: true, unscopedOnly: true },
-  { to: '/plugins', icon: Puzzle, key: 'plugins' as const, adminOnly: true, unscopedOnly: true },
+  { to: '/infrastructure', icon: Server, key: 'infrastructure' as const, adminOnly: true, unscopedOnly: true, sidebarHidden: true },
+  { to: '/plugins', icon: Puzzle, key: 'plugins' as const, adminOnly: true, unscopedOnly: true, sidebarHidden: true },
   // Backend /audit is ADMIN-only too.
   { to: '/logs', icon: FileText, key: 'logs' as const, adminOnly: true },
+  { to: '/billing', icon: CreditCard, key: 'billing' as const, adminOnly: false },
 ];
 
 const themeIcons = { light: Sun, dark: Moon, system: Monitor };
@@ -62,16 +66,26 @@ export function Layout({ onLogout, userRole }: LayoutProps) {
   });
 
   const { scoped } = useRole();
+  const { access: billingAccess, loading: billingLoading } = useBillingAccess();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (billingLoading || !billingAccess?.paymentRequired) return;
+    if (location.pathname === '/billing') return;
+    navigate('/billing', { replace: true });
+  }, [billingAccess, billingLoading, location.pathname, navigate]);
+
   const navItems = allNavItems.filter(
-    item => (!item.adminOnly || userRole === 'admin') && (!item.unscopedOnly || !scoped),
+    item =>
+      !('sidebarHidden' in item && item.sidebarHidden) &&
+      (!item.adminOnly || userRole === 'admin') &&
+      (!item.unscopedOnly || !scoped),
   );
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  // Show the build-time version immediately, then replace it with the live running version from the
-  // backend so a stale-built bundle can't display the wrong number. Falls back silently on error.
-  const [version, setVersion] = useState(__APP_VERSION__);
   // A newer published release, shown to admins as a link to its notes. The route is ADMIN-only, refuses a
   // session-scoped key, and answers quietly when GitHub is unreachable or the check is turned off.
   const [update, setUpdate] = useState<{ latest: string; url: string } | null>(null);
@@ -86,21 +100,6 @@ export function Layout({ onLogout, userRole }: LayoutProps) {
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    healthApi
-      .check()
-      .then(info => {
-        if (active && info?.version) setVersion(info.version);
-      })
-      .catch(() => {
-        /* keep the build-time fallback */
-      });
-    return () => {
-      active = false;
-    };
   }, []);
 
   useEffect(() => {
@@ -171,8 +170,7 @@ export function Layout({ onLogout, userRole }: LayoutProps) {
             {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
           <div className="mobile-brand">
-            <img src="/openwa_logo.webp" alt="OpenWA" className="sidebar-logo" />
-            <span className="brand-name">{t('common.appName')}</span>
+            <img src="/logo.png" alt="Sherlo" className="sidebar-logo" />
           </div>
           <div style={{ width: 40 }} />
         </header>
@@ -184,18 +182,7 @@ export function Layout({ onLogout, userRole }: LayoutProps) {
         className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobile ? 'mobile' : ''} ${isMobileOpen ? 'open' : ''}`}
       >
         <div className="sidebar-header">
-          <img src="/openwa_logo.webp" alt="OpenWA" className="sidebar-logo" />
-          {!isCollapsed && (
-            <div className="sidebar-brand">
-              <span className="brand-name">{t('common.appName')}</span>
-              <span className="brand-version">v{version}</span>
-              {update && (
-                <a className="brand-update" href={update.url} target="_blank" rel="noopener noreferrer">
-                  {t('common.updateAvailable', { version: update.latest })}
-                </a>
-              )}
-            </div>
-          )}
+          <img src="/logo.png" alt="Sherlo" className="sidebar-logo" />
         </div>
 
         {!isMobile && (
@@ -267,6 +254,11 @@ export function Layout({ onLogout, userRole }: LayoutProps) {
               </div>
             )}
           </div>
+          {update && !isCollapsed && (
+            <a className="brand-update sidebar-update-link" href={update.url} target="_blank" rel="noopener noreferrer">
+              {t('common.updateAvailable', { version: update.latest })}
+            </a>
+          )}
           <div className="appearance-menu">
             <button
               className="theme-toggle-btn"
@@ -288,6 +280,7 @@ export function Layout({ onLogout, userRole }: LayoutProps) {
       </aside>
 
       <main className={`main-content ${isCollapsed ? 'expanded' : ''} ${isMobile ? 'mobile' : ''}`}>
+        {billingAccess && <TrialBanner access={billingAccess} />}
         <Outlet />
       </main>
     </div>

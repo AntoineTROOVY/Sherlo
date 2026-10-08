@@ -163,10 +163,11 @@ export function useWebSocket(events: WebSocketEvents = {}) {
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
 
-    // Get API key from sessionStorage (same as api.ts)
+    // An API key still authenticates a programmatic tab. An email account sends its cookie instead.
     const apiKey = sessionStorage.getItem('openwa_api_key');
+    const account = sessionStorage.getItem('openwa_account') === '1';
 
-    if (!apiKey) {
+    if (!apiKey && !account) {
       console.warn('[WebSocket] No API key found, skipping connection');
       return;
     }
@@ -177,14 +178,16 @@ export function useWebSocket(events: WebSocketEvents = {}) {
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
+      withCredentials: true,
       // Send the key via `auth` (and a header for proxies). NOT via `query` — a key in the
       // handshake URL leaks into access logs / Referer. The gateway reads auth first.
-      auth: {
-        apiKey,
-      },
-      extraHeaders: {
-        'X-API-Key': apiKey,
-      },
+      // An account session has no key: the cookie is enough.
+      ...(apiKey
+        ? {
+            auth: { apiKey },
+            extraHeaders: { 'X-API-Key': apiKey },
+          }
+        : {}),
     });
 
     socketRef.current.on('connect', () => {
