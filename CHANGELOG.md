@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop `backup.sh` and `restore.sh` on an env line they cannot parse instead of falling back to the default path.
 - Verify the PostgreSQL server certificate in `backup.sh` when `DATABASE_SSL=true`, as the app does.
 - Dead-letter undispatched ingress events instead of deleting them when they age out of the dedup window.
 - Keep a re-sent ingress delivery redrivable when an earlier dead letter for its id was already redriven.
@@ -61,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Upgrade notes (behavior changes)
 
+- `backup.sh` and `restore.sh` exit with status 2 when `./.env` or `.env.generated` sets a key in a form they cannot parse; fix the line or pass the key in the environment.
 - With `DATABASE_SSL=true`, `backup.sh` now fails against a PostgreSQL server whose certificate the app would reject; trust a private CA through `NODE_EXTRA_CA_CERTS` or `PGSSLROOTCERT`.
 
 ## [0.24.0] - 2026-10-03
