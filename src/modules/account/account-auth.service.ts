@@ -29,9 +29,7 @@ export class AccountAuthService implements OnModuleInit {
     // The running server (Node, including the Dokploy image) loads it via dynamic import().
     if (process.env.JEST_WORKER_ID) return;
     const started = await startAuth();
-    this.logger.log(
-      `Better Auth ready (${started.accountUserCount} account(s), database ${started.authDatabaseFile})`,
-    );
+    this.logger.log('Better Auth schema is ready');
     if (!started.passwordReset) {
       this.logger.warn('Password reset is off until RESEND_API_KEY is set');
     }

@@ -69,7 +69,7 @@ h3 {
   margin: 0;
 }
 
-#root button {
+button {
   border-radius: 8px;
   border: 1px solid transparent;
   padding: 0.6em 1.2em;
@@ -81,13 +81,13 @@ h3 {
 }
 /* Visible keyboard focus — cross-browser and keyboard-only, so the ring guides Tab navigation
    without flashing on every mouse click. */
-#root button:focus-visible,
-#root a:focus-visible,
-#root [tabindex]:focus-visible {
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid var(--primary, #dff96d);
   outline-offset: 2px;
 }
-#root button:focus:not(:focus-visible) {
+button:focus:not(:focus-visible) {
   outline: none;
 }
 
@@ -106,8 +106,8 @@ html {
   }
 }
 
-/* Global select/dropdown styling (dashboard only — Tawk.to mounts on body). */
-#root select {
+/* Global select/dropdown styling */
+select {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -127,17 +127,17 @@ html {
   transition: all 0.2s;
 }
 
-#root select:hover {
+select:hover {
   border-color: var(--primary, #dff96d);
 }
 
-#root select:focus {
+select:focus {
   outline: none;
   border-color: var(--primary, #dff96d);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
-#root select:disabled {
+select:disabled {
   background-color: var(--bg-light, #f8fafc);
   color: var(--text-muted, #94a3b8);
   cursor: not-allowed;
@@ -429,7 +429,7 @@ code {
 }
 
 /* Select dropdown caret on the opposite side */
-[dir='rtl'] #root select {
+[dir='rtl'] select {
   padding: 0.75rem 1rem 0.75rem 2.5rem;
   background-position: left 0.75rem center;
 }
@@ -488,7 +488,7 @@ code {
     padding: 0.875rem 1.25rem 1.25rem;
   }
 
-  #root select {
+  select {
     padding: 0.625rem 2.25rem 0.625rem 0.875rem;
     font-size: 0.875rem;
   }

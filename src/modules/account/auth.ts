@@ -32,10 +32,6 @@ export interface StartedAuth {
   emailVerification: boolean;
   /** True when STRIPE_SECRET_KEY and STRIPE_PRICE_ID are set. */
   stripe: boolean;
-  /** Resolved path to auth.sqlite (for ops logging). */
-  authDatabaseFile: string;
-  /** Number of Better Auth user rows after migration. */
-  accountUserCount: number;
 }
 
 type AuthInstance = Awaited<ReturnType<typeof buildAuth>>;
@@ -204,7 +200,5 @@ async function buildAuth() {
     passwordReset,
     emailVerification,
     stripe: stripeSettings !== null,
-    authDatabaseFile: databaseFile,
-    accountUserCount: userCount(),
   };
 }
