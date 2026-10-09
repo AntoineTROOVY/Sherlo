@@ -136,12 +136,14 @@ describe('production HTTP surface (configureApp)', () => {
     expect(await nonceOf()).not.toEqual(await nonceOf());
   });
 
-  it('allows styles and fonts only from its own origin', async () => {
+  it('allows dashboard styles plus Tawk.to widget assets', async () => {
     const res = await request(app.getHttpServer()).get('/').set('Accept', 'text/html').expect(200);
 
     const csp = res.headers['content-security-policy'];
-    expect(csp).toMatch(/(?:^|;)font-src 'self'(?:;|$)/);
-    expect(csp).toMatch(/(?:^|;)style-src 'self' 'unsafe-inline'(?:;|$)/);
+    expect(csp).toMatch(/(?:^|;)font-src 'self' https:\/\/fonts\.gstatic\.com(?:;|$)/);
+    expect(csp).toMatch(
+      /(?:^|;)style-src 'self' 'unsafe-inline' https:\/\/embed\.tawk\.to https:\/\/fonts\.googleapis\.com(?:;|$)/,
+    );
   });
 
   it('echoes the CORS header for an allowed Origin', async () => {

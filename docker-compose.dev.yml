@@ -55,6 +55,7 @@ services:
       - XDG_CONFIG_HOME=/tmp/.config
       - XDG_CACHE_HOME=/tmp/.cache
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - SKIP_DATA_VOLUME_CHECK=true
       # Restart-resilience: auto-start previously authenticated sessions on boot. The liveness
       # watchdog (#798) only covers a RUNNING container — a `compose down/up` or rebuild kills every
       # engine, and without this flag sessions sit at `disconnected` until started by hand. Default

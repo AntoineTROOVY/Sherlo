@@ -23,7 +23,7 @@ export function TawkToChat() {
     script.async = true;
     script.src = TAWK_EMBED_SRC;
     script.charset = 'UTF-8';
-    script.crossOrigin = 'anonymous';
+    script.setAttribute('crossorigin', '*');
 
     const anchor = document.getElementsByTagName('script')[0];
     anchor?.parentNode?.insertBefore(script, anchor);

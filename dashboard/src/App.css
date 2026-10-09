@@ -108,25 +108,25 @@ body {
   line-height: 1.6;
 }
 
-button {
+#root button {
   font-family: inherit;
 }
 
-input,
-select,
-textarea {
+#root input,
+#root select,
+#root textarea {
   font-family: inherit;
   background: var(--bg-white);
   color: var(--text-primary);
   border-color: var(--border);
 }
 
-a {
+#root a {
   color: var(--primary-text);
   text-decoration: none;
 }
 
-a:hover {
+#root a:hover {
   text-decoration: underline;
 }
 

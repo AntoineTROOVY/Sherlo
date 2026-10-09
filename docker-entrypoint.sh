@@ -18,6 +18,18 @@ if [ "$(id -u)" != 0 ]; then
   done
 fi
 
+# Refuse to boot in production when /app/data is not a mounted volume — otherwise SQLite (auth +
+# main DB) lands on the container layer and is wiped on every redeploy (git push on Dokploy).
+if [ "${SKIP_DATA_VOLUME_CHECK:-}" != "true" ] && [ "${NODE_ENV:-production}" = "production" ]; then
+  if ! grep -qs ' /app/data ' /proc/mounts 2>/dev/null; then
+    echo "FATAL: /app/data is not a Docker volume mount — user accounts and sessions will not survive redeploy." >&2
+    echo "       Use openwa-data:/app/data in docker-compose.yml (volume openwa_openwa-data, external: true)." >&2
+    echo "       Before first deploy: ./scripts/ensure-openwa-data-volume.sh" >&2
+    echo "       On Dokploy: map a persistent volume to /app/data; do not bind-mount the git checkout." >&2
+    exit 1
+  fi
+fi
+
 mkdir -p /app/data/sessions /app/data/media /app/data/plugins
 
 # Chromium leaves SingletonLock/SingletonSocket/SingletonCookie in each session profile and does

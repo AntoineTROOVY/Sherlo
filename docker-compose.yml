@@ -1,5 +1,9 @@
 # OpenWA - Docker Compose Configuration
 # Smart Orchestration with Profiles
+#
+# Persistent data (Better Auth users, SQLite main DB, WhatsApp session profiles):
+#   ./scripts/ensure-openwa-data-volume.sh   # once per host, before first deploy
+# The openwa-data volume is external so redeploys must not run `docker compose down -v` on it.
 
 services:
   # ===== CORE: Docker Socket Proxy (sole container with /var/run/docker.sock access) =====
@@ -151,7 +155,7 @@ services:
       # ENGINE_TYPE above. main.ts treats a blank value as unset (.env.generated wins), and the app
       # layer (configuration.ts) supplies the sane container default (headless, ./data/sessions, the
       # sandbox + no-dev-shm flag set) when nothing is set anywhere. Set one on the host/.env to pin it.
-      - SESSION_DATA_PATH=${SESSION_DATA_PATH:-}
+      - SESSION_DATA_PATH=${SESSION_DATA_PATH:-/app/data/sessions}
       - PUPPETEER_HEADLESS=${PUPPETEER_HEADLESS:-}
       - PUPPETEER_ARGS=${PUPPETEER_ARGS:-}
       - PUPPETEER_PROTOCOL_TIMEOUT_MS=${PUPPETEER_PROTOCOL_TIMEOUT_MS:-}
@@ -177,7 +181,9 @@ services:
       # and docs/13). NODE_ID must be STABLE across restarts: the app default (the container
       # hostname) changes on every recreate, making the new container a "new node" that has to wait
       # out its previous identity's lease before re-adopting sessions.
-      - NODE_ID=${NODE_ID:-}
+      # Stable default — do not rely on the container hostname (changes every recreate).
+      - NODE_ID=${NODE_ID:-sherlo-primary}
+      - AUTH_DATABASE_PATH=${AUTH_DATABASE_PATH:-/app/data/auth.sqlite}
       - NODE_URL=${NODE_URL:-}
       - SESSION_LEASE_TTL_MS=${SESSION_LEASE_TTL_MS:-}
       - SESSION_LEASE_HEARTBEAT_MS=${SESSION_LEASE_HEARTBEAT_MS:-}
@@ -192,7 +198,7 @@ services:
       # as a fallback by the storage layer) so existing .env files keep working unchanged. S3_REGION is
       # forwarded so external-S3 works.
       - STORAGE_TYPE=${STORAGE_TYPE:-}
-      - STORAGE_LOCAL_PATH=${STORAGE_LOCAL_PATH:-}
+      - STORAGE_LOCAL_PATH=${STORAGE_LOCAL_PATH:-/app/data/media}
       - S3_ENDPOINT=${S3_ENDPOINT:-}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
@@ -344,7 +350,7 @@ services:
       - DATABASE_STATEMENT_TIMEOUT_MS=${DATABASE_STATEMENT_TIMEOUT_MS:-}
       - DATABASE_IDLE_TIMEOUT_MS=${DATABASE_IDLE_TIMEOUT_MS:-}
       - DATABASE_CONNECTION_TIMEOUT_MS=${DATABASE_CONNECTION_TIMEOUT_MS:-}
-      - MAIN_DATABASE_NAME=${MAIN_DATABASE_NAME:-}
+      - MAIN_DATABASE_NAME=${MAIN_DATABASE_NAME:-/app/data/main.sqlite}
       - REDIS_USERNAME=${REDIS_USERNAME:-}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - REDIS_CONNECT_TIMEOUT_MS=${REDIS_CONNECT_TIMEOUT_MS:-}
@@ -535,7 +541,7 @@ volumes:
   # compose project name — otherwise re-enabling a built-in service could mount a fresh empty volume.
   openwa-data:
     name: openwa_openwa-data
-    driver: local
+    external: true
   postgres-data:
     name: openwa_postgres-data
     driver: local
