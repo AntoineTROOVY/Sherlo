@@ -78,10 +78,10 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          // The dashboard bundles its fonts, so no third-party style or font origin is allowed. The Bull Board
-          // UI (/api/admin/queues) links IBM Plex from Google Fonts; that stylesheet is blocked and it falls
-          // back to system fonts.
-          styleSrc: ["'self'", "'unsafe-inline'"],
+          // The dashboard bundles its fonts; Bull Board still falls back to system fonts when Google Fonts
+          // is blocked. Tawk.to injects `<link rel="stylesheet">` from embed.tawk.to — without that origin
+          // the widget renders unstyled and inherits the dashboard's global button/input rules.
+          styleSrc: ["'self'", "'unsafe-inline'", 'https://embed.tawk.to', 'https://fonts.googleapis.com'],
           scriptSrc: [
             "'self'",
             (_req, res) => `'nonce-${(res as Response).locals.cspNonce as string}'`,
@@ -96,7 +96,7 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
           mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
           connectSrc: ["'self'", 'https://*.tawk.to', 'wss://*.tawk.to'],
           frameSrc: ['https://embed.tawk.to'],
-          fontSrc: ["'self'"],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com'],
           objectSrc: ["'none'"],
           // Auto-upgrade HTTP→HTTPS in production, unless CSP_UPGRADE_INSECURE_REQUESTS opts out for an
           // HTTP-only private-network deployment (otherwise the browser forces the dashboard to https). (#611)
