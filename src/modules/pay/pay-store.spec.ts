@@ -44,11 +44,20 @@ it('records a paid gateway payment for the calling application to read back', ()
     },
     env,
   );
-  attachGatewaySession(created.id, 'session-1', 'https://epg.unibank.am/pay', env);
+  attachGatewaySession(created.id, 'session-1', 'https://epg.unibank.am/pay', env, {
+    amountAmd: 1684.2,
+    exchangeRate: 421.05,
+  });
   expect(applyGatewayPayment({ ...payment, orderId: created.id }, 'production', env)).toBe(created.id);
   expect(applyGatewayPayment({ ...payment, orderId: created.id }, 'sandbox', env)).toBeNull();
   const stored = gatewayPaymentById(created.id, env);
-  expect(stored).toMatchObject({ status: 'paid', amount: 400, reference: 'order-1' });
+  expect(stored).toMatchObject({
+    status: 'paid',
+    amount: 400,
+    reference: 'order-1',
+    amountAmd: 1684.2,
+    exchangeRate: 421.05,
+  });
   expect(stored?.paidAt).toEqual(expect.any(String));
 });
 
@@ -88,6 +97,7 @@ it('drops a previously stored application callback when opening the store', () =
   const columns = db.prepare('PRAGMA table_info(sherlo_gateway_payment)').all() as Array<{ name: string }>;
   db.close();
   expect(columns.map(column => column.name)).not.toContain('callbackUrl');
+  expect(columns.map(column => column.name)).toEqual(expect.arrayContaining(['amountAmd', 'exchangeRate']));
 });
 
 it('marks the moment a gateway session expires', () => {

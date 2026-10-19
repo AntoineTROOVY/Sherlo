@@ -42,6 +42,10 @@ export interface PayCheckoutResult {
   /** Exact currency units, such as 4 for 4.00 EUR. */
   amount: number;
   currency: string;
+  /** Amount in AMD the buyer pays. Null until the bank page has been opened. */
+  amountAmd: number | null;
+  /** AMD for one unit of currency. Null until the bank page has been opened. */
+  exchangeRate: number | null;
   /** Bank page only. Absent once the payment is no longer payable. */
   url: string | null;
   paidAt: string | null;
@@ -149,9 +153,15 @@ export class PayService {
         sessionId,
         url: `${settings.environment === 'sandbox' ? 'https://pay.spayon.io/sandbox' : 'https://pay.scoupon.am'}/session/${encodeURIComponent(sessionId)}`,
       };
-      const url = await spayonCardCheckoutUrl(checkout, request, settings.environment);
-      attachGatewaySession(payment.id, sessionId, url, process.env);
-      return { ...view({ ...payment, status: 'pending', bankUrl: url }), url };
+      const bank = await spayonCardCheckoutUrl(checkout, request, settings.environment);
+      attachGatewaySession(payment.id, sessionId, bank.url, process.env, bank);
+      return view({
+        ...payment,
+        status: 'pending',
+        bankUrl: bank.url,
+        amountAmd: bank.amountAmd,
+        exchangeRate: bank.exchangeRate,
+      });
     } catch (error) {
       logger.error(`Gateway checkout failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw new BadGatewayException('Could not open the payment. Please try again.');
@@ -180,6 +190,8 @@ export function view(
     status: payment.status,
     amount: payment.amount / 100,
     currency: payment.currency,
+    amountAmd: payment.amountAmd,
+    exchangeRate: payment.exchangeRate,
     url,
     paidAt: payment.paidAt,
     expiredAt: payment.expiredAt,

@@ -14,7 +14,16 @@ const expected: SpayonCheckoutRequest = {
   return_url: 'https://sherlo.example/billing',
   cancel_url: 'https://sherlo.example/billing',
 };
-const card = { id: 2558, method: 'uni', originalPrice: 59, originalCurrency: 'EUR', priceInProductCurrency: 59 };
+const card = {
+  id: 2558,
+  method: 'uni',
+  originalPrice: 59,
+  originalCurrency: 'EUR',
+  priceInProductCurrency: 59,
+  price: 24780,
+  currency: 'AMD',
+};
+const settlement = { amountAmd: 24780, exchangeRate: 420 };
 const session = {
   sessionId: 's-1',
   orderId: 'order-1',
@@ -39,7 +48,7 @@ it('submits the provider form server-side and returns the bank URL without openi
   fetchMock
     .mockResolvedValueOnce(Response.json({ data: session }))
     .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: bank } }));
-  await expect(spayonCardCheckoutUrl(checkout, expected, 'production')).resolves.toBe(bank);
+  await expect(spayonCardCheckoutUrl(checkout, expected, 'production')).resolves.toEqual({ url: bank, ...settlement });
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(fetchMock.mock.calls[0][0]).toBe('https://api.spayon.io/api/public/session/s-1');
   const [, init] = fetchMock.mock.calls[1];
@@ -70,6 +79,27 @@ it.each([
   fetchMock.mockResolvedValueOnce(Response.json({ data: { ...session, ...change } }));
   return expect(spayonCardCheckoutUrl(checkout, expected, 'production')).rejects.toThrow('does not match');
 });
+
+it('reports the AMD amount and the rate shown on the provider checkout', async () => {
+  fetchMock
+    .mockResolvedValueOnce(
+      Response.json({ data: { ...session, paymentOptions: [{ ...card, price: '24780.50', currency: 'amd' }] } }),
+    )
+    .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: bank } }));
+  await expect(spayonCardCheckoutUrl(checkout, expected, 'production')).resolves.toEqual({
+    url: bank,
+    amountAmd: 24780.5,
+    exchangeRate: 420.01,
+  });
+});
+
+it.each([{ price: undefined }, { currency: 'EUR' }, { price: 0 }])(
+  'refuses a card option that does not give an AMD amount: %j',
+  change => {
+    fetchMock.mockResolvedValueOnce(Response.json({ data: { ...session, paymentOptions: [{ ...card, ...change }] } }));
+    return expect(spayonCardCheckoutUrl(checkout, expected, 'production')).rejects.toThrow('AMD amount');
+  },
+);
 
 it.each([{ originalPrice: 60 }, { originalCurrency: 'AMD' }, { priceInProductCurrency: 60 }, { method: 'crypto' }])(
   'refuses incorrect prices, additional fees or a different payment method: %j',
@@ -103,6 +133,9 @@ it('uses isolated sandbox endpoints and only accepts a sandbox card form', async
   fetchMock
     .mockResolvedValueOnce(Response.json({ data: session }))
     .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: sandboxUrl } }));
-  await expect(spayonCardCheckoutUrl(checkout, expected, 'sandbox')).resolves.toBe(sandboxUrl);
+  await expect(spayonCardCheckoutUrl(checkout, expected, 'sandbox')).resolves.toEqual({
+    url: sandboxUrl,
+    ...settlement,
+  });
   expect(fetchMock.mock.calls[0][0]).toBe('https://api.spayon.io/api/sandbox/public/session/s-1');
 });

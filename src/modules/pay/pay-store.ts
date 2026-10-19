@@ -14,6 +14,10 @@ export interface GatewayPayment {
   /** Minor currency units. */
   amount: number;
   currency: string;
+  /** Settlement amount in AMD. Null until the bank page has been opened. */
+  amountAmd: number | null;
+  /** AMD for one unit of currency. Null until the bank page has been opened. */
+  exchangeRate: number | null;
   sessionId: string | null;
   bankUrl: string | null;
   status: string;
@@ -73,9 +77,8 @@ export function initializeGatewayStore(db: Database): void {
       sessionId, bankUrl, status, returnUrl, cancelUrl, createdAt, paidAt, expiredAt
     FROM sherlo_gateway_payment_previous;
     DROP TABLE sherlo_gateway_payment_previous;`);
-    return;
-  }
-  db.exec(`CREATE TABLE IF NOT EXISTS sherlo_gateway_payment (
+  } else {
+    db.exec(`CREATE TABLE IF NOT EXISTS sherlo_gateway_payment (
     id TEXT PRIMARY KEY,
     reference TEXT NOT NULL,
     environment TEXT NOT NULL,
@@ -92,8 +95,14 @@ export function initializeGatewayStore(db: Database): void {
     createdAt TEXT NOT NULL,
     paidAt TEXT,
     expiredAt TEXT,
-    UNIQUE (reference, environment)
-  );`);
+      UNIQUE (reference, environment)
+    );`);
+  }
+  const names = new Set(
+    (db.prepare('PRAGMA table_info(sherlo_gateway_payment)').all() as Array<{ name: string }>).map(column => column.name),
+  );
+  if (!names.has('amountAmd')) db.exec('ALTER TABLE sherlo_gateway_payment ADD COLUMN amountAmd REAL');
+  if (!names.has('exchangeRate')) db.exec('ALTER TABLE sherlo_gateway_payment ADD COLUMN exchangeRate REAL');
 }
 
 export function gatewayPaymentByReference(
@@ -130,6 +139,8 @@ export function insertGatewayPayment(input: NewGatewayPayment, env: NodeJS.Proce
     const row: GatewayPayment = {
       ...input,
       id: randomUUID(),
+      amountAmd: null,
+      exchangeRate: null,
       sessionId: null,
       bankUrl: null,
       status: 'pending',
@@ -167,7 +178,8 @@ export function reopenGatewayPayment(id: string, env: NodeJS.ProcessEnv): void {
   try {
     db.prepare(
       `UPDATE sherlo_gateway_payment
-       SET status = 'pending', sessionId = NULL, bankUrl = NULL, paidAt = NULL, expiredAt = NULL
+       SET status = 'pending', sessionId = NULL, bankUrl = NULL, amountAmd = NULL, exchangeRate = NULL,
+           paidAt = NULL, expiredAt = NULL
        WHERE id = ? AND status IN ('failed', 'expired')`,
     ).run(id);
   } finally {
@@ -180,9 +192,18 @@ export function attachGatewaySession(
   sessionId: string,
   bankUrl: string | null,
   env: NodeJS.ProcessEnv,
+  settlement?: { amountAmd: number; exchangeRate: number },
 ): void {
   const db = database(env);
   try {
+    if (settlement) {
+      db.prepare(
+        `UPDATE sherlo_gateway_payment
+         SET sessionId = ?, bankUrl = ?, amountAmd = ?, exchangeRate = ?
+         WHERE id = ? AND status = 'pending'`,
+      ).run(sessionId, bankUrl, settlement.amountAmd, settlement.exchangeRate, id);
+      return;
+    }
     db.prepare(`UPDATE sherlo_gateway_payment SET sessionId = ?, bankUrl = ? WHERE id = ? AND status = 'pending'`).run(
       sessionId,
       bankUrl,

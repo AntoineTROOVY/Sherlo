@@ -68,6 +68,22 @@ export class PayCheckoutResponseDto {
   currency!: string;
 
   @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 1684.2,
+    description: 'Amount in AMD the buyer pays, as shown by the provider. Null until the bank page has been opened.',
+  })
+  amountAmd!: number | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 421.05,
+    description: 'AMD for 1 unit of currency, as shown by the provider. 421.05 means 1 EUR = 421.05 AMD.',
+  })
+  exchangeRate!: number | null;
+
+  @ApiProperty({
     type: String,
     nullable: true,
     description: 'Bank page. Present while the payment can still be completed.',

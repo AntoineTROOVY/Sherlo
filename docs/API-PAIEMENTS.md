@@ -72,6 +72,8 @@ Réponse `201` :
   "status": "pending",
   "amount": 4,
   "currency": "EUR",
+  "amountAmd": 1684.2,
+  "exchangeRate": 421.05,
   "url": "https://epg.unibank.am/...",
   "paidAt": null,
   "expiredAt": null
@@ -79,6 +81,8 @@ Réponse `201` :
 ```
 
 `url` est l’adresse de la banque. L’application y envoie le navigateur du client.
+
+`amountAmd` est le montant en AMD que le client paie, tel que la page de paiement l’affiche. `exchangeRate` est le cours affiché : `1` unité de `currency` vaut `exchangeRate` AMD. Ici, 1 EUR = 421,05 AMD. Les deux chiffres viennent de la session de paiement et sont arrondis au centième, comme sur cette page. Sherlo ne consulte pas un autre cours. `GET` renvoie les mêmes valeurs. Elles sont `null` tant que la page bancaire n’a pas été ouverte.
 
 La même `reference` avec le même montant renvoie le même paiement. Un montant différent sur cette référence répond `409`.
 

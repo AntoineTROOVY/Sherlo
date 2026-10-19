@@ -98,9 +98,9 @@ export async function spayonPlugins(settings: SpayonSettings, env: NodeJS.Proces
       checkout = await client.createSession(request);
       attachSpayonSession(orderId, checkout.sessionId, env);
     }
-    const url = await spayonCardCheckoutUrl(checkout, request, settings.environment);
-    rememberSpayonBankUrl(orderId, url, env);
-    return { url };
+    const bank = await spayonCardCheckoutUrl(checkout, request, settings.environment);
+    rememberSpayonBankUrl(orderId, bank.url, env);
+    return { url: bank.url };
   };
 
   return [

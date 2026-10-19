@@ -14,6 +14,18 @@ interface PaymentOption {
   originalPrice: number;
   originalCurrency: string;
   priceInProductCurrency: number;
+  /** Settlement amount. AMD when the card payment is processed in dram. */
+  price?: number | string;
+  /** Settlement currency, such as AMD. */
+  currency?: string;
+}
+
+export interface SpayonBankCheckout {
+  url: string;
+  /** Amount in AMD the buyer pays, rounded the same way as the provider checkout. */
+  amountAmd: number;
+  /** AMD for one unit of the charged currency. 421.05 means 1 EUR = 421.05 AMD. */
+  exchangeRate: number;
 }
 
 /**
@@ -24,7 +36,7 @@ export async function spayonCardCheckoutUrl(
   checkout: { sessionId: string; url: string },
   expected: SpayonCheckoutRequest,
   environment: SpayonCredentials['environment'],
-): Promise<string> {
+): Promise<SpayonBankCheckout> {
   const storefront = new URL(checkout.url);
   if (!checkoutHost(storefront)) throw new Error('Invalid Spayon storefront URL');
   const api = environment === 'sandbox' ? '/api/sandbox/public' : '/api/public';
@@ -78,6 +90,7 @@ export async function spayonCardCheckoutUrl(
   ) {
     throw new Error('No matching Spayon card option at the agreed price');
   }
+  const settlement = amdSettlement(option);
   const bankResponse = await fetch(
     `https://api.spayon.io${api}/payments/bank/sessions/${encodeURIComponent(checkout.sessionId)}`,
     {
@@ -98,7 +111,41 @@ export async function spayonCardCheckoutUrl(
   if (![302, 303, 307, 308].includes(bankResponse.status) || !location) {
     throw new Error(`Spayon did not provide a bank redirect (${bankResponse.status})`);
   }
-  return validateSpayonBankUrl(location, environment);
+  return { url: validateSpayonBankUrl(location, environment), ...settlement };
+}
+
+/**
+ * The provider checkout shows `1 <currency> = <rate> AMD` as
+ * `price / priceInProductCurrency`, then displays both figures to two decimals.
+ */
+function amdSettlement(option: PaymentOption): Pick<SpayonBankCheckout, 'amountAmd' | 'exchangeRate'> {
+  const price = finiteNumber(option.price);
+  const charged = finiteNumber(option.priceInProductCurrency);
+  if (option.currency?.toUpperCase() !== 'AMD' || price === null || charged === null) {
+    throw new Error('Spayon card option did not include an AMD amount');
+  }
+  const amountAmd = displayed(price);
+  const exchangeRate = displayed(price / charged);
+  if (amountAmd === null || exchangeRate === null) {
+    throw new Error('Spayon card option did not include an AMD amount');
+  }
+  return { amountAmd, exchangeRate };
+}
+
+function finiteNumber(value: number | string | undefined): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+/** Same rounding as the provider checkout: parseFloat(Number(value).toFixed(2)). */
+function displayed(value: number): number | null {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const shown = Number(value.toFixed(2));
+  return Number.isFinite(shown) && shown > 0 ? shown : null;
 }
 
 export function validateSpayonBankUrl(location: string, environment: SpayonCredentials['environment']): string {

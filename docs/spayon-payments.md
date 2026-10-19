@@ -20,7 +20,7 @@ DASHBOARD_URL=https://adresse-publique-dashboard.example
 
 `SPAYON_PRICE` est exprimé en unités monétaires : `59` signifie 59 euros, pas 59 centimes. Les identifiants ne doivent jamais être préfixés par `VITE_` ni envoyés au navigateur. Sans identifiants, l’offre s’affiche mais le paiement est indisponible ; les accès payants restent contrôlés après l’essai gratuit.
 
-Spayon documente `EUR`, `AMD`, `USD`, `RUB` et `GBP`. Le test réel de création accepte 59 EUR : le formulaire affiche ce montant, puis indique une conversion en AMD pour le traitement du règlement. Aucun taux de change n’est inventé : si le compte exige l’AMD, définir le prix AMD convenu et la devise ensemble avant de facturer.
+Spayon documente `EUR`, `AMD`, `USD`, `RUB` et `GBP`. Le test réel de création accepte 59 EUR : le formulaire affiche ce montant, puis indique une conversion en AMD pour le traitement du règlement. Aucun taux de change n’est inventé : l’API paiements renvoie le montant AMD et le cours déjà affichés par cette page (`prix AMD / prix EUR`, au centième). Si le compte exige l’AMD, définir le prix AMD convenu et la devise ensemble avant de facturer.
 
 Pour un test local avec des identifiants de production, les URL de paiement peuvent être définies séparément de l’authentification :
 
