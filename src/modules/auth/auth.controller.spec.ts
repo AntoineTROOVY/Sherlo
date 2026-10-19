@@ -254,6 +254,7 @@ describe('AuthController — payment keys stay with the payment account', () => 
     usageCount: 0,
     createdAt: new Date('2026-01-01T00:00:00Z'),
   } as unknown as ApiKey;
+  const testKey = { ...paymentKey, id: 'pay-test', name: 'checkout-test', purpose: ApiKeyPurpose.PAYMENT_TEST } as ApiKey;
   const generalKey = { ...paymentKey, id: 'gen-1', name: 'whatsapp', purpose: ApiKeyPurpose.GENERAL } as ApiKey;
   const owner = {
     id: 'user-1',
@@ -267,7 +268,7 @@ describe('AuthController — payment keys stay with the payment account', () => 
 
   beforeEach(() => {
     authService = {
-      findAll: jest.fn().mockResolvedValue([generalKey, paymentKey]),
+      findAll: jest.fn().mockResolvedValue([generalKey, paymentKey, testKey]),
       findOne: jest.fn().mockResolvedValue(paymentKey),
       createApiKey: jest.fn(),
     };
@@ -282,7 +283,7 @@ describe('AuthController — payment keys stay with the payment account', () => 
 
   it('lists and reads payment keys for the signed-in payment account', async () => {
     const listed = await controller.findAll(owner);
-    expect(listed.map(key => key.id)).toEqual(['gen-1', 'pay-1']);
+    expect(listed.map(key => key.id)).toEqual(['gen-1', 'pay-1', 'pay-test']);
     expect((await controller.findOne('pay-1', owner)).id).toBe('pay-1');
   });
 
@@ -291,5 +292,15 @@ describe('AuthController — payment keys stay with the payment account', () => 
       controller.create({ name: 'checkout', purpose: ApiKeyPurpose.PAYMENT }, {} as Request),
     ).rejects.toThrow(/payment account/);
     expect(authService.createApiKey).not.toHaveBeenCalled();
+  });
+
+  it('lets the payment account create a test key and hides it from everyone else', async () => {
+    authService.createApiKey.mockResolvedValue({ apiKey: testKey, rawKey: 'owa_k1_test' });
+    await expect(
+      controller.create({ name: 'checkout test', purpose: ApiKeyPurpose.PAYMENT_TEST }, {} as Request),
+    ).rejects.toThrow(/payment account/);
+    const created = await controller.create({ name: 'checkout test', purpose: ApiKeyPurpose.PAYMENT_TEST }, {} as Request, owner);
+    expect(created.purpose).toBe(ApiKeyPurpose.PAYMENT_TEST);
+    expect(authService.createApiKey).toHaveBeenCalledTimes(1);
   });
 });

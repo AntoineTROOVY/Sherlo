@@ -669,6 +669,10 @@
       "title": "Payment API key",
       "lead": "Visible only on this account. Operator role, with no WhatsApp session limit. Send it in the X-API-Key header.",
       "create": "Create the payment key",
+      "testCreate": "Create a test key",
+      "testBadge": "Test",
+      "testModalTitle": "Create a test key",
+      "testNote": "The requests stay the same. This key opens a Sherlo card page: any card details are accepted, then the buyer returns to your application.",
       "empty": "No payment key yet.",
       "modalTitle": "Create the payment key"
     },

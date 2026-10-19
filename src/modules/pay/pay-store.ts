@@ -1,5 +1,5 @@
 /// <reference path="../account/better-sqlite3.d.ts" />
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import Database from 'better-sqlite3';
 import { authDatabasePath } from '../account/account-actor';
 import type { SpayonSessionStatus } from '../account/spayon-client';
@@ -212,6 +212,33 @@ export function attachGatewaySession(
   } finally {
     db.close();
   }
+}
+
+export function markTestPaymentPaid(id: string, env: NodeJS.ProcessEnv, now = new Date()): void {
+  const db = database(env);
+  try {
+    db.prepare(
+      `UPDATE sherlo_gateway_payment SET status = 'paid', paidAt = ?
+       WHERE id = ? AND environment = 'test' AND status = 'pending'`,
+    ).run(now.toISOString(), id);
+  } finally {
+    db.close();
+  }
+}
+
+export function testTokenMatches(bankUrl: string | null, given: string | undefined): boolean {
+  let expected: string | null = null;
+  if (bankUrl) {
+    try {
+      expected = new URL(bankUrl).searchParams.get('t');
+    } catch {
+      expected = null;
+    }
+  }
+  if (!given || !expected) return false;
+  const left = Buffer.from(given);
+  const right = Buffer.from(expected);
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 /**

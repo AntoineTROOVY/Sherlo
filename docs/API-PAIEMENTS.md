@@ -82,6 +82,14 @@ Réponse `201` :
 
 `url` est l’adresse de la banque. L’application y envoie le navigateur du client.
 
+## Clé de test
+
+La clé de test se crée au même endroit, avec le bouton **Créer une clé de test**. L’application ne change aucune requête : seul l’en-tête `X-API-Key` change.
+
+`url` ouvre alors une page carte hébergée par Sherlo. N’importe quelles informations de carte sont acceptées. **Payer** confirme le paiement et renvoie le navigateur sur `returnUrl`. **Annuler** renvoie sur `cancelUrl`. Le résultat se lit toujours avec `GET /api/pay/checkouts/{id}` et la même clé de test. `status: "paid"` confirme le paiement.
+
+`amountAmd` et `exchangeRate` sont fixes en test : 1 unité de `currency` vaut 400 AMD. Aucune carte n’est débitée, et la banque n’est pas contactée. Une clé de paiement réelle ne voit pas ces paiements.
+
 `amountAmd` est le montant en AMD que le client paie, tel que la page de paiement l’affiche. `exchangeRate` est le cours affiché : `1` unité de `currency` vaut `exchangeRate` AMD. Ici, 1 EUR = 421,05 AMD. Les deux chiffres viennent de la session de paiement et sont arrondis au centième, comme sur cette page. Sherlo ne consulte pas un autre cours. `GET` renvoie les mêmes valeurs. Elles sont `null` tant que la page bancaire n’a pas été ouverte.
 
 La même `reference` avec le même montant renvoie le même paiement. Un montant différent sur cette référence répond `409`.

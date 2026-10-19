@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { CreateApiKeyDto, UpdateApiKeyDto, ApiKeyResponseDto, ApiKeyCreatedResponseDto } from './dto';
 import { RequireRole, CurrentApiKey, RequireUnscopedKey } from './decorators/auth.decorators';
-import { type ApiKey, ApiKeyPurpose, ApiKeyRole } from './entities/api-key.entity';
+import { type ApiKey, ApiKeyPurpose, ApiKeyRole, isPaymentPurpose } from './entities/api-key.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from './../audit/entities/audit-log.entity';
 import { canManagePaymentKeys } from '../account/account-actor';
@@ -73,7 +73,7 @@ export class AuthController {
   }
 
   private paymentHidden(key: ApiKey, actor?: ApiKey): boolean {
-    return (key.purpose ?? ApiKeyPurpose.GENERAL) === ApiKeyPurpose.PAYMENT && !canManagePaymentKeys(actor);
+    return isPaymentPurpose(key.purpose) && !canManagePaymentKeys(actor);
   }
 
   private refuseHiddenPaymentKey(key: ApiKey, actor: ApiKey | undefined, id: string): void {
@@ -96,7 +96,7 @@ export class AuthController {
     @Req() req: Request,
     @CurrentApiKey() actor?: ApiKey,
   ): Promise<ApiKeyCreatedResponseDto> {
-    if (dto.purpose === ApiKeyPurpose.PAYMENT) {
+    if (isPaymentPurpose(dto.purpose)) {
       if (!canManagePaymentKeys(actor)) {
         throw new ForbiddenException('Only the payment account can manage payment API keys');
       }

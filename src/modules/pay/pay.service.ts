@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   BadGatewayException,
   BadRequestException,
@@ -16,9 +17,13 @@ import {
   gatewayPaymentByReference,
   initializeGatewayStore,
   insertGatewayPayment,
+  markTestPaymentPaid,
   reopenGatewayPayment,
+  testTokenMatches,
   type GatewayPayment,
 } from './pay-store';
+import { acceptedOrigin } from './pay-origin';
+import { testAmdQuote, testCardPage, testClosedPage } from './pay-test-page';
 import Database from 'better-sqlite3';
 import { authDatabasePath } from '../account/account-actor';
 
@@ -34,6 +39,14 @@ export interface CreatePayCheckout {
   returnUrl: string;
   cancelUrl: string;
 }
+
+export interface PayCheckoutOptions {
+  /** A payment-test API key opens Sherlo's card page and never calls the bank. */
+  test: boolean;
+  origin: string;
+}
+
+export type TestPageResult = { action: 'html'; status: number; html: string } | { action: 'redirect'; location: string };
 
 export interface PayCheckoutResult {
   id: string;
@@ -56,23 +69,70 @@ export interface PayCheckoutResult {
 export class PayService {
   private ready = false;
 
-  create(input: CreatePayCheckout): Promise<PayCheckoutResult> {
-    return this.open(input);
+  create(input: CreatePayCheckout, options: PayCheckoutOptions): Promise<PayCheckoutResult> {
+    return this.open(input, options);
   }
 
-  find(id: string): PayCheckoutResult {
+  find(id: string, test: boolean): PayCheckoutResult {
     this.ensureStore();
     const payment = gatewayPaymentById(id, process.env);
-    if (!payment) throw new NotFoundException('Payment not found');
+    if (!payment || (payment.environment === 'test') !== test) throw new NotFoundException('Payment not found');
     return view(payment);
   }
 
-  private async open(input: CreatePayCheckout): Promise<PayCheckoutResult> {
+  testCheckout(id: string, token: string | undefined): TestPageResult | null {
+    const payment = this.visibleTestPayment(id, token);
+    if (!payment) return null;
+    if (payment.status === 'paid') return { action: 'redirect', location: buyerUrl(payment.returnUrl, payment) };
+    if (payment.status !== 'pending' || !payment.bankUrl) return { action: 'html', status: 409, html: testClosedPage() };
+    const page = new URL(payment.bankUrl);
+    page.pathname = `${page.pathname.replace(/\/$/, '')}/cancel`;
+    return {
+      action: 'html',
+      status: 200,
+      html: testCardPage({
+        productName: payment.productName,
+        amount: payment.amount / 100,
+        currency: payment.currency,
+        amountAmd: payment.amountAmd ?? testAmdQuote(payment.amount).amountAmd,
+        exchangeRate: payment.exchangeRate ?? testAmdQuote(payment.amount).exchangeRate,
+        action: payment.bankUrl,
+        cancelUrl: page.toString(),
+      }),
+    };
+  }
+
+  completeTestCheckout(id: string, token: string | undefined): TestPageResult | null {
+    const payment = this.visibleTestPayment(id, token);
+    if (!payment) return null;
+    if (payment.status === 'pending') markTestPaymentPaid(payment.id, process.env);
+    const current = gatewayPaymentById(payment.id, process.env) ?? payment;
+    if (current.status !== 'paid') return { action: 'html', status: 409, html: testClosedPage() };
+    return { action: 'redirect', location: buyerUrl(current.returnUrl, current) };
+  }
+
+  cancelTestCheckout(id: string, token: string | undefined): TestPageResult | null {
+    const payment = this.visibleTestPayment(id, token);
+    if (!payment) return null;
+    if (payment.status === 'paid') return { action: 'redirect', location: buyerUrl(payment.returnUrl, payment) };
+    if (payment.status !== 'pending') return { action: 'html', status: 409, html: testClosedPage() };
+    return { action: 'redirect', location: buyerUrl(payment.cancelUrl, payment) };
+  }
+
+  private visibleTestPayment(id: string, token: string | undefined): GatewayPayment | null {
+    this.ensureStore();
+    const payment = gatewayPaymentById(id, process.env);
+    if (!payment || payment.environment !== 'test' || !testTokenMatches(payment.bankUrl, token)) return null;
+    return payment;
+  }
+
+  private async open(input: CreatePayCheckout, options: PayCheckoutOptions): Promise<PayCheckoutResult> {
     this.ensureStore();
     const settings = resolveSpayonSettings(process.env);
-    if (!settings.credentials) {
+    if (!options.test && !settings.credentials) {
       throw new ServiceUnavailableException('Payment is not configured yet');
     }
+    const environment = options.test ? 'test' : settings.environment;
     const currency = (input.currency ?? settings.currency).trim().toUpperCase();
     if (currency !== settings.currency) {
       throw new BadRequestException(`Currency must be ${settings.currency}`);
@@ -95,7 +155,7 @@ export class PayService {
     const fullName = input.fullName?.trim() || null;
     if (fullName && fullName.length > 120) throw new BadRequestException('Name is too long');
 
-    let payment = gatewayPaymentByReference(reference, settings.environment, process.env);
+    let payment = gatewayPaymentByReference(reference, environment, process.env);
     if (payment && (payment.amount !== amount || payment.currency !== currency)) {
       throw new ConflictException('This reference already exists for a different amount');
     }
@@ -105,6 +165,7 @@ export class PayService {
       payment = gatewayPaymentById(payment.id, process.env);
     }
     if (payment?.bankUrl && payment.status === 'pending') {
+      if (environment === 'test') return view(payment);
       return {
         ...view(payment),
         url: validateSpayonBankUrl(payment.bankUrl, settings.environment),
@@ -114,7 +175,7 @@ export class PayService {
       payment = insertGatewayPayment(
         {
           reference,
-          environment: settings.environment,
+          environment,
           productName,
           email,
           fullName,
@@ -127,6 +188,11 @@ export class PayService {
       );
     }
 
+    if (options.test) return this.attachTestPage(payment, options.origin);
+
+    if (!settings.credentials) {
+      throw new ServiceUnavailableException('Payment is not configured yet');
+    }
     const destination = new URL(returnUrl);
     destination.searchParams.set('payment', payment.id);
     destination.searchParams.set('reference', payment.reference);
@@ -168,6 +234,22 @@ export class PayService {
     }
   }
 
+  private attachTestPage(payment: GatewayPayment, origin: string): PayCheckoutResult {
+    const pageOrigin = acceptedOrigin(origin, process.env);
+    if (!pageOrigin) throw new BadRequestException('Unexpected payment page host');
+    const quote = testAmdQuote(payment.amount);
+    const token = randomBytes(18).toString('base64url');
+    const url = `${pageOrigin}/api/pay/test/${payment.id}?t=${encodeURIComponent(token)}`;
+    attachGatewaySession(payment.id, `test:${payment.id}`, url, process.env, quote);
+    return view({
+      ...payment,
+      status: 'pending',
+      bankUrl: url,
+      amountAmd: quote.amountAmd,
+      exchangeRate: quote.exchangeRate,
+    });
+  }
+
   private ensureStore(): void {
     if (this.ready) return;
     const db = new Database(authDatabasePath(process.env));
@@ -207,6 +289,13 @@ export function minorUnits(amount: number): number {
     throw new BadRequestException('Amount must have at most two decimal places');
   }
   return minor;
+}
+
+function buyerUrl(base: string, payment: GatewayPayment): string {
+  const url = new URL(base);
+  url.searchParams.set('payment', payment.id);
+  url.searchParams.set('reference', payment.reference);
+  return url.toString();
 }
 
 function customerUrl(value: string, environment: 'sandbox' | 'production'): string {

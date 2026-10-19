@@ -6,10 +6,16 @@ export enum ApiKeyRole {
   VIEWER = 'viewer',
 }
 
-/** `payment` keys open checkouts. They stay hidden from every account except the payment owner. */
+/** `payment` keys open bank checkouts. `payment-test` keys open Sherlo's card page instead. */
 export enum ApiKeyPurpose {
   GENERAL = 'general',
   PAYMENT = 'payment',
+  PAYMENT_TEST = 'payment-test',
+}
+
+/** Payment keys, live or test, stay hidden from every account except the payment owner. */
+export function isPaymentPurpose(purpose: string | undefined): boolean {
+  return purpose === ApiKeyPurpose.PAYMENT || purpose === ApiKeyPurpose.PAYMENT_TEST;
 }
 
 @Entity('api_keys')

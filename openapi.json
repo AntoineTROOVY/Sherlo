@@ -18220,7 +18220,8 @@
             "description": "general keys call WhatsApp and the rest of the API. payment keys open checkouts and are visible only to the payment account.",
             "enum": [
               "general",
-              "payment"
+              "payment",
+              "payment-test"
             ],
             "default": "general"
           },
@@ -18292,7 +18293,8 @@
             "type": "string",
             "enum": [
               "general",
-              "payment"
+              "payment",
+              "payment-test"
             ],
             "default": "general"
           },
@@ -18375,7 +18377,8 @@
             "type": "string",
             "enum": [
               "general",
-              "payment"
+              "payment",
+              "payment-test"
             ],
             "default": "general"
           },

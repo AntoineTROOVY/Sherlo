@@ -8,6 +8,7 @@ import {
   gatewayPaymentById,
   initializeGatewayStore,
   insertGatewayPayment,
+  markTestPaymentPaid,
 } from './pay-store';
 
 let directory: string;
@@ -59,6 +60,25 @@ it('records a paid gateway payment for the calling application to read back', ()
     exchangeRate: 421.05,
   });
   expect(stored?.paidAt).toEqual(expect.any(String));
+});
+
+it('does not let the test page mark a live payment as paid', () => {
+  const created = insertGatewayPayment(
+    {
+      reference: 'order-1',
+      environment: 'production',
+      productName: 'Other app',
+      email: 'buyer@example.com',
+      fullName: null,
+      amount: 400,
+      currency: 'EUR',
+      returnUrl: 'https://app.example/thanks',
+      cancelUrl: 'https://app.example/cancel',
+    },
+    env,
+  );
+  markTestPaymentPaid(created.id, env);
+  expect(gatewayPaymentById(created.id, env)?.status).toBe('pending');
 });
 
 it('rejects a gateway callback whose amount or session does not match', () => {

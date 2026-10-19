@@ -225,7 +225,7 @@ export function ApiKeys() {
   const deleteMutation = useDeleteApiKeyMutation();
   const revokeMutation = useRevokeApiKeyMutation();
   const [showModal, setShowModal] = useState(false);
-  const [createPurpose, setCreatePurpose] = useState<'general' | 'payment'>('general');
+  const [createPurpose, setCreatePurpose] = useState<'general' | 'payment' | 'payment-test'>('general');
   const [newKey, setNewKey] = useState(emptyKeyForm);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -251,7 +251,7 @@ export function ApiKeys() {
     setNewKey(emptyKeyForm);
   };
 
-  const openCreate = (purpose: 'general' | 'payment') => {
+  const openCreate = (purpose: 'general' | 'payment' | 'payment-test') => {
     setCreatePurpose(purpose);
     setCreatedKey(null);
     setNewKey({ ...emptyKeyForm, role: 'operator' });
@@ -270,17 +270,18 @@ export function ApiKeys() {
       toast.error(t('apiKeys.createBtn'), t('apiKeys.expiry.invalid'));
       return;
     }
+    const paymentKey = createPurpose !== 'general';
     const scoped = canScopeSessions(newKey.role);
     const allowedIps = parseScopeList(newKey.ips);
     const allowedChats = scoped ? normalizeChatScope(newKey.chats) : [];
     try {
       const created = await createMutation.mutateAsync({
         name: newKey.name,
-        role: createPurpose === 'payment' ? 'operator' : newKey.role,
-        ...(createPurpose === 'payment' ? { purpose: 'payment' } : {}),
-        ...(createPurpose !== 'payment' && scoped ? { allowedSessions: newKey.allowedSessions } : {}),
+        role: paymentKey ? 'operator' : newKey.role,
+        ...(paymentKey ? { purpose: createPurpose } : {}),
+        ...(!paymentKey && scoped ? { allowedSessions: newKey.allowedSessions } : {}),
         ...(allowedIps.length > 0 ? { allowedIps } : {}),
-        ...(createPurpose !== 'payment' && allowedChats.length > 0 ? { allowedChats } : {}),
+        ...(!paymentKey && allowedChats.length > 0 ? { allowedChats } : {}),
         ...(newKey.expires ? { expiresAt: new Date(newKey.expires).toISOString() } : {}),
       });
       setCreatedKey(created.apiKey || null);
@@ -500,9 +501,12 @@ export function ApiKeys() {
     [t, sessions],
   );
 
-  const generalKeys = useMemo(() => apiKeys.filter(key => key.purpose !== 'payment'), [apiKeys]);
+  const generalKeys = useMemo(
+    () => apiKeys.filter(key => key.purpose !== 'payment' && key.purpose !== 'payment-test'),
+    [apiKeys],
+  );
   const paymentKeyRows = useMemo(
-    () => (showPaymentKeys ? apiKeys.filter(key => key.purpose === 'payment') : []),
+    () => (showPaymentKeys ? apiKeys.filter(key => key.purpose === 'payment' || key.purpose === 'payment-test') : []),
     [apiKeys, showPaymentKeys],
   );
 
@@ -557,7 +561,9 @@ export function ApiKeys() {
               ? t('apiKeys.createdTitle')
               : createPurpose === 'payment'
                 ? t('apiKeys.payment.modalTitle')
-                : t('apiKeys.modalTitle')
+                : createPurpose === 'payment-test'
+                  ? t('apiKeys.payment.testModalTitle')
+                  : t('apiKeys.modalTitle')
           }
           closeLabel={t('common.close')}
           footer={
@@ -595,6 +601,7 @@ export function ApiKeys() {
             </div>
           ) : (
             <>
+              {createPurpose === 'payment-test' && <p className="payment-test-note">{t('apiKeys.payment.testNote')}</p>}
               <label htmlFor="ak-1">{t('common.name')}</label>
               <input
                 id="ak-1"
@@ -643,7 +650,7 @@ export function ApiKeys() {
               )}
               <KeyLimitFields
                 idPrefix="ak-new"
-                role={createPurpose === 'payment' ? 'admin' : newKey.role}
+                role={createPurpose === 'general' ? newKey.role : 'admin'}
                 ips={newKey.ips}
                 chats={newKey.chats}
                 expires={newKey.expires}
@@ -725,10 +732,16 @@ export function ApiKeys() {
               <h2>{t('apiKeys.payment.title')}</h2>
               <p>{t('apiKeys.payment.lead')}</p>
             </div>
-            <button className="btn-secondary" onClick={() => openCreate('payment')}>
-              <Plus size={18} />
-              {t('apiKeys.payment.create')}
-            </button>
+            <div className="payment-keys-actions">
+              <button className="btn-secondary" onClick={() => openCreate('payment')}>
+                <Plus size={18} />
+                {t('apiKeys.payment.create')}
+              </button>
+              <button className="btn-secondary" onClick={() => openCreate('payment-test')}>
+                <Plus size={18} />
+                {t('apiKeys.payment.testCreate')}
+              </button>
+            </div>
           </div>
           {paymentKeyRows.length === 0 ? (
             <p className="payment-keys-empty">{t('apiKeys.payment.empty')}</p>
@@ -736,7 +749,10 @@ export function ApiKeys() {
             <ul className="payment-keys-list">
               {paymentKeyRows.map(key => (
                 <li key={key.id}>
-                  <span className="name-cell">{key.name}</span>
+                  <span className="name-cell">
+                    {key.name}
+                    {key.purpose === 'payment-test' && <span className="payment-key-badge">{t('apiKeys.payment.testBadge')}</span>}
+                  </span>
                   <code>{key.keyPrefix}****</code>
                   <span className="actions-cell">
                     <button

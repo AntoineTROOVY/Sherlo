@@ -1,7 +1,8 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { requestCheckoutOrigin } from './pay-origin';
 import { minorUnits, PayService } from './pay.service';
 
 const previous = {
@@ -44,7 +45,69 @@ it('refuses a customer return URL that is not public HTTPS before contacting the
     returnUrl: 'http://localhost:3000/thanks',
     cancelUrl: 'https://app.example/cancel',
   };
-  await expect(service.create(input)).rejects.toThrow(BadRequestException);
-  await expect(service.create({ ...input, returnUrl: 'https://10.0.0.1/thanks' })).rejects.toThrow(BadRequestException);
+  const live = { test: false, origin: 'https://api.sherlo.co' };
+  await expect(service.create(input, live)).rejects.toThrow(BadRequestException);
+  await expect(service.create({ ...input, returnUrl: 'https://10.0.0.1/thanks' }, live)).rejects.toThrow(
+    BadRequestException,
+  );
+  rmSync(directory, { recursive: true, force: true });
+});
+
+it('keeps a test card on a Sherlo host', () => {
+  expect(requestCheckoutOrigin({ protocol: 'http', get: () => 'api.sherlo.co', headers: {} }, {})).toBe(
+    'https://api.sherlo.co',
+  );
+  expect(
+    requestCheckoutOrigin({ protocol: 'http', get: () => 'localhost:2795', headers: {} }, { NODE_ENV: 'development' }),
+  ).toBe('http://localhost:2795');
+  expect(
+    requestCheckoutOrigin(
+      { protocol: 'http', get: () => 'evil.example', headers: {} },
+      { NODE_ENV: 'production', BETTER_AUTH_URL: 'https://app.sherlo.co' },
+    ),
+  ).toBe('https://app.sherlo.co');
+});
+
+it('confirms a test checkout on Sherlo’s card page without calling the bank', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sherlo-pay-test-'));
+  process.env.AUTH_DATABASE_PATH = join(directory, 'auth.sqlite');
+  delete process.env.SPAYON_CLIENT_ID;
+  delete process.env.SPAYON_CLIENT_SECRET;
+  process.env.SPAYON_ENVIRONMENT = 'production';
+  process.env.SPAYON_CURRENCY = 'EUR';
+  process.env.BETTER_AUTH_URL = 'https://api.sherlo.co';
+  const service = new PayService();
+  const input = {
+    amount: 4,
+    productName: 'Other app <b>',
+    email: 'buyer@example.com',
+    reference: 'order-test',
+    returnUrl: 'https://app.example/thanks',
+    cancelUrl: 'https://app.example/cancel',
+  };
+  const created = await service.create(input, { test: true, origin: 'http://api.sherlo.co' });
+  expect(created).toMatchObject({ status: 'pending', amount: 4, currency: 'EUR', amountAmd: 1600, exchangeRate: 400 });
+  expect(created.url).toMatch(/^https:\/\/api\.sherlo\.co\/api\/pay\/test\/[0-9a-f-]+\?t=/);
+  expect((await service.create(input, { test: true, origin: 'https://api.sherlo.co' })).url).toBe(created.url);
+  expect(() => service.find(created.id, false)).toThrow(NotFoundException);
+
+  const token = new URL(created.url!).searchParams.get('t') ?? '';
+  const page = service.testCheckout(created.id, token);
+  expect(page).toMatchObject({ action: 'html', status: 200 });
+  if (page?.action === 'html') {
+    expect(page.html).toContain('Payer');
+    expect(page.html).toContain('&lt;b&gt;');
+    expect(page.html).not.toMatch(/<input[^>]*\sname=/);
+  }
+  const paid = service.completeTestCheckout(created.id, token);
+  expect(paid?.action).toBe('redirect');
+  if (paid?.action === 'redirect') {
+    const back = new URL(paid.location);
+    expect(`${back.origin}${back.pathname}`).toBe('https://app.example/thanks');
+    expect(back.searchParams.get('payment')).toBe(created.id);
+    expect(back.searchParams.get('reference')).toBe('order-test');
+  }
+  expect(service.find(created.id, true)).toMatchObject({ status: 'paid', url: null, amountAmd: 1600 });
+  expect(service.completeTestCheckout(created.id, 'nope')).toBeNull();
   rmSync(directory, { recursive: true, force: true });
 });

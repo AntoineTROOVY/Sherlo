@@ -51,6 +51,26 @@
   gap: 1rem;
 }
 
+.api-keys-page .payment-keys-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.api-keys-page .payment-key-badge {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.api-keys-page .payment-test-note {
+  margin: 0 0 1rem;
+  color: var(--text-muted);
+}
+
 .api-keys-page .payment-keys-list code {
   color: var(--text-secondary);
 }

@@ -675,6 +675,10 @@
       "title": "Clé API paiement",
       "lead": "Visible uniquement sur ce compte. Rôle opérateur, sans session WhatsApp. Elle s’envoie dans l’en-tête X-API-Key.",
       "create": "Créer la clé de paiement",
+      "testCreate": "Créer une clé de test",
+      "testBadge": "Test",
+      "testModalTitle": "Créer une clé de test",
+      "testNote": "Les requêtes restent les mêmes. Cette clé ouvre une page carte Sherlo : n’importe quelles informations sont acceptées, puis l’acheteur revient sur votre application.",
       "empty": "Aucune clé de paiement.",
       "modalTitle": "Créer la clé de paiement"
     },
