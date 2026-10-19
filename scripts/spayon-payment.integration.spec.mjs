@@ -86,7 +86,11 @@ test('Spayon checkout, signed callback and return reconciliation through account
       assert.ok(body.price === 59 || body.price === 4);
       assert.equal(body.currency, 'EUR');
       assert.equal(body.callback_url, 'http://sherlo.test/api/account/spayon/webhook');
-      assert.equal(body.return_url, 'http://sherlo.test/billing?checkout=returned');
+      assert.match(body.return_url, /^https:\/\/sherlo\.test\/api\/pay\/r\/[0-9a-f]{32}$/);
+      assert.match(body.cancel_url, /^https:\/\/sherlo\.test\/api\/pay\/r\/[0-9a-f]{32}$/);
+      assert.notEqual(body.return_url, body.cancel_url);
+      assert.equal(body.return_url.includes('billing'), false);
+      assert.equal(body.product_name, 'Sherlo Pro');
       assert.equal(body.product_id, undefined);
       assert.equal(body.defaultPaymentMethod, 'visamaster');
       const sessionId = `session-${orders.size + 1}`;

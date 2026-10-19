@@ -23,11 +23,15 @@ import {
   type GatewayPayment,
 } from './pay-store';
 import { acceptedOrigin } from './pay-origin';
+import { issuePaymentHandoff } from './payment-handoff';
 import { testAmdQuote, testCardPage, testClosedPage } from './pay-test-page';
 import Database from 'better-sqlite3';
 import { authDatabasePath } from '../account/account-actor';
 
 const logger = createLogger('Pay');
+
+/** The only product title the payment provider is allowed to see. */
+export const PROVIDER_PRODUCT_NAME = 'Sherlo Pro';
 
 export interface CreatePayCheckout {
   amount: number;
@@ -118,6 +122,14 @@ export class PayService {
     return { action: 'redirect', location: buyerUrl(payment.cancelUrl, payment) };
   }
 
+  /** Browser hop after the bank. The provider never receives this address. */
+  buyerHandoff(id: string, kind: 'return' | 'cancel'): string | null {
+    this.ensureStore();
+    const payment = gatewayPaymentById(id, process.env);
+    if (!payment) return null;
+    return buyerUrl(kind === 'cancel' ? payment.cancelUrl : payment.returnUrl, payment);
+  }
+
   private visibleTestPayment(id: string, token: string | undefined): GatewayPayment | null {
     this.ensureStore();
     const payment = gatewayPaymentById(id, process.env);
@@ -175,7 +187,7 @@ export class PayService {
         {
           reference,
           environment,
-          productName,
+          productName: PROVIDER_PRODUCT_NAME,
           email,
           fullName,
           amount,
@@ -192,14 +204,8 @@ export class PayService {
     if (!settings.credentials) {
       throw new ServiceUnavailableException('Payment is not configured yet');
     }
-    const destination = new URL(returnUrl);
-    destination.searchParams.set('payment', payment.id);
-    destination.searchParams.set('reference', payment.reference);
-    const cancelled = new URL(cancelUrl);
-    cancelled.searchParams.set('payment', payment.id);
-    cancelled.searchParams.set('reference', payment.reference);
     const request: SpayonCheckoutRequest = {
-      product_name: productName,
+      product_name: PROVIDER_PRODUCT_NAME,
       price: amount / 100,
       currency,
       order_id: payment.id,
@@ -207,8 +213,8 @@ export class PayService {
       full_name: fullName ?? undefined,
       defaultPaymentMethod: 'visamaster',
       callback_url: spayonUrls(process.env, settings.environment).callback,
-      return_url: destination.toString(),
-      cancel_url: cancelled.toString(),
+      return_url: issuePaymentHandoff(buyerUrl(returnUrl, payment), process.env),
+      cancel_url: issuePaymentHandoff(buyerUrl(cancelUrl, payment), process.env),
     };
     try {
       const client = new SpayonClient(settings.credentials);

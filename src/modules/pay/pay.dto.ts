@@ -14,7 +14,10 @@ export class CreatePayCheckoutDto {
   @MaxLength(3)
   currency?: string;
 
-  @ApiProperty({ example: 'Pro plan' })
+  @ApiProperty({
+    example: 'Pro plan',
+    description: 'Ignored. The payment provider always receives the product title Sherlo Pro.',
+  })
   @IsString()
   @MinLength(1)
   @MaxLength(120)
@@ -40,7 +43,10 @@ export class CreatePayCheckoutDto {
   @MaxLength(80)
   reference!: string;
 
-  @ApiProperty({ description: 'Public page of your application. The buyer returns here, never to Sherlo.' })
+  @ApiProperty({
+    description:
+      'Public page of your application. Sherlo keeps it and redirects the buyer here. The payment provider only receives a Sherlo address.',
+  })
   @IsString()
   @MaxLength(2000)
   returnUrl!: string;

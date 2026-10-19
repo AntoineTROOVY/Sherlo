@@ -103,7 +103,8 @@ it('confirms a test checkout on Sherlo’s card page without calling the bank', 
   expect(page).toMatchObject({ action: 'html', status: 200 });
   if (page?.action === 'html') {
     expect(page.html).toContain('Payer');
-    expect(page.html).toContain('&lt;b&gt;');
+    expect(page.html).toContain('Sherlo Pro');
+    expect(page.html).not.toContain('Other app');
     expect(page.html).toContain(`action="/api/pay/test/${created.id}?t=`);
     expect(page.html).not.toContain('https://app.sherlo.co');
     expect(page.html).not.toMatch(/<input[^>]*\sname=/);
@@ -116,7 +117,63 @@ it('confirms a test checkout on Sherlo’s card page without calling the bank', 
     expect(back.searchParams.get('payment')).toBe(created.id);
     expect(back.searchParams.get('reference')).toBe('order-test');
   }
+  expect(service.buyerHandoff(created.id, 'return')).toContain('https://app.example/thanks');
+  expect(service.buyerHandoff(created.id, 'cancel')).toContain('https://app.example/cancel');
   expect(service.find(created.id, true)).toMatchObject({ status: 'paid', url: null, amountAmd: 1600 });
   expect(service.completeTestCheckout(created.id, 'nope')).toBeNull();
   rmSync(directory, { recursive: true, force: true });
+});
+
+it('never gives Spayon the application address or product title', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'sherlo-pay-proxy-'));
+  process.env.AUTH_DATABASE_PATH = join(directory, 'auth.sqlite');
+  process.env.SPAYON_CLIENT_ID = 'client';
+  process.env.SPAYON_CLIENT_SECRET = 'secret';
+  process.env.SPAYON_ENVIRONMENT = 'sandbox';
+  process.env.SPAYON_CURRENCY = 'EUR';
+  process.env.BETTER_AUTH_URL = 'https://api.sherlo.co';
+  const seen: Array<Record<string, unknown>> = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (typeof init?.body === 'string' && init.body.startsWith('{')) seen.push(JSON.parse(init.body));
+    if (url.includes('/tokens')) {
+      return new Response(JSON.stringify({ access_token: 'tok', expires_in: 3600 }), { status: 200 });
+    }
+    if (init?.method === 'POST' && url.includes('checkout-session')) {
+      return new Response(
+        JSON.stringify({ session_id: 'sess-1', session_url: 'https://pay.spayon.io/sandbox/session/sess-1' }),
+        { status: 200 },
+      );
+    }
+    return new Response('stop', { status: 500 });
+  }) as typeof fetch;
+  try {
+    const service = new PayService();
+    await expect(
+      service.create(
+        {
+          amount: 49.99,
+          productName: 'Basic Pass secret',
+          email: 'buyer@example.com',
+          reference: 'order-proxy',
+          returnUrl: 'https://basic-pass.com/compte/',
+          cancelUrl: 'https://basic-pass.com/compte/?arcapay=cancel',
+        },
+        { test: false, origin: 'https://basic-pass.com' },
+      ),
+    ).rejects.toThrow();
+    const payload = seen.find(body => typeof body.product_name === 'string');
+    const encoded = JSON.stringify(payload);
+    const handoff = /^https:\/\/api\.sherlo\.co\/api\/pay\/r\/[0-9a-f]{32}$/;
+    expect(payload?.product_name).toBe('Sherlo Pro');
+    expect(String(payload?.return_url)).toMatch(handoff);
+    expect(String(payload?.cancel_url)).toMatch(handoff);
+    expect(payload?.return_url).not.toBe(payload?.cancel_url);
+    expect(encoded).not.toContain('basic-pass.com');
+    expect(encoded).not.toContain('Basic Pass');
+  } finally {
+    globalThis.fetch = original;
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

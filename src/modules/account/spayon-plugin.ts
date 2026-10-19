@@ -15,6 +15,7 @@ import {
   spayonOrderForUser,
 } from './spayon-store';
 import { applyGatewayPayment } from '../pay/pay-store';
+import { issuePaymentHandoff } from '../pay/payment-handoff';
 
 const logger = createLogger('Spayon');
 
@@ -82,8 +83,8 @@ export async function spayonPlugins(settings: SpayonSettings, env: NodeJS.Proces
       full_name: user.name,
       defaultPaymentMethod: 'visamaster',
       callback_url: urls.callback,
-      return_url: `${urls.back}?checkout=returned`,
-      cancel_url: `${urls.back}?checkout=canceled`,
+      return_url: issuePaymentHandoff(`${urls.back}?checkout=returned`, env),
+      cancel_url: issuePaymentHandoff(`${urls.back}?checkout=canceled`, env),
     };
     let checkout;
     if (resumable?.sessionId) {
