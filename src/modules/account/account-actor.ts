@@ -1,4 +1,4 @@
-import { ApiKey, ApiKeyRole } from '../auth/entities/api-key.entity';
+import { ApiKey, ApiKeyPurpose, ApiKeyRole } from '../auth/entities/api-key.entity';
 
 /** Sent so an account with no WhatsApp sessions is scoped to nothing. An empty list means "every session". */
 export const ACCOUNT_SCOPE_NONE = '00000000-0000-0000-0000-000000000000';
@@ -13,8 +13,29 @@ export interface AccountIdentity {
   sessionIds: string[];
 }
 
+/** The only dashboard account that can see or create payment API keys. */
+export const PAYMENT_KEY_OWNER_EMAIL = 'destructor67810@gmail.com';
+
 export interface AccountApiKey extends ApiKey {
   accountUserId: string;
+  accountEmail: string;
+}
+
+/** True only for the dashboard session of the payment owner. A raw API key never qualifies. */
+export function canManagePaymentKeys(key: ApiKey | undefined): boolean {
+  if (!accountUserIdOf(key)) return false;
+  const email = (key as AccountApiKey).accountEmail || key?.name || '';
+  return email.trim().toLowerCase() === PAYMENT_KEY_OWNER_EMAIL;
+}
+
+/** The payment owner keeps the API-keys page even when another account was created first. */
+export function dashboardRoleForAccount(
+  email: string | undefined,
+  storedRole: string | undefined,
+): 'admin' | 'user' {
+  if (storedRole === 'admin') return 'admin';
+  if (email?.trim().toLowerCase() === PAYMENT_KEY_OWNER_EMAIL) return 'admin';
+  return 'user';
 }
 
 export function accountUserIdOf(key: ApiKey | undefined): string | undefined {
@@ -65,10 +86,12 @@ export function resolveTrustedOrigins(env: NodeJS.ProcessEnv): string[] {
   add(env.DASHBOARD_URL);
   for (const part of (env.CORS_ORIGINS ?? '').split(',')) add(part);
   if (env.NODE_ENV !== 'production') {
-    add('http://localhost:2886');
-    add('http://localhost:2785');
-    add('http://127.0.0.1:2886');
-    add('http://127.0.0.1:2785');
+    const ports = new Set(['2886', '2785', env.PORT?.trim() || '', env.DASHBOARD_PORT?.trim() || '']);
+    for (const port of ports) {
+      if (!/^\d+$/.test(port)) continue;
+      add(`http://localhost:${port}`);
+      add(`http://127.0.0.1:${port}`);
+    }
   }
   return [...origins];
 }
@@ -102,9 +125,11 @@ export function syntheticAccountKey(identity: AccountIdentity): AccountApiKey {
     isActive: true,
     expiresAt: null,
     lastUsedAt: null,
+    purpose: ApiKeyPurpose.GENERAL,
     usageCount: 0,
     createdAt: new Date(0),
     updatedAt: new Date(0),
     accountUserId: identity.id,
+    accountEmail: identity.email,
   };
 }

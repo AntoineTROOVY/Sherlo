@@ -73,17 +73,25 @@ beforeEach(() => {
 afterEach(() => {
   rtl.cleanup();
   globalThis.fetch = originalFetch;
+  window.sessionStorage.removeItem('openwa_payment_keys');
 });
 
 test('shows 59 EUR as a single payment for 40 years, without a monthly price or portal', async () => {
   rtl.render(createElement(Billing));
   await rtl.screen.findByRole('button', { name: 'Activer Pro' });
-  assert.equal(rtl.screen.getByRole('link', { name: 'Créer une clé API' }).getAttribute('href'), '/api-keys');
+  assert.equal(rtl.screen.queryByRole('link', { name: 'Créer une clé API' }), null);
   assert.match(document.body.textContent!, /59,00\s*€/);
   assert.match(document.body.textContent!, /paiement unique/);
   assert.match(document.body.textContent!, /40 ans d’accès/);
   assert.doesNotMatch(document.body.textContent!, /\/mois|\/ an|Polar|Stripe/);
   assert.equal(rtl.screen.queryByRole('button', { name: 'Gérer l’abonnement' }), null);
+});
+
+test('shows the payment key link only for the account allowed to manage it', async () => {
+  window.sessionStorage.setItem('openwa_payment_keys', '1');
+  rtl.render(createElement(Billing));
+  await rtl.screen.findByRole('button', { name: 'Activer Pro' });
+  assert.equal(rtl.screen.getByRole('link', { name: 'Créer une clé API' }).getAttribute('href'), '/api-keys');
 });
 
 test('keeps a pending payment open and checks its result every 3 seconds', async () => {

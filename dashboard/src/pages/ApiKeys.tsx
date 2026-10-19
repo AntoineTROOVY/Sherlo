@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, type RefObject } from 'react';
+import { useState, useEffect, useMemo, useRef, useContext, type RefObject } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   useTable,
@@ -35,6 +35,7 @@ import { PageHeader } from '../components/PageHeader';
 import { Modal } from '../components/Modal';
 import { SessionScopePicker } from '../components/SessionScopePicker';
 import { useToast } from '../hooks/useToast';
+import { RoleContext } from '../hooks/useRole';
 import { copyToClipboard } from '../utils/clipboard';
 import { captionLength } from '../utils/bulkMedia';
 import {
@@ -212,6 +213,10 @@ const columnHelper = createColumnHelper<typeof features, ApiKey>();
 export function ApiKeys() {
   const { t } = useTranslation();
   const toast = useToast();
+  const role = useContext(RoleContext);
+  const showPaymentKeys = role
+    ? role.paymentKeys === true
+    : sessionStorage.getItem('openwa_payment_keys') === '1';
   useDocumentTitle(t('apiKeys.title'));
   const { data: apiKeys = [], isLoading: loading, error: apiKeysError } = useApiKeysQuery();
   const { data: sessions = [] } = useSessionsQuery();
@@ -220,6 +225,7 @@ export function ApiKeys() {
   const deleteMutation = useDeleteApiKeyMutation();
   const revokeMutation = useRevokeApiKeyMutation();
   const [showModal, setShowModal] = useState(false);
+  const [createPurpose, setCreatePurpose] = useState<'general' | 'payment'>('general');
   const [newKey, setNewKey] = useState(emptyKeyForm);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -240,8 +246,16 @@ export function ApiKeys() {
 
   const closeCreateModal = () => {
     setShowModal(false);
+    setCreatePurpose('general');
     setCreatedKey(null);
     setNewKey(emptyKeyForm);
+  };
+
+  const openCreate = (purpose: 'general' | 'payment') => {
+    setCreatePurpose(purpose);
+    setCreatedKey(null);
+    setNewKey({ ...emptyKeyForm, role: 'operator' });
+    setShowModal(true);
   };
 
   // A datetime-local with a blank segment reports an empty value, the same as no expiry at all, and
@@ -262,10 +276,11 @@ export function ApiKeys() {
     try {
       const created = await createMutation.mutateAsync({
         name: newKey.name,
-        role: newKey.role,
-        ...(scoped ? { allowedSessions: newKey.allowedSessions } : {}),
+        role: createPurpose === 'payment' ? 'operator' : newKey.role,
+        ...(createPurpose === 'payment' ? { purpose: 'payment' } : {}),
+        ...(createPurpose !== 'payment' && scoped ? { allowedSessions: newKey.allowedSessions } : {}),
         ...(allowedIps.length > 0 ? { allowedIps } : {}),
-        ...(allowedChats.length > 0 ? { allowedChats } : {}),
+        ...(createPurpose !== 'payment' && allowedChats.length > 0 ? { allowedChats } : {}),
         ...(newKey.expires ? { expiresAt: new Date(newKey.expires).toISOString() } : {}),
       });
       setCreatedKey(created.apiKey || null);
@@ -485,9 +500,15 @@ export function ApiKeys() {
     [t, sessions],
   );
 
+  const generalKeys = useMemo(() => apiKeys.filter(key => key.purpose !== 'payment'), [apiKeys]);
+  const paymentKeyRows = useMemo(
+    () => (showPaymentKeys ? apiKeys.filter(key => key.purpose === 'payment') : []),
+    [apiKeys, showPaymentKeys],
+  );
+
   const table = useTable({
     features,
-    data: apiKeys,
+    data: generalKeys,
     columns,
     state: { columnVisibility },
     onColumnVisibilityChange: setColumnVisibility,
@@ -510,7 +531,7 @@ export function ApiKeys() {
         title={t('apiKeys.title')}
         subtitle={t('apiKeys.subtitle')}
         actions={
-          <button className="btn-primary" onClick={() => setShowModal(true)}>
+          <button className="btn-primary" onClick={() => openCreate('general')}>
             <Plus size={18} />
             {t('apiKeys.createBtn')}
           </button>
@@ -531,7 +552,13 @@ export function ApiKeys() {
           // cannot be dismissed until the request settles.
           onClose={createMutation.isPending ? () => {} : closeCreateModal}
           hideCloseButton={createMutation.isPending}
-          title={createdKey ? t('apiKeys.createdTitle') : t('apiKeys.modalTitle')}
+          title={
+            createdKey
+              ? t('apiKeys.createdTitle')
+              : createPurpose === 'payment'
+                ? t('apiKeys.payment.modalTitle')
+                : t('apiKeys.modalTitle')
+          }
           closeLabel={t('common.close')}
           footer={
             !createdKey ? (
@@ -583,36 +610,40 @@ export function ApiKeys() {
               <span className={nameTooLong ? 'key-field-hint' : undefined} role="status">
                 {nameTooLong ? t('common.fieldTooLong', { max: 100, count: nameLength }) : ''}
               </span>
-              <label htmlFor="ak-2">{t('common.role')}</label>
-              <select
-                id="ak-2"
-                value={newKey.role}
-                onChange={e =>
-                  setNewKey({
-                    ...newKey,
-                    role: e.target.value,
-                    allowedSessions: canScopeSessions(e.target.value) ? newKey.allowedSessions : [],
-                    chats: canScopeSessions(e.target.value) ? newKey.chats : '',
-                  })
-                }
-              >
-                {roleNames.map(r => (
-                  <option key={r} value={r}>
-                    {t(`apiKeys.roles.${r}`)}
-                  </option>
-                ))}
-              </select>
-              {canScopeSessions(newKey.role) && (
-                <SessionScopePicker
-                  sessions={sessions}
-                  selectedIds={newKey.allowedSessions}
-                  onChange={ids => setNewKey({ ...newKey, allowedSessions: ids })}
-                  disabled={createMutation.isPending}
-                />
+              {createPurpose === 'general' && (
+                <>
+                  <label htmlFor="ak-2">{t('common.role')}</label>
+                  <select
+                    id="ak-2"
+                    value={newKey.role}
+                    onChange={e =>
+                      setNewKey({
+                        ...newKey,
+                        role: e.target.value,
+                        allowedSessions: canScopeSessions(e.target.value) ? newKey.allowedSessions : [],
+                        chats: canScopeSessions(e.target.value) ? newKey.chats : '',
+                      })
+                    }
+                  >
+                    {roleNames.map(r => (
+                      <option key={r} value={r}>
+                        {t(`apiKeys.roles.${r}`)}
+                      </option>
+                    ))}
+                  </select>
+                  {canScopeSessions(newKey.role) && (
+                    <SessionScopePicker
+                      sessions={sessions}
+                      selectedIds={newKey.allowedSessions}
+                      onChange={ids => setNewKey({ ...newKey, allowedSessions: ids })}
+                      disabled={createMutation.isPending}
+                    />
+                  )}
+                </>
               )}
               <KeyLimitFields
                 idPrefix="ak-new"
-                role={newKey.role}
+                role={createPurpose === 'payment' ? 'admin' : newKey.role}
                 ips={newKey.ips}
                 chats={newKey.chats}
                 expires={newKey.expires}
@@ -687,6 +718,49 @@ export function ApiKeys() {
         </Modal>
       )}
 
+      {showPaymentKeys && (
+        <section className="payment-keys">
+          <div className="payment-keys-head">
+            <div>
+              <h2>{t('apiKeys.payment.title')}</h2>
+              <p>{t('apiKeys.payment.lead')}</p>
+            </div>
+            <button className="btn-secondary" onClick={() => openCreate('payment')}>
+              <Plus size={18} />
+              {t('apiKeys.payment.create')}
+            </button>
+          </div>
+          {paymentKeyRows.length === 0 ? (
+            <p className="payment-keys-empty">{t('apiKeys.payment.empty')}</p>
+          ) : (
+            <ul className="payment-keys-list">
+              {paymentKeyRows.map(key => (
+                <li key={key.id}>
+                  <span className="name-cell">{key.name}</span>
+                  <code>{key.keyPrefix}****</code>
+                  <span className="actions-cell">
+                    <button
+                      className="icon-btn"
+                      onClick={() => setConfirmAction({ type: 'revoke', id: key.id, name: key.name })}
+                      title={t('apiKeys.actions.revoke')}
+                    >
+                      <RefreshCw size={16} />
+                    </button>
+                    <button
+                      className="icon-btn danger"
+                      onClick={() => setConfirmAction({ type: 'delete', id: key.id, name: key.name })}
+                      title={t('apiKeys.actions.delete')}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       <div className="api-keys-content">
         <div className="keys-table-container">
           {apiKeysError && apiKeys.length === 0 ? (
@@ -707,7 +781,7 @@ export function ApiKeys() {
                 </>
               )}
             </div>
-          ) : apiKeys.length === 0 ? (
+          ) : generalKeys.length === 0 ? (
             <div className="empty-table-state">
               <KeyRound size={48} strokeWidth={1} />
               <h3>{t('apiKeys.empty.title')}</h3>

@@ -15,7 +15,7 @@ import { In, Repository, UpdateQueryBuilder, DeleteQueryBuilder, type QueryDeepP
 import { randomBytes } from 'crypto';
 import { ipMatches } from '../../common/utils/ip';
 import { hashApiKey } from './api-key-hash';
-import { ApiKey, ApiKeyRole } from './entities/api-key.entity';
+import { ApiKey, ApiKeyPurpose, ApiKeyRole } from './entities/api-key.entity';
 import { CreateApiKeyDto, UpdateApiKeyDto } from './dto';
 import { createLogger } from '../../common/services/logger.service';
 import { setRequestActor } from '../../common/services/request-context';
@@ -191,6 +191,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       keyHash,
       keyPrefix,
       role,
+      purpose: ApiKeyPurpose.GENERAL,
     });
 
     return this.apiKeyRepository.save(apiKey);
@@ -207,6 +208,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       keyHash,
       keyPrefix,
       role: dto.role || ApiKeyRole.OPERATOR,
+      purpose: dto.purpose || ApiKeyPurpose.GENERAL,
       allowedIps: dto.allowedIps || null,
       allowedSessions: normalizeScopeList(dto.allowedSessions),
       allowedChats: normalizeChatAllowList(dto.allowedChats),

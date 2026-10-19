@@ -7,7 +7,7 @@ import { API_BASE_URL } from '../services/api';
 import './Login.css';
 
 interface LoginProps {
-  onLogin: (role?: string, engineType?: string, scoped?: boolean) => void;
+  onLogin: (role?: string, engineType?: string, scoped?: boolean, paymentKeys?: boolean) => void;
 }
 
 type AuthMode = 'sign-in' | 'sign-up' | 'forgot' | 'reset' | 'verify-otp';
@@ -61,11 +61,14 @@ export function Login({ onLogin }: LoginProps) {
       credentials: 'include',
     });
     if (response.ok) {
-      const data: { role?: string; engineType?: string; scoped?: unknown } = await response.json().catch(() => ({}));
+      const data: { role?: string; engineType?: string; scoped?: unknown; paymentKeys?: unknown } = await response
+        .json()
+        .catch(() => ({}));
       onLogin(
         data.role,
         typeof data.engineType === 'string' ? data.engineType : undefined,
         data.scoped === true,
+        data.paymentKeys === true,
       );
       return true;
     }

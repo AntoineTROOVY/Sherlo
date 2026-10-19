@@ -14,10 +14,11 @@ L’application appelante envoie le client sur la page de la banque. Il ne voit 
 
 La clé se crée dans le tableau de bord, par le compte administrateur Sherlo.
 
-1. Ouvrez [https://app.sherlo.co/api-keys](https://app.sherlo.co/api-keys). Le menu s’appelle **Clés API**. La page Facturation a le même lien, **Créer une clé API**.
-2. Choisissez le rôle **Opérateur**.
-3. Ne limitez pas la clé à une session WhatsApp, ni à des chats.
-4. Copiez la clé tout de suite. Elle n’est plus affichée ensuite.
+1. Ouvrez [https://app.sherlo.co/api-keys](https://app.sherlo.co/api-keys). Le menu s’appelle **Clés API**. La liste principale sert à WhatsApp, aux webhooks et au reste de l’API.
+2. La section **Clé API paiement** n’apparaît que pour le compte autorisé à encaisser. Les autres comptes ne voient pas ces clés, y compris dans la réponse de l’API.
+3. Choisissez le rôle **Opérateur**.
+4. Ne limitez pas la clé à une session WhatsApp, ni à des chats.
+5. Copiez la clé tout de suite. Elle n’est plus affichée ensuite.
 
 La clé a le rôle `operator` ou `admin`, **sans** restriction de session WhatsApp.
 

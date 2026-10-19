@@ -106,7 +106,7 @@ html {
   }
 }
 
-/* Global select/dropdown styling (dashboard only — TicketDM mounts on body). */
+/* Global select/dropdown styling, scoped to the dashboard root. */
 #root select {
   appearance: none;
   -webkit-appearance: none;

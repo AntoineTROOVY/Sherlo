@@ -14,4 +14,7 @@ export interface RoleContextType {
   /** Whether the key is restricted to selected sessions, so the cross-session routes refuse it. */
   scoped: boolean;
   setScoped: (scoped: boolean) => void;
+  /** The signed-in account may see and create payment API keys. */
+  paymentKeys?: boolean;
+  setPaymentKeys?: (paymentKeys: boolean) => void;
 }

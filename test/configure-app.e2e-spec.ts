@@ -136,15 +136,13 @@ describe('production HTTP surface (configureApp)', () => {
     expect(await nonceOf()).not.toEqual(await nonceOf());
   });
 
-  it('allows dashboard styles plus TicketDM widget assets', async () => {
+  it('allows dashboard styles and blocks third-party chat widgets', async () => {
     const res = await request(app.getHttpServer()).get('/').set('Accept', 'text/html').expect(200);
 
     const csp = res.headers['content-security-policy'];
     expect(csp).toMatch(/(?:^|;)font-src 'self' https:\/\/fonts\.gstatic\.com(?:;|$)/);
     expect(csp).toMatch(/(?:^|;)style-src 'self' 'unsafe-inline' https:\/\/fonts\.googleapis\.com(?:;|$)/);
-    expect(csp).toMatch(/(?:^|;)script-src [^;]*https:\/\/ticketdm\.com(?:;|$)/);
-    expect(csp).toMatch(/(?:^|;)connect-src 'self' https:\/\/ticketdm\.com(?:;|$)/);
-    expect(csp).toMatch(/(?:^|;)frame-src https:\/\/ticketdm\.com(?:;|$)/);
+    expect(csp).not.toMatch(/ticketdm\.com/);
     expect(csp).not.toMatch(/tawk\.to/);
   });
 

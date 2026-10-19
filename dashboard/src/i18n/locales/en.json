@@ -664,7 +664,14 @@
   },
   "apiKeys": {
     "title": "API Keys",
-    "subtitle": "Manage API keys for authentication and access control",
+    "subtitle": "Keys for WhatsApp, webhooks, and the rest of the API",
+    "payment": {
+      "title": "Payment API key",
+      "lead": "Visible only on this account. Operator role, with no WhatsApp session limit. Send it in the X-API-Key header.",
+      "create": "Create the payment key",
+      "empty": "No payment key yet.",
+      "modalTitle": "Create the payment key"
+    },
     "createBtn": "Create API Key",
     "modalTitle": "Create API Key",
     "createdTitle": "API Key Created",
@@ -1305,7 +1312,7 @@
     "promoApplied": "{{amount}} off",
     "promoInvalid": "Invalid promo code.",
     "apiKeyTitle": "Sherlo API key",
-    "apiKeyLead": "Another application pays with a key created here. Choose the operator role and do not restrict it to a WhatsApp session. Send it in the X-API-Key header.",
+    "apiKeyLead": "This section appears only on the account allowed to manage payments. Create the key under API Keys, in the payment section, with no WhatsApp session limit.",
     "apiKeyAction": "Create an API key"
   }
 }

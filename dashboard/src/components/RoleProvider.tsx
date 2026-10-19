@@ -53,6 +53,17 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const [paymentKeys, setPaymentKeysState] = useState(() => sessionStorage.getItem('openwa_payment_keys') === '1');
+
+  const setPaymentKeys = useCallback((allowed: boolean) => {
+    setPaymentKeysState(allowed);
+    if (allowed) {
+      sessionStorage.setItem('openwa_payment_keys', '1');
+    } else {
+      sessionStorage.removeItem('openwa_payment_keys');
+    }
+  }, []);
+
   const value: RoleContextType = {
     role,
     setRole,
@@ -64,6 +75,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     setEngineType,
     scoped,
     setScoped,
+    paymentKeys,
+    setPaymentKeys,
   };
 
   return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;

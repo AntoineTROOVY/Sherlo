@@ -670,7 +670,14 @@
   },
   "apiKeys": {
     "title": "Clés API",
-    "subtitle": "Gérez les clés API pour l'authentification et le contrôle d'accès",
+    "subtitle": "Clés pour WhatsApp, les webhooks et le reste de l’API",
+    "payment": {
+      "title": "Clé API paiement",
+      "lead": "Visible uniquement sur ce compte. Rôle opérateur, sans session WhatsApp. Elle s’envoie dans l’en-tête X-API-Key.",
+      "create": "Créer la clé de paiement",
+      "empty": "Aucune clé de paiement.",
+      "modalTitle": "Créer la clé de paiement"
+    },
     "createBtn": "Créer une clé API",
     "modalTitle": "Créer une clé API",
     "createdTitle": "Clé API créée",
@@ -1311,7 +1318,7 @@
     "promoApplied": "Réduction de {{amount}}",
     "promoInvalid": "Code promo invalide.",
     "apiKeyTitle": "Clé API Sherlo",
-    "apiKeyLead": "Une autre application paie avec une clé créée ici. Choisissez le rôle opérateur, sans restriction de session. Elle s’envoie dans l’en-tête X-API-Key.",
+    "apiKeyLead": "Cette section n’apparaît que sur le compte autorisé. La clé se crée dans Clés API, section paiement, sans restriction de session WhatsApp.",
     "apiKeyAction": "Créer une clé API"
   }
 }

@@ -4,7 +4,7 @@ import { CurrentApiKey } from './decorators/auth.decorators';
 import { ApiKey } from './entities/api-key.entity';
 import { ValidateApiKeyResponseDto } from './dto';
 import { EngineFactory } from '../../engine/engine.factory';
-import { accountUserIdOf } from '../account/account-actor';
+import { accountUserIdOf, canManagePaymentKeys } from '../account/account-actor';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -27,6 +27,7 @@ export class AuthValidateController {
     role?: string;
     engineType?: string;
     scoped?: boolean;
+    paymentKeys?: boolean;
   } {
     // This route is behind the global API-key guard, so only a validated key reaches this handler
     // (a missing/invalid key 401s first). The guard has already verified the key — including its
@@ -46,6 +47,7 @@ export class AuthValidateController {
       role: apiKey.role,
       engineType: this.engineFactory.getCurrentEngine(),
       scoped: accountUserIdOf(apiKey) ? false : (apiKey.allowedSessions?.length ?? 0) > 0,
+      paymentKeys: canManagePaymentKeys(apiKey),
     };
   }
 }

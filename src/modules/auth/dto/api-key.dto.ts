@@ -1,7 +1,7 @@
 import { IsString, IsOptional, IsEnum, IsArray, ArrayUnique, IsDateString, MinLength, Validate } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MaxCodePoints } from '../../../common/validation/max-code-points';
-import { ApiKeyRole } from '../entities/api-key.entity';
+import { ApiKeyPurpose, ApiKeyRole } from '../entities/api-key.entity';
 import { IsIpOrCidrConstraint } from './is-ip-or-cidr.validator';
 import { IsSessionIdConstraint } from './is-session-id.validator';
 import { IsChatIdConstraint } from './is-chat-id.validator';
@@ -26,6 +26,16 @@ export class CreateApiKeyDto {
   @IsOptional()
   @IsEnum(ApiKeyRole)
   role?: ApiKeyRole;
+
+  @ApiPropertyOptional({
+    description:
+      'general keys call WhatsApp and the rest of the API. payment keys open checkouts and are visible only to the payment account.',
+    enum: ApiKeyPurpose,
+    default: ApiKeyPurpose.GENERAL,
+  })
+  @IsOptional()
+  @IsEnum(ApiKeyPurpose)
+  purpose?: ApiKeyPurpose;
 
   @ApiPropertyOptional({
     description: 'Allowed IP addresses (whitelist)',
@@ -90,6 +100,9 @@ export class ApiKeyResponseDto {
   @ApiProperty({ enum: ApiKeyRole })
   role!: ApiKeyRole;
 
+  @ApiProperty({ enum: ApiKeyPurpose, default: ApiKeyPurpose.GENERAL })
+  purpose!: ApiKeyPurpose;
+
   @ApiPropertyOptional()
   allowedIps?: string[];
 
@@ -142,6 +155,12 @@ export class ValidateApiKeyResponseDto {
     example: false,
   })
   scoped?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Whether this dashboard account may see and create payment API keys.',
+    example: false,
+  })
+  paymentKeys?: boolean;
 }
 
 export class UpdateApiKeyDto {

@@ -5,7 +5,7 @@ import type { IncomingHttpHeaders } from 'http';
 import { createLogger } from '../../common/services/logger.service';
 import { Session } from '../session/entities/session.entity';
 import { ApiKey } from '../auth/entities/api-key.entity';
-import { accountUserIdOf, syntheticAccountKey } from './account-actor';
+import { accountUserIdOf, dashboardRoleForAccount, syntheticAccountKey } from './account-actor';
 import { isBillingExemptApiPath, resolveBillingAccess } from './account-billing';
 import { loadAuthUserBillingRow } from './account-billing-user';
 import { startAuth } from './auth';
@@ -50,7 +50,7 @@ export class AccountAuthService implements OnModuleInit {
     const { auth, fromNodeHeaders } = await startAuth();
     const session = await auth.api.getSession({ headers: fromNodeHeaders(headers) });
     if (!session?.user) return null;
-    const role = (session.user as { role?: string }).role === 'admin' ? 'admin' : 'user';
+    const role = dashboardRoleForAccount(session.user.email, (session.user as { role?: string }).role);
     const sessionIds = (
       await this.sessions.find({ select: { id: true }, where: { ownerUserId: session.user.id } })
     ).map(row => row.id);

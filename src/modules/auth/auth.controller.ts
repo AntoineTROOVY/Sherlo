@@ -1,12 +1,13 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Req, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Req, HttpCode, HttpStatus, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { CreateApiKeyDto, UpdateApiKeyDto, ApiKeyResponseDto, ApiKeyCreatedResponseDto } from './dto';
 import { RequireRole, CurrentApiKey, RequireUnscopedKey } from './decorators/auth.decorators';
-import { type ApiKey, ApiKeyRole } from './entities/api-key.entity';
+import { type ApiKey, ApiKeyPurpose, ApiKeyRole } from './entities/api-key.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from './../audit/entities/audit-log.entity';
+import { canManagePaymentKeys } from '../account/account-actor';
 
 // A key stored before expiresAt was validated can hold an unparseable expiry, which SQLite reads back as
 // an Invalid Date. The gateway refuses such a key as expired, but JSON would serialize the expiry as null
@@ -45,6 +46,7 @@ export class AuthController {
   private authzSnapshot(key: ApiKey) {
     return {
       role: key.role,
+      purpose: key.purpose ?? ApiKeyPurpose.GENERAL,
       allowedIps: key.allowedIps,
       allowedSessions: key.allowedSessions,
       allowedChats: key.allowedChats,
@@ -62,11 +64,22 @@ export class AuthController {
       allowedSessions: k.allowedSessions || undefined,
       allowedChats: k.allowedChats || undefined,
       isActive: k.isActive,
+      purpose: k.purpose ?? ApiKeyPurpose.GENERAL,
       expiresAt: readableExpiry(k.expiresAt) || undefined,
       lastUsedAt: k.lastUsedAt || undefined,
       usageCount: k.usageCount,
       createdAt: k.createdAt,
     };
+  }
+
+  private paymentHidden(key: ApiKey, actor?: ApiKey): boolean {
+    return (key.purpose ?? ApiKeyPurpose.GENERAL) === ApiKeyPurpose.PAYMENT && !canManagePaymentKeys(actor);
+  }
+
+  private refuseHiddenPaymentKey(key: ApiKey, actor: ApiKey | undefined, id: string): void {
+    if (this.paymentHidden(key, actor)) {
+      throw new NotFoundException(`API key with id '${id}' not found`);
+    }
   }
 
   @Post()
@@ -83,6 +96,14 @@ export class AuthController {
     @Req() req: Request,
     @CurrentApiKey() actor?: ApiKey,
   ): Promise<ApiKeyCreatedResponseDto> {
+    if (dto.purpose === ApiKeyPurpose.PAYMENT) {
+      if (!canManagePaymentKeys(actor)) {
+        throw new ForbiddenException('Only the payment account can manage payment API keys');
+      }
+      if ((dto.allowedSessions?.length ?? 0) > 0 || (dto.allowedChats?.length ?? 0) > 0) {
+        throw new BadRequestException('A payment key cannot be limited to a WhatsApp session or chat');
+      }
+    }
     const { apiKey, rawKey } = await this.authService.createApiKey(dto);
     await this.auditService.logInfo(AuditAction.API_KEY_CREATED, {
       ...this.auditContext(req, actor),
@@ -104,9 +125,9 @@ export class AuthController {
     description: 'All API keys (the plaintext key is never returned; only the keyPrefix).',
     type: [ApiKeyResponseDto],
   })
-  async findAll(): Promise<ApiKeyResponseDto[]> {
+  async findAll(@CurrentApiKey() actor?: ApiKey): Promise<ApiKeyResponseDto[]> {
     const keys = await this.authService.findAll();
-    return keys.map(k => this.toResponse(k));
+    return keys.filter(key => !this.paymentHidden(key, actor)).map(k => this.toResponse(k));
   }
 
   @Get(':id')
@@ -118,8 +139,11 @@ export class AuthController {
     type: ApiKeyResponseDto,
   })
   @ApiResponse({ status: 404, description: 'No API key with this id.' })
-  async findOne(@Param('id') id: string): Promise<ApiKeyResponseDto> {
+  async findOne(@Param('id') id: string, @CurrentApiKey() actor?: ApiKey): Promise<ApiKeyResponseDto> {
     const k = await this.authService.findOne(id);
+    if (this.paymentHidden(k, actor)) {
+      throw new NotFoundException(`API key with id '${id}' not found`);
+    }
     return this.toResponse(k);
   }
 
@@ -140,6 +164,7 @@ export class AuthController {
     @CurrentApiKey() actor?: ApiKey,
   ): Promise<ApiKeyResponseDto> {
     const before = await this.authService.findOne(id);
+    this.refuseHiddenPaymentKey(before, actor, id);
     const k = await this.authService.update(id, dto);
     await this.auditService.logInfo(AuditAction.API_KEY_UPDATED, {
       ...this.auditContext(req, actor),
@@ -165,6 +190,7 @@ export class AuthController {
   })
   async delete(@Param('id') id: string, @Req() req: Request, @CurrentApiKey() actor?: ApiKey): Promise<void> {
     const target = await this.authService.findOne(id);
+    this.refuseHiddenPaymentKey(target, actor, id);
     await this.authService.delete(id);
     await this.auditService.logInfo(AuditAction.API_KEY_DELETED, {
       ...this.auditContext(req, actor),
@@ -187,6 +213,8 @@ export class AuthController {
     @Req() req: Request,
     @CurrentApiKey() actor?: ApiKey,
   ): Promise<ApiKeyResponseDto> {
+    const existing = await this.authService.findOne(id);
+    this.refuseHiddenPaymentKey(existing, actor, id);
     const k = await this.authService.revoke(id);
     await this.auditService.logInfo(AuditAction.API_KEY_REVOKED, {
       ...this.auditContext(req, actor),

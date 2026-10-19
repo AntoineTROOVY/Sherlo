@@ -15,6 +15,7 @@ describe('AuthValidateController', () => {
       role: ApiKeyRole.ADMIN,
       engineType: 'baileys',
       scoped: false,
+      paymentKeys: false,
     });
   });
 
@@ -45,7 +46,13 @@ describe('AuthValidateController', () => {
     // The handler must NOT re-validate without an IP, which previously fail-closed and wrongly
     // reported valid:false for any key carrying an allowedIps restriction.
     const key = makeKey({ allowedIps: ['10.0.0.0/24'] });
-    expect(controller.validate(key)).toEqual({ valid: true, role: key.role, engineType: 'baileys', scoped: false });
+    expect(controller.validate(key)).toEqual({
+      valid: true,
+      role: key.role,
+      engineType: 'baileys',
+      scoped: false,
+      paymentKeys: false,
+    });
   });
 
   it('returns valid:false when no key is attached (defense-in-depth)', () => {

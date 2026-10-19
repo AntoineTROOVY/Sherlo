@@ -34,7 +34,7 @@ export function isKeyUnusable(status: number, message: unknown): boolean {
 }
 
 export type StartupValidation =
-  { action: 'role'; role: UserRole; scoped: boolean; engineType?: string } | { action: 'logout' } | { action: 'keep' };
+  { action: 'role'; role: UserRole; scoped: boolean; paymentKeys: boolean; engineType?: string } | { action: 'logout' } | { action: 'keep' };
 
 /**
  * Fold the startup /auth/validate answer into an auth decision:
@@ -50,15 +50,16 @@ export type StartupValidation =
  */
 export function resolveStartupValidation(
   status: number,
-  body: { valid?: boolean; role?: string; engineType?: string; scoped?: unknown } | null,
+  body: { valid?: boolean; role?: string; engineType?: string; scoped?: unknown; paymentKeys?: unknown } | null,
 ): StartupValidation {
   if (status === 401 || status === 403) return { action: 'logout' };
   if (status < 200 || status >= 300) return { action: 'keep' };
   if (body?.valid && isUserRole(body.role)) {
     const scoped = body.scoped === true;
+    const paymentKeys = body.paymentKeys === true;
     return typeof body.engineType === 'string'
-      ? { action: 'role', role: body.role, scoped, engineType: body.engineType }
-      : { action: 'role', role: body.role, scoped };
+      ? { action: 'role', role: body.role, scoped, paymentKeys, engineType: body.engineType }
+      : { action: 'role', role: body.role, scoped, paymentKeys };
   }
   return { action: 'keep' };
 }

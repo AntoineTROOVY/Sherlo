@@ -201,6 +201,7 @@ export interface ApiKey {
   name: string;
   keyPrefix: string;
   role: 'admin' | 'operator' | 'viewer';
+  purpose?: 'general' | 'payment';
   allowedIps?: string[];
   allowedSessions?: string[];
   allowedChats?: string[];
@@ -1051,6 +1052,7 @@ export const apiKeyApi = {
   create: (data: {
     name: string;
     role: string;
+    purpose?: 'general' | 'payment';
     allowedIps?: string[];
     allowedSessions?: string[];
     expiresAt?: string;

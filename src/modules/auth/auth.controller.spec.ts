@@ -3,7 +3,8 @@ import type { Request } from 'express';
 import { AuthController } from './auth.controller';
 import { UNSCOPED_KEY } from './decorators/auth.decorators';
 import { AuditAction } from '../audit/entities/audit-log.entity';
-import type { ApiKey } from './entities/api-key.entity';
+import { ApiKeyPurpose, type ApiKey } from './entities/api-key.entity';
+import { PAYMENT_KEY_OWNER_EMAIL } from '../account/account-actor';
 import type { AuthService } from './auth.service';
 import type { AuditService } from '../audit/audit.service';
 
@@ -145,6 +146,7 @@ describe('AuthController — API-key lifecycle audit logging', () => {
     expect(metadata?.role).toBe('operator');
     expect(metadata?.scope).toEqual({
       role: 'operator',
+      purpose: 'general',
       allowedIps: ['10.0.0.1'],
       allowedSessions: ['s1'],
       allowedChats: ['628123@c.us'],
@@ -238,5 +240,56 @@ describe('AuthController: unparseable stored expiry', () => {
     expect((await controller.findOne('k1')).expiresAt).toBe(expiresAt);
     authService.findOne.mockResolvedValueOnce({ ...stored, expiresAt: null });
     expect((await controller.findOne('k1')).expiresAt).toBeUndefined();
+  });
+});
+
+describe('AuthController — payment keys stay with the payment account', () => {
+  const paymentKey = {
+    id: 'pay-1',
+    name: 'checkout',
+    keyPrefix: 'owa_k1pay',
+    role: 'operator',
+    purpose: ApiKeyPurpose.PAYMENT,
+    isActive: true,
+    usageCount: 0,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+  } as unknown as ApiKey;
+  const generalKey = { ...paymentKey, id: 'gen-1', name: 'whatsapp', purpose: ApiKeyPurpose.GENERAL } as ApiKey;
+  const owner = {
+    id: 'user-1',
+    name: PAYMENT_KEY_OWNER_EMAIL,
+    accountUserId: 'user-1',
+    accountEmail: PAYMENT_KEY_OWNER_EMAIL,
+  } as unknown as ApiKey;
+
+  let authService: { findAll: jest.Mock; findOne: jest.Mock; createApiKey: jest.Mock };
+  let controller: AuthController;
+
+  beforeEach(() => {
+    authService = {
+      findAll: jest.fn().mockResolvedValue([generalKey, paymentKey]),
+      findOne: jest.fn().mockResolvedValue(paymentKey),
+      createApiKey: jest.fn(),
+    };
+    controller = new AuthController(authService as unknown as AuthService, { logInfo: jest.fn() } as unknown as AuditService);
+  });
+
+  it('hides payment keys from every other account and from a raw API key', async () => {
+    const listed = await controller.findAll();
+    expect(listed.map(key => key.id)).toEqual(['gen-1']);
+    await expect(controller.findOne('pay-1')).rejects.toThrow(/not found/);
+  });
+
+  it('lists and reads payment keys for the signed-in payment account', async () => {
+    const listed = await controller.findAll(owner);
+    expect(listed.map(key => key.id)).toEqual(['gen-1', 'pay-1']);
+    expect((await controller.findOne('pay-1', owner)).id).toBe('pay-1');
+  });
+
+  it('refuses to create a payment key for anyone else', async () => {
+    await expect(
+      controller.create({ name: 'checkout', purpose: ApiKeyPurpose.PAYMENT }, {} as Request),
+    ).rejects.toThrow(/payment account/);
+    expect(authService.createApiKey).not.toHaveBeenCalled();
   });
 });

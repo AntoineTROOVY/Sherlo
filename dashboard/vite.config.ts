@@ -27,19 +27,20 @@ export default defineConfig({
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
   server: {
-    port: 2886,
+    port: Number(process.env.DASHBOARD_PORT || 2886),
+    strictPort: Boolean(process.env.DASHBOARD_PORT),
     proxy: {
       // With the trailing slash: Vite matches a plain key as a string prefix, so '/api' also
       // captured the SPA route /api-keys and a reload of that page went to the backend.
       '/api/': {
-        target: 'http://localhost:2785',
+        target: process.env.API_PROXY_TARGET || 'http://localhost:2785',
         changeOrigin: true,
         secure: false,
       },
       // Proxy the WebSocket (socket.io) transport so the dashboard's real-time
       // chats/sessions streams work against the dev backend.
       '/socket.io': {
-        target: 'http://localhost:2785',
+        target: process.env.API_PROXY_TARGET || 'http://localhost:2785',
         ws: true,
         changeOrigin: true,
       },

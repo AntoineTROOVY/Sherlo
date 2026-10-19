@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Loader2 } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useBillingAccess, type BillingAccess } from '../hooks/useBillingAccess';
+import { RoleContext } from '../hooks/useRole';
 import { PageHeader } from '../components/PageHeader';
 import { API_BASE_URL } from '../services/api';
 import './Billing.css';
@@ -42,6 +43,10 @@ function money(amount: number, currency: string, locale: string): string {
 
 export function Billing() {
   const { t, i18n } = useTranslation();
+  const role = useContext(RoleContext);
+  const showPaymentKey = role
+    ? role.paymentKeys === true
+    : sessionStorage.getItem('openwa_payment_keys') === '1';
   useDocumentTitle(t('billing.title'));
   const [view, setView] = useState<BillingView>({ kind: 'loading' });
   const [pending, setPending] = useState(false);
@@ -367,13 +372,15 @@ export function Billing() {
               </article>
             </>
           )}
-          <article className="billing-panel billing-api-key">
-            <h3>{t('billing.apiKeyTitle')}</h3>
-            <p>{t('billing.apiKeyLead')}</p>
-            <a className="btn-secondary" href="/api-keys">
-              {t('billing.apiKeyAction')}
-            </a>
-          </article>
+          {showPaymentKey && (
+            <article className="billing-panel billing-api-key">
+              <h3>{t('billing.apiKeyTitle')}</h3>
+              <p>{t('billing.apiKeyLead')}</p>
+              <a className="btn-secondary" href="/api-keys">
+                {t('billing.apiKeyAction')}
+              </a>
+            </article>
+          )}
         </>
       )}
     </div>

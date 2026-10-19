@@ -10,6 +10,51 @@
 
 /* H1 inherited from global */
 
+.api-keys-page .payment-keys {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-white);
+}
+
+.api-keys-page .payment-keys-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.api-keys-page .payment-keys-head h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.api-keys-page .payment-keys-head p,
+.api-keys-page .payment-keys-empty {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.api-keys-page .payment-keys-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.api-keys-page .payment-keys-list li {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.api-keys-page .payment-keys-list code {
+  color: var(--text-secondary);
+}
+
 .api-keys-page .api-keys-content {
   display: flex;
   flex-direction: column;

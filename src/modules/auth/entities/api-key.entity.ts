@@ -6,6 +6,12 @@ export enum ApiKeyRole {
   VIEWER = 'viewer',
 }
 
+/** `payment` keys open checkouts. They stay hidden from every account except the payment owner. */
+export enum ApiKeyPurpose {
+  GENERAL = 'general',
+  PAYMENT = 'payment',
+}
+
 @Entity('api_keys')
 export class ApiKey {
   @PrimaryGeneratedColumn('uuid')
@@ -29,6 +35,9 @@ export class ApiKey {
     default: ApiKeyRole.OPERATOR,
   })
   role!: ApiKeyRole;
+
+  @Column({ type: 'varchar', length: 20, default: ApiKeyPurpose.GENERAL })
+  purpose!: ApiKeyPurpose;
 
   @Column({ type: 'simple-array', nullable: true })
   allowedIps!: string[] | null;

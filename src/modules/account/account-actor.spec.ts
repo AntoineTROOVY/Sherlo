@@ -4,6 +4,8 @@ import {
   accountAllowedSessions,
   accountUserIdOf,
   authDatabasePath,
+  canManagePaymentKeys,
+  dashboardRoleForAccount,
   resolveBetterAuthBaseURL,
   resolveBetterAuthSecret,
   resolveTrustedOrigins,
@@ -50,6 +52,19 @@ describe('resolveBetterAuthBaseURL', () => {
 });
 
 describe('resolveTrustedOrigins', () => {
+  it('accepts the dev server when it is started on another port', () => {
+    expect(
+      resolveTrustedOrigins({ NODE_ENV: 'development', PORT: '2795', DASHBOARD_PORT: '2896' }),
+    ).toEqual(
+      expect.arrayContaining([
+        'http://localhost:2896',
+        'http://127.0.0.1:2896',
+        'http://localhost:2795',
+        'http://localhost:2886',
+      ]),
+    );
+  });
+
   it('includes the public origin, the dashboard, and explicit CORS origins', () => {
     expect(
       resolveTrustedOrigins({
@@ -82,6 +97,20 @@ describe('syntheticAccountKey', () => {
     expect(admin.role).toBe(ApiKeyRole.ADMIN);
     expect(admin.allowedSessions).toEqual(['s1']);
     expect(accountUserIdOf(admin)).toBe('u1');
+    expect(admin.accountEmail).toBe('a@b.c');
+
+    const owner = syntheticAccountKey({
+      id: 'pay',
+      email: 'Destructor67810@gmail.com',
+      role: 'admin',
+      sessionIds: [],
+    });
+    expect(canManagePaymentKeys(owner)).toBe(true);
+    expect(canManagePaymentKeys(admin)).toBe(false);
+    expect(dashboardRoleForAccount('Destructor67810@gmail.com', 'user')).toBe('admin');
+    expect(dashboardRoleForAccount('someone@example.com', 'admin')).toBe('admin');
+    expect(dashboardRoleForAccount('someone@example.com', 'user')).toBe('user');
+    expect(canManagePaymentKeys({ ...owner, accountUserId: '' } as typeof owner)).toBe(false);
 
     const member = syntheticAccountKey({ id: 'u2', email: 'c@d.e', role: 'user', sessionIds: ['s2'] });
     expect(member.role).toBe(ApiKeyRole.OPERATOR);

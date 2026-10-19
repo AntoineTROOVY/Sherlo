@@ -45,6 +45,7 @@ test('startup validation: ok + role refreshes the cached role from the server', 
     action: 'role',
     role: 'viewer',
     scoped: false,
+    paymentKeys: false,
   });
 });
 
@@ -53,6 +54,7 @@ test('startup validation: ok + role also carries the engine the server reports',
     action: 'role',
     role: 'operator',
     scoped: false,
+    paymentKeys: false,
     engineType: 'baileys',
   });
 });
@@ -62,12 +64,20 @@ test('startup validation: ok + role carries whether the key is session-scoped', 
     action: 'role',
     role: 'admin',
     scoped: true,
+    paymentKeys: false,
   });
   // Anything but a literal true is unscoped.
   assert.deepEqual(resolveStartupValidation(200, { valid: true, role: 'admin', scoped: 'yes' }), {
     action: 'role',
     role: 'admin',
     scoped: false,
+    paymentKeys: false,
+  });
+  assert.deepEqual(resolveStartupValidation(200, { valid: true, role: 'admin', paymentKeys: true }), {
+    action: 'role',
+    role: 'admin',
+    scoped: false,
+    paymentKeys: true,
   });
 });
 

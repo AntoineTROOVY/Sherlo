@@ -8,7 +8,6 @@ import { ToastProvider } from './components/Toast';
 import { useRole } from './hooks/useRole';
 import { RoleProvider } from './components/RoleProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { TicketDMChat } from './components/TicketDMChat';
 import { API_BASE_URL } from './services/api';
 import { clearActorState, isUserRole, resolveStartupValidation } from './utils/authLifecycle';
 import './App.css';
@@ -44,9 +43,9 @@ function AppContent() {
   const [savedKey] = useState(() => sessionStorage.getItem('openwa_api_key'));
   const [savedAccount] = useState(() => sessionStorage.getItem('openwa_account') === '1');
   const [isAuthenticated, setIsAuthenticated] = useState(!!savedKey || savedAccount);
-  const { setRole, role, setEngineType, setScoped, scoped } = useRole();
+  const { setRole, role, setEngineType, setScoped, scoped, setPaymentKeys } = useRole();
 
-  const handleLogin = (validatedRole?: string, engineType?: string, scoped = false) => {
+  const handleLogin = (validatedRole?: string, engineType?: string, scoped = false, paymentKeys = false) => {
     sessionStorage.setItem('openwa_account', '1');
     sessionStorage.removeItem('openwa_api_key');
 
@@ -56,6 +55,7 @@ function AppContent() {
     setRole(isUserRole(validatedRole) ? validatedRole : 'viewer');
     setEngineType(engineType ?? null);
     setScoped(scoped);
+    setPaymentKeys?.(paymentKeys);
 
     setIsAuthenticated(true);
   };
@@ -66,13 +66,14 @@ function AppContent() {
     setRole(null);
     setEngineType(null);
     setScoped(false);
+    setPaymentKeys?.(false);
     sessionStorage.removeItem('openwa_api_key');
     sessionStorage.removeItem('openwa_account');
     // Wipe the React Query cache too: it is keyed by resource, not actor, so without a full
     // clear a logout → login in the same tab with a different key/scope shows the previous
     // actor's sessions/messages/apiKeys/audit rows.
     clearActorState(queryClient);
-  }, [setRole, setEngineType, setScoped]);
+  }, [setRole, setEngineType, setScoped, setPaymentKeys]);
 
   // Re-validate and refresh the role on mount if already authenticated
   useEffect(() => {
@@ -95,6 +96,7 @@ function AppContent() {
         } else if (decision.action === 'role') {
           setRole(decision.role);
           setScoped(decision.scoped);
+          setPaymentKeys?.(decision.paymentKeys);
           if (decision.engineType) setEngineType(decision.engineType);
         }
       })
@@ -102,7 +104,7 @@ function AppContent() {
         // Network failure (API unreachable): keep the cached role so a transient outage at
         // page load doesn't eject the user — an explicit 401/403 above still logs out.
       });
-  }, [savedKey, savedAccount, setRole, setEngineType, setScoped, handleLogout]);
+  }, [savedKey, savedAccount, setRole, setEngineType, setScoped, setPaymentKeys, handleLogout]);
 
   const loadingFallback = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
@@ -149,8 +151,6 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <RoleProvider>
-          {/* Mounted outside the auth branch so the chat is also on the login (landing) page. */}
-          <TicketDMChat />
           <AppContent />
         </RoleProvider>
       </QueryClientProvider>

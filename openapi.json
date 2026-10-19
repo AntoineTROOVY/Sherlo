@@ -18215,6 +18215,15 @@
             ],
             "default": "operator"
           },
+          "purpose": {
+            "type": "string",
+            "description": "general keys call WhatsApp and the rest of the API. payment keys open checkouts and are visible only to the payment account.",
+            "enum": [
+              "general",
+              "payment"
+            ],
+            "default": "general"
+          },
           "allowedIps": {
             "description": "Allowed IP addresses (whitelist)",
             "example": [
@@ -18279,6 +18288,14 @@
               "viewer"
             ]
           },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "general",
+              "payment"
+            ],
+            "default": "general"
+          },
           "allowedIps": {
             "type": "array",
             "items": {
@@ -18326,6 +18343,7 @@
           "name",
           "keyPrefix",
           "role",
+          "purpose",
           "isActive",
           "usageCount",
           "createdAt",
@@ -18352,6 +18370,14 @@
               "operator",
               "viewer"
             ]
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "general",
+              "payment"
+            ],
+            "default": "general"
           },
           "allowedIps": {
             "type": "array",
@@ -18395,6 +18421,7 @@
           "name",
           "keyPrefix",
           "role",
+          "purpose",
           "isActive",
           "usageCount",
           "createdAt"
@@ -18466,6 +18493,11 @@
           "scoped": {
             "type": "boolean",
             "description": "Whether the key is restricted to selected sessions; present only when valid.",
+            "example": false
+          },
+          "paymentKeys": {
+            "type": "boolean",
+            "description": "Whether this dashboard account may see and create payment API keys.",
             "example": false
           }
         },
