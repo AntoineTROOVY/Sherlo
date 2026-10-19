@@ -3,7 +3,8 @@ import { API_BASE_URL } from '../services/api';
 
 export interface BillingAccess {
   billingEnabled: boolean;
-  provider?: 'stripe' | 'polar' | null;
+  provider?: 'spayon' | null;
+  accessUntil?: string | null;
   subscribed: boolean;
   trialDaysTotal: number;
   trialDaysRemaining: number | null;

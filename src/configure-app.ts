@@ -79,13 +79,12 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
         directives: {
           defaultSrc: ["'self'"],
           // The dashboard bundles its fonts; Bull Board still falls back to system fonts when Google Fonts
-          // is blocked. Tawk.to injects `<link rel="stylesheet">` from embed.tawk.to — without that origin
-          // the widget renders unstyled and inherits the dashboard's global button/input rules.
-          styleSrc: ["'self'", "'unsafe-inline'", 'https://embed.tawk.to', 'https://fonts.googleapis.com'],
+          // is blocked. The TicketDM widget styles itself inside a shadow root, so it needs no external stylesheet origin.
+          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           scriptSrc: [
             "'self'",
             (_req, res) => `'nonce-${(res as Response).locals.cspNonce as string}'`,
-            'https://embed.tawk.to',
+            'https://ticketdm.com',
           ],
           // `blob:` is needed for the outgoing image-attachment preview, which the dashboard renders
           // from a URL.createObjectURL(file) blob before the message is sent (Chats.tsx).
@@ -94,8 +93,9 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
           // explicit media-src, <audio>/<video> fall back to default-src 'self' and are blocked.
           // Mirror imgSrc so audio/video render the same way images already do.
           mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
-          connectSrc: ["'self'", 'https://*.tawk.to', 'wss://*.tawk.to'],
-          frameSrc: ['https://embed.tawk.to'],
+          // TicketDM fetches its state/ping endpoints from its own origin and renders its panel in an iframe there.
+          connectSrc: ["'self'", 'https://ticketdm.com'],
+          frameSrc: ['https://ticketdm.com'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com'],
           objectSrc: ["'none'"],
           // Auto-upgrade HTTP→HTTPS in production, unless CSP_UPGRADE_INSECURE_REQUESTS opts out for an

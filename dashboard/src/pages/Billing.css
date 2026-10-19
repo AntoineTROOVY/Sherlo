@@ -124,6 +124,58 @@
   margin-bottom: 0.35rem;
 }
 
+.billing-pro-price-was {
+  margin-right: 0.45rem;
+  margin-bottom: 0.2rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: line-through;
+  color: color-mix(in srgb, #f4faf6 45%, transparent);
+}
+
+.billing-promo {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.85rem 0 0.75rem;
+}
+
+.billing-promo input {
+  flex: 1;
+  min-width: 0;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #f4faf6 28%, transparent);
+  background: transparent;
+  color: #f4faf6;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+}
+
+.billing-promo button {
+  border: none;
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  background: color-mix(in srgb, #f4faf6 14%, transparent);
+  color: #f4faf6;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.billing-promo button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.billing-promo-note {
+  margin: -0.35rem 0 1rem;
+  font-size: 0.8125rem;
+  color: var(--primary, #c8f542);
+}
+
+.billing-promo-note--error {
+  color: #fecaca;
+}
+
 .billing-pro-price-main {
   font-size: 2.75rem;
   font-weight: 800;

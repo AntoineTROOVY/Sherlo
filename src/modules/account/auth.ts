@@ -10,11 +10,11 @@ import {
   resolveTrustedOrigins,
   signupOpen,
 } from './account-actor';
-import { resolvePolarSettings } from './polar-config';
 import { createSendResetPassword, createSendVerificationOTP, resolveResendConfig } from './account-resend';
-import { polarPlugins } from './polar-plugin';
-import { resolveStripeSettings } from './stripe-config';
-import { stripePlugins } from './stripe-plugin';
+import { resolveSpayonSettings } from './spayon-config';
+import { spayonPlugins } from './spayon-plugin';
+import { initializeSpayonStore } from './spayon-store';
+import { initializeGatewayStore } from '../pay/pay-store';
 
 /** Mounted beside the existing /api/auth API-key routes, not on top of them. */
 export const BETTER_AUTH_BASE_PATH = '/api/account';
@@ -22,16 +22,12 @@ export const BETTER_AUTH_BASE_PATH = '/api/account';
 export interface StartedAuth {
   auth: AuthInstance['auth'];
   fromNodeHeaders: AuthInstance['fromNodeHeaders'];
-  /** True when POLAR_ACCESS_TOKEN is set and checkout is mounted. */
-  polar: boolean;
-  /** True when subscription webhooks are signed with POLAR_WEBHOOK_SECRET. */
-  polarWebhooks: boolean;
   /** True when RESEND_API_KEY is set and password-reset emails can be sent. */
   passwordReset: boolean;
   /** True when sign-up requires email OTP verification via Resend. */
   emailVerification: boolean;
-  /** True when STRIPE_SECRET_KEY and STRIPE_PRICE_ID are set. */
-  stripe: boolean;
+  /** True when Spayon credentials are configured. */
+  spayon: boolean;
   /** Resolved path to auth.sqlite (for ops logging). */
   authDatabaseFile: string;
   /** Number of Better Auth user rows after migration. */
@@ -92,14 +88,13 @@ async function buildAuth() {
 
   const baseURL = resolveBetterAuthBaseURL(process.env);
   const secureCookies = baseURL.startsWith('https://');
-  const stripeSettings = resolveStripeSettings(process.env);
-  const polar = stripeSettings ? null : resolvePolarSettings(process.env);
+  const spayonSettings = resolveSpayonSettings(process.env);
   const resendReady = resolveResendConfig(process.env) !== null;
   const sendResetPassword = createSendResetPassword(process.env);
   const passwordReset = resendReady;
   const emailVerification = resendReady;
 
-  const plugins: Awaited<ReturnType<typeof polarPlugins>> = [];
+  const plugins: Awaited<ReturnType<typeof spayonPlugins>> = [];
   if (emailVerification) {
     const { emailOTP } = await import('better-auth/plugins/email-otp');
     plugins.push(
@@ -111,11 +106,7 @@ async function buildAuth() {
       }),
     );
   }
-  if (stripeSettings) {
-    plugins.push(...(await stripePlugins(stripeSettings, process.env)));
-  } else if (polar) {
-    plugins.push(...(await polarPlugins(polar, process.env)));
-  }
+  plugins.push(...(await spayonPlugins(spayonSettings, process.env)));
 
   const options = {
     appName: 'Sherlo',
@@ -147,6 +138,8 @@ async function buildAuth() {
           defaultValue: 'user',
           input: false,
         },
+        // Retain historical billing columns so upgrading never removes account data.
+        // Spayon access is stored separately and never trusts these old status values.
         stripeCustomerId: {
           type: 'string' as const,
           required: false,
@@ -193,17 +186,17 @@ async function buildAuth() {
   // that races an empty file logs a false "missing tables" error on every fresh boot.
   const { runMigrations } = await getMigrations(options);
   await runMigrations();
+  initializeSpayonStore(sqlite);
+  initializeGatewayStore(sqlite);
   const auth = betterAuth(options);
   handler = toNodeHandler(auth);
 
   return {
     auth,
     fromNodeHeaders: (headers: IncomingHttpHeaders) => fromNodeHeaders(headers),
-    polar: polar !== null,
-    polarWebhooks: Boolean(polar?.webhookSecret),
     passwordReset,
     emailVerification,
-    stripe: stripeSettings !== null,
+    spayon: spayonSettings.credentials !== null,
     authDatabaseFile: databaseFile,
     accountUserCount: userCount(),
   };

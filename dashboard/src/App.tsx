@@ -8,7 +8,7 @@ import { ToastProvider } from './components/Toast';
 import { useRole } from './hooks/useRole';
 import { RoleProvider } from './components/RoleProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { TawkToChat } from './components/TawkToChat';
+import { TicketDMChat } from './components/TicketDMChat';
 import { API_BASE_URL } from './services/api';
 import { clearActorState, isUserRole, resolveStartupValidation } from './utils/authLifecycle';
 import './App.css';
@@ -120,7 +120,6 @@ function AppContent() {
 
   return (
     <ToastProvider>
-      <TawkToChat />
       <BrowserRouter>
         <Suspense fallback={loadingFallback}>
           <Routes>
@@ -150,6 +149,8 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <RoleProvider>
+          {/* Mounted outside the auth branch so the chat is also on the login (landing) page. */}
+          <TicketDMChat />
           <AppContent />
         </RoleProvider>
       </QueryClientProvider>

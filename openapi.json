@@ -589,6 +589,80 @@
         ]
       }
     },
+    "/api/pay/checkouts": {
+      "post": {
+        "description": "Creates a payment on https://api.sherlo.co. The response url is the bank page. The caller reads the result with GET /api/pay/checkouts/{id}. status paid is the confirmation.",
+        "operationId": "PayController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePayCheckoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayCheckoutResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Open a bank payment",
+        "tags": [
+          "pay"
+        ]
+      }
+    },
+    "/api/pay/checkouts/{id}": {
+      "get": {
+        "operationId": "PayController_find",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayCheckoutResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Read a payment result",
+        "tags": [
+          "pay"
+        ]
+      }
+    },
     "/api/sessions": {
       "post": {
         "operationId": "SessionController_create",
@@ -17964,6 +18038,10 @@
     {
       "name": "health",
       "description": "Health check endpoints"
+    },
+    {
+      "name": "pay",
+      "description": "Bank payments for other applications"
     }
   ],
   "servers": [
@@ -18393,6 +18471,108 @@
         },
         "required": [
           "valid"
+        ]
+      },
+      "CreatePayCheckoutDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 4,
+            "description": "Price in currency units. 4 means 4.00, not 4 cents."
+          },
+          "currency": {
+            "type": "string",
+            "example": "EUR"
+          },
+          "productName": {
+            "type": "string",
+            "example": "Pro plan"
+          },
+          "email": {
+            "type": "string",
+            "example": "buyer@example.com"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Ada Lovelace"
+          },
+          "reference": {
+            "type": "string",
+            "example": "order-1001",
+            "description": "Your own order reference. Repeating it returns the same payment."
+          },
+          "returnUrl": {
+            "type": "string",
+            "description": "Public page of your application. The buyer returns here, never to Sherlo."
+          },
+          "cancelUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "productName",
+          "email",
+          "reference",
+          "returnUrl",
+          "cancelUrl"
+        ]
+      },
+      "PayCheckoutResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reference": {
+            "type": "string",
+            "example": "order-1001"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paid",
+              "failed",
+              "expired"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "example": 4,
+            "description": "Price in currency units. 4 means 4.00, not 4 cents."
+          },
+          "currency": {
+            "type": "string",
+            "example": "EUR"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Bank page. Present while the payment can still be completed."
+          },
+          "paidAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "expiredAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "status",
+          "amount",
+          "currency",
+          "url",
+          "paidAt",
+          "expiredAt"
         ]
       },
       "CreateSessionDto": {

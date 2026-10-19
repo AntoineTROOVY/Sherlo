@@ -136,14 +136,16 @@ describe('production HTTP surface (configureApp)', () => {
     expect(await nonceOf()).not.toEqual(await nonceOf());
   });
 
-  it('allows dashboard styles plus Tawk.to widget assets', async () => {
+  it('allows dashboard styles plus TicketDM widget assets', async () => {
     const res = await request(app.getHttpServer()).get('/').set('Accept', 'text/html').expect(200);
 
     const csp = res.headers['content-security-policy'];
     expect(csp).toMatch(/(?:^|;)font-src 'self' https:\/\/fonts\.gstatic\.com(?:;|$)/);
-    expect(csp).toMatch(
-      /(?:^|;)style-src 'self' 'unsafe-inline' https:\/\/embed\.tawk\.to https:\/\/fonts\.googleapis\.com(?:;|$)/,
-    );
+    expect(csp).toMatch(/(?:^|;)style-src 'self' 'unsafe-inline' https:\/\/fonts\.googleapis\.com(?:;|$)/);
+    expect(csp).toMatch(/(?:^|;)script-src [^;]*https:\/\/ticketdm\.com(?:;|$)/);
+    expect(csp).toMatch(/(?:^|;)connect-src 'self' https:\/\/ticketdm\.com(?:;|$)/);
+    expect(csp).toMatch(/(?:^|;)frame-src https:\/\/ticketdm\.com(?:;|$)/);
+    expect(csp).not.toMatch(/tawk\.to/);
   });
 
   it('echoes the CORS header for an allowed Origin', async () => {

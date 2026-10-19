@@ -1,6 +1,6 @@
 # Documentation API Sherlo
 
-Documentation pour **connecter votre logiciel à Sherlo** via `https://api.sherlo.co`, avec une **clé API créée dans l’application** [app.sherlo.co](https://app.sherlo.co). Tout le reste (connexion à Sherlo, sessions WhatsApp, webhooks) passe par cette clé — rien d’autre à documenter côté auth produit.
+Documentation de l’**API WhatsApp** pour connecter un logiciel à Sherlo via `https://api.sherlo.co`, avec une **clé API créée dans l’application** [app.sherlo.co](https://app.sherlo.co). L’API de paiement est dans un autre document : [`API-PAIEMENTS.md`](./API-PAIEMENTS.md).
 
 | Service | URL |
 | -------- | ----- |

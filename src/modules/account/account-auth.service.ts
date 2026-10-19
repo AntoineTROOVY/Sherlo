@@ -29,23 +29,19 @@ export class AccountAuthService implements OnModuleInit {
     // The running server (Node, including the Dokploy image) loads it via dynamic import().
     if (process.env.JEST_WORKER_ID) return;
     const started = await startAuth();
-    this.logger.log(
-      `Better Auth ready (${started.accountUserCount} account(s), database ${started.authDatabaseFile})`,
-    );
+    this.logger.log(`Better Auth ready (${started.accountUserCount} account(s), database ${started.authDatabaseFile})`);
     if (!started.passwordReset) {
       this.logger.warn('Password reset is off until RESEND_API_KEY is set');
     }
     if (started.emailVerification) {
       this.logger.log('Sign-up email verification (OTP) is enabled via Resend');
     }
-    if (started.stripe) {
-      this.logger.log('Stripe billing is enabled');
-    } else if (!started.polar) {
-      this.logger.warn('Billing is off until STRIPE_SECRET_KEY + STRIPE_PRICE_ID or POLAR_ACCESS_TOKEN is set');
-    } else if (!started.polarWebhooks) {
-      this.logger.log('Polar checkout is ready. Set POLAR_WEBHOOK_SECRET to receive subscription events.');
+    if (started.spayon) {
+      this.logger.log('Spayon one-time payments are enabled');
     } else {
-      this.logger.log('Polar checkout and webhooks are ready');
+      this.logger.warn(
+        'Spayon checkout requires SPAYON_CLIENT_ID and SPAYON_CLIENT_SECRET. Billing access remains enforced.',
+      );
     }
   }
 
@@ -66,7 +62,7 @@ export class AccountAuthService implements OnModuleInit {
     });
   }
 
-  /** Blocks dashboard account traffic after the free trial when Polar billing is on and there is no subscription. */
+  /** Blocks dashboard account traffic after the free trial when no paid access is active. */
   async assertAccountOwnsSession(accountUserId: string, sessionId: string): Promise<void> {
     const owned = await this.sessions.exists({ where: { id: sessionId, ownerUserId: accountUserId } });
     if (!owned) {
@@ -89,13 +85,11 @@ export class AccountAuthService implements OnModuleInit {
         id: session.user.id,
         role: billingRow?.role ?? (session.user as { role?: string }).role,
         createdAt: billingRow?.createdAt ?? session.user.createdAt,
-        subscriptionStatus: billingRow?.subscriptionStatus,
-        stripeCustomerId: billingRow?.stripeCustomerId,
       },
       process.env,
     );
     if (access.paymentRequired) {
-      throw new ForbiddenException('An active subscription is required. Open Billing to subscribe.');
+      throw new ForbiddenException('Paid access is required. Open Billing to activate your account.');
     }
   }
 }

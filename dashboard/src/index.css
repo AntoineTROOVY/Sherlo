@@ -106,7 +106,7 @@ html {
   }
 }
 
-/* Global select/dropdown styling (dashboard only — Tawk.to mounts on body). */
+/* Global select/dropdown styling (dashboard only — TicketDM mounts on body). */
 #root select {
   appearance: none;
   -webkit-appearance: none;
