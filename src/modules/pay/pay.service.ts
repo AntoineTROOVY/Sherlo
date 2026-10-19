@@ -85,8 +85,7 @@ export class PayService {
     if (!payment) return null;
     if (payment.status === 'paid') return { action: 'redirect', location: buyerUrl(payment.returnUrl, payment) };
     if (payment.status !== 'pending' || !payment.bankUrl) return { action: 'html', status: 409, html: testClosedPage() };
-    const page = new URL(payment.bankUrl);
-    page.pathname = `${page.pathname.replace(/\/$/, '')}/cancel`;
+    const action = `/api/pay/test/${payment.id}?t=${encodeURIComponent(token ?? '')}`;
     return {
       action: 'html',
       status: 200,
@@ -96,8 +95,8 @@ export class PayService {
         currency: payment.currency,
         amountAmd: payment.amountAmd ?? testAmdQuote(payment.amount).amountAmd,
         exchangeRate: payment.exchangeRate ?? testAmdQuote(payment.amount).exchangeRate,
-        action: payment.bankUrl,
-        cancelUrl: page.toString(),
+        action,
+        cancelUrl: `/api/pay/test/${payment.id}/cancel?t=${encodeURIComponent(token ?? '')}`,
       }),
     };
   }

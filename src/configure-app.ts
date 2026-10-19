@@ -15,6 +15,7 @@ import { ActiveKeyIndex } from './modules/auth/active-key-index';
 import { requestContextMiddleware } from './common/middleware/request-context.middleware';
 import { createLogger } from './common/services/logger.service';
 import { injectDashboardCspNonce } from './config/dashboard-csp';
+import { relaxTestCardFormAction } from './modules/pay/pay-test-page';
 import { resolveCorsPolicy, isUpgradeInsecureRequestsEnabled, resolveBodyLimit } from './config/bootstrap-security';
 import { resolveRequestTimeoutMs } from './config/http-timeouts';
 
@@ -69,6 +70,22 @@ export function configureApp(app: INestApplication, options: ConfigureAppOptions
   // element below; plugin config UIs copy it only onto inline scripts in their opaque sandboxed iframe.
   app.use((req: Request, res: Response, next: NextFunction) => {
     res.locals.cspNonce = randomBytes(18).toString('base64url');
+    next();
+  });
+
+  // Registered before Helmet so it runs after Helmet writes the policy. The test card must post
+  // back to whichever Sherlo host served it, then redirect to the merchant's HTTPS return page.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (!req.path.toLowerCase().startsWith('/api/pay/test')) {
+      next();
+      return;
+    }
+    const send = res.writeHead.bind(res);
+    res.writeHead = ((...args: Parameters<Response['writeHead']>) => {
+      const header = res.getHeader('Content-Security-Policy');
+      if (typeof header === 'string') res.setHeader('Content-Security-Policy', relaxTestCardFormAction(header));
+      return send(...args);
+    }) as Response['writeHead'];
     next();
   });
 

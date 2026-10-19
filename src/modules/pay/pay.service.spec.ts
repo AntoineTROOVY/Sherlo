@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { requestCheckoutOrigin } from './pay-origin';
+import { relaxTestCardFormAction } from './pay-test-page';
 import { minorUnits, PayService } from './pay.service';
 
 const previous = {
@@ -53,6 +54,12 @@ it('refuses a customer return URL that is not public HTTPS before contacting the
   rmSync(directory, { recursive: true, force: true });
 });
 
+it('lets the test card post on this host and return to the merchant', () => {
+  const policy = relaxTestCardFormAction("default-src 'self';form-action 'self';script-src 'self'");
+  expect(policy).toContain("form-action 'self' https: http://localhost:* http://127.0.0.1:*");
+  expect(policy).toContain("script-src 'self'");
+});
+
 it('keeps a test card on a Sherlo host', () => {
   expect(requestCheckoutOrigin({ protocol: 'http', get: () => 'api.sherlo.co', headers: {} }, {})).toBe(
     'https://api.sherlo.co',
@@ -97,6 +104,8 @@ it('confirms a test checkout on Sherlo’s card page without calling the bank', 
   if (page?.action === 'html') {
     expect(page.html).toContain('Payer');
     expect(page.html).toContain('&lt;b&gt;');
+    expect(page.html).toContain(`action="/api/pay/test/${created.id}?t=`);
+    expect(page.html).not.toContain('https://app.sherlo.co');
     expect(page.html).not.toMatch(/<input[^>]*\sname=/);
   }
   const paid = service.completeTestCheckout(created.id, token);

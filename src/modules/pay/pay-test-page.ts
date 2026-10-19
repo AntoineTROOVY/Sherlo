@@ -123,6 +123,18 @@ function layout(title: string, body: string): string {
 </html>`;
 }
 
+/**
+ * Helmet's `form-action 'self'` blocks this page twice: the stored checkout URL can name
+ * app.sherlo.co while the browser is on api.sherlo.co, and Chrome also applies the directive to
+ * the redirect toward the merchant's return page. Allow those navigations on this page only.
+ */
+export function relaxTestCardFormAction(policy: string): string {
+  return policy.replace(
+    "form-action 'self'",
+    "form-action 'self' https: http://localhost:* http://127.0.0.1:*",
+  );
+}
+
 function money(amount: number, currency: string): string {
   const formatted = amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `${formatted} ${currency}`;
