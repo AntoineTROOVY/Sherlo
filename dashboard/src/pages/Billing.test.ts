@@ -78,6 +78,7 @@ afterEach(() => {
 test('shows 59 EUR as a single payment for 40 years, without a monthly price or portal', async () => {
   rtl.render(createElement(Billing));
   await rtl.screen.findByRole('button', { name: 'Activer Pro' });
+  assert.equal(rtl.screen.getByRole('link', { name: 'Créer une clé API' }).getAttribute('href'), '/api-keys');
   assert.match(document.body.textContent!, /59,00\s*€/);
   assert.match(document.body.textContent!, /paiement unique/);
   assert.match(document.body.textContent!, /40 ans d’accès/);

@@ -367,6 +367,13 @@ export function Billing() {
               </article>
             </>
           )}
+          <article className="billing-panel billing-api-key">
+            <h3>{t('billing.apiKeyTitle')}</h3>
+            <p>{t('billing.apiKeyLead')}</p>
+            <a className="btn-secondary" href="/api-keys">
+              {t('billing.apiKeyAction')}
+            </a>
+          </article>
         </>
       )}
     </div>

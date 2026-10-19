@@ -10,6 +10,15 @@ Documentation pour **encaisser depuis une autre application** via `https://api.s
 
 L’application appelante envoie le client sur la page de la banque. Il ne voit aucune page Sherlo. Elle confirme le paiement en relisant Sherlo. Aucune URL de notification n’est demandée.
 
+## Créer la clé
+
+La clé se crée dans le tableau de bord, par le compte administrateur Sherlo.
+
+1. Ouvrez [https://app.sherlo.co/api-keys](https://app.sherlo.co/api-keys). Le menu s’appelle **Clés API**. La page Facturation a le même lien, **Créer une clé API**.
+2. Choisissez le rôle **Opérateur**.
+3. Ne limitez pas la clé à une session WhatsApp, ni à des chats.
+4. Copiez la clé tout de suite. Elle n’est plus affichée ensuite.
+
 La clé a le rôle `operator` ou `admin`, **sans** restriction de session WhatsApp.
 
 ```http

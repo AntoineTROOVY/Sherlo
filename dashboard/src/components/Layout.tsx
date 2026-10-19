@@ -72,7 +72,7 @@ export function Layout({ onLogout, userRole }: LayoutProps) {
 
   useEffect(() => {
     if (billingLoading || !billingAccess?.paymentRequired) return;
-    if (location.pathname === '/billing') return;
+    if (location.pathname === '/billing' || location.pathname === '/api-keys') return;
     navigate('/billing', { replace: true });
   }, [billingAccess, billingLoading, location.pathname, navigate]);
 

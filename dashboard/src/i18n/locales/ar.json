@@ -1280,6 +1280,9 @@
     "promoLabel": "Promo code",
     "promoApply": "Apply",
     "promoApplied": "{{amount}} off",
-    "promoInvalid": "Invalid promo code."
+    "promoInvalid": "Invalid promo code.",
+    "apiKeyTitle": "Sherlo API key",
+    "apiKeyLead": "Another application pays with a key created here. Choose the operator role and do not restrict it to a WhatsApp session. Send it in the X-API-Key header.",
+    "apiKeyAction": "Create an API key"
   }
 }

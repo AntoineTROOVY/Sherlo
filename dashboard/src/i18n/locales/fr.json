@@ -1309,6 +1309,9 @@
     "promoLabel": "Code promo",
     "promoApply": "Appliquer",
     "promoApplied": "Réduction de {{amount}}",
-    "promoInvalid": "Code promo invalide."
+    "promoInvalid": "Code promo invalide.",
+    "apiKeyTitle": "Clé API Sherlo",
+    "apiKeyLead": "Une autre application paie avec une clé créée ici. Choisissez le rôle opérateur, sans restriction de session. Elle s’envoie dans l’en-tête X-API-Key.",
+    "apiKeyAction": "Créer une clé API"
   }
 }
