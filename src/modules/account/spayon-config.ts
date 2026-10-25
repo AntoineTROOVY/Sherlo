@@ -74,7 +74,8 @@ function sameSecret(input: string, expected: string): boolean {
 }
 
 export function spayonUrls(env: NodeJS.ProcessEnv, environment: SpayonSettings['environment']) {
-  const callback = env.SPAYON_CALLBACK_URL?.trim() || `${resolveBetterAuthBaseURL(env)}/api/account/spayon/webhook`;
+  const configured = env.SPAYON_CALLBACK_URL?.trim() || `${resolveBetterAuthBaseURL(env)}/api/account/spayon/webhook`;
+  const callback = callbackOnReachableHost(configured);
   const back = env.SPAYON_RETURN_URL?.trim() || billingReturnUrl(env);
   for (const value of [callback, back]) {
     const url = new URL(value);
@@ -88,4 +89,11 @@ export function spayonUrls(env: NodeJS.ProcessEnv, environment: SpayonSettings['
     }
   }
   return { callback, back };
+}
+
+/** api.sherlo.co has no DNS record, so Spayon cannot deliver the payment callback. The live server is app.sherlo.co. */
+function callbackOnReachableHost(value: string): string {
+  const url = new URL(value);
+  if (url.hostname === 'api.sherlo.co') url.hostname = 'app.sherlo.co';
+  return url.href;
 }

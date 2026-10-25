@@ -54,6 +54,22 @@ it('requires HTTPS URLs in production, allows HTTP for sandbox', () => {
   });
 });
 
+it('sends the Spayon callback to app.sherlo.co when the configured host does not exist', () => {
+  expect(
+    spayonUrls(
+      {
+        SPAYON_CALLBACK_URL: 'https://api.sherlo.co/api/account/spayon/webhook',
+        SPAYON_RETURN_URL: 'https://app.sherlo.co/billing',
+      },
+      'production',
+    ).callback,
+  ).toBe('https://app.sherlo.co/api/account/spayon/webhook');
+  expect(
+    spayonUrls({ BETTER_AUTH_URL: 'https://api.sherlo.co', DASHBOARD_URL: 'https://app.sherlo.co' }, 'production')
+      .callback,
+  ).toBe('https://app.sherlo.co/api/account/spayon/webhook');
+});
+
 it('supports explicit HTTPS payment URLs while keeping local auth and the dashboard unchanged', () => {
   expect(
     spayonUrls(
