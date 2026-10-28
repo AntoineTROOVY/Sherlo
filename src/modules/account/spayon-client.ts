@@ -39,6 +39,20 @@ export function verifySpayonSignature(rawBody: string | Buffer, signature: strin
   return timingSafeEqual(expected, Buffer.from(signature, 'hex'));
 }
 
+const CHECKOUT_HOSTS = new Set(['spayon.io', 'pay.scoupon.am', 'pay.safon.io']);
+
+/** Hosts Spayon may return as the checkout page. Telr sessions are served from pay.safon.io. */
+export function isSpayonCheckoutHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return host.endsWith('.spayon.io') || CHECKOUT_HOSTS.has(host);
+}
+
+/** Page used when an existing session has to be opened again. New sessions use the URL Spayon returns. */
+export function spayonCheckoutUrl(sessionId: string, environment: SpayonCredentials['environment']): string {
+  const origin = environment === 'sandbox' ? 'https://pay.spayon.io/sandbox' : 'https://pay.safon.io';
+  return `${origin}/session/${encodeURIComponent(sessionId)}`;
+}
+
 /** Server-side client for https://docs.spayon.io/. Never expose credentials to the dashboard. */
 export class SpayonClient {
   private token: { value: string; expiresAt: number } | null = null;
@@ -102,12 +116,7 @@ export class SpayonClient {
       throw new Error('Invalid Spayon checkout response');
     }
     const url = new URL(result.session_url);
-    if (
-      url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      !(url.hostname === 'spayon.io' || url.hostname.endsWith('.spayon.io') || url.hostname === 'pay.scoupon.am')
-    ) {
+    if (url.protocol !== 'https:' || url.username || url.password || url.port || !isSpayonCheckoutHost(url.hostname)) {
       throw new Error('Invalid Spayon checkout URL');
     }
     return { sessionId: result.session_id, url: url.href };

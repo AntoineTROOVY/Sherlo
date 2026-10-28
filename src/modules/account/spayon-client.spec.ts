@@ -77,6 +77,24 @@ describe('Spayon API client', () => {
     await expect(new SpayonClient(credentials).createSession(input)).rejects.toThrow('Spayon API request failed (401)');
   });
 
+  it('accepts the Safon checkout host returned for Telr sessions', async () => {
+    fetchMock
+      .mockResolvedValueOnce(reply({ access_token: 'token', expires_in: 3600 }))
+      .mockResolvedValueOnce(reply({ session_id: 'session-1', session_url: 'https://pay.safon.io/session/session-1' }));
+    await expect(new SpayonClient({ ...credentials, environment: 'production' }).createSession(input)).resolves.toEqual(
+      { sessionId: 'session-1', url: 'https://pay.safon.io/session/session-1' },
+    );
+  });
+
+  it('rejects a lookalike of the Safon checkout host', async () => {
+    fetchMock
+      .mockResolvedValueOnce(reply({ access_token: 'token', expires_in: 3600 }))
+      .mockResolvedValueOnce(
+        reply({ session_id: 'session-1', session_url: 'https://pay.safon.io.evil.example/session/session-1' }),
+      );
+    await expect(new SpayonClient(credentials).createSession(input)).rejects.toThrow('Invalid Spayon checkout URL');
+  });
+
   it('accepts the production checkout host returned by the real Spayon API', async () => {
     fetchMock
       .mockResolvedValueOnce(reply({ access_token: 'token', expires_in: 3600 }))

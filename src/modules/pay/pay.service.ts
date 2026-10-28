@@ -8,7 +8,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { createLogger } from '../../common/services/logger.service';
-import { SpayonClient, type SpayonCheckoutRequest } from '../account/spayon-client';
+import { SpayonClient, spayonCheckoutUrl, type SpayonCheckoutRequest } from '../account/spayon-client';
 import { resolveSpayonSettings, spayonUrls } from '../account/spayon-config';
 import { spayonCardCheckoutUrl, validateSpayonBankUrl } from '../account/spayon-card-checkout';
 import {
@@ -218,11 +218,12 @@ export class PayService {
     };
     try {
       const client = new SpayonClient(settings.credentials);
-      const sessionId = payment.sessionId ?? (await client.createSession(request)).sessionId;
+      const created = payment.sessionId ? null : await client.createSession(request);
+      const sessionId = payment.sessionId ?? created!.sessionId;
       if (!payment.sessionId) attachGatewaySession(payment.id, sessionId, null, process.env);
       const checkout = {
         sessionId,
-        url: `${settings.environment === 'sandbox' ? 'https://pay.spayon.io/sandbox' : 'https://pay.scoupon.am'}/session/${encodeURIComponent(sessionId)}`,
+        url: created?.url ?? spayonCheckoutUrl(sessionId, settings.environment),
       };
       const bank = await spayonCardCheckoutUrl(checkout, request, settings.environment);
       attachGatewaySession(payment.id, sessionId, bank.url, process.env, bank);

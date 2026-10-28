@@ -4,7 +4,7 @@ import type { BetterAuthPlugin } from 'better-auth';
 import { z } from 'zod';
 import { resolveBillingAccess } from './account-billing';
 import { loadAuthUserBillingRow } from './account-billing-user';
-import { SpayonClient, verifySpayonSignature, type SpayonCheckoutRequest } from './spayon-client';
+import { SpayonClient, spayonCheckoutUrl, verifySpayonSignature, type SpayonCheckoutRequest } from './spayon-client';
 import { spayonCardCheckoutUrl, validateSpayonBankUrl } from './spayon-card-checkout';
 import { quotedSpayonAmount, spayonUrls, type SpayonSettings } from './spayon-config';
 import {
@@ -89,10 +89,9 @@ export async function spayonPlugins(settings: SpayonSettings, env: NodeJS.Proces
     let checkout;
     if (resumable?.sessionId) {
       // Older orders predate bank-URL persistence; initialize their existing Spayon session once.
-      const origin = settings.environment === 'sandbox' ? 'https://pay.spayon.io/sandbox' : 'https://pay.scoupon.am';
       checkout = {
         sessionId: resumable.sessionId,
-        url: `${origin}/session/${encodeURIComponent(resumable.sessionId)}`,
+        url: spayonCheckoutUrl(resumable.sessionId, settings.environment),
       };
     } else {
       createSpayonOrder(orderId, user.id, settings, env, amount);

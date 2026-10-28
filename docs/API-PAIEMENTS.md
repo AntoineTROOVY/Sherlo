@@ -74,7 +74,7 @@ Réponse `201` :
   "currency": "EUR",
   "amountAmd": 1684.2,
   "exchangeRate": 421.05,
-  "url": "https://epg.unibank.am/...",
+  "url": "https://secure.telr.com/gateway/process.html?o=...",
   "paidAt": null,
   "expiredAt": null
 }
@@ -90,7 +90,7 @@ La clé de test se crée au même endroit, avec le bouton **Créer une clé de t
 
 `amountAmd` et `exchangeRate` sont fixes en test : 1 unité de `currency` vaut 400 AMD. Aucune carte n’est débitée, et la banque n’est pas contactée. Une clé de paiement réelle ne voit pas ces paiements.
 
-`amountAmd` est le montant en AMD que le client paie, tel que la page de paiement l’affiche. `exchangeRate` est le cours affiché : `1` unité de `currency` vaut `exchangeRate` AMD. Ici, 1 EUR = 421,05 AMD. Les deux chiffres viennent de la session de paiement et sont arrondis au centième, comme sur cette page. Sherlo ne consulte pas un autre cours. `GET` renvoie les mêmes valeurs. Elles sont `null` tant que la page bancaire n’a pas été ouverte.
+`amountAmd` est le montant converti affiché sur la page de paiement. Le prestataire actuel, Telr, le règle en AED. `exchangeRate` est le cours affiché : `1` unité de `currency` vaut `exchangeRate` dans cette devise. Les deux chiffres viennent de la session de paiement et sont arrondis au centième, comme sur cette page. Sherlo ne consulte pas un autre cours. `GET` renvoie les mêmes valeurs. Elles sont `null` tant que la page bancaire n’a pas été ouverte. `url` est la page Telr (`secure.telr.com`).
 
 La même `reference` avec le même montant renvoie le même paiement. Un montant différent sur cette référence répond `409`.
 

@@ -93,11 +93,32 @@ it('reports the AMD amount and the rate shown on the provider checkout', async (
   });
 });
 
+it('returns the Telr bank page for a Safon checkout settled in AED', async () => {
+  const telr = 'https://secure.telr.com/gateway/process.html?o=bank-order';
+  const safon = { sessionId: 's-1', url: 'https://pay.safon.io/session/s-1' };
+  fetchMock
+    .mockResolvedValueOnce(
+      Response.json({
+        data: {
+          ...session,
+          paymentOptions: [{ ...card, method: 'telr', price: 245.99, currency: 'AED' }],
+        },
+      }),
+    )
+    .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: telr } }));
+  await expect(spayonCardCheckoutUrl(safon, expected, 'production')).resolves.toEqual({
+    url: telr,
+    amountAmd: 245.99,
+    exchangeRate: 4.17,
+  });
+  expect(fetchMock.mock.calls[0][1]).toMatchObject({ headers: { Origin: 'https://pay.safon.io' } });
+});
+
 it.each([{ price: undefined }, { currency: 'EUR' }, { price: 0 }])(
-  'refuses a card option that does not give an AMD amount: %j',
+  'refuses a card option that does not give a settlement amount: %j',
   change => {
     fetchMock.mockResolvedValueOnce(Response.json({ data: { ...session, paymentOptions: [{ ...card, ...change }] } }));
-    return expect(spayonCardCheckoutUrl(checkout, expected, 'production')).rejects.toThrow('AMD amount');
+    return expect(spayonCardCheckoutUrl(checkout, expected, 'production')).rejects.toThrow('settlement amount');
   },
 );
 
@@ -116,6 +137,8 @@ it.each([
   'https://epg.unibank.am:444/payment',
   'https://localhost/payment',
   'https://pay.scoupon.am/session/s-1',
+  'https://secure.telr.com.evil.example/gateway/process.html',
+  'http://secure.telr.com/gateway/process.html',
 ])('refuses unsafe or intermediate redirects: %s', location => {
   fetchMock
     .mockResolvedValueOnce(Response.json({ data: session }))

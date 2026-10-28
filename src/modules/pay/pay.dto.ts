@@ -77,7 +77,8 @@ export class PayCheckoutResponseDto {
     type: Number,
     nullable: true,
     example: 1684.2,
-    description: 'Amount in AMD the buyer pays, as shown by the provider. Null until the bank page has been opened.',
+    description:
+      'Converted amount shown on the provider page. Telr settles it in AED. Null until the bank page has been opened.',
   })
   amountAmd!: number | null;
 
@@ -85,7 +86,8 @@ export class PayCheckoutResponseDto {
     type: Number,
     nullable: true,
     example: 421.05,
-    description: 'AMD for 1 unit of currency, as shown by the provider. 421.05 means 1 EUR = 421.05 AMD.',
+    description:
+      'Settlement units for 1 unit of currency, as shown by the provider. 4.17 means 1 EUR = 4.17 AED.',
   })
   exchangeRate!: number | null;
 

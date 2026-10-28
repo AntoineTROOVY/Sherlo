@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import type { SpayonCheckoutRequest, SpayonCredentials } from './spayon-client';
+import { isSpayonCheckoutHost, type SpayonCheckoutRequest, type SpayonCredentials } from './spayon-client';
 
 const checkoutHost = (url: URL): boolean =>
-  url.protocol === 'https:' &&
-  !url.username &&
-  !url.password &&
-  !url.port &&
-  (url.hostname === 'spayon.io' || url.hostname.endsWith('.spayon.io') || url.hostname === 'pay.scoupon.am');
+  url.protocol === 'https:' && !url.username && !url.password && !url.port && isSpayonCheckoutHost(url.hostname);
+
+/** Card methods the provider has used. `telr` is the live acquirer; the earlier names stay valid. */
+const CARD_METHODS = new Set(['uni', 'visamaster', 'telr']);
+/** Settlement currencies those acquirers have returned. Unibank charged AMD, Telr charges AED. */
+const SETTLEMENT_CURRENCIES = new Set(['AMD', 'AED']);
 
 interface PaymentOption {
   id: number;
@@ -14,17 +15,20 @@ interface PaymentOption {
   originalPrice: number;
   originalCurrency: string;
   priceInProductCurrency: number;
-  /** Settlement amount. AMD when the card payment is processed in dram. */
+  /** Settlement amount in `currency`, as shown on the provider checkout. */
   price?: number | string;
-  /** Settlement currency, such as AMD. */
+  /** Settlement currency. AMD for Unibank, AED for Telr. */
   currency?: string;
 }
 
 export interface SpayonBankCheckout {
   url: string;
-  /** Amount in AMD the buyer pays, rounded the same way as the provider checkout. */
+  /**
+   * Converted amount shown on the provider checkout, rounded the same way.
+   * The live Telr page shows this in AED. The response field keeps its name.
+   */
   amountAmd: number;
-  /** AMD for one unit of the charged currency. 421.05 means 1 EUR = 421.05 AMD. */
+  /** Settlement units for one unit of the charged currency. 4.17 means 1 EUR = 4.17 AED. */
   exchangeRate: number;
 }
 
@@ -77,7 +81,7 @@ export async function spayonCardCheckoutUrl(
   ) {
     throw new Error('Spayon card session does not match the order');
   }
-  const options = (session.paymentOptions ?? []).filter(option => ['uni', 'visamaster'].includes(option.method));
+  const options = (session.paymentOptions ?? []).filter(option => CARD_METHODS.has(option.method));
   const option =
     options.find(item => item.id === session.defaultPaymentOptionId) ?? (options.length === 1 ? options[0] : null);
   if (
@@ -115,19 +119,19 @@ export async function spayonCardCheckoutUrl(
 }
 
 /**
- * The provider checkout shows `1 <currency> = <rate> AMD` as
+ * The provider checkout shows `1 <currency> = <rate> <settlement>` as
  * `price / priceInProductCurrency`, then displays both figures to two decimals.
  */
 function amdSettlement(option: PaymentOption): Pick<SpayonBankCheckout, 'amountAmd' | 'exchangeRate'> {
   const price = finiteNumber(option.price);
   const charged = finiteNumber(option.priceInProductCurrency);
-  if (option.currency?.toUpperCase() !== 'AMD' || price === null || charged === null) {
-    throw new Error('Spayon card option did not include an AMD amount');
+  if (!SETTLEMENT_CURRENCIES.has(option.currency?.toUpperCase() ?? '') || price === null || charged === null) {
+    throw new Error('Spayon card option did not include a settlement amount');
   }
   const amountAmd = displayed(price);
   const exchangeRate = displayed(price / charged);
   if (amountAmd === null || exchangeRate === null) {
-    throw new Error('Spayon card option did not include an AMD amount');
+    throw new Error('Spayon card option did not include a settlement amount');
   }
   return { amountAmd, exchangeRate };
 }
@@ -152,7 +156,7 @@ export function validateSpayonBankUrl(location: string, environment: SpayonCrede
   const bank = new URL(location);
   const trustedDestination =
     environment === 'production'
-      ? bank.hostname === 'epg.unibank.am'
+      ? bank.hostname === 'epg.unibank.am' || bank.hostname === 'secure.telr.com'
       : checkoutHost(bank) && bank.pathname.startsWith('/sandbox/');
   if (bank.protocol !== 'https:' || bank.username || bank.password || bank.port || !trustedDestination) {
     throw new Error('Unexpected Spayon bank redirect');

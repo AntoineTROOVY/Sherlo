@@ -36,7 +36,7 @@ Redémarrer le serveur après modification des variables. Ouvrir Facturation ave
 ## Parcours et webhook
 
 1. Le navigateur appelle `POST /api/account/spayon/checkout` avec la session du compte connecté. Le prix, la devise et l’identifiant de commande sont fixés par le serveur.
-2. Le serveur crée une commande locale puis une session Spayon avec `product_name`, `price`, `currency` et `defaultPaymentMethod: visamaster`. Il charge ensuite les options de la session et effectue lui-même la requête du bouton « Proceed to payment ». Il ne transmet au navigateur que la redirection bancaire obtenue (`epg.unibank.am` pour le terminal actuellement testé). Le client ne voit donc pas l’écran intermédiaire Scoupon. Les données de carte sont saisies directement chez la banque et ne transitent pas par Sherlo.
+2. Le serveur crée une commande locale puis une session Spayon avec `product_name`, `price`, `currency` et `defaultPaymentMethod: visamaster`. Il charge ensuite les options de la session et effectue lui-même la requête du bouton « Proceed to payment ». Il ne transmet au navigateur que la redirection bancaire obtenue (`secure.telr.com` pour le terminal actuel, servi depuis `pay.safon.io`). Le client ne voit donc pas l’écran intermédiaire Safon. Les données de carte sont saisies directement chez la banque et ne transitent pas par Sherlo.
 3. Spayon appelle `POST /api/account/spayon/webhook`. L’adresse est transmise automatiquement dans chaque demande de paiement. Elle doit être accessible publiquement ; pour un serveur local, utiliser un tunnel public.
 4. Le serveur vérifie `X-Signature` : HMAC-SHA256 du corps brut, avec le même Client Secret que pour l’authentification. Il vérifie ensuite la commande, l’environnement, la session, le montant et la devise. Seul `paid` active l’accès.
 5. L’utilisateur revient sur `/billing?checkout=returned&sessionId=…`. Sherlo consulte le statut Spayon via `POST /api/account/spayon/sync` si nécessaire. Seul le propriétaire de la commande peut effectuer cette vérification.
@@ -90,7 +90,7 @@ Documentation officielle : [création de session](https://docs.spayon.io/create-
 
 ## Accès direct au formulaire bancaire
 
-L’option `defaultPaymentMethod` est documentée, mais le test réel sur ce compte renvoie toujours l’écran Scoupon. Le serveur reproduit donc la requête HTTP de cet écran, sans navigateur automatisé :
+L’option `defaultPaymentMethod` est documentée, mais le test réel sur ce compte renvoie l’écran Safon. Le serveur reproduit donc la requête HTTP de cet écran, sans navigateur automatisé :
 
 - Lecture de `GET /api/public/session/{sessionId}` avec l’origine du site de paiement retourné par l’API.
 - Vérification de la commande, du prix de 59 EUR, de la disponibilité du terminal carte et de l’absence de supplément.
